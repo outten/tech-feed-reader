@@ -1,53 +1,66 @@
-<h2>Dashboard</h2>
+<div class="page-header">
+  <div>
+    <h2>Dashboard</h2>
+    <p class="subtitle">
+      Recent unread articles, top counts, and feed health.
+    </p>
+  </div>
+</div>
 
 <% if @degraded %>
-  <p class="error">
-    <strong>Feeds are systematically failing.</strong>
-    Check network connectivity, then look at <a href="/admin/health">/admin/health</a>
-    for per-feed details.
-  </p>
+  <div class="degradation-banner">
+    <span class="banner-icon">⚠</span>
+    <span><strong>Feeds are systematically failing.</strong> Check connectivity, then look at <a class="banner-link" href="/admin/health">/admin/health</a>.</span>
+  </div>
 <% end %>
 
-<p class="subtitle">
-  <%= @article_count %> article<%= 's' unless @article_count == 1 %> across <%= @feed_count %> feed<%= 's' unless @feed_count == 1 %>
-  &middot; <strong><%= @unread_count %> unread</strong>
-  <% if @bookmark_count.positive? %>
-    &middot; <%= @bookmark_count %> bookmarked
-  <% end %>
-  <% if @article_count.zero? %>
-    &middot; nothing yet — <a href="/feeds">add a feed</a> or hit
-    "Refresh all" to populate.
-  <% end %>
-</p>
+<div class="stat-cards">
+  <div class="summary-card">
+    <span class="summary-label">Articles</span>
+    <span class="summary-value"><%= @article_count %></span>
+    <span class="summary-sub">across <%= @feed_count %> feed<%= 's' unless @feed_count == 1 %></span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Unread</span>
+    <span class="summary-value"><%= @unread_count %></span>
+    <span class="summary-sub"><a href="/articles?state=unread">view all &rarr;</a></span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Bookmarked</span>
+    <span class="summary-value"><%= @bookmark_count %></span>
+    <span class="summary-sub"><a href="/articles?state=bookmarked">view all &rarr;</a></span>
+  </div>
+</div>
 
 <% if @articles.any? %>
   <section class="benchmark-section">
     <h3>Recent unread</h3>
-    <ul class="article-list">
+    <ul class="news-list">
       <% @articles.each do |article| %>
-        <li class="unread">
-          <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
+        <li class="news-item">
+          <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
           <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
-          <span class="meta">
+          <div class="news-meta">
             <% if (feed = feed_for(article)) %>
-              <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·
+              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
             <% end %>
-            <%= relative_time(article['published_at']) %>
-          </span>
+            <span><%= relative_time(article['published_at']) %></span>
+          </div>
         </li>
       <% end %>
     </ul>
-    <p class="subtitle">
+    <p class="subtitle" style="margin-top:1rem">
       <a href="/articles">All articles &rarr;</a>
-      &middot;
-      <a href="/articles?state=bookmarked">Bookmarked &rarr;</a>
     </p>
   </section>
-<% elsif @article_count.positive? %>
-  <section class="benchmark-section">
-    <p class="data-source">
-      Inbox zero! No unread articles. <a href="/articles">Browse all</a> or
-      <a href="/articles?state=bookmarked">bookmarked</a>.
-    </p>
-  </section>
+<% elsif @article_count.zero? %>
+  <div class="empty-state">
+    No articles yet. <a href="/feeds">Add a feed</a> and click "Refresh all"
+    to populate.
+  </div>
+<% else %>
+  <div class="empty-state">
+    Inbox zero — no unread articles. Browse <a href="/articles">all</a>
+    or your <a href="/articles?state=bookmarked">bookmarks</a>.
+  </div>
 <% end %>

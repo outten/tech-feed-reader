@@ -1,99 +1,108 @@
-<h2>Feeds</h2>
-<p class="subtitle">Manage subscribed RSS / Atom sources. <%= @feeds.length %> active.</p>
+<div class="page-header">
+  <div>
+    <h2>Feeds</h2>
+    <p class="subtitle">
+      Manage subscribed RSS / Atom sources. <%= @feeds.length %> active.
+    </p>
+  </div>
+  <% if @feeds.any? %>
+    <form method="post" action="/admin/refresh/all">
+      <button type="submit" class="refresh-btn">Refresh all</button>
+    </form>
+  <% end %>
+</div>
 
 <% if @notice == 'added' %>
-  <p class="notice">Feed added.</p>
+  <div class="notice">Feed added.</div>
 <% elsif @notice == 'removed' %>
-  <p class="notice">Feed removed.</p>
+  <div class="notice">Feed removed.</div>
 <% elsif @notice == 'refreshed' %>
-  <p class="notice">
-    Refreshed (status: <%= params['status'] %>;
-    <%= params['imported'] %> new article<%= 's' unless params['imported'] == '1' %>).
-  </p>
+  <div class="notice">
+    Refreshed (status: <%= h(params['status']) %>;
+    <%= h(params['imported']) %> new article<%= 's' unless params['imported'] == '1' %>).
+  </div>
 <% elsif @notice == 'refreshed-all' %>
-  <p class="notice">
+  <div class="notice">
     Refresh-all complete:
-    ok=<%= params['ok'] || 0 %>,
-    not_modified=<%= params['not_modified'] || 0 %>,
-    error=<%= params['error'] || 0 %>,
-    <%= params['imported'] || 0 %> new article<%= 's' unless params['imported'] == '1' %>.
-  </p>
+    ok=<%= h(params['ok'] || '0') %>,
+    not_modified=<%= h(params['not_modified'] || '0') %>,
+    error=<%= h(params['error'] || '0') %>,
+    <%= h(params['imported'] || '0') %> new article<%= 's' unless params['imported'] == '1' %>.
+  </div>
 <% elsif @notice %>
-  <p class="notice"><%= @notice %></p>
+  <div class="notice"><%= h(@notice) %></div>
 <% end %>
 
 <% if @error == 'invalid-url' %>
-  <p class="error">That doesn't look like a valid http(s) URL.</p>
+  <div class="error">That doesn't look like a valid http(s) URL.</div>
 <% elsif @error == 'duplicate-url' %>
-  <p class="error">That feed is already subscribed.</p>
+  <div class="error">That feed is already subscribed.</div>
 <% elsif @error == 'not-found' %>
-  <p class="error">No feed with that id.</p>
+  <div class="error">No feed with that id.</div>
 <% elsif @error %>
-  <p class="error"><%= @error %></p>
+  <div class="error"><%= h(@error) %></div>
 <% end %>
 
-<section class="benchmark-section">
+<div class="portfolio-add">
   <h3>Add a feed</h3>
-  <form method="post" action="/feeds" class="feed-form">
+  <form method="post" action="/feeds" class="portfolio-form">
     <label>
       URL
       <input type="url" name="url" required placeholder="https://example.com/feed.xml">
     </label>
     <label>
       Title (optional)
-      <input type="text" name="title" placeholder="Auto-filled on first fetch if blank">
+      <input type="text" name="title" placeholder="Auto-filled on first fetch">
     </label>
     <label>
       Poll interval (seconds)
       <input type="number" name="fetch_interval_seconds" min="60" value="<%= FeedsStore::PUBLISHER_INTERVAL %>">
     </label>
-    <button type="submit">Add</button>
+    <button type="submit" class="btn-primary">Add</button>
   </form>
-  <p class="data-source">
-    Defaults: 900s for high-frequency feeds (HN, Lobsters), 3600s for
-    publishers, 14400s for personal blogs. Feeds honour <code>If-Modified-Since</code>
-    and <code>ETag</code> when the publisher supports them.
+  <p class="subtitle" style="margin-top:0.75rem">
+    Suggested intervals: 900s for high-frequency feeds (HN, Lobsters), 3600s
+    for publishers, 14400s for personal blogs. <code>If-Modified-Since</code>
+    + <code>ETag</code> are honoured when the publisher supports them.
   </p>
-</section>
+</div>
 
 <% if @feeds.any? %>
-  <section class="benchmark-section">
-    <h3>
-      Subscribed
-      <form method="post" action="/admin/refresh/all" style="display:inline; margin-left:1em;">
-        <button type="submit">Refresh all</button>
-      </form>
-    </h3>
-    <table class="feeds-table">
-      <thead>
+  <table class="data-table" style="margin-top:2rem">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>URL</th>
+        <th>Interval</th>
+        <th>Last fetched</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @feeds.each do |feed| %>
         <tr>
-          <th>Title</th>
-          <th>URL</th>
-          <th>Interval</th>
-          <th>Last fetched</th>
-          <th>Status</th>
-          <th></th>
+          <td>
+            <% if feed['title'] && !feed['title'].to_s.empty? %>
+              <%= h(feed['title']) %>
+            <% else %>
+              <em class="muted">(unset)</em>
+            <% end %>
+          </td>
+          <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"><%= h(feed['url']) %></a></td>
+          <td class="num"><%= feed['fetch_interval_seconds'] %>s</td>
+          <td class="muted"><%= relative_time(feed['last_fetched_at']) %></td>
+          <td class="muted"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
+          <td>
+            <form method="post" action="/admin/refresh/<%= feed['id'] %>" style="display:inline">
+              <button type="submit" class="refresh-btn">Refresh</button>
+            </form>
+            <form method="post" action="/feeds/<%= feed['id'] %>/delete" style="display:inline" onsubmit="return confirm('Remove this feed and all its articles?');">
+              <button type="submit" class="danger">Remove</button>
+            </form>
+          </td>
         </tr>
-      </thead>
-      <tbody>
-        <% @feeds.each do |feed| %>
-          <tr>
-            <td><%= feed['title'] || '<em>(unset)</em>' %></td>
-            <td><a href="<%= feed['url'] %>" rel="noopener noreferrer" target="_blank"><%= feed['url'] %></a></td>
-            <td><%= feed['fetch_interval_seconds'] %>s</td>
-            <td><%= relative_time(feed['last_fetched_at']) %></td>
-            <td><%= feed['last_status'] || '—' %></td>
-            <td>
-              <form method="post" action="/admin/refresh/<%= feed['id'] %>" style="display:inline">
-                <button type="submit">Refresh</button>
-              </form>
-              <form method="post" action="/feeds/<%= feed['id'] %>/delete" style="display:inline" onsubmit="return confirm('Remove this feed and all its articles?');">
-                <button type="submit" class="danger">Remove</button>
-              </form>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </section>
+      <% end %>
+    </tbody>
+  </table>
 <% end %>
