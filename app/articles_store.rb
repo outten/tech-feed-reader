@@ -58,16 +58,27 @@ module ArticlesStore
   # Full-text search via the articles_fts virtual table. `rank` is FTS5's
   # built-in relevance score (lower = better). Empty / blank queries
   # return [] instead of raising — FTS5 errors on empty MATCH terms.
-  def search(query, limit: DEFAULT_LIMIT)
+  #
+  # Returned rows include an `excerpt` column built via FTS5's snippet()
+  # function — content_text with up to 16 tokens around the match,
+  # surrounded by <mark>…</mark> tags. Safe to render unescaped (the
+  # underlying content_text was sanitized at import; snippet only adds
+  # <mark> markers).
+  #
+  # Raises SQLite3::SQLException on a malformed FTS5 query (e.g. an
+  # unmatched quote). Callers — currently the /search route — rescue
+  # and surface the message to the user.
+  def search(query, limit: DEFAULT_LIMIT, offset: 0)
     return [] if query.to_s.strip.empty?
 
-    db.execute(<<~SQL, [query.to_s.strip, limit])
-      SELECT a.*
+    db.execute(<<~SQL, [query.to_s.strip, limit, offset])
+      SELECT a.*,
+             snippet(articles_fts, 1, '<mark>', '</mark>', '…', 16) AS excerpt
       FROM articles a
       JOIN articles_fts f ON a.id = f.rowid
       WHERE articles_fts MATCH ?
       ORDER BY rank
-      LIMIT ?
+      LIMIT ? OFFSET ?
     SQL
   end
 

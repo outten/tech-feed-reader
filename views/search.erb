@@ -1,18 +1,65 @@
 <h2>Search</h2>
-<p class="subtitle">Full-text search across article history.</p>
+<p class="subtitle">
+  Full-text search across article titles + extracted body text.
+  FTS5 syntax — quoted phrases, AND/OR/NOT, prefix-with-* — works.
+</p>
 
-<form action="/search" method="get" class="portfolio-form" style="margin-top: 12px">
-  <label class="full-width">Query
-    <input type="text" name="q" value="<%= @query %>" placeholder="kubernetes ebpf" autofocus>
+<form action="/search" method="get" class="feed-form">
+  <label>
+    Query
+    <input type="text" name="q" value="<%= h(@query) %>" placeholder='kubernetes ebpf, "exact phrase", ai NOT crypto' autofocus>
   </label>
-  <button type="submit" class="btn-primary">Search</button>
+  <button type="submit">Search</button>
 </form>
 
-<% unless @query.empty? %>
-  <section class="benchmark-section" style="margin-top: 18px">
-    <h3>Results for <code><%= @query %></code></h3>
-    <p class="data-source">
-      Search index lands in Tier 2 — see <code>SPEC.md</code> milestone I.
-    </p>
+<% if @error %>
+  <p class="error">
+    Query syntax error: <code><%= h(@error) %></code>. Try removing quotes
+    or special characters, or wrapping the whole thing in <code>"…"</code>.
+  </p>
+<% end %>
+
+<% if !@query.empty? && !@error %>
+  <section class="benchmark-section">
+    <h3>
+      <% if @results.empty? %>
+        No results for <code><%= h(@query) %></code>. Try
+      <a href="/search?q=<%= CGI.escape(@query) %>%2A">prefix-match
+      with <code>*</code></a> if it's an unusual word.
+      <% else %>
+        Results for <code><%= h(@query) %></code>
+        <span class="meta">(page <%= @page %>, showing <%= @results.length %>)</span>
+      <% end %>
+    </h3>
+
+    <% if @results.any? %>
+      <ul class="article-list">
+        <% @results.each do |article| %>
+          <li class="<%= article['read'] == 1 ? 'read' : 'unread' %>">
+            <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
+            <% (@tags_by_article[article['id']] || []).each do |tag| %>
+              <a class="badge tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a>
+            <% end %>
+            <p class="excerpt"><%= article['excerpt'] %></p>
+            <span class="meta">
+              <% if (feed = @feeds_by_id[article['feed_id']]) %>
+                <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> &middot;
+              <% end %>
+              <%= relative_time(article['published_at']) %>
+            </span>
+          </li>
+        <% end %>
+      </ul>
+
+      <nav class="pager">
+        <% if @page > 1 %>
+          <a href="?q=<%= CGI.escape(@query) %>&page=<%= @page - 1 %>">&larr; Prev</a>
+        <% end %>
+        <span>Page <%= @page %></span>
+        <% if @results.length == @per_page %>
+          <a href="?q=<%= CGI.escape(@query) %>&page=<%= @page + 1 %>">Next &rarr;</a>
+        <% end %>
+      </nav>
+    <% end %>
   </section>
 <% end %>

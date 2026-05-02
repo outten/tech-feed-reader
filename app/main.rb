@@ -2,6 +2,7 @@ require 'sinatra'
 require 'sinatra/base'
 require 'json'
 require 'time'
+require 'cgi'
 require 'dotenv'
 
 # Load credentials (Anthropic API key for Tier 2 summarization, etc.).
@@ -79,6 +80,14 @@ class TechFeedReader < Sinatra::Base
     # to ON DELETE CASCADE, but stay safe).
     def feed_for(article)
       (@feeds_by_id ||= {})[article['feed_id']]
+    end
+
+    # HTML-escape helper for user-controlled strings reflected back into
+    # the page (e.g. the search query). Sinatra-default ERB does not
+    # auto-escape `<%= %>` output, so dynamic data reflected verbatim
+    # would be an XSS vector.
+    def h(text)
+      Rack::Utils.escape_html(text.to_s)
     end
   end
 
@@ -268,8 +277,27 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/search' do
-    @page_title = 'Search'
-    @query = params['q'].to_s
+    @query    = params['q'].to_s.strip
+    @page     = [params['page'].to_i, 1].max
+    @per_page = 50
+    offset    = (@page - 1) * @per_page
+
+    if @query.empty?
+      @results = []
+      @error   = nil
+    else
+      begin
+        @results = ArticlesStore.search(@query, limit: @per_page, offset: offset)
+        @error   = nil
+      rescue SQLite3::SQLException => e
+        @results = []
+        @error   = e.message
+      end
+    end
+
+    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @tags_by_article = TagsStore.tags_for_articles(@results.map { |a| a['id'] })
+    @page_title      = @query.empty? ? 'Search' : "Search: #{@query}"
     erb :search
   end
 

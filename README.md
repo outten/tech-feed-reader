@@ -2,7 +2,7 @@
 
 A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: Tier 1 shipped + tagging.** Add feeds at `/feeds`, refresh manually or via `make scheduler`, read at `/article/:uid`, mark read / bookmark / archive, filter `/articles` by state or tag. Tag rules (regex / keyword / feed_id) live at `/tags` and auto-apply on import + backfill against existing articles. `/admin/cache` + `/admin/health` cover observability. CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`. Next: FTS-backed `/search` UI, then extractive + Claude summarizers and activity charts.
+> **Status: Tier 1 shipped + tagging + search.** Add feeds at `/feeds`, refresh manually or via `make scheduler`, read at `/article/:uid`, mark read / bookmark / archive, filter `/articles` by state or tag. Tag rules (regex / keyword / feed_id) at `/tags` auto-apply on import + backfill. `/search` runs SQLite FTS5 with `<mark>`-highlighted excerpts. CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`. Next: extractive + Claude summarizers and activity charts.
 
 ## Getting started
 
