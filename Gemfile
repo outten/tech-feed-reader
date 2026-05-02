@@ -36,3 +36,9 @@ gem 'csv'
 # is enabled in app/database.rb so the scheduler can write while the web
 # process serves reads without blocking.
 gem 'sqlite3'
+
+# Anthropic SDK — powers the Tier 2-K LLM summary on /article/:uid.
+# Optional at boot — if ANTHROPIC_API_KEY is unset the "Summarize with
+# Claude" button stays hidden and the existing pure-Ruby extractive
+# summary keeps working.
+gem 'anthropic'
