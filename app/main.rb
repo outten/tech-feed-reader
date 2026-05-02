@@ -20,6 +20,8 @@ require_relative 'tags_applier'
 require_relative 'feed_fetcher'
 require_relative 'health_registry'
 require_relative 'scheduler'
+require_relative 'summary_store'
+require_relative 'summarizer/extractive'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -145,8 +147,26 @@ class TechFeedReader < Sinatra::Base
     @state        = ReadStateStore.opened!(@article['id'])
     @article_tags = TagsStore.tags_for_article(@article['id'])
     @all_tags     = TagsStore.all
+    @summary      = SummaryStore.find(@article['id'])
     @page_title   = @article['title']
     erb :article
+  end
+
+  # Regenerate the extractive summary for an article. The summary is
+  # already auto-generated on import, so this is mainly useful when the
+  # algorithm changes or content_text has been updated. Runs synchronously
+  # — no network — so it returns quickly.
+  post '/article/:uid/summarize' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+
+    summary = Summarizer::Extractive.summarize(article['content_text'].to_s)
+    if summary.empty?
+      redirect to("/article/#{uid}?error=empty-content")
+    else
+      SummaryStore.upsert(article['id'], extractive: summary)
+      redirect to("/article/#{uid}?notice=resummarized")
+    end
   end
 
   post '/article/:uid/read' do |uid|

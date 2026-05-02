@@ -1,6 +1,8 @@
 require_relative 'database'
 require_relative 'tags_store'
 require_relative 'tags_applier'
+require_relative 'summary_store'
+require_relative 'summarizer/extractive'
 
 # Wrapper around the `articles` table. Returns hash-rows (matching
 # Database#results_as_hash) so callers can pass them straight into ERB.
@@ -106,11 +108,12 @@ module ArticlesStore
           entry[:author], entry[:published_at],
           entry[:content_html].to_s, entry[:content_text].to_s
         ])
-        next if db.changes.zero?  # uid was a duplicate, skip tag step
+        next if db.changes.zero?  # uid was a duplicate, skip tag + summary
 
         inserted  += 1
         article_id = db.last_insert_row_id
         apply_tags_for(article_id, entry, feed_id, rules)
+        generate_extractive_for(article_id, entry)
       end
     end
     inserted
@@ -131,6 +134,17 @@ module ArticlesStore
       TagsApplier.matching_tag_ids(shape, rules).each do |tag_id|
         TagsStore.tag_article(article_id, tag_id)
       end
+    end
+
+    # Auto-generate the extractive summary at import time. Pure-compute
+    # (no network), so it stays inside the import transaction. Skips if
+    # the body is empty so we don't store empty rows.
+    def generate_extractive_for(article_id, entry)
+      body = entry[:content_text].to_s.strip
+      return if body.empty?
+      summary = Summarizer::Extractive.summarize(body)
+      return if summary.empty?
+      SummaryStore.upsert(article_id, extractive: summary)
     end
 
     # Build a SELECT a.*, read_state... over articles LEFT JOIN read_state
