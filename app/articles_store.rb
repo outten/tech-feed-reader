@@ -22,6 +22,39 @@ module ArticlesStore
     db.execute('SELECT COUNT(*) AS c FROM articles').first['c']
   end
 
+  # Articles per published-day for the last N days, gap-filled to zero
+  # so the chart has a stable x-axis. Returns [{day:, count:}] in
+  # chronological order.
+  def daily_counts(days: 30)
+    today  = Date.today
+    cutoff = (today - days + 1).to_s
+    rows = db.execute(<<~SQL, [cutoff]).each_with_object({}) { |r, h| h[r['day']] = r['c'] }
+      SELECT DATE(published_at) AS day, COUNT(*) AS c
+      FROM articles
+      WHERE DATE(published_at) >= ?
+      GROUP BY DATE(published_at)
+    SQL
+
+    (0...days).map do |i|
+      day = (today - (days - 1 - i)).to_s
+      { day: day, count: rows[day] || 0 }
+    end
+  end
+
+  # Top N feeds by total article count. Used by the /dashboard "Most
+  # active feeds" widget. LEFT JOIN so feeds with zero articles still
+  # show, but they sort to the bottom.
+  def counts_by_feed(limit: 10)
+    db.execute(<<~SQL, [limit])
+      SELECT f.id, f.title, f.url, COUNT(a.id) AS c
+      FROM feeds f
+      LEFT JOIN articles a ON a.feed_id = f.id
+      GROUP BY f.id
+      ORDER BY c DESC, f.title ASC
+      LIMIT ?
+    SQL
+  end
+
   def find(id)
     db.execute('SELECT * FROM articles WHERE id = ?', [id]).first
   end

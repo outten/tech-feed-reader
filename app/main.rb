@@ -101,14 +101,17 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/dashboard' do
-    @page_title     = 'Dashboard'
-    @articles       = ArticlesStore.recent(limit: 20, state: :unread)
-    @feeds_by_id    = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-    @article_count  = ArticlesStore.count
-    @unread_count   = ReadStateStore.unread_count
-    @bookmark_count = ReadStateStore.bookmarked_count
-    @feed_count     = FeedsStore.count
-    @degraded       = HealthRegistry.degraded?
+    @page_title       = 'Dashboard'
+    @articles         = ArticlesStore.recent(limit: 20, state: :unread)
+    @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @article_count    = ArticlesStore.count
+    @unread_count     = ReadStateStore.unread_count
+    @bookmark_count   = ReadStateStore.bookmarked_count
+    @feed_count       = FeedsStore.count
+    @degraded         = HealthRegistry.degraded?
+    @daily_counts     = ArticlesStore.daily_counts(days: 30)
+    @top_feeds        = ArticlesStore.counts_by_feed(limit: 10)
+    @top_tags_week    = TagsStore.top_in_window(days: 7, limit: 8)
     erb :dashboard
   end
 
