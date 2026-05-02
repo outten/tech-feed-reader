@@ -29,6 +29,13 @@
     error=<%= h(params['error'] || '0') %>,
     <%= h(params['imported'] || '0') %> new article<%= 's' unless params['imported'] == '1' %>.
   </div>
+<% elsif @notice == 'imported' %>
+  <div class="notice">
+    Imported OPML &middot;
+    <%= h(params['added'] || '0') %> added,
+    <%= h(params['skipped'] || '0') %> already present
+    (<%= h(params['total'] || '0') %> total feeds in the file).
+  </div>
 <% elsif @notice %>
   <div class="notice"><%= h(@notice) %></div>
 <% end %>
@@ -39,6 +46,10 @@
   <div class="error">That feed is already subscribed.</div>
 <% elsif @error == 'not-found' %>
   <div class="error">No feed with that id.</div>
+<% elsif @error == 'missing-file' %>
+  <div class="error">Pick an OPML file before clicking Import.</div>
+<% elsif @error == 'import-failed' %>
+  <div class="error">Import failed: <code><%= h(params['msg']) %></code>.</div>
 <% elsif @error %>
   <div class="error"><%= h(@error) %></div>
 <% end %>
@@ -64,6 +75,21 @@
     Suggested intervals: 900s for high-frequency feeds (HN, Lobsters), 3600s
     for publishers, 14400s for personal blogs. <code>If-Modified-Since</code>
     + <code>ETag</code> are honoured when the publisher supports them.
+  </p>
+</div>
+
+<div class="portfolio-add" style="margin-top:1.25rem">
+  <h3>Bulk OPML</h3>
+  <form method="post" action="/feeds/import" enctype="multipart/form-data" class="portfolio-form">
+    <label class="full-width">
+      Import from OPML file
+      <input type="file" name="file" accept=".opml,.xml,application/xml,text/x-opml" required>
+    </label>
+    <button type="submit" class="btn-primary">Import</button>
+  </form>
+  <p class="subtitle" style="margin-top:0.75rem">
+    Re-import is idempotent — feeds whose URL is already subscribed are
+    skipped. <a href="/feeds/export.opml">Download current feed list as OPML &rarr;</a>
   </p>
 </div>
 

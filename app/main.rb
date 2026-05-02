@@ -23,6 +23,7 @@ require_relative 'scheduler'
 require_relative 'summary_store'
 require_relative 'summarizer/extractive'
 require_relative 'summarizer/claude'
+require_relative 'opml'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -262,6 +263,39 @@ class TechFeedReader < Sinatra::Base
     else
       redirect to('/feeds?error=not-found')
     end
+  end
+
+  # Bulk import via OPML. Skips URLs already present so re-importing the
+  # same file is idempotent; flashes a count summary on the redirect.
+  post '/feeds/import' do
+    upload = params['file']
+    redirect to('/feeds?error=missing-file') unless upload && upload[:tempfile]
+
+    begin
+      content = upload[:tempfile].read
+      entries = OPML.parse(content)
+      added   = 0
+      skipped = 0
+      entries.each do |entry|
+        if FeedsStore.find_by_url(entry[:url])
+          skipped += 1
+        else
+          FeedsStore.add(url: entry[:url], title: entry[:title])
+          added += 1
+        end
+      end
+      redirect to("/feeds?notice=imported&added=#{added}&skipped=#{skipped}&total=#{entries.length}")
+    rescue StandardError => e
+      redirect to("/feeds?error=import-failed&msg=#{CGI.escape(e.message)}")
+    end
+  end
+
+  # Export every subscribed feed as OPML 2.0 — moves the feed list to
+  # any other reader (or back into a fresh tech-feed-reader install).
+  get '/feeds/export.opml' do
+    content_type 'text/x-opml'
+    attachment "tech-feed-reader-feeds-#{Date.today}.opml"
+    OPML.build(FeedsStore.all)
   end
 
   get '/tags' do
