@@ -13,6 +13,7 @@ Dotenv.load(File.expand_path('../../.env', __FILE__))
 require_relative 'database'
 require_relative 'feeds_store'
 require_relative 'articles_store'
+require_relative 'read_state_store'
 require_relative 'feed_fetcher'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
@@ -85,12 +86,16 @@ class TechFeedReader < Sinatra::Base
 
   get '/dashboard' do
     @page_title    = 'Dashboard'
-    @articles      = ArticlesStore.recent(limit: 20)
+    @articles      = ArticlesStore.recent(limit: 20, state: :unread)
     @feeds_by_id   = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @article_count = ArticlesStore.count
+    @unread_count  = ReadStateStore.unread_count
+    @bookmark_count = ReadStateStore.bookmarked_count
     @feed_count    = FeedsStore.count
     erb :dashboard
   end
+
+  ARTICLES_STATE_FILTERS = %i[all unread bookmarked archived].freeze
 
   get '/articles' do
     @page_title  = 'Articles'
@@ -100,21 +105,51 @@ class TechFeedReader < Sinatra::Base
     feed_id      = params['feed_id'].to_i
     @feed_filter = feed_id.positive? ? FeedsStore.find(feed_id) : nil
 
+    @state_filter = (params['state'] || 'all').to_sym
+    @state_filter = :all unless ARTICLES_STATE_FILTERS.include?(@state_filter)
+
     @articles = if @feed_filter
-                  ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset)
+                  ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset, state: @state_filter)
                 else
-                  ArticlesStore.recent(limit: @per_page, offset: offset)
+                  ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter)
                 end
 
-    @total_count = @feed_filter ? @articles.length : ArticlesStore.count
     @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     erb :articles
   end
 
-  get '/article/:id' do |id|
-    @page_title = 'Article'
-    @article_id = id
+  get '/article/:uid' do |uid|
+    @article = ArticlesStore.find_by_uid(uid)
+    halt 404, erb(:article_not_found) unless @article
+
+    @feed       = FeedsStore.find(@article['feed_id'])
+    @state      = ReadStateStore.opened!(@article['id'])
+    @page_title = @article['title']
     erb :article
+  end
+
+  post '/article/:uid/read' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    read = params['read'] != '0'  # default true; pass read=0 to mark unread
+    ReadStateStore.mark_read(article['id'], read: read)
+    redirect to(params['return_to'] || "/article/#{uid}")
+  end
+
+  post '/article/:uid/bookmark' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    value = params['value'] != '0'
+    ReadStateStore.mark_bookmarked(article['id'], value: value)
+    redirect to(params['return_to'] || "/article/#{uid}")
+  end
+
+  post '/article/:uid/archive' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    value = params['value'] != '0'
+    ReadStateStore.mark_archived(article['id'], value: value)
+    redirect to(params['return_to'] || "/article/#{uid}")
   end
 
   get '/feeds' do

@@ -3,7 +3,12 @@
   <% if @feed_filter %>
     Filtered by feed. <a href="/articles">Clear filter</a>.
   <% else %>
-    <%= @total_count %> article<%= 's' unless @total_count == 1 %> across all feeds.
+    Filter:
+    <% %i[all unread bookmarked archived].each do |state| %>
+      <% qs = @feed_filter ? "feed_id=#{@feed_filter['id']}&" : '' %>
+      <a href="?<%= qs %>state=<%= state %>"
+         <%= 'class="active"' if @state_filter == state %>><%= state %></a>
+    <% end %>
   <% end %>
 </p>
 
@@ -19,8 +24,10 @@
   <section class="benchmark-section">
     <ul class="article-list">
       <% @articles.each do |article| %>
-        <li>
+        <li class="<%= article['read'] == 1 ? 'read' : 'unread' %>">
           <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
+          <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
+          <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
           <span class="meta">
             <% if (feed = feed_for(article)) %>
               <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·

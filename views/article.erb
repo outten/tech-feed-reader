@@ -1,10 +1,55 @@
-<h2>Article</h2>
-<p class="subtitle">id: <code><%= @article_id %></code></p>
+<article class="reading-view">
+  <header>
+    <h2><%= @article['title'] %></h2>
+    <p class="meta">
+      <% if @feed %>
+        <a href="/articles?feed_id=<%= @feed['id'] %>"><%= @feed['title'] || @feed['url'] %></a>
+      <% end %>
+      <% if @article['author'] && !@article['author'].to_s.empty? %>
+        · by <%= @article['author'] %>
+      <% end %>
+      · <%= relative_time(@article['published_at']) %>
+      <% if @article['url'] && !@article['url'].empty? %>
+        · <a href="<%= @article['url'] %>" rel="noopener noreferrer" target="_blank">Source &rarr;</a>
+      <% end %>
+    </p>
 
-<section class="benchmark-section">
-  <h3>Coming up</h3>
-  <p class="data-source">
-    Single-article view: title · publisher · published_at · sanitized content · cached summary · tag chips.
-    Renders from <code>ArticlesStore</code> + <code>SummaryStore</code> only — no on-render fetches.
-  </p>
-</section>
+    <p class="actions">
+      <% if @state['read'] == 1 %>
+        <form method="post" action="/article/<%= @article['uid'] %>/read" style="display:inline">
+          <input type="hidden" name="read" value="0">
+          <button type="submit">Mark unread</button>
+        </form>
+      <% else %>
+        <form method="post" action="/article/<%= @article['uid'] %>/read" style="display:inline">
+          <button type="submit">Mark read</button>
+        </form>
+      <% end %>
+
+      <form method="post" action="/article/<%= @article['uid'] %>/bookmark" style="display:inline">
+        <input type="hidden" name="value" value="<%= @state['bookmarked'] == 1 ? '0' : '1' %>">
+        <button type="submit"><%= @state['bookmarked'] == 1 ? 'Unbookmark' : 'Bookmark' %></button>
+      </form>
+
+      <form method="post" action="/article/<%= @article['uid'] %>/archive" style="display:inline">
+        <input type="hidden" name="value" value="<%= @state['archived'] == 1 ? '0' : '1' %>">
+        <button type="submit"><%= @state['archived'] == 1 ? 'Unarchive' : 'Archive' %></button>
+      </form>
+    </p>
+  </header>
+
+  <section class="article-body">
+    <% if @article['content_html'] && !@article['content_html'].empty? %>
+      <%= @article['content_html'] %>
+    <% else %>
+      <p><em>(no content extracted — try the source link)</em></p>
+    <% end %>
+  </section>
+
+  <footer class="article-footer">
+    <p class="subtitle">
+      Article id: <code><%= @article['uid'] %></code>
+      · <a href="/articles">&larr; All articles</a>
+    </p>
+  </footer>
+</article>
