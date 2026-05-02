@@ -1,7 +1,14 @@
-.PHONY: run dev serve test install refresh-feeds refresh-feed scheduler
+.PHONY: run dev serve test install migrate refresh-feeds refresh-feed scheduler
 
 install:
 	bundle install
+
+# Apply any pending SQL migrations from db/migrations/. Idempotent — safe
+# to run repeatedly. The web app auto-migrates on boot (see app/main.rb)
+# so this is mostly for CI / setup steps that prep the DB before the
+# scheduler or scripts run.
+migrate:
+	bundle exec ruby scripts/migrate.rb
 
 # Auto-reloading dev server. `rerun` reads .rerun in the project root for
 # watch dirs, file patterns, and ignore globs. NOTE: .rerun does NOT support

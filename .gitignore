@@ -3,10 +3,9 @@
 tmp/
 .cache/
 data/cache/
-data/feeds.json
-data/articles/
-data/tags.json
-data/read_state.json
-data/summaries/
+data/app.db
+data/app.db-shm
+data/app.db-wal
+data/app.db-journal
 data/scheduler*.log
 *.log

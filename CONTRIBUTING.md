@@ -43,7 +43,7 @@ Branch naming: `outten/TODO-NNN` where `NNN` is the next sequential number (late
 git add path/to/file.rb path/to/spec.rb path/to/doc.md
 ```
 
-**Do not** use `git add -A` or `git add .` — it can sweep in `.credentials`, `data/*.json`, cached feed bodies, or other private state. (Most of those are in `.gitignore`, but stage explicitly anyway.)
+**Do not** use `git add -A` or `git add .` — it can sweep in `.credentials`, `data/app.db*`, cached feed bodies, or other private state. (Most of those are in `.gitignore`, but stage explicitly anyway.)
 
 ### Commit message style
 
@@ -76,7 +76,7 @@ Most PRs are a single commit. Multiple commits are fine when the PR genuinely sp
 - Force-push to `main`.
 - Skip hooks (`--no-verify`).
 - Amend a commit that's already pushed unless you control all consumers.
-- Commit data files (`.credentials`, `data/*.json`, cached feed bodies, summaries — `.gitignore` should catch all of them).
+- Commit data files (`.credentials`, `data/app.db*`, cached feed bodies — `.gitignore` should catch all of them).
 
 ## 4. Push
 

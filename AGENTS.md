@@ -22,6 +22,7 @@ No other API keys required — RSS / Atom feeds are public and unauthenticated. 
 
 ```bash
 make install                 # bundle install
+make migrate                 # apply any pending db/migrations/*.sql (idempotent)
 make run                     # auto-reload via rerun → http://localhost:4567 (alias: make dev)
 make serve                   # one-shot run, no auto-reload
 make test                    # RSpec
@@ -31,25 +32,27 @@ make scheduler               # long-running poller honouring per-feed intervals
 make summarize ARTICLE=...   # one-off summarize (CLI; mirrors the on-page button)
 ```
 
+`make run` auto-migrates on boot, so `make migrate` is mainly for CI / scripts that need the DB up before the web process starts.
+
 `make run` reads [.rerun](.rerun) for watch dirs and ignore globs. **`.rerun` does NOT support `#` comments** — its contents are shell-split verbatim. Keep it option-only.
 
-## Caching architecture
+## Storage architecture
 
-**Two-tier in-memory cache** (mirroring `t-money`'s `MarketDataService`):
-- `@cache` — live; gated by per-feed `effective_ttl`.
-- `@persistent_cache` — fallback; survives `bust_cache!`. Returned when live is empty.
-- `@cache_timestamps` — per-feed timestamp.
+**Single SQLite DB** at `data/app.db` is the source of truth for feeds, articles, read state, tags, and summaries. WAL mode lets the scheduler write while web requests read without blocking; `PRAGMA foreign_keys=ON` cascades deletes (drop a feed → its articles + their read_state + summaries + article_tags rows go too).
 
-**Disk cache** at `data/cache/`:
+This replaces `t-money-terminal`'s file-per-store + mutex + atomic-rename pattern. SQLite's transactions handle atomicity; we don't need to roll our own.
+
+**Schema lives in [db/migrations/](db/migrations/).** The runner is [app/database.rb](app/database.rb) — `Database.migrate!` is idempotent, applies any pending migration files in filename order, and is called automatically on web-app boot (skipped under `RACK_ENV=test`). `make migrate` is the explicit one-shot entry point.
+
+**Disk cache** at `data/cache/` (separate from the DB) holds raw fetch payloads as a debug aid:
 ```
 data/cache/
-├── feeds/<feed_id>.xml         # raw RSS/Atom payload (last successful fetch)
-├── articles/<yyyy-mm>.json     # monthly-sharded article history (full content extracted at fetch)
-├── summaries/<article_id>.json # extractive + LLM summaries, immutable per article id
-└── feed_meta.json              # per-feed last_etag / last_modified / last_fetched_at
+└── feeds/<feed_id>.xml   # raw RSS/Atom payload, last successful fetch
 ```
 
-**Per-feed TTL** (analogous to `t-money`'s market-aware TTL):
+Article bodies, extracted content, and summaries all live in SQLite — not on disk.
+
+**Per-feed TTL** (analogous to `t-money`'s market-aware TTL) — the `feeds.fetch_interval_seconds` column is the source of truth; the table below is just the suggested default at add-time:
 
 | Feed cadence | Default poll interval |
 |---|---|
@@ -57,13 +60,11 @@ data/cache/
 | Major publishers (Ars, Verge, NYT-tech, …) | 1 h |
 | Personal blogs / low-volume | 4–6 h |
 
-Override per feed in `FeedsStore` — the value is the source of truth, the table above is just the suggested default at add-time.
-
 **Rendering contract** (load-bearing — break it and pages get slow):
 
 ```
 Page renders MUST be cache-only.
-  /dashboard, /articles, /article/:id → ArticlesStore + SummaryStore + ReadStateStore reads only
+  /dashboard, /articles, /article/:id → SQLite reads only
 
 Network events ONLY happen via:
   - Scheduled poll (make scheduler)
@@ -74,35 +75,39 @@ Network events ONLY happen via:
 
 Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfolio_perf_spec.rb`) asserting `not_to receive(:fetch_feed)` on `/articles` and `/dashboard` render.
 
-## Stores (file-backed, mutex-guarded, atomic-rename writes)
+## Tables
 
-| Store | File | Purpose |
-|---|---|---|
-| `FeedsStore` | `data/feeds.json` | Subscribed feeds: id, url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status |
-| `ArticlesStore` | `data/articles/<yyyy-mm>.json` | Article history sharded by published-month: id, feed_id, title, url, author, published_at, content_html, content_text, tags |
-| `TagsStore` | `data/tags.json` | User tag rules: name, match (regex / keyword list / feed_id) |
-| `ReadStateStore` | `data/read_state.json` | Per-article state: read, bookmarked, archived, opened_at |
-| `SummaryStore` | `data/summaries/<article_id>.json` | Cached summaries — extractive always; LLM only when user clicks "summarize" |
-| `HealthRegistry` (in-memory) | — | Bounded ring buffer of feed-fetch observations; surfaces at `/admin/health` |
+| Table | Purpose |
+|---|---|
+| `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status |
+| `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text |
+| `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via INSERT/UPDATE/DELETE triggers |
+| `read_state` | Per-article state: read, bookmarked, archived, opened_at |
+| `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
+| `article_tags` | Many-to-many join between articles and tags |
+| `summaries` | Cached summaries: extractive (always) + llm (on demand) |
+| `schema_migrations` | Migration runner state |
 
-All mutating stores use `MUTEX.synchronize` + write-to-`.tmp`-then-rename — same as `t-money`'s `PortfolioStore` / `TradesStore` / `ProfileStore`.
+`HealthRegistry` is in-memory only (bounded ring buffer of feed-fetch observations); surfaces at `/admin/health`, clears on process restart.
+
+Per-store wrapper classes (`FeedsStore`, `ArticlesStore`, etc.) sit on top of the DB and present a higher-level API to the app — but the data lives in SQLite, not in JSON files.
 
 ## Article id
 
-`SHA1(feed_url + article_url)[0,12]`. Stable across re-fetches, URL-safe, short enough for a clean route segment (`/article/abc123def456`).
+Each article has both a SQLite rowid (`articles.id`, used internally for joins and FTS5 linkage) and a stable `uid` = `SHA1(feed_url + article_url)[0,12]` used in URLs (`/article/abc123def456`). The uid is stable across re-fetches; the rowid is internal.
 
 ## Feed-fetch flow
 
 ```
-1. read FeedsStore[feed_id]
-2. GET feed_url with If-Modified-Since: feed[:last_modified] and If-None-Match: feed[:last_etag]
-3. if 304 → record health observation, update last_fetched_at, return
+1. SELECT row from feeds WHERE id = ?
+2. GET feed_url with If-Modified-Since: feed.last_modified and If-None-Match: feed.last_etag
+3. if 304 → record health observation, UPDATE feeds.last_fetched_at, return
 4. if 200 → parse with feedjira (or rss stdlib), extract entries
-5. for each entry not already in ArticlesStore (by article_id):
+5. for each entry whose uid is not already in articles:
      - run readability extraction on entry[:content] (single shared extractor)
-     - assign tags (TagsStore rules)
-     - write to ArticlesStore[<yyyy-mm>]
-6. update FeedsStore[feed_id] with new etag / last_modified / last_fetched_at / last_status
+     - INSERT into articles (FTS5 trigger keeps articles_fts in sync)
+     - assign tags via tags-rule matcher → INSERT into article_tags
+6. UPDATE feeds SET last_etag, last_modified, last_fetched_at, last_status WHERE id = ?
 7. record HealthRegistry observation
 ```
 
@@ -128,15 +133,16 @@ In-memory only; clears on process restart. Tests opt in via `ENV['HEALTH_REGISTR
 
 ```
 app/
-  main.rb                  # Sinatra routes
+  main.rb                  # Sinatra routes; auto-migrates on boot
+  database.rb              # SQLite handle + migration runner
   feed_fetcher.rb          # HTTP layer (If-Modified-Since / ETag honouring) + parse
   feed_parser.rb           # rss / feedjira wrapper; normalises Atom + RSS to one shape
   providers/
     readability.rb         # extract main content from origin URL
     archive.rb             # archive.org fallback
     http_client.rb         # shared user-agent + retry/backoff + cache headers
-  feeds_store.rb
-  articles_store.rb        # monthly-sharded
+  feeds_store.rb           # SQLite-backed wrapper (CRUD on the feeds table)
+  articles_store.rb        # SQLite-backed wrapper (CRUD on articles + FTS5)
   tags_store.rb
   read_state_store.rb
   summary_store.rb
@@ -144,16 +150,20 @@ app/
     extractive.rb          # TextRank-style; pure Ruby
     claude.rb              # Anthropic SDK wrapper
   health_registry.rb
+db/
+  migrations/
+    001_init.sql           # initial schema; new files added per feature PR
 views/                     # ERB templates — mirror t-money's UI patterns
 public/
-  style.css                # ported from t-money for visual consistency (TBD)
+  style.css                # ported from t-money for visual consistency
   app.js                   # search box + tag-filter behaviour
 scripts/
-  scheduler.rb             # long-running poller; reads FeedsStore, honours per-feed TTL
+  migrate.rb               # one-shot migration runner (also auto-run on web boot)
+  scheduler.rb             # long-running poller; reads feeds table, honours per-feed TTL
   refresh_feed.rb          # one-shot poll
   refresh_all.rb           # poll every feed once
 spec/                      # RSpec
-data/                      # all app state (git-ignored)
+data/                      # SQLite DB + raw-feed cache (git-ignored)
 .github/workflows/ci.yml   # RSpec + scripts syntax check on push to main + every PR
 ```
 
@@ -175,7 +185,7 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 
 2. **Atom vs RSS 2.0 vs RSS 1.0.** Don't write three parsers — pick one library (start with `feedjira`) that normalises all three to a single shape. If you fork the parser, you'll regret it.
 
-3. **Article-content size.** Some entries are 100 KB of inline HTML. Don't keep that in memory longer than you have to. Sharding `ArticlesStore` by month keeps the per-shard size bounded.
+3. **Article-content size.** Some entries are 100 KB of inline HTML. SQLite handles big TEXT columns fine, but don't `SELECT *` when you only need the listing fields — index-supported queries that omit `content_html` / `content_text` keep the `/articles` page fast even with thousands of rows.
 
 4. **De-dup across feeds.** The same article appears in HN front page + the publisher's RSS. Article id is keyed by `feed_url + article_url`, so dedupe is per-article-per-feed, not global. If global dedup matters, add a separate URL-hash index.
 
