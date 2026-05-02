@@ -1,4 +1,6 @@
 require_relative 'database'
+require_relative 'tags_store'
+require_relative 'tags_applier'
 
 # Wrapper around the `articles` table. Returns hash-rows (matching
 # Database#results_as_hash) so callers can pass them straight into ERB.
@@ -41,6 +43,18 @@ module ArticlesStore
     db.execute(state_query(scope: 'a.feed_id = ?', filter: state), [feed_id, limit, offset])
   end
 
+  # Articles tagged with the given tag id, with read-state columns and
+  # optional state filter. Joins article_tags inside the FROM clause
+  # (vs. as a sub-select) so SQLite can use the article_tags PK index.
+  def for_tag(tag_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
+    sql = state_query(
+      from_extra: 'JOIN article_tags at ON at.article_id = a.id',
+      scope:      'at.tag_id = ?',
+      filter:     state
+    )
+    db.execute(sql, [tag_id, limit, offset])
+  end
+
   # Full-text search via the articles_fts virtual table. `rank` is FTS5's
   # built-in relevance score (lower = better). Empty / blank queries
   # return [] instead of raising — FTS5 errors on empty MATCH terms.
@@ -71,6 +85,7 @@ module ArticlesStore
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     SQL
 
+    rules    = TagsStore.all  # snapshot once per import batch
     inserted = 0
     db.transaction do
       entries.each do |entry|
@@ -80,7 +95,11 @@ module ArticlesStore
           entry[:author], entry[:published_at],
           entry[:content_html].to_s, entry[:content_text].to_s
         ])
-        inserted += db.changes
+        next if db.changes.zero?  # uid was a duplicate, skip tag step
+
+        inserted  += 1
+        article_id = db.last_insert_row_id
+        apply_tags_for(article_id, entry, feed_id, rules)
       end
     end
     inserted
@@ -89,9 +108,24 @@ module ArticlesStore
   class << self
     private
 
+    # Apply tag rules to a freshly-inserted article. Runs inside the
+    # import transaction so the article + its tags land atomically.
+    def apply_tags_for(article_id, entry, feed_id, rules)
+      return if rules.empty?
+      shape = {
+        'title'        => entry[:title].to_s,
+        'content_text' => entry[:content_text].to_s,
+        'feed_id'      => feed_id
+      }
+      TagsApplier.matching_tag_ids(shape, rules).each do |tag_id|
+        TagsStore.tag_article(article_id, tag_id)
+      end
+    end
+
     # Build a SELECT a.*, read_state... over articles LEFT JOIN read_state
-    # with optional WHERE-scope (e.g. "a.feed_id = ?") and read-state filter.
-    def state_query(scope: nil, filter: :all)
+    # with optional WHERE-scope (e.g. "a.feed_id = ?"), an optional extra
+    # FROM-clause join (used by for_tag), and a read-state filter.
+    def state_query(scope: nil, filter: :all, from_extra: nil)
       where_clauses = []
       where_clauses << scope if scope
       case filter
@@ -112,6 +146,7 @@ module ArticlesStore
                rs.opened_at               AS opened_at
         FROM articles a
         LEFT JOIN read_state rs ON a.id = rs.article_id
+        #{from_extra}
         #{where_sql}
         ORDER BY a.published_at DESC, a.id DESC
         LIMIT ? OFFSET ?
