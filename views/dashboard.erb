@@ -1,19 +1,24 @@
 <h2>Dashboard</h2>
 <p class="subtitle">
-  <%= @article_count %> article<%= 's' unless @article_count == 1 %> across <%= @feed_count %> feed<%= 's' unless @feed_count == 1 %>.
+  <%= @article_count %> article<%= 's' unless @article_count == 1 %> across <%= @feed_count %> feed<%= 's' unless @feed_count == 1 %>
+  &middot; <strong><%= @unread_count %> unread</strong>
+  <% if @bookmark_count.positive? %>
+    &middot; <%= @bookmark_count %> bookmarked
+  <% end %>
   <% if @article_count.zero? %>
-    Nothing yet — <a href="/feeds">add a feed</a> or hit
-    <code>POST /admin/refresh/all</code> to populate.
+    &middot; nothing yet — <a href="/feeds">add a feed</a> or hit
+    "Refresh all" to populate.
   <% end %>
 </p>
 
 <% if @articles.any? %>
   <section class="benchmark-section">
-    <h3>Recent</h3>
+    <h3>Recent unread</h3>
     <ul class="article-list">
       <% @articles.each do |article| %>
-        <li>
+        <li class="unread">
           <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
+          <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
           <span class="meta">
             <% if (feed = feed_for(article)) %>
               <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·
@@ -23,6 +28,17 @@
         </li>
       <% end %>
     </ul>
-    <p class="subtitle"><a href="/articles">All articles &rarr;</a></p>
+    <p class="subtitle">
+      <a href="/articles">All articles &rarr;</a>
+      &middot;
+      <a href="/articles?state=bookmarked">Bookmarked &rarr;</a>
+    </p>
+  </section>
+<% elsif @article_count.positive? %>
+  <section class="benchmark-section">
+    <p class="data-source">
+      Inbox zero! No unread articles. <a href="/articles">Browse all</a> or
+      <a href="/articles?state=bookmarked">bookmarked</a>.
+    </p>
   </section>
 <% end %>

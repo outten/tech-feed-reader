@@ -27,21 +27,18 @@ module ArticlesStore
 
   # Most recent articles across all feeds. Ordered by published_at then
   # id so missing-published_at rows don't bunch at the top.
-  def recent(limit: DEFAULT_LIMIT, offset: 0)
-    db.execute(<<~SQL, [limit, offset])
-      SELECT * FROM articles
-      ORDER BY published_at DESC, id DESC
-      LIMIT ? OFFSET ?
-    SQL
+  #
+  # Returns rows with read / bookmarked / archived / opened_at columns
+  # populated from a LEFT JOIN on read_state — so callers don't have to
+  # follow up with a per-article ReadStateStore.get. Optional state:
+  # filter (:unread | :bookmarked | :archived | :all) lets callers ask
+  # for only the rows they want without re-issuing the query.
+  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all)
+    db.execute(state_query(filter: state), [limit, offset])
   end
 
-  def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0)
-    db.execute(<<~SQL, [feed_id, limit, offset])
-      SELECT * FROM articles
-      WHERE feed_id = ?
-      ORDER BY published_at DESC, id DESC
-      LIMIT ? OFFSET ?
-    SQL
+  def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
+    db.execute(state_query(scope: 'a.feed_id = ?', filter: state), [feed_id, limit, offset])
   end
 
   # Full-text search via the articles_fts virtual table. `rank` is FTS5's
@@ -91,6 +88,35 @@ module ArticlesStore
 
   class << self
     private
+
+    # Build a SELECT a.*, read_state... over articles LEFT JOIN read_state
+    # with optional WHERE-scope (e.g. "a.feed_id = ?") and read-state filter.
+    def state_query(scope: nil, filter: :all)
+      where_clauses = []
+      where_clauses << scope if scope
+      case filter
+      when :unread     then where_clauses << 'COALESCE(rs.read, 0) = 0'
+      when :bookmarked then where_clauses << 'rs.bookmarked = 1'
+      when :archived   then where_clauses << 'rs.archived = 1'
+      when :all        then # no extra clause
+      else raise ArgumentError, "Unknown read-state filter: #{filter.inspect}"
+      end
+
+      where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"
+
+      <<~SQL
+        SELECT a.*,
+               COALESCE(rs.read, 0)       AS read,
+               COALESCE(rs.bookmarked, 0) AS bookmarked,
+               COALESCE(rs.archived, 0)   AS archived,
+               rs.opened_at               AS opened_at
+        FROM articles a
+        LEFT JOIN read_state rs ON a.id = rs.article_id
+        #{where_sql}
+        ORDER BY a.published_at DESC, a.id DESC
+        LIMIT ? OFFSET ?
+      SQL
+    end
 
     def db
       Database.connection

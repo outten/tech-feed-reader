@@ -2,7 +2,7 @@
 
 A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: Tier 1 reading is live.** Add a feed at `/feeds`, hit "Refresh all", and articles flow into `/articles` and `/dashboard`. The cache-only render contract is enforced by [`spec/articles_perf_spec.rb`](spec/articles_perf_spec.rb). Per-article view + read-state and the long-running scheduler are next.
+> **Status: Tier 1 complete.** Add feeds at `/feeds`, refresh, read articles at `/article/:uid`, mark read / bookmark / archive, filter `/articles` by state. The cache-only render contract is enforced by [`spec/articles_perf_spec.rb`](spec/articles_perf_spec.rb). The long-running scheduler script (TODO-009) and Tier 2 (tags / FTS-backed search UI / summarizers) are next.
 
 ## Getting started
 

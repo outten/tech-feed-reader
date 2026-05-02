@@ -27,10 +27,23 @@ RSpec.describe 'TechFeedReader smoke' do
     end
   end
 
-  it 'renders /article/:id' do
-    get '/article/abc123'
+  it 'renders /article/:uid for an existing article' do
+    feed = FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
+    ArticlesStore.import(feed_id: feed['id'], entries: [{
+      uid: 'abc123def456', title: 'Hello',
+      url: 'https://example.com/post', author: 'A',
+      published_at: '2026-05-02T12:00:00Z',
+      content_html: '<p>Body</p>', content_text: 'Body'
+    }])
+
+    get '/article/abc123def456'
     expect(last_response.status).to eq(200)
-    expect(last_response.body).to include('abc123')
+    expect(last_response.body).to include('Hello')
+  end
+
+  it 'returns 404 for an unknown article uid' do
+    get '/article/zzzzzzzzzzzz'
+    expect(last_response.status).to eq(404)
   end
 
   describe 'POST /feeds' do
