@@ -141,8 +141,8 @@ app/
   sanitizer.rb             # loofah whitelist; sanitize_html + text_only
   providers/
     http_client.rb         # shared user-agent + retry/backoff + scheme guard
-    readability.rb         # extract main content from origin URL (Tier 2)
-    archive.rb             # archive.org fallback (Tier 2)
+    readability.rb         # extract main content from origin URL (teaser-feed fallback)
+    archive.rb             # archive.org fallback (Tier 3)
   feeds_store.rb           # SQLite-backed wrapper (CRUD on the feeds table)
   articles_store.rb        # SQLite-backed wrapper (CRUD on articles + FTS5)
   read_state_store.rb      # lazy per-article read / bookmark / archive state
