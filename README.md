@@ -2,12 +2,13 @@
 
 A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: greenfield seed.** The app boots, the route shell renders empty-state pages, and the SQLite schema + migration runner are wired in. Feed fetching, the FeedsStore, and the rest of Tier 1 are next.
+> **Status: greenfield seed.** The app boots; SQLite schema + migration runner are in place; `FeedsStore` and the `/feeds` add/remove UI work end-to-end. Feed fetching is the next Tier 1 piece — see [SPEC.md](SPEC.md) milestone B.
 
 ## Getting started
 
 ```bash
 make install
+make seed-feeds # optional: insert the 5 starter feeds
 make run        # dev server with rerun auto-reload → http://localhost:4567
 make test       # RSpec — smoke suite passes out of the box
 ```

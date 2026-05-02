@@ -11,6 +11,7 @@ Dotenv.load(File.expand_path('../../.credentials', __FILE__))
 Dotenv.load(File.expand_path('../../.env', __FILE__))
 
 require_relative 'database'
+require_relative 'feeds_store'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -33,6 +34,15 @@ class TechFeedReader < Sinatra::Base
   set :public_folder, File.expand_path('../../public', __FILE__)
   set :port, 4567
   set :bind, '0.0.0.0' if ENV['RACK_ENV'] == 'production'
+
+  # Surface the real exception in test runs so a 500 in rack-test prints
+  # the underlying error class + backtrace instead of the bare "Internal
+  # Server Error" page. Has no effect outside test env.
+  configure :test do
+    set :raise_errors, true
+    set :dump_errors, false
+    set :show_exceptions, false
+  end
 
   helpers do
     # Cache-bust query string for static assets — same pattern as t-money so
@@ -81,7 +91,45 @@ class TechFeedReader < Sinatra::Base
 
   get '/feeds' do
     @page_title = 'Feeds'
+    @feeds      = FeedsStore.all
+    @notice     = params['notice']
+    @error      = params['error']
     erb :feeds
+  end
+
+  # Add a feed. URL is required; title and fetch_interval_seconds are
+  # optional — once FeedFetcher lands (TODO-004), the title gets backfilled
+  # on first successful poll. Until then, the user-supplied title (or the
+  # URL itself) is what shows in the list.
+  post '/feeds' do
+    url = params['url'].to_s.strip
+
+    unless url.match?(%r{\Ahttps?://\S+\z})
+      redirect to('/feeds?error=invalid-url')
+    end
+
+    title    = (params['title'] || '').strip
+    title    = nil if title.empty?
+    interval = params['fetch_interval_seconds'].to_i
+    interval = FeedsStore::PUBLISHER_INTERVAL if interval <= 0
+
+    begin
+      FeedsStore.add(url: url, title: title, fetch_interval_seconds: interval)
+      redirect to('/feeds?notice=added')
+    rescue SQLite3::ConstraintException
+      redirect to('/feeds?error=duplicate-url')
+    end
+  end
+
+  # POST-for-delete because plain HTML forms only support GET / POST.
+  # Cascades through articles → read_state / summaries / article_tags
+  # via the FK chain in 001_init.sql.
+  post '/feeds/:id/delete' do |id|
+    if FeedsStore.remove(id.to_i)
+      redirect to('/feeds?notice=removed')
+    else
+      redirect to('/feeds?error=not-found')
+    end
   end
 
   get '/tags' do

@@ -23,6 +23,7 @@ No other API keys required — RSS / Atom feeds are public and unauthenticated. 
 ```bash
 make install                 # bundle install
 make migrate                 # apply any pending db/migrations/*.sql (idempotent)
+make seed-feeds              # insert the 5 v1-kickoff starter feeds (idempotent)
 make run                     # auto-reload via rerun → http://localhost:4567 (alias: make dev)
 make serve                   # one-shot run, no auto-reload
 make test                    # RSpec

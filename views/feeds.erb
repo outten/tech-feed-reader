@@ -1,10 +1,78 @@
 <h2>Feeds</h2>
-<p class="subtitle">Manage subscribed RSS / Atom sources.</p>
+<p class="subtitle">Manage subscribed RSS / Atom sources. <%= @feeds.length %> active.</p>
+
+<% if @notice == 'added' %>
+  <p class="notice">Feed added.</p>
+<% elsif @notice == 'removed' %>
+  <p class="notice">Feed removed.</p>
+<% elsif @notice %>
+  <p class="notice"><%= @notice %></p>
+<% end %>
+
+<% if @error == 'invalid-url' %>
+  <p class="error">That doesn't look like a valid http(s) URL.</p>
+<% elsif @error == 'duplicate-url' %>
+  <p class="error">That feed is already subscribed.</p>
+<% elsif @error == 'not-found' %>
+  <p class="error">No feed with that id.</p>
+<% elsif @error %>
+  <p class="error"><%= @error %></p>
+<% end %>
 
 <section class="benchmark-section">
-  <h3>Coming up</h3>
+  <h3>Add a feed</h3>
+  <form method="post" action="/feeds" class="feed-form">
+    <label>
+      URL
+      <input type="url" name="url" required placeholder="https://example.com/feed.xml">
+    </label>
+    <label>
+      Title (optional)
+      <input type="text" name="title" placeholder="Auto-filled on first fetch if blank">
+    </label>
+    <label>
+      Poll interval (seconds)
+      <input type="number" name="fetch_interval_seconds" min="60" value="<%= FeedsStore::PUBLISHER_INTERVAL %>">
+    </label>
+    <button type="submit">Add</button>
+  </form>
   <p class="data-source">
-    Add / remove feeds; per-feed stats (last fetched, article count, success rate).
-    First Tier-1 feature to ship — see <code>SPEC.md</code> milestone A.
+    Defaults: 900s for high-frequency feeds (HN, Lobsters), 3600s for
+    publishers, 14400s for personal blogs. Feeds honour <code>If-Modified-Since</code>
+    and <code>ETag</code> when the publisher supports them.
   </p>
 </section>
+
+<% if @feeds.any? %>
+  <section class="benchmark-section">
+    <h3>Subscribed</h3>
+    <table class="feeds-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>URL</th>
+          <th>Interval</th>
+          <th>Last fetched</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @feeds.each do |feed| %>
+          <tr>
+            <td><%= feed['title'] || '<em>(unset)</em>' %></td>
+            <td><a href="<%= feed['url'] %>" rel="noopener noreferrer" target="_blank"><%= feed['url'] %></a></td>
+            <td><%= feed['fetch_interval_seconds'] %>s</td>
+            <td><%= relative_time(feed['last_fetched_at']) %></td>
+            <td><%= feed['last_status'] || '—' %></td>
+            <td>
+              <form method="post" action="/feeds/<%= feed['id'] %>/delete" onsubmit="return confirm('Remove this feed and all its articles?');">
+                <button type="submit" class="danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
