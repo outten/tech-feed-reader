@@ -15,6 +15,7 @@ require_relative 'feeds_store'
 require_relative 'articles_store'
 require_relative 'read_state_store'
 require_relative 'feed_fetcher'
+require_relative 'health_registry'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -85,13 +86,14 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/dashboard' do
-    @page_title    = 'Dashboard'
-    @articles      = ArticlesStore.recent(limit: 20, state: :unread)
-    @feeds_by_id   = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-    @article_count = ArticlesStore.count
-    @unread_count  = ReadStateStore.unread_count
+    @page_title     = 'Dashboard'
+    @articles       = ArticlesStore.recent(limit: 20, state: :unread)
+    @feeds_by_id    = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @article_count  = ArticlesStore.count
+    @unread_count   = ReadStateStore.unread_count
     @bookmark_count = ReadStateStore.bookmarked_count
-    @feed_count    = FeedsStore.count
+    @feed_count     = FeedsStore.count
+    @degraded       = HealthRegistry.degraded?
     erb :dashboard
   end
 
@@ -207,12 +209,21 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/admin/health' do
-    @page_title = 'Provider health'
+    @page_title    = 'Provider health'
+    @observations  = HealthRegistry.observations.last(50).reverse
+    @summary       = HealthRegistry.per_feed_summary
+    @degraded      = HealthRegistry.degraded?
+    @feeds_by_id   = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @enabled       = HealthRegistry.enabled?
     erb :admin_health
   end
 
   get '/admin/cache' do
-    @page_title = 'Cache admin'
+    @page_title  = 'Cache admin'
+    @feeds       = FeedsStore.all
+    @article_counts = Database.connection
+      .execute('SELECT feed_id, COUNT(*) AS c FROM articles GROUP BY feed_id')
+      .each_with_object({}) { |row, h| h[row['feed_id']] = row['c'] }
     erb :admin_cache
   end
 

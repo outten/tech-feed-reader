@@ -2,6 +2,7 @@ require 'time'
 require_relative 'providers/http_client'
 require_relative 'feed_parser'
 require_relative 'feeds_store'
+require_relative 'health_registry'
 
 # Orchestrator: takes a feed row, GETs the URL with conditional-GET
 # headers, parses on 200, records status + ETag + Last-Modified +
@@ -22,8 +23,15 @@ module FeedFetcher
 
   module_function
 
-  # `feed` is a hash row from FeedsStore. Returns a Result.
+  # `feed` is a hash row from FeedsStore. Returns a Result. The fetch is
+  # wrapped in HealthRegistry.measure so /admin/health surfaces latency
+  # + status + degraded? state. The wrap is a no-op in test env unless
+  # ENV['HEALTH_REGISTRY']=1.
   def fetch_feed(feed)
+    HealthRegistry.measure(feed['id']) { fetch_feed_impl(feed) }
+  end
+
+  def fetch_feed_impl(feed)
     response = Providers::HttpClient.get(
       feed['url'],
       headers: {

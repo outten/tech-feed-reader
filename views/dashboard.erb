@@ -1,4 +1,13 @@
 <h2>Dashboard</h2>
+
+<% if @degraded %>
+  <p class="error">
+    <strong>Feeds are systematically failing.</strong>
+    Check network connectivity, then look at <a href="/admin/health">/admin/health</a>
+    for per-feed details.
+  </p>
+<% end %>
+
 <p class="subtitle">
   <%= @article_count %> article<%= 's' unless @article_count == 1 %> across <%= @feed_count %> feed<%= 's' unless @feed_count == 1 %>
   &middot; <strong><%= @unread_count %> unread</strong>
