@@ -2,7 +2,7 @@
 
 A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: Tier 2 + OPML + related-articles.** Add feeds at `/feeds` or bulk-import via OPML. Teaser feeds (HN, Lobsters) auto-fall back to a readability fetch. `/article/:uid` shows an auto-extractive summary, an opt-in Claude LLM summary, and a "Related" panel of articles surfaced by FTS5 keyword overlap (no personalization). `/dashboard` charts articles-per-day for the last 30 days alongside top-active-feeds and top-tags-this-week panels. Mark read / bookmark / archive, filter by state or tag, full-text search via SQLite FTS5. CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`.
+> **Status: Tier 3 nearly complete.** Add feeds at `/feeds` or bulk-import via OPML. Teaser feeds (HN, Lobsters) auto-fall back to a readability fetch. `/article/:uid` shows an auto-extractive summary, an opt-in Claude LLM summary, and a "Related" panel of articles surfaced by FTS5 keyword overlap. `/dashboard` adds a 30-day articles chart, top-active-feeds, top-tags-this-week, and a **trending topics** widget that surfaces the most-talked-about terms across the last 14 days. Mark read / bookmark / archive, filter by state or tag, full-text search via SQLite FTS5. CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`.
 
 ## Getting started
 

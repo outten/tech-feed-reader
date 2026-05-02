@@ -25,6 +25,7 @@ require_relative 'summarizer/extractive'
 require_relative 'summarizer/claude'
 require_relative 'opml'
 require_relative 'recommendation'
+require_relative 'topic_clusters'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -114,6 +115,7 @@ class TechFeedReader < Sinatra::Base
     @daily_counts     = ArticlesStore.daily_counts(days: 30)
     @top_feeds        = ArticlesStore.counts_by_feed(limit: 10)
     @top_tags_week    = TagsStore.top_in_window(days: 7, limit: 8)
+    @topic_clusters   = TopicClusters.recent(days: 14, limit: 8)
     erb :dashboard
   end
 
