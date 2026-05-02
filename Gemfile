@@ -30,3 +30,9 @@ gem 'loofah'
 # csv is no longer a default gem starting with Ruby 3.4; needed if/when we
 # add export endpoints. Cheap to ship now so it's there when Tier 3 lands.
 gem 'csv'
+
+# SQLite — single source of truth for feeds, articles, read state, tags,
+# and summaries. FTS5 (built into modern sqlite) backs /search. WAL mode
+# is enabled in app/database.rb so the scheduler can write while the web
+# process serves reads without blocking.
+gem 'sqlite3'

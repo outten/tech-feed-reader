@@ -1,8 +1,8 @@
 # Tech Feed Reader
 
-A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Same architecture as [t-money-terminal](https://github.com/outten/t-money-terminal): Ruby / Sinatra / ERB / RSpec, file-backed JSON stores, cache-only render contract, scheduled background refresh.
+A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: greenfield seed.** The app boots and the route shell renders empty-state pages. Feed fetching, article store, and the rest of Tier 1 are next.
+> **Status: greenfield seed.** The app boots, the route shell renders empty-state pages, and the SQLite schema + migration runner are wired in. Feed fetching, the FeedsStore, and the rest of Tier 1 are next.
 
 ## Getting started
 

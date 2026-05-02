@@ -10,6 +10,13 @@ require 'dotenv'
 Dotenv.load(File.expand_path('../../.credentials', __FILE__))
 Dotenv.load(File.expand_path('../../.env', __FILE__))
 
+require_relative 'database'
+
+# Auto-migrate on boot for dev / production so `make run` always sees an
+# up-to-date schema. Test env stays hermetic — specs that need tables
+# call Database.migrate! themselves against the in-memory DB.
+Database.migrate! unless ENV['RACK_ENV'] == 'test'
+
 # Tech Feed Reader — single-user RSS / Atom aggregator.
 #
 # Architecture mirrors t-money-terminal: file-backed JSON stores under

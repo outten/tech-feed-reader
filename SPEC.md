@@ -4,7 +4,7 @@
 
 ## One-liner
 
-A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Same architecture and conventions as `t-money-terminal`: Ruby / Sinatra / ERB / RSpec, file-backed JSON stores, cache-only render contract, scheduled background refresh.
+A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from `t-money-terminal` (Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh) but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
 ## Goals
 
@@ -29,28 +29,34 @@ The user is one person reading ~50–200 articles a week across ~20–50 feeds. 
 Same shape as `t-money-terminal` — see [AGENTS.md](AGENTS.md) for the full pattern. Quick summary:
 
 - **Ruby 3.4+ / Sinatra / ERB / RSpec / rerun** (auto-reload dev loop).
-- **File-backed JSON stores** under `data/`, each guarded by `MUTEX.synchronize` + write-to-`.tmp`-then-rename for crash safety.
-- **Cache-only render contract**: `/dashboard` and `/articles` render purely from cache. The only network events are the background scheduler, the `/admin/refresh/*` buttons, and explicit user-triggered fetches.
+- **Single SQLite DB** at `data/app.db` (WAL mode, `foreign_keys=ON`) holds feeds, articles, read state, tags, and summaries. FTS5 backs `/search`. The file-per-store JSON pattern from `t-money` is replaced — SQLite provides atomicity, transactions, and full-text search out of the box.
+- **Cache-only render contract**: `/dashboard` and `/articles` render purely from the DB. The only network events are the background scheduler, the `/admin/refresh/*` buttons, and explicit user-triggered fetches.
 - **Per-feed TTL** (analogous to `t-money`'s market-aware TTL): the scheduler picks feed-fetch cadence per feed based on observed update frequency. High-volume feeds (HN, Lobsters) poll every 15 min; low-volume blogs every 4–6 h.
 - **HealthRegistry** pattern for feed-fetch observability — bounded ring buffer of `(feed, timestamp, status, latency)` tuples surfaced at `/admin/health`.
 - **`UserAgent` + retry/backoff layer** — single shared HTTP client with cache-friendly headers (`If-Modified-Since`, `If-None-Match`) so feeds that support 304 don't waste bandwidth.
 
 ## Data model
 
-### Stores (file-backed, mutex-guarded)
+### Tables (SQLite — `data/app.db`)
 
-| Store | File | Purpose |
-|---|---|---|
-| `FeedsStore` | `data/feeds.json` | Subscribed feeds: URL, title, fetch interval, last_fetched_at, last_etag, last_modified, fetch_status |
-| `ArticlesStore` | `data/articles/<yyyy-mm>.json` (sharded by month) | Article history: id, feed_id, title, url, author, published_at, summary, content_html, content_text, tags |
-| `TagsStore` | `data/tags.json` | User-defined tag rules: name, match (regex / keyword list / feed_id) |
-| `ReadStateStore` | `data/read_state.json` | Per-article state: read, bookmarked, archived, opened_at |
-| `SummaryStore` | `data/summaries/<article_id>.json` | LLM / extractive summaries keyed by article id; immutable (re-summarize on demand only) |
-| `HealthRegistry` (in-memory) | — | Per-feed fetch observations; clears on restart |
+| Table | Purpose |
+|---|---|
+| `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status |
+| `articles` | Article history: id (rowid), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text |
+| `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via triggers |
+| `read_state` | Per-article state: read, bookmarked, archived, opened_at — keyed by article rowid |
+| `tags` | User-defined tag rules: name, match_kind (regex/keyword/feed_id), match_value |
+| `article_tags` | Many-to-many join between articles and tags |
+| `summaries` | Extractive + LLM summaries per article; immutable (re-summarize on demand) |
+| `schema_migrations` | Migration runner state — see `db/migrations/*.sql` |
+
+`HealthRegistry` lives in process memory only (bounded ring buffer of feed-fetch observations); it clears on restart.
+
+Schema is defined in [db/migrations/001_init.sql](db/migrations/001_init.sql); the runner is [app/database.rb](app/database.rb).
 
 ### Article id
 
-`SHA1(feed_url + article_url)[0,12]` — stable across re-fetches; safe URL slug.
+Each article has both a SQLite rowid (`articles.id`, used internally for joins and FTS5 linkage) and a stable `uid` = `SHA1(feed_url + article_url)[0,12]` used in URLs (`/article/abc123def456`). The uid is stable across re-fetches; the rowid is internal.
 
 ## Pages (initial set)
 
@@ -71,7 +77,7 @@ The same hard rule that makes `/portfolio` fast in `t-money` applies here:
 
 ```
 Page renders MUST be cache-only.
-  /dashboard → reads ArticlesStore + ReadStateStore + SummaryStore — no fetches
+  /dashboard → reads articles + read_state + summaries from SQLite — no fetches
   /articles  → same
   /article/:id → same; summarize button is the only on-demand network event
                   on this page
@@ -99,8 +105,8 @@ Hard test in `spec/articles_perf_spec.rb` (mirroring `portfolio_perf_spec.rb`) a
 
 ### Tier 2 — analyze + summarize [P1]
 
-- H. Tagging: rule-based (`TagsStore`) + manual override on the article view.
-- I. Full-text search across `content_text` + title + summary. SQLite or pure-Ruby reverse-index — start simple.
+- H. Tagging: rule-based (`tags` + `article_tags`) + manual override on the article view.
+- I. Full-text search across `content_text` + title (SQLite FTS5 — index already in place); widen to summaries when those land.
 - J. Extractive summary (TextRank-style; pure Ruby) cached per article.
 - K. LLM-backed summary as an opt-in upgrade (Claude API; cached forever per article id).
 - L. Per-tag / per-feed activity charts on `/dashboard` (Chart.js, mirroring t-money's value-over-time pattern).
@@ -129,11 +135,11 @@ Hard test in `spec/articles_perf_spec.rb` (mirroring `portfolio_perf_spec.rb`) a
 - **GitHub Actions CI** runs RSpec + scripts syntax check on every PR.
 - **`.credentials` for keys** (Claude API key for summarization, none other expected at v1).
 
-## Open questions for v1 kickoff
+## Resolved at v1 kickoff
 
-1. **Initial seed feed list** — what feeds does the user want pre-loaded? (HN, Lobsters, Ars Technica, The Verge, others?)
-2. **Summary backend** — start with extractive-only (no API key needed) or wire Claude API from day 1?
-3. **Storage shape for articles** — start with monthly-sharded JSON files, OR jump to SQLite for full-text search? FTS would simplify Tier 2's search task significantly.
-4. **Mobile-friendly** as v1 priority, or desktop-only and add responsive CSS in Tier 3?
+These were the four open questions surfaced before any feature code landed; recording the answers here so the rationale is visible.
 
-These should be resolved before the first commit lands.
+1. **Initial seed feed list** — start with 5 to validate the pipeline: Hacker News, Lobsters, Ars Technica, The Verge, Simon Willison's blog. More added via `/feeds` once the UI lands.
+2. **Summary backend** — extractive first (no API key needed), Claude API wired in Tier 2 alongside it. Both gated behind a user button on `/article/:id`.
+3. **Storage shape for articles** — **SQLite from day 1** (replaces monthly-sharded JSON). FTS5 backs `/search` and removes a Tier 2 design choice. WAL + foreign-key cascades cover the concurrency + integrity story.
+4. **Mobile** — desktop-first; responsive CSS is welcome but mobile-native is a non-goal.
