@@ -136,12 +136,13 @@ In-memory only; clears on process restart. Tests opt in via `ENV['HEALTH_REGISTR
 app/
   main.rb                  # Sinatra routes; auto-migrates on boot
   database.rb              # SQLite handle + migration runner
-  feed_fetcher.rb          # HTTP layer (If-Modified-Since / ETag honouring) + parse
-  feed_parser.rb           # rss / feedjira wrapper; normalises Atom + RSS to one shape
+  feed_fetcher.rb          # orchestrator: conditional GET → parse → update FeedsStore
+  feed_parser.rb           # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom
+  sanitizer.rb             # loofah whitelist; sanitize_html + text_only
   providers/
-    readability.rb         # extract main content from origin URL
-    archive.rb             # archive.org fallback
-    http_client.rb         # shared user-agent + retry/backoff + cache headers
+    http_client.rb         # shared user-agent + retry/backoff + scheme guard
+    readability.rb         # extract main content from origin URL (Tier 2)
+    archive.rb             # archive.org fallback (Tier 2)
   feeds_store.rb           # SQLite-backed wrapper (CRUD on the feeds table)
   articles_store.rb        # SQLite-backed wrapper (CRUD on articles + FTS5)
   tags_store.rb

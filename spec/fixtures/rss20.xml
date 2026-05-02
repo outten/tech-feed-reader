@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Tech Blog</title>
+    <link>https://example.com/</link>
+    <description>Stories about software.</description>
+    <language>en-us</language>
+
+    <item>
+      <title>Hello, world</title>
+      <link>https://example.com/posts/hello</link>
+      <author>jane@example.com (Jane Doe)</author>
+      <pubDate>Fri, 02 May 2026 12:00:00 +0000</pubDate>
+      <guid>https://example.com/posts/hello</guid>
+      <description><![CDATA[<p>First post body. <script>alert('xss')</script><em>emphasis</em>.</p>]]></description>
+    </item>
+
+    <item>
+      <title>Second post</title>
+      <link>https://example.com/posts/second</link>
+      <pubDate>Thu, 01 May 2026 09:00:00 +0000</pubDate>
+      <guid>https://example.com/posts/second</guid>
+      <description><![CDATA[<p>Body two with <iframe src="evil.com"></iframe> and <a href="https://example.com/x">a link</a>.</p>]]></description>
+    </item>
+  </channel>
+</rss>
