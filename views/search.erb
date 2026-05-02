@@ -1,0 +1,18 @@
+<h2>Search</h2>
+<p class="subtitle">Full-text search across article history.</p>
+
+<form action="/search" method="get" class="portfolio-form" style="margin-top: 12px">
+  <label class="full-width">Query
+    <input type="text" name="q" value="<%= @query %>" placeholder="kubernetes ebpf" autofocus>
+  </label>
+  <button type="submit" class="btn-primary">Search</button>
+</form>
+
+<% unless @query.empty? %>
+  <section class="benchmark-section" style="margin-top: 18px">
+    <h3>Results for <code><%= @query %></code></h3>
+    <p class="data-source">
+      Search index lands in Tier 2 — see <code>SPEC.md</code> milestone I.
+    </p>
+  </section>
+<% end %>

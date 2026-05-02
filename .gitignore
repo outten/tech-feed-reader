@@ -1,0 +1,12 @@
+.credentials
+.env
+tmp/
+.cache/
+data/cache/
+data/feeds.json
+data/articles/
+data/tags.json
+data/read_state.json
+data/summaries/
+data/scheduler*.log
+*.log
