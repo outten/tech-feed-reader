@@ -22,6 +22,7 @@ require_relative 'health_registry'
 require_relative 'scheduler'
 require_relative 'summary_store'
 require_relative 'summarizer/extractive'
+require_relative 'summarizer/claude'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -143,12 +144,13 @@ class TechFeedReader < Sinatra::Base
     @article = ArticlesStore.find_by_uid(uid)
     halt 404, erb(:article_not_found) unless @article
 
-    @feed         = FeedsStore.find(@article['feed_id'])
-    @state        = ReadStateStore.opened!(@article['id'])
-    @article_tags = TagsStore.tags_for_article(@article['id'])
-    @all_tags     = TagsStore.all
-    @summary      = SummaryStore.find(@article['id'])
-    @page_title   = @article['title']
+    @feed            = FeedsStore.find(@article['feed_id'])
+    @state           = ReadStateStore.opened!(@article['id'])
+    @article_tags    = TagsStore.tags_for_article(@article['id'])
+    @all_tags        = TagsStore.all
+    @summary         = SummaryStore.find(@article['id'])
+    @claude_available = Summarizer::Claude.available?
+    @page_title      = @article['title']
     erb :article
   end
 
@@ -166,6 +168,29 @@ class TechFeedReader < Sinatra::Base
     else
       SummaryStore.upsert(article['id'], extractive: summary)
       redirect to("/article/#{uid}?notice=resummarized")
+    end
+  end
+
+  # LLM summary via Claude. Opt-in (only fires when the user clicks
+  # "Summarize with Claude"). Cached forever per article id; never
+  # auto-invalidated. The button is hidden in the view when
+  # Summarizer::Claude.available? is false (no API key set).
+  post '/article/:uid/summarize/llm' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+
+    result = Summarizer::Claude.summarize(
+      title:        article['title'].to_s,
+      content_text: article['content_text'].to_s
+    )
+
+    case result.status
+    when :ok
+      SummaryStore.upsert(article['id'], llm: result.text, llm_model: result.model)
+      redirect to("/article/#{uid}?notice=llm-summarized&model=#{CGI.escape(result.model)}")
+    when :unavailable then redirect to("/article/#{uid}?error=llm-unavailable")
+    when :empty       then redirect to("/article/#{uid}?error=empty-content")
+    else                   redirect to("/article/#{uid}?error=llm-failed&msg=#{CGI.escape(result.error.to_s)}")
     end
   end
 
