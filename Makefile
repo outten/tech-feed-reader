@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate refresh-feeds refresh-feed scheduler
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler
 
 install:
 	bundle install
@@ -9,6 +9,11 @@ install:
 # scheduler or scripts run.
 migrate:
 	bundle exec ruby scripts/migrate.rb
+
+# Insert the v1-kickoff starter feeds (HN, Lobsters, Ars, Verge,
+# simonwillison.net). Idempotent — skips any URL already present.
+seed-feeds:
+	bundle exec ruby scripts/seed_feeds.rb
 
 # Auto-reloading dev server. `rerun` reads .rerun in the project root for
 # watch dirs, file patterns, and ignore globs. NOTE: .rerun does NOT support

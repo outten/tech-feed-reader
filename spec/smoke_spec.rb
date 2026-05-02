@@ -32,4 +32,41 @@ RSpec.describe 'TechFeedReader smoke' do
     expect(last_response.status).to eq(200)
     expect(last_response.body).to include('abc123')
   end
+
+  describe 'POST /feeds' do
+    it 'adds a feed and redirects with notice=added' do
+      post '/feeds', { url: 'https://example.com/rss', title: 'Example' }
+      expect(last_response.status).to eq(302)
+      expect(last_response.headers['Location']).to include('/feeds?notice=added')
+      expect(FeedsStore.find_by_url('https://example.com/rss')).not_to be_nil
+    end
+
+    it 'rejects malformed URLs with error=invalid-url' do
+      post '/feeds', { url: 'not-a-url' }
+      expect(last_response.status).to eq(302)
+      expect(last_response.headers['Location']).to include('/feeds?error=invalid-url')
+      expect(FeedsStore.count).to eq(0)
+    end
+
+    it 'reports duplicate URLs with error=duplicate-url' do
+      FeedsStore.add(url: 'https://dup.example.com/rss')
+      post '/feeds', { url: 'https://dup.example.com/rss' }
+      expect(last_response.headers['Location']).to include('/feeds?error=duplicate-url')
+      expect(FeedsStore.count).to eq(1)
+    end
+  end
+
+  describe 'POST /feeds/:id/delete' do
+    it 'removes the feed and redirects with notice=removed' do
+      feed = FeedsStore.add(url: 'https://gone.example.com/rss')
+      post "/feeds/#{feed['id']}/delete"
+      expect(last_response.headers['Location']).to include('/feeds?notice=removed')
+      expect(FeedsStore.find(feed['id'])).to be_nil
+    end
+
+    it 'reports a missing feed with error=not-found' do
+      post '/feeds/999/delete'
+      expect(last_response.headers['Location']).to include('/feeds?error=not-found')
+    end
+  end
 end
