@@ -5,6 +5,10 @@ gem 'sinatra'
 gem 'puma'
 gem 'rerun'
 
+# Rack 3 unbundled the `rackup` CLI into its own gem; Sinatra 4 + Rack 3
+# need it explicit or `bundle exec ruby app/main.rb` fails to boot.
+gem 'rackup', '~> 2.3'
+
 # Test
 group :test do
   gem 'rspec'
