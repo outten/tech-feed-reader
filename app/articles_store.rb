@@ -3,6 +3,7 @@ require_relative 'tags_store'
 require_relative 'tags_applier'
 require_relative 'summary_store'
 require_relative 'summarizer/extractive'
+require_relative 'providers/readability'
 
 # Wrapper around the `articles` table. Returns hash-rows (matching
 # Database#results_as_hash) so callers can pass them straight into ERB.
@@ -100,8 +101,14 @@ module ArticlesStore
 
     rules    = TagsStore.all  # snapshot once per import batch
     inserted = 0
+    # Run readability OUTSIDE the transaction — readability does HTTP, and
+    # we don't want the SQLite write lock held for the full duration of N
+    # sequential publisher fetches. By the time we open the transaction
+    # below every entry is already final.
+    upgraded = entries.map { |e| maybe_readability_upgrade(e) }
+
     db.transaction do
-      entries.each do |entry|
+      upgraded.each do |entry|
         db.execute(sql, [
           entry[:uid], feed_id,
           entry[:title].to_s, entry[:url].to_s,
@@ -145,6 +152,22 @@ module ArticlesStore
       summary = Summarizer::Extractive.summarize(body)
       return if summary.empty?
       SummaryStore.upsert(article_id, extractive: summary)
+    end
+
+    # When a feed body looks like a teaser (Lobsters / HN "Comments"
+    # link, ≤300 chars), fetch the entry's source URL and run our
+    # Readability extractor. On success, splice the extracted html /
+    # text into the entry hash and continue the import. On failure,
+    # the entry is returned unchanged — the user gets a placeholder
+    # body but no crash.
+    def maybe_readability_upgrade(entry)
+      return entry unless Providers::Readability.teaser?(entry[:content_text])
+      return entry if entry[:url].to_s.empty?
+
+      upgrade = Providers::Readability.extract(entry[:url])
+      return entry unless upgrade
+
+      entry.merge(content_html: upgrade[:html], content_text: upgrade[:text])
     end
 
     # Build a SELECT a.*, read_state... over articles LEFT JOIN read_state

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <div class="random-classname-no-selector-match">
+    <p>Some scattered intro paragraph that is not the actual content. Just a few words.</p>
+  </div>
+  <div class="actual-content-but-no-known-class">
+    <p>This is the body of the article in a div with no recognised class name. The density-based fallback should pick this up because it has the most non-link text on the page. We need at least four hundred characters of content here for the heuristic to count it as substantive enough to win against the other shorter blocks. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+  </div>
+  <div class="sidebar">
+    <a href="/x">link</a>
+    <a href="/y">link</a>
+    <a href="/z">link</a>
+  </div>
+</body>
+</html>
