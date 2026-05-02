@@ -36,6 +36,10 @@
     <%= h(params['skipped'] || '0') %> already present
     (<%= h(params['total'] || '0') %> total feeds in the file).
   </div>
+<% elsif @notice == 'catalog-added' %>
+  <div class="notice">Added <strong><%= h(params['title']) %></strong> from the catalog.</div>
+<% elsif @notice == 'already-subscribed' %>
+  <div class="notice"><strong><%= h(params['title']) %></strong> is already subscribed.</div>
 <% elsif @notice %>
   <div class="notice"><%= h(@notice) %></div>
 <% end %>
@@ -50,6 +54,8 @@
   <div class="error">Pick an OPML file before clicking Import.</div>
 <% elsif @error == 'import-failed' %>
   <div class="error">Import failed: <code><%= h(params['msg']) %></code>.</div>
+<% elsif @error == 'not-in-catalog' %>
+  <div class="error">That URL isn't in the curated catalog. Use the "Add a feed" form for arbitrary URLs.</div>
 <% elsif @error %>
   <div class="error"><%= h(@error) %></div>
 <% end %>
@@ -132,3 +138,37 @@
     </tbody>
   </table>
 <% end %>
+
+<section class="benchmark-section" style="margin-top:2.5rem">
+  <h3>Discover popular feeds</h3>
+  <p class="subtitle">
+    25 hand-picked tech feeds. Click <strong>Add</strong> on anything that looks
+    interesting — the URL goes straight into the subscriptions list. Already-
+    subscribed entries are marked.
+  </p>
+  <% @categories.each do |key, label| %>
+    <% entries = @catalog[key] %>
+    <% next if entries.empty? %>
+    <h4 class="catalog-category"><%= label %></h4>
+    <ul class="catalog-list">
+      <% entries.each do |entry| %>
+        <% subscribed = @subscribed.include?(entry[:url]) %>
+        <li class="catalog-row <%= 'subscribed' if subscribed %>">
+          <div class="catalog-meta">
+            <span class="catalog-title"><%= h(entry[:title]) %></span>
+            <span class="catalog-blurb"><%= h(entry[:blurb]) %></span>
+            <span class="muted catalog-url"><%= h(entry[:url]) %></span>
+          </div>
+          <% if subscribed %>
+            <span class="badge subscribed-badge">✓ Subscribed</span>
+          <% else %>
+            <form method="post" action="/feeds/catalog/add">
+              <input type="hidden" name="url" value="<%= h(entry[:url]) %>">
+              <button type="submit" class="btn-primary">+ Add</button>
+            </form>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

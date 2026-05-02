@@ -26,6 +26,7 @@ require_relative 'summarizer/claude'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
+require_relative 'feed_catalog'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -228,11 +229,31 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/feeds' do
-    @page_title = 'Feeds'
-    @feeds      = FeedsStore.all
-    @notice     = params['notice']
-    @error      = params['error']
+    @page_title  = 'Feeds'
+    @feeds       = FeedsStore.all
+    @notice      = params['notice']
+    @error       = params['error']
+    @catalog     = FeedCatalog.by_category
+    @subscribed  = @feeds.map { |f| f['url'] }.to_set
+    @categories  = FeedCatalog::CATEGORIES
     erb :feeds
+  end
+
+  # One-click add from the curated catalog. Looks the URL up in the
+  # catalog (so a user can't grease through with arbitrary metadata via
+  # the form), then routes through FeedsStore.add. Idempotent — duplicate
+  # URLs short-circuit to a friendly notice.
+  post '/feeds/catalog/add' do
+    url   = params['url'].to_s.strip
+    entry = FeedCatalog.find_by_url(url)
+    redirect to('/feeds?error=not-in-catalog') unless entry
+
+    if FeedsStore.find_by_url(url)
+      redirect to("/feeds?notice=already-subscribed&title=#{CGI.escape(entry[:title])}")
+    else
+      FeedsStore.add(url: entry[:url], title: entry[:title], fetch_interval_seconds: entry[:interval])
+      redirect to("/feeds?notice=catalog-added&title=#{CGI.escape(entry[:title])}")
+    end
   end
 
   # Add a feed. URL is required; title and fetch_interval_seconds are

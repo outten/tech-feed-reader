@@ -15,7 +15,7 @@ Start with [SPEC.md](SPEC.md) for the why and [AGENTS.md](AGENTS.md) for the how
 ```bash
 make install                      # bundle install
 make migrate                      # apply any pending db/migrations/*.sql
-make seed-feeds                   # insert the 5 v1-kickoff starter feeds (idempotent)
+make seed-feeds                   # insert the 5 catalog seed defaults (browse 25 more via /feeds)
 make run                          # dev server with rerun auto-reload (auto-migrates on boot)
 make test                         # RSpec
 make refresh-feeds                # poll every feed in FeedsStore once
