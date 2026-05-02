@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tech Feed Reader<%= @page_title ? " — #{@page_title}" : '' %></title>
+  <title>Tech Feed Reader<%= @page_title ? " — #{h(@page_title)}" : '' %></title>
   <link rel="stylesheet" href="/style.css?v=<%= asset_mtime('public/style.css') %>">
 </head>
 <body>
