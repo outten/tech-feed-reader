@@ -59,6 +59,31 @@
     <% end %>
   </header>
 
+  <% if params['notice'] == 'resummarized' %>
+    <div class="notice">Extractive summary regenerated.</div>
+  <% elsif params['error'] == 'empty-content' %>
+    <div class="error">No content_text to summarise.</div>
+  <% end %>
+
+  <% if @summary && !@summary['extractive'].to_s.empty? %>
+    <section class="benchmark-section">
+      <h3>
+        Summary
+        <span class="muted" style="font-size:0.78rem; font-weight:normal">
+          (extractive,
+          <%= @summary['llm'].to_s.empty? ? 'no LLM yet' : "with LLM via #{h(@summary['llm_model'] || '?')}" %>)
+        </span>
+        <form method="post" action="/article/<%= @article['uid'] %>/summarize" style="display:inline; margin-left:0.5rem">
+          <button type="submit" class="refresh-btn">Re-summarize</button>
+        </form>
+      </h3>
+      <p class="excerpt"><%= h(@summary['extractive']) %></p>
+      <% unless @summary['llm'].to_s.empty? %>
+        <p class="excerpt"><%= h(@summary['llm']) %></p>
+      <% end %>
+    </section>
+  <% end %>
+
   <section class="article-body">
     <% if @article['content_html'] && !@article['content_html'].empty? %>
       <%= @article['content_html'] %>
