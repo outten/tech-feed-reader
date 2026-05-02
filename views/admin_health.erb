@@ -1,30 +1,32 @@
-<h2>Provider health</h2>
-<p class="subtitle">
-  Bounded ring buffer of feed-fetch observations &mdash; in-memory only,
-  clears on process restart.
-  <% unless @enabled %>
-    <strong>(no-op in this env &mdash; set <code>HEALTH_REGISTRY=1</code> to enable)</strong>
-  <% end %>
-</p>
+<div class="page-header">
+  <div>
+    <h2>Provider health</h2>
+    <p class="subtitle">
+      Bounded ring buffer of feed-fetch observations &mdash; in-memory only,
+      clears on process restart.
+      <% unless @enabled %>
+        <strong>(no-op in this env &mdash; set <code>HEALTH_REGISTRY=1</code>)</strong>
+      <% end %>
+    </p>
+  </div>
+</div>
 
 <% if @degraded %>
-  <p class="error">
-    <strong>Degraded:</strong> recent fetches are mostly failing. Check network /
-    publisher status.
-  </p>
+  <div class="degradation-banner">
+    <span class="banner-icon">⚠</span>
+    <span><strong>Degraded:</strong> recent fetches are mostly failing. Check network / publisher status.</span>
+  </div>
 <% end %>
 
 <% if @summary.empty? %>
-  <section class="benchmark-section">
-    <p class="data-source">
-      No observations yet. Trigger a fetch via <code>POST /admin/refresh/all</code>
-      or wait for the scheduler.
-    </p>
-  </section>
+  <div class="empty-state">
+    No observations yet. Trigger a fetch via
+    <code>POST /admin/refresh/all</code> or wait for the scheduler.
+  </div>
 <% else %>
   <section class="benchmark-section">
     <h3>Per-feed summary</h3>
-    <table class="feeds-table">
+    <table class="data-table">
       <thead>
         <tr><th>Feed</th><th>Total</th><th>Success</th><th>Errors</th><th>Avg latency</th><th>Last status</th></tr>
       </thead>
@@ -33,36 +35,36 @@
           <tr>
             <td>
               <% if (feed = @feeds_by_id[feed_id]) %>
-                <a href="/articles?feed_id=<%= feed_id %>"><%= feed['title'] || feed['url'] %></a>
+                <a href="/articles?feed_id=<%= feed_id %>"><%= h(feed['title'] || feed['url']) %></a>
               <% else %>
-                feed #<%= feed_id %> <em>(removed)</em>
+                feed #<%= feed_id %> <em class="muted">(removed)</em>
               <% end %>
             </td>
-            <td><%= s[:total] %></td>
-            <td><%= s[:success] %></td>
-            <td><%= s[:errors] %></td>
-            <td><%= s[:avg_latency_ms] ? "#{s[:avg_latency_ms]}ms" : '&mdash;' %></td>
-            <td><%= s[:last].status %></td>
+            <td class="num"><%= s[:total] %></td>
+            <td class="num"><%= s[:success] %></td>
+            <td class="num"><%= s[:errors] %></td>
+            <td class="num"><%= s[:avg_latency_ms] ? "#{s[:avg_latency_ms]}ms" : '—' %></td>
+            <td class="muted"><%= s[:last].status %></td>
           </tr>
         <% end %>
       </tbody>
     </table>
   </section>
 
-  <section class="benchmark-section">
+  <section class="benchmark-section" style="margin-top:2rem">
     <h3>Recent observations</h3>
-    <table class="feeds-table">
+    <table class="data-table">
       <thead>
         <tr><th>When</th><th>Feed</th><th>Status</th><th>Latency</th><th>Note</th></tr>
       </thead>
       <tbody>
         <% @observations.each do |obs| %>
           <tr>
-            <td><%= relative_time(obs.at) %></td>
-            <td><%= (@feeds_by_id[obs.feed_id] || {})['title'] || "#{obs.feed_id}" %></td>
-            <td><%= obs.status %></td>
-            <td><%= obs.latency_ms %>ms</td>
-            <td><%= obs.note || '&mdash;' %></td>
+            <td class="muted"><%= relative_time(obs.at) %></td>
+            <td><%= h((@feeds_by_id[obs.feed_id] || {})['title'] || "#{obs.feed_id}") %></td>
+            <td class="muted"><%= obs.status %></td>
+            <td class="num"><%= obs.latency_ms %>ms</td>
+            <td class="muted"><%= obs.note ? h(obs.note) : '—' %></td>
           </tr>
         <% end %>
       </tbody>

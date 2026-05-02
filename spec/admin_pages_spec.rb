@@ -30,7 +30,7 @@ RSpec.describe 'admin pages' do
       get '/admin/cache'
       expect(last_response.body).to include('Example')
       expect(last_response.body).to include('200')
-      expect(last_response.body).to match(/<td>1<\/td>/) # one article
+      expect(last_response.body).to match(/<td[^>]*>1<\/td>/) # one article
     end
   end
 

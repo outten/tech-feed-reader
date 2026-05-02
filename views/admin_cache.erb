@@ -1,48 +1,54 @@
-<h2>Cache admin</h2>
-<p class="subtitle">
-  Per-feed cache age + manual refresh.
-  <form method="post" action="/admin/refresh/all" style="display:inline; margin-left:1em;">
-    <button type="submit">Refresh all</button>
-  </form>
-</p>
+<div class="page-header">
+  <div>
+    <h2>Cache admin</h2>
+    <p class="subtitle">Per-feed cache age and manual refresh.</p>
+  </div>
+  <% if @feeds.any? %>
+    <form method="post" action="/admin/refresh/all">
+      <button type="submit" class="refresh-btn">Refresh all</button>
+    </form>
+  <% end %>
+</div>
 
 <% if @feeds.empty? %>
-  <section class="benchmark-section">
-    <p class="data-source">
-      No feeds subscribed. Add one at <a href="/feeds">/feeds</a>.
-    </p>
-  </section>
+  <div class="empty-state">
+    No feeds subscribed. Add one at <a href="/feeds">/feeds</a>.
+  </div>
 <% else %>
-  <section class="benchmark-section">
-    <table class="feeds-table">
-      <thead>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Feed</th>
+        <th>Articles</th>
+        <th>Interval</th>
+        <th>Last fetched</th>
+        <th>Status</th>
+        <th>ETag</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @feeds.each do |feed| %>
         <tr>
-          <th>Feed</th>
-          <th>Articles</th>
-          <th>Interval</th>
-          <th>Last fetched</th>
-          <th>Status</th>
-          <th>ETag</th>
-          <th></th>
+          <td><%= h(feed['title'] || feed['url']) %></td>
+          <td class="num"><%= @article_counts[feed['id']] || 0 %></td>
+          <td class="num"><%= feed['fetch_interval_seconds'] %>s</td>
+          <td class="muted"><%= relative_time(feed['last_fetched_at']) %></td>
+          <td class="muted"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
+          <td class="mono muted">
+            <% if feed['last_etag'] %>
+              <%= h(feed['last_etag'][0, 16]) %>…
+            <% else %>
+              —
+            <% end %>
+          </td>
+          <td>
+            <form method="post" action="/admin/refresh/<%= feed['id'] %>" style="display:inline">
+              <button type="submit" class="refresh-btn">Refresh</button>
+            </form>
+          </td>
         </tr>
-      </thead>
-      <tbody>
-        <% @feeds.each do |feed| %>
-          <tr>
-            <td><%= feed['title'] || feed['url'] %></td>
-            <td><%= @article_counts[feed['id']] || 0 %></td>
-            <td><%= feed['fetch_interval_seconds'] %>s</td>
-            <td><%= relative_time(feed['last_fetched_at']) %></td>
-            <td><%= feed['last_status'] || '&mdash;' %></td>
-            <td><%= feed['last_etag'] ? feed['last_etag'][0, 16] + '…' : '&mdash;' %></td>
-            <td>
-              <form method="post" action="/admin/refresh/<%= feed['id'] %>" style="display:inline">
-                <button type="submit">Refresh</button>
-              </form>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </section>
+      <% end %>
+    </tbody>
+  </table>
 <% end %>

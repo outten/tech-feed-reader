@@ -1,65 +1,68 @@
-<h2>Search</h2>
-<p class="subtitle">
-  Full-text search across article titles + extracted body text.
-  FTS5 syntax — quoted phrases, AND/OR/NOT, prefix-with-* — works.
-</p>
+<div class="page-header">
+  <div>
+    <h2>Search</h2>
+    <p class="subtitle">
+      Full-text search across article titles + extracted body text.
+      FTS5 syntax — quoted phrases, AND/OR/NOT, prefix-with-* — works.
+    </p>
+  </div>
+</div>
 
-<form action="/search" method="get" class="feed-form">
-  <label>
-    Query
-    <input type="text" name="q" value="<%= h(@query) %>" placeholder='kubernetes ebpf, "exact phrase", ai NOT crypto' autofocus>
-  </label>
-  <button type="submit">Search</button>
-</form>
+<div class="portfolio-add">
+  <form action="/search" method="get" class="portfolio-form">
+    <label class="full-width">
+      Query
+      <input type="text" name="q" value="<%= h(@query) %>" placeholder='kubernetes ebpf, "exact phrase", ai NOT crypto' autofocus>
+    </label>
+    <button type="submit" class="btn-primary">Search</button>
+  </form>
+</div>
 
 <% if @error %>
-  <p class="error">
+  <div class="error">
     Query syntax error: <code><%= h(@error) %></code>. Try removing quotes
     or special characters, or wrapping the whole thing in <code>"…"</code>.
-  </p>
+  </div>
 <% end %>
 
 <% if !@query.empty? && !@error %>
-  <section class="benchmark-section">
-    <h3>
-      <% if @results.empty? %>
-        No results for <code><%= h(@query) %></code>. Try
-      <a href="/search?q=<%= CGI.escape(@query) %>%2A">prefix-match
-      with <code>*</code></a> if it's an unusual word.
-      <% else %>
-        Results for <code><%= h(@query) %></code>
-        <span class="meta">(page <%= @page %>, showing <%= @results.length %>)</span>
-      <% end %>
-    </h3>
-
-    <% if @results.any? %>
-      <ul class="article-list">
-        <% @results.each do |article| %>
-          <li class="<%= article['read'] == 1 ? 'read' : 'unread' %>">
-            <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
-            <% (@tags_by_article[article['id']] || []).each do |tag| %>
-              <a class="badge tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a>
+  <% if @results.empty? %>
+    <div class="empty-state">
+      No results for <code><%= h(@query) %></code>.
+      Try <a href="/search?q=<%= CGI.escape(@query) %>%2A">prefix-match with <code>*</code></a>
+      if it's an unusual word.
+    </div>
+  <% else %>
+    <p class="subtitle" style="margin-top:1.25rem">
+      Results for <code><%= h(@query) %></code>
+      <span class="muted">(page <%= @page %>, showing <%= @results.length %>)</span>
+    </p>
+    <ul class="news-list">
+      <% @results.each do |article| %>
+        <li class="news-item <%= article['read'] == 1 ? 'read' : '' %>">
+          <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+          <% (@tags_by_article[article['id']] || []).each do |tag| %>
+            <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+          <% end %>
+          <p class="excerpt"><%= article['excerpt'] %></p>
+          <div class="news-meta">
+            <% if (feed = @feeds_by_id[article['feed_id']]) %>
+              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
             <% end %>
-            <p class="excerpt"><%= article['excerpt'] %></p>
-            <span class="meta">
-              <% if (feed = @feeds_by_id[article['feed_id']]) %>
-                <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> &middot;
-              <% end %>
-              <%= relative_time(article['published_at']) %>
-            </span>
-          </li>
-        <% end %>
-      </ul>
+            <span><%= relative_time(article['published_at']) %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
 
-      <nav class="pager">
-        <% if @page > 1 %>
-          <a href="?q=<%= CGI.escape(@query) %>&page=<%= @page - 1 %>">&larr; Prev</a>
-        <% end %>
-        <span>Page <%= @page %></span>
-        <% if @results.length == @per_page %>
-          <a href="?q=<%= CGI.escape(@query) %>&page=<%= @page + 1 %>">Next &rarr;</a>
-        <% end %>
-      </nav>
-    <% end %>
-  </section>
+    <nav class="pager">
+      <% if @page > 1 %>
+        <a href="?q=<%= CGI.escape(@query) %>&page=<%= @page - 1 %>">&larr; Prev</a>
+      <% end %>
+      <span>Page <%= @page %></span>
+      <% if @results.length == @per_page %>
+        <a href="?q=<%= CGI.escape(@query) %>&page=<%= @page + 1 %>">Next &rarr;</a>
+      <% end %>
+    </nav>
+  <% end %>
 <% end %>

@@ -1,61 +1,61 @@
 <article class="reading-view">
   <header>
-    <h2><%= @article['title'] %></h2>
-    <p class="meta">
+    <h2><%= h(@article['title']) %></h2>
+    <p class="subtitle">
       <% if @feed %>
-        <a href="/articles?feed_id=<%= @feed['id'] %>"><%= @feed['title'] || @feed['url'] %></a>
+        <a href="/articles?feed_id=<%= @feed['id'] %>"><%= h(@feed['title'] || @feed['url']) %></a>
       <% end %>
       <% if @article['author'] && !@article['author'].to_s.empty? %>
-        · by <%= @article['author'] %>
+        &middot; by <%= h(@article['author']) %>
       <% end %>
-      · <%= relative_time(@article['published_at']) %>
+      &middot; <%= relative_time(@article['published_at']) %>
       <% if @article['url'] && !@article['url'].empty? %>
-        · <a href="<%= @article['url'] %>" rel="noopener noreferrer" target="_blank">Source &rarr;</a>
+        &middot; <a href="<%= h(@article['url']) %>" rel="noopener noreferrer" target="_blank">Source &rarr;</a>
       <% end %>
     </p>
 
-    <p class="actions">
+    <div class="actions">
       <% if @state['read'] == 1 %>
-        <form method="post" action="/article/<%= @article['uid'] %>/read" style="display:inline">
+        <form method="post" action="/article/<%= @article['uid'] %>/read">
           <input type="hidden" name="read" value="0">
           <button type="submit">Mark unread</button>
         </form>
       <% else %>
-        <form method="post" action="/article/<%= @article['uid'] %>/read" style="display:inline">
+        <form method="post" action="/article/<%= @article['uid'] %>/read">
           <button type="submit">Mark read</button>
         </form>
       <% end %>
 
-      <form method="post" action="/article/<%= @article['uid'] %>/bookmark" style="display:inline">
+      <form method="post" action="/article/<%= @article['uid'] %>/bookmark">
         <input type="hidden" name="value" value="<%= @state['bookmarked'] == 1 ? '0' : '1' %>">
-        <button type="submit"><%= @state['bookmarked'] == 1 ? 'Unbookmark' : 'Bookmark' %></button>
+        <button type="submit"><%= @state['bookmarked'] == 1 ? '★ Unbookmark' : '☆ Bookmark' %></button>
       </form>
 
-      <form method="post" action="/article/<%= @article['uid'] %>/archive" style="display:inline">
+      <form method="post" action="/article/<%= @article['uid'] %>/archive">
         <input type="hidden" name="value" value="<%= @state['archived'] == 1 ? '0' : '1' %>">
         <button type="submit"><%= @state['archived'] == 1 ? 'Unarchive' : 'Archive' %></button>
       </form>
-    </p>
+    </div>
 
     <% if @article_tags.any? || @all_tags.any? %>
-      <p class="tags">
+      <div class="tags">
         <% applied_ids = @article_tags.map { |t| t['id'] } %>
         <% @article_tags.each do |tag| %>
-          <span class="badge tag-chip">
-            <a href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a>
+          <span class="tag-chip">
+            <a href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
             <form method="post" action="/article/<%= @article['uid'] %>/tag/<%= tag['id'] %>" style="display:inline">
               <input type="hidden" name="value" value="remove">
               <button type="submit" title="Remove tag">&times;</button>
             </form>
           </span>
         <% end %>
-        <% (@all_tags - @article_tags).reject { |t| applied_ids.include?(t['id']) }.each do |tag| %>
+        <% @all_tags.reject { |t| applied_ids.include?(t['id']) }.each do |tag| %>
           <form method="post" action="/article/<%= @article['uid'] %>/tag/<%= tag['id'] %>" style="display:inline">
             <input type="hidden" name="value" value="add">
-            <button type="submit" class="tag-chip-add">+ <%= tag['name'] %></button>
+            <button type="submit" class="tag-chip-add">+ <%= h(tag['name']) %></button>
           </form>
         <% end %>
-      </p>
+      </div>
     <% end %>
   </header>
 
@@ -63,14 +63,14 @@
     <% if @article['content_html'] && !@article['content_html'].empty? %>
       <%= @article['content_html'] %>
     <% else %>
-      <p><em>(no content extracted — try the source link)</em></p>
+      <p><em>(no content extracted &mdash; try the source link)</em></p>
     <% end %>
   </section>
 
   <footer class="article-footer">
     <p class="subtitle">
       Article id: <code><%= @article['uid'] %></code>
-      · <a href="/articles">&larr; All articles</a>
+      &middot; <a href="/articles">&larr; All articles</a>
     </p>
   </footer>
 </article>

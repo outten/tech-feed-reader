@@ -1,60 +1,62 @@
-<h2>
-  Articles
-  <% if @feed_filter %> &mdash; <%= @feed_filter['title'] || @feed_filter['url'] %><% end %>
-  <% if @tag_filter %> &mdash; <span class="badge tag-chip"><%= @tag_filter['name'] %></span><% end %>
-</h2>
-<p class="subtitle">
-  <% if @feed_filter || @tag_filter %>
-    Filtered. <a href="/articles">Clear filter</a>.
-  <% else %>
-    Filter:
-    <% %i[all unread bookmarked archived].each do |state| %>
-      <a href="?state=<%= state %>"
-         <%= 'class="active"' if @state_filter == state %>><%= state %></a>
+<div class="page-header">
+  <div>
+    <h2>
+      Articles
+      <% if @feed_filter %> &mdash; <%= h(@feed_filter['title'] || @feed_filter['url']) %><% end %>
+      <% if @tag_filter %> &mdash; <span class="tag-chip"><%= h(@tag_filter['name']) %></span><% end %>
+    </h2>
+    <% if @feed_filter || @tag_filter %>
+      <p class="subtitle">Filtered. <a href="/articles">Clear filter</a>.</p>
+    <% else %>
+      <p class="subtitle state-filter">
+        <% %i[all unread bookmarked archived].each do |state| %>
+          <a href="?state=<%= state %>"
+             class="<%= 'active' if @state_filter == state %>"><%= state %></a>
+        <% end %>
+      </p>
     <% end %>
-  <% end %>
-</p>
+  </div>
+</div>
 
 <% if @articles.empty? %>
-  <section class="benchmark-section">
-    <p class="data-source">
-      No articles yet. Add a feed via <a href="/feeds">/feeds</a> and
-      hit the per-row "Refresh" button (or <code>POST /admin/refresh/all</code>)
-      to populate.
-    </p>
-  </section>
+  <div class="empty-state">
+    <% if @feed_filter || @tag_filter %>
+      No articles match this filter.
+    <% else %>
+      No articles yet. Add a feed at <a href="/feeds">/feeds</a> and click
+      "Refresh all" to populate.
+    <% end %>
+  </div>
 <% else %>
-  <section class="benchmark-section">
-    <ul class="article-list">
-      <% @articles.each do |article| %>
-        <li class="<%= article['read'] == 1 ? 'read' : 'unread' %>">
-          <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
-          <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
-          <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
-          <% (@tags_by_article[article['id']] || []).each do |tag| %>
-            <a class="badge tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a>
+  <ul class="news-list">
+    <% @articles.each do |article| %>
+      <li class="news-item <%= article['read'] == 1 ? 'read' : '' %>">
+        <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+        <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
+        <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
+        <% (@tags_by_article[article['id']] || []).each do |tag| %>
+          <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+        <% end %>
+        <div class="news-meta">
+          <% if (feed = feed_for(article)) %>
+            <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
           <% end %>
-          <span class="meta">
-            <% if (feed = feed_for(article)) %>
-              <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·
-            <% end %>
-            <%= relative_time(article['published_at']) %>
-            <% if article['author'] && !article['author'].to_s.empty? %>
-              · <%= article['author'] %>
-            <% end %>
-          </span>
-        </li>
-      <% end %>
-    </ul>
-  </section>
+          <span><%= relative_time(article['published_at']) %></span>
+          <% if article['author'] && !article['author'].to_s.empty? %>
+            <span><%= h(article['author']) %></span>
+          <% end %>
+        </div>
+      </li>
+    <% end %>
+  </ul>
 
   <nav class="pager">
     <% if @page > 1 %>
-      <a href="?page=<%= @page - 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %>">&larr; Prev</a>
+      <a href="?page=<%= @page - 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %><%= "&tag=#{@tag_filter['id']}" if @tag_filter %><%= "&state=#{@state_filter}" if @state_filter != :all %>">&larr; Prev</a>
     <% end %>
     <span>Page <%= @page %></span>
     <% if @articles.length == @per_page %>
-      <a href="?page=<%= @page + 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %>">Next &rarr;</a>
+      <a href="?page=<%= @page + 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %><%= "&tag=#{@tag_filter['id']}" if @tag_filter %><%= "&state=#{@state_filter}" if @state_filter != :all %>">Next &rarr;</a>
     <% end %>
   </nav>
 <% end %>
