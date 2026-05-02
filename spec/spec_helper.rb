@@ -4,6 +4,7 @@ require 'rack/test'
 ENV['RACK_ENV'] = 'test'
 
 require_relative '../app/database'
+require_relative '../app/health_registry'
 
 # Reset + re-migrate the in-memory DB before every example so each spec
 # starts from a clean, schema-loaded slate. database_spec layers its own
@@ -17,9 +18,11 @@ RSpec.configure do |c|
   c.before(:each) do
     Database.reset!
     Database.migrate!
+    HealthRegistry.reset!
   end
 
   c.after(:each) do
     Database.reset!
+    HealthRegistry.reset!
   end
 end
