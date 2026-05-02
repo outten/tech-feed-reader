@@ -115,6 +115,25 @@
     <% end %>
   </section>
 
+  <% if @related && @related.any? %>
+    <section class="benchmark-section">
+      <h3>Related</h3>
+      <ul class="news-list">
+        <% @related.each do |a| %>
+          <li class="news-item">
+            <a class="news-headline" href="/article/<%= a['uid'] %>"><%= h(a['title']) %></a>
+            <div class="news-meta">
+              <% if (feed = (@feeds_by_id || {})[a['feed_id']]) %>
+                <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+              <% end %>
+              <span><%= relative_time(a['published_at']) %></span>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
   <footer class="article-footer">
     <p class="subtitle">
       Article id: <code><%= @article['uid'] %></code>

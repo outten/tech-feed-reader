@@ -24,6 +24,7 @@ require_relative 'summary_store'
 require_relative 'summarizer/extractive'
 require_relative 'summarizer/claude'
 require_relative 'opml'
+require_relative 'recommendation'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -154,6 +155,8 @@ class TechFeedReader < Sinatra::Base
     @all_tags        = TagsStore.all
     @summary         = SummaryStore.find(@article['id'])
     @claude_available = Summarizer::Claude.available?
+    @related         = Recommendation.for_article(@article, limit: 5)
+    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title      = @article['title']
     erb :article
   end
