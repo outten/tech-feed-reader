@@ -2,7 +2,7 @@
   <div>
     <h2>Dashboard</h2>
     <p class="subtitle">
-      Recent unread articles, top counts, and feed health.
+      Recent unread articles, top counts, feed activity over time.
     </p>
   </div>
 </div>
@@ -31,6 +31,52 @@
     <span class="summary-sub"><a href="/articles?state=bookmarked">view all &rarr;</a></span>
   </div>
 </div>
+
+<% if @article_count.positive? %>
+  <section class="benchmark-section">
+    <h3>Activity (last 30 days)</h3>
+    <div class="chart-box"><canvas id="dailyChart" height="80"></canvas></div>
+  </section>
+
+  <div class="dashboard-grid">
+    <section class="benchmark-section">
+      <h3>Most active feeds</h3>
+      <% if @top_feeds.any? && @top_feeds.first['c'].to_i.positive? %>
+        <table class="data-table">
+          <tbody>
+            <% @top_feeds.each do |feed| %>
+              <% next if feed['c'].to_i.zero? %>
+              <tr>
+                <td><a href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a></td>
+                <td class="num"><%= feed['c'] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="muted">No articles yet.</p>
+      <% end %>
+    </section>
+
+    <section class="benchmark-section">
+      <h3>Top tags this week</h3>
+      <% if @top_tags_week.any? %>
+        <p class="tag-cloud">
+          <% @top_tags_week.each do |tag| %>
+            <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %> <span class="muted">(<%= tag['count'] %>)</span></a>
+          <% end %>
+        </p>
+      <% else %>
+        <p class="muted">
+          No tagged articles this week.
+          <% if TagsStore.count.zero? %>
+            Add a rule at <a href="/tags">/tags</a> to start tagging.
+          <% end %>
+        </p>
+      <% end %>
+    </section>
+  </div>
+<% end %>
 
 <% if @articles.any? %>
   <section class="benchmark-section">
@@ -63,4 +109,45 @@
     Inbox zero — no unread articles. Browse <a href="/articles">all</a>
     or your <a href="/articles?state=bookmarked">bookmarks</a>.
   </div>
+<% end %>
+
+<% if @article_count.positive? %>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      const data = <%= @daily_counts.to_json %>;
+      const ctx  = document.getElementById('dailyChart');
+      if (!ctx || !window.Chart) return;
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      const stroke = isDark ? '#0a84ff' : '#0071e3';
+      const grid   = isDark ? '#3a3a3c' : '#e5e5ea';
+      const muted  = isDark ? '#aeaeb2' : '#8e8e93';
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.day.slice(5)),  // MM-DD
+          datasets: [{
+            label: 'Articles',
+            data:  data.map(d => d.count),
+            borderColor: stroke,
+            backgroundColor: stroke + '22',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+            y: { grid: { color: grid }, ticks: { color: muted, precision: 0 }, beginAtZero: true }
+          }
+        }
+      });
+    })();
+  </script>
 <% end %>

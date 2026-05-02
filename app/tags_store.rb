@@ -87,6 +87,23 @@ module TagsStore
     SQL
   end
 
+  # Top tags in a recent window — used by the dashboard "Top tags" list.
+  # Counts article_tags rows whose article was published within the
+  # window. Returns [{id:, name:, count:}] sorted by count desc.
+  def top_in_window(days: 7, limit: 10)
+    cutoff = (Date.today - days + 1).to_s
+    db.execute(<<~SQL, [cutoff, limit])
+      SELECT t.id, t.name, COUNT(*) AS count
+      FROM tags t
+      JOIN article_tags at ON at.tag_id = t.id
+      JOIN articles a      ON a.id      = at.article_id
+      WHERE DATE(a.published_at) >= ?
+      GROUP BY t.id
+      ORDER BY count DESC, t.name ASC
+      LIMIT ?
+    SQL
+  end
+
   class << self
     private
 
