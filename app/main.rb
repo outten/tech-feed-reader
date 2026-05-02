@@ -16,6 +16,7 @@ require_relative 'articles_store'
 require_relative 'read_state_store'
 require_relative 'feed_fetcher'
 require_relative 'health_registry'
+require_relative 'scheduler'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -237,9 +238,9 @@ class TechFeedReader < Sinatra::Base
   post '/admin/refresh/all' do
     summary = { ok: 0, not_modified: 0, error: 0, imported: 0 }
     FeedsStore.all.each do |feed|
-      result = FeedFetcher.fetch_feed(feed)
+      result, imported = Scheduler.refresh_one(feed)
       summary[result.status] = (summary[result.status] || 0) + 1
-      summary[:imported] += ArticlesStore.import(feed_id: feed['id'], entries: result.entries) if result.status == :ok
+      summary[:imported]    += imported
     end
     qs = summary.map { |k, v| "#{k}=#{v}" }.join('&')
     redirect to("/feeds?notice=refreshed-all&#{qs}")
@@ -252,8 +253,7 @@ class TechFeedReader < Sinatra::Base
     feed = FeedsStore.find(feed_id.to_i)
     redirect to('/feeds?error=not-found') unless feed
 
-    result   = FeedFetcher.fetch_feed(feed)
-    imported = result.status == :ok ? ArticlesStore.import(feed_id: feed['id'], entries: result.entries) : 0
+    result, imported = Scheduler.refresh_one(feed)
     redirect to("/feeds?notice=refreshed&status=#{result.status}&imported=#{imported}")
   end
 

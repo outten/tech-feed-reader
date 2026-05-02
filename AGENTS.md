@@ -145,13 +145,14 @@ app/
     archive.rb             # archive.org fallback (Tier 2)
   feeds_store.rb           # SQLite-backed wrapper (CRUD on the feeds table)
   articles_store.rb        # SQLite-backed wrapper (CRUD on articles + FTS5)
-  tags_store.rb
-  read_state_store.rb
-  summary_store.rb
-  summarizer/
+  read_state_store.rb      # lazy per-article read / bookmark / archive state
+  tags_store.rb            # (Tier 2)
+  summary_store.rb         # (Tier 2)
+  summarizer/              # (Tier 2)
     extractive.rb          # TextRank-style; pure Ruby
     claude.rb              # Anthropic SDK wrapper
-  health_registry.rb
+  health_registry.rb       # bounded ring buffer of feed-fetch observations
+  scheduler.rb             # due-feed picker + refresh_one helper (used by scripts + admin)
 db/
   migrations/
     001_init.sql           # initial schema; new files added per feature PR
@@ -161,9 +162,10 @@ public/
   app.js                   # search box + tag-filter behaviour
 scripts/
   migrate.rb               # one-shot migration runner (also auto-run on web boot)
+  seed_feeds.rb            # insert the v1-kickoff starter feed list (idempotent)
   scheduler.rb             # long-running poller; reads feeds table, honours per-feed TTL
-  refresh_feed.rb          # one-shot poll
-  refresh_all.rb           # poll every feed once
+  refresh_feed.rb          # one-shot poll of a single feed (id or URL)
+  refresh_feeds.rb         # one-shot poll of every feed
 spec/                      # RSpec
 data/                      # SQLite DB + raw-feed cache (git-ignored)
 .github/workflows/ci.yml   # RSpec + scripts syntax check on push to main + every PR
