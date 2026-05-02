@@ -14,6 +14,8 @@ require_relative 'database'
 require_relative 'feeds_store'
 require_relative 'articles_store'
 require_relative 'read_state_store'
+require_relative 'tags_store'
+require_relative 'tags_applier'
 require_relative 'feed_fetcher'
 require_relative 'health_registry'
 require_relative 'scheduler'
@@ -106,18 +108,23 @@ class TechFeedReader < Sinatra::Base
     @per_page    = 50
     offset       = (@page - 1) * @per_page
     feed_id      = params['feed_id'].to_i
+    tag_id       = params['tag'].to_i
     @feed_filter = feed_id.positive? ? FeedsStore.find(feed_id) : nil
+    @tag_filter  = tag_id.positive?  ? TagsStore.find(tag_id)   : nil
 
     @state_filter = (params['state'] || 'all').to_sym
     @state_filter = :all unless ARTICLES_STATE_FILTERS.include?(@state_filter)
 
-    @articles = if @feed_filter
+    @articles = if @tag_filter
+                  ArticlesStore.for_tag(tag_id, limit: @per_page, offset: offset, state: @state_filter)
+                elsif @feed_filter
                   ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset, state: @state_filter)
                 else
                   ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter)
                 end
 
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @tags_by_article = TagsStore.tags_for_articles(@articles.map { |a| a['id'] })
     erb :articles
   end
 
@@ -125,9 +132,11 @@ class TechFeedReader < Sinatra::Base
     @article = ArticlesStore.find_by_uid(uid)
     halt 404, erb(:article_not_found) unless @article
 
-    @feed       = FeedsStore.find(@article['feed_id'])
-    @state      = ReadStateStore.opened!(@article['id'])
-    @page_title = @article['title']
+    @feed         = FeedsStore.find(@article['feed_id'])
+    @state        = ReadStateStore.opened!(@article['id'])
+    @article_tags = TagsStore.tags_for_article(@article['id'])
+    @all_tags     = TagsStore.all
+    @page_title   = @article['title']
     erb :article
   end
 
@@ -199,8 +208,63 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/tags' do
-    @page_title = 'Tags'
+    @page_title     = 'Tags'
+    @tags           = TagsStore.all
+    @article_counts = TagsStore.article_counts
+    @feeds_by_id    = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @notice         = params['notice']
+    @error          = params['error']
     erb :tags
+  end
+
+  # Add a new tag rule. Auto-runs the backfill applier so existing
+  # articles get tagged immediately, not just future fetches.
+  post '/tags' do
+    name = params['name'].to_s.strip
+    kind = params['match_kind'].to_s.strip
+    val  = params['match_value'].to_s.strip
+
+    redirect to('/tags?error=missing-fields') if name.empty? || val.empty?
+    redirect to('/tags?error=invalid-kind')   unless TagsStore::KINDS.include?(kind)
+
+    if kind == 'regex'
+      begin
+        Regexp.new(val)
+      rescue RegexpError
+        redirect to('/tags?error=invalid-regex')
+      end
+    end
+
+    begin
+      tag    = TagsStore.add(name: name, match_kind: kind, match_value: val)
+      tagged = TagsApplier.apply_to_existing(tag['id'])
+      redirect to("/tags?notice=added&tagged=#{tagged}")
+    rescue SQLite3::ConstraintException
+      redirect to('/tags?error=duplicate-name')
+    end
+  end
+
+  post '/tags/:id/delete' do |id|
+    if TagsStore.remove(id.to_i)
+      redirect to('/tags?notice=removed')
+    else
+      redirect to('/tags?error=not-found')
+    end
+  end
+
+  # Toggle a tag on a single article. value=add | remove (default add).
+  # Used by the manual-override chips on /article/:uid.
+  post '/article/:uid/tag/:tag_id' do |uid, tag_id|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    halt 404 unless TagsStore.find(tag_id.to_i)
+
+    if params['value'] == 'remove'
+      TagsStore.untag_article(article['id'], tag_id.to_i)
+    else
+      TagsStore.tag_article(article['id'], tag_id.to_i)
+    end
+    redirect to(params['return_to'] || "/article/#{uid}")
   end
 
   get '/search' do

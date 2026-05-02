@@ -36,6 +36,27 @@
         <button type="submit"><%= @state['archived'] == 1 ? 'Unarchive' : 'Archive' %></button>
       </form>
     </p>
+
+    <% if @article_tags.any? || @all_tags.any? %>
+      <p class="tags">
+        <% applied_ids = @article_tags.map { |t| t['id'] } %>
+        <% @article_tags.each do |tag| %>
+          <span class="badge tag-chip">
+            <a href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a>
+            <form method="post" action="/article/<%= @article['uid'] %>/tag/<%= tag['id'] %>" style="display:inline">
+              <input type="hidden" name="value" value="remove">
+              <button type="submit" title="Remove tag">&times;</button>
+            </form>
+          </span>
+        <% end %>
+        <% (@all_tags - @article_tags).reject { |t| applied_ids.include?(t['id']) }.each do |tag| %>
+          <form method="post" action="/article/<%= @article['uid'] %>/tag/<%= tag['id'] %>" style="display:inline">
+            <input type="hidden" name="value" value="add">
+            <button type="submit" class="tag-chip-add">+ <%= tag['name'] %></button>
+          </form>
+        <% end %>
+      </p>
+    <% end %>
   </header>
 
   <section class="article-body">

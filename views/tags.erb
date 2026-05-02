@@ -1,10 +1,84 @@
 <h2>Tags</h2>
-<p class="subtitle">Tag rules and per-tag activity.</p>
+<p class="subtitle">
+  Rule-based tagging. Each rule auto-applies to new articles on import,
+  and a backfill pass runs against existing articles when a rule is added.
+  <%= @tags.length %> tag<%= 's' unless @tags.length == 1 %>.
+</p>
+
+<% if @notice == 'added' %>
+  <p class="notice">Tag added<% if (params['tagged'] || '0') != '0' %> &middot; <%= params['tagged'] %> existing article<%= 's' unless params['tagged'] == '1' %> tagged via backfill<% end %>.</p>
+<% elsif @notice == 'removed' %>
+  <p class="notice">Tag removed.</p>
+<% end %>
+<% if @error == 'missing-fields' %>
+  <p class="error">Name and match value are required.</p>
+<% elsif @error == 'invalid-kind' %>
+  <p class="error">match_kind must be one of: regex, keyword, feed_id.</p>
+<% elsif @error == 'invalid-regex' %>
+  <p class="error">That regex didn't compile.</p>
+<% elsif @error == 'duplicate-name' %>
+  <p class="error">A tag with that name already exists.</p>
+<% elsif @error == 'not-found' %>
+  <p class="error">No tag with that id.</p>
+<% end %>
 
 <section class="benchmark-section">
-  <h3>Coming up</h3>
+  <h3>Add a tag rule</h3>
+  <form method="post" action="/tags" class="feed-form">
+    <label>
+      Name
+      <input type="text" name="name" required placeholder="e.g. ai, rust, hn">
+    </label>
+    <label>
+      Match kind
+      <select name="match_kind">
+        <option value="keyword">keyword (case-insensitive substring)</option>
+        <option value="regex">regex (case-insensitive)</option>
+        <option value="feed_id">feed_id (specific feed)</option>
+      </select>
+    </label>
+    <label>
+      Match value
+      <input type="text" name="match_value" required placeholder="word, regex, or feed id">
+    </label>
+    <button type="submit">Add rule</button>
+  </form>
   <p class="data-source">
-    User-defined tag rules (regex / keyword / feed_id) with auto-apply
-    on fetch. Lands in Tier 2 — see <code>SPEC.md</code> milestone H.
+    <strong>keyword</strong>: simple substring against title + content_text.
+    <strong>regex</strong>: Ruby regex source, case-insensitive.
+    <strong>feed_id</strong>: every article from a specific feed (find ids on
+    <a href="/feeds">/feeds</a>).
   </p>
 </section>
+
+<% if @tags.any? %>
+  <section class="benchmark-section">
+    <h3>Active rules</h3>
+    <table class="feeds-table">
+      <thead>
+        <tr><th>Tag</th><th>Kind</th><th>Match value</th><th>Articles</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% @tags.each do |tag| %>
+          <tr>
+            <td><a href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a></td>
+            <td><%= tag['match_kind'] %></td>
+            <td>
+              <% if tag['match_kind'] == 'feed_id' && (feed = @feeds_by_id[tag['match_value'].to_i]) %>
+                <%= feed['title'] || feed['url'] %> <span class="meta">(id <%= tag['match_value'] %>)</span>
+              <% else %>
+                <code><%= tag['match_value'] %></code>
+              <% end %>
+            </td>
+            <td><%= @article_counts[tag['id']] || 0 %></td>
+            <td>
+              <form method="post" action="/tags/<%= tag['id'] %>/delete" style="display:inline" onsubmit="return confirm('Remove this tag and all its associations?');">
+                <button type="submit" class="danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>

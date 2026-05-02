@@ -1,12 +1,15 @@
-<h2>Articles<% if @feed_filter %> &mdash; <%= @feed_filter['title'] || @feed_filter['url'] %><% end %></h2>
+<h2>
+  Articles
+  <% if @feed_filter %> &mdash; <%= @feed_filter['title'] || @feed_filter['url'] %><% end %>
+  <% if @tag_filter %> &mdash; <span class="badge tag-chip"><%= @tag_filter['name'] %></span><% end %>
+</h2>
 <p class="subtitle">
-  <% if @feed_filter %>
-    Filtered by feed. <a href="/articles">Clear filter</a>.
+  <% if @feed_filter || @tag_filter %>
+    Filtered. <a href="/articles">Clear filter</a>.
   <% else %>
     Filter:
     <% %i[all unread bookmarked archived].each do |state| %>
-      <% qs = @feed_filter ? "feed_id=#{@feed_filter['id']}&" : '' %>
-      <a href="?<%= qs %>state=<%= state %>"
+      <a href="?state=<%= state %>"
          <%= 'class="active"' if @state_filter == state %>><%= state %></a>
     <% end %>
   <% end %>
@@ -28,6 +31,9 @@
           <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
           <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
           <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
+          <% (@tags_by_article[article['id']] || []).each do |tag| %>
+            <a class="badge tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= tag['name'] %></a>
+          <% end %>
           <span class="meta">
             <% if (feed = feed_for(article)) %>
               <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·
