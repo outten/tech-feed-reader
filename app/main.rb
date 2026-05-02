@@ -12,6 +12,8 @@ Dotenv.load(File.expand_path('../../.env', __FILE__))
 
 require_relative 'database'
 require_relative 'feeds_store'
+require_relative 'articles_store'
+require_relative 'feed_fetcher'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -65,6 +67,14 @@ class TechFeedReader < Sinatra::Base
       else                     "#{(diff / 86_400).round}d ago"
       end
     end
+
+    # Lookup helper for views — turns a feed_id into a feeds row using
+    # the @feeds_by_id hash the route handler builds. Returns nil if the
+    # feed has been deleted (orphaned articles shouldn't happen thanks
+    # to ON DELETE CASCADE, but stay safe).
+    def feed_for(article)
+      (@feeds_by_id ||= {})[article['feed_id']]
+    end
   end
 
   # ---- Routes ---------------------------------------------------------
@@ -74,12 +84,30 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/dashboard' do
-    @page_title = 'Dashboard'
+    @page_title    = 'Dashboard'
+    @articles      = ArticlesStore.recent(limit: 20)
+    @feeds_by_id   = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @article_count = ArticlesStore.count
+    @feed_count    = FeedsStore.count
     erb :dashboard
   end
 
   get '/articles' do
-    @page_title = 'Articles'
+    @page_title  = 'Articles'
+    @page        = [params['page'].to_i, 1].max
+    @per_page    = 50
+    offset       = (@page - 1) * @per_page
+    feed_id      = params['feed_id'].to_i
+    @feed_filter = feed_id.positive? ? FeedsStore.find(feed_id) : nil
+
+    @articles = if @feed_filter
+                  ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset)
+                else
+                  ArticlesStore.recent(limit: @per_page, offset: offset)
+                end
+
+    @total_count = @feed_filter ? @articles.length : ArticlesStore.count
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     erb :articles
   end
 
@@ -151,6 +179,36 @@ class TechFeedReader < Sinatra::Base
   get '/admin/cache' do
     @page_title = 'Cache admin'
     erb :admin_cache
+  end
+
+  # Refresh every feed in FeedsStore. Iterates synchronously; for the
+  # default starter set (5 feeds) this is fine. The scheduler script
+  # (TODO-009) is the right tool once polling cadence matters.
+  #
+  # NOTE: /all must be declared before the :feed_id variant so Sinatra
+  # matches the static path first. Otherwise the URL string "all" gets
+  # parsed as a feed_id (= 0) and the request 404s.
+  post '/admin/refresh/all' do
+    summary = { ok: 0, not_modified: 0, error: 0, imported: 0 }
+    FeedsStore.all.each do |feed|
+      result = FeedFetcher.fetch_feed(feed)
+      summary[result.status] = (summary[result.status] || 0) + 1
+      summary[:imported] += ArticlesStore.import(feed_id: feed['id'], entries: result.entries) if result.status == :ok
+    end
+    qs = summary.map { |k, v| "#{k}=#{v}" }.join('&')
+    redirect to("/feeds?notice=refreshed-all&#{qs}")
+  end
+
+  # Refresh a single feed: fetch + parse + sanitize + import. Synchronous
+  # (single-user app, no queue needed at v1). Redirects to /feeds with a
+  # status notice so the form-based UI stays simple.
+  post '/admin/refresh/:feed_id' do |feed_id|
+    feed = FeedsStore.find(feed_id.to_i)
+    redirect to('/feeds?error=not-found') unless feed
+
+    result   = FeedFetcher.fetch_feed(feed)
+    imported = result.status == :ok ? ArticlesStore.import(feed_id: feed['id'], entries: result.entries) : 0
+    redirect to("/feeds?notice=refreshed&status=#{result.status}&imported=#{imported}")
   end
 
   # ---- Boot -----------------------------------------------------------

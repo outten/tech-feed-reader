@@ -1,10 +1,47 @@
-<h2>Articles</h2>
-<p class="subtitle">Main reading interface — paginated, filterable by tag / feed / read-state.</p>
+<h2>Articles<% if @feed_filter %> &mdash; <%= @feed_filter['title'] || @feed_filter['url'] %><% end %></h2>
+<p class="subtitle">
+  <% if @feed_filter %>
+    Filtered by feed. <a href="/articles">Clear filter</a>.
+  <% else %>
+    <%= @total_count %> article<%= 's' unless @total_count == 1 %> across all feeds.
+  <% end %>
+</p>
 
-<section class="benchmark-section">
-  <h3>Coming up</h3>
-  <p class="data-source">
-    The articles page renders <code>ArticlesStore</code> — sorted by recency, with
-    tag chips and a per-row read-toggle. Empty until the feed fetcher lands.
-  </p>
-</section>
+<% if @articles.empty? %>
+  <section class="benchmark-section">
+    <p class="data-source">
+      No articles yet. Add a feed via <a href="/feeds">/feeds</a> and
+      hit the per-row "Refresh" button (or <code>POST /admin/refresh/all</code>)
+      to populate.
+    </p>
+  </section>
+<% else %>
+  <section class="benchmark-section">
+    <ul class="article-list">
+      <% @articles.each do |article| %>
+        <li>
+          <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
+          <span class="meta">
+            <% if (feed = feed_for(article)) %>
+              <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·
+            <% end %>
+            <%= relative_time(article['published_at']) %>
+            <% if article['author'] && !article['author'].to_s.empty? %>
+              · <%= article['author'] %>
+            <% end %>
+          </span>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+
+  <nav class="pager">
+    <% if @page > 1 %>
+      <a href="?page=<%= @page - 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %>">&larr; Prev</a>
+    <% end %>
+    <span>Page <%= @page %></span>
+    <% if @articles.length == @per_page %>
+      <a href="?page=<%= @page + 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %>">Next &rarr;</a>
+    <% end %>
+  </nav>
+<% end %>

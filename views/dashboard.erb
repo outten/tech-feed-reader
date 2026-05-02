@@ -1,13 +1,28 @@
 <h2>Dashboard</h2>
 <p class="subtitle">
-  Recent unread, top tags, feed-fetch health. Empty until feeds + articles land — see <a href="/feeds">Feeds</a> to add your first source.
+  <%= @article_count %> article<%= 's' unless @article_count == 1 %> across <%= @feed_count %> feed<%= 's' unless @feed_count == 1 %>.
+  <% if @article_count.zero? %>
+    Nothing yet — <a href="/feeds">add a feed</a> or hit
+    <code>POST /admin/refresh/all</code> to populate.
+  <% end %>
 </p>
 
-<section class="benchmark-section">
-  <h3>Coming up</h3>
-  <p class="data-source">
-    The dashboard surfaces the most recent unread articles, top tags this week,
-    and a feed-fetch health banner once the underlying stores ship. See
-    <code>SPEC.md</code> for the planned shape.
-  </p>
-</section>
+<% if @articles.any? %>
+  <section class="benchmark-section">
+    <h3>Recent</h3>
+    <ul class="article-list">
+      <% @articles.each do |article| %>
+        <li>
+          <a href="/article/<%= article['uid'] %>"><%= article['title'] %></a>
+          <span class="meta">
+            <% if (feed = feed_for(article)) %>
+              <a href="/articles?feed_id=<%= feed['id'] %>"><%= feed['title'] || feed['url'] %></a> ·
+            <% end %>
+            <%= relative_time(article['published_at']) %>
+          </span>
+        </li>
+      <% end %>
+    </ul>
+    <p class="subtitle"><a href="/articles">All articles &rarr;</a></p>
+  </section>
+<% end %>

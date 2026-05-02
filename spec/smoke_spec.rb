@@ -69,4 +69,45 @@ RSpec.describe 'TechFeedReader smoke' do
       expect(last_response.headers['Location']).to include('/feeds?error=not-found')
     end
   end
+
+  describe 'POST /admin/refresh/:feed_id' do
+    let(:rss_body) { File.read(File.expand_path('fixtures/rss20.xml', __dir__)) }
+
+    it 'fetches, imports, and redirects with refresh status' do
+      feed     = FeedsStore.add(url: 'https://example.com/feed.rss')
+      response = instance_double(Net::HTTPSuccess, code: '200', body: rss_body)
+      allow(response).to receive(:[]) { |_| nil }
+      allow(Providers::HttpClient).to receive(:get).and_return(response)
+
+      post "/admin/refresh/#{feed['id']}"
+      expect(last_response.status).to eq(302)
+      expect(last_response.headers['Location']).to include('notice=refreshed')
+      expect(last_response.headers['Location']).to include('status=ok')
+      expect(last_response.headers['Location']).to include('imported=2')
+      expect(ArticlesStore.count).to eq(2)
+    end
+
+    it 'reports not-found for an unknown feed id' do
+      post '/admin/refresh/999'
+      expect(last_response.headers['Location']).to include('error=not-found')
+    end
+  end
+
+  describe 'POST /admin/refresh/all' do
+    let(:rss_body) { File.read(File.expand_path('fixtures/rss20.xml', __dir__)) }
+
+    it 'iterates every feed and reports the summary' do
+      FeedsStore.add(url: 'https://a.example.com/rss')
+      FeedsStore.add(url: 'https://b.example.com/rss')
+      response = instance_double(Net::HTTPSuccess, code: '200', body: rss_body)
+      allow(response).to receive(:[]) { |_| nil }
+      allow(Providers::HttpClient).to receive(:get).and_return(response)
+
+      post '/admin/refresh/all'
+      expect(last_response.status).to eq(302)
+      expect(last_response.headers['Location']).to include('notice=refreshed-all')
+      expect(last_response.headers['Location']).to include('ok=2')
+      expect(last_response.headers['Location']).to include('imported=4')
+    end
+  end
 end

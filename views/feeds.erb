@@ -5,6 +5,19 @@
   <p class="notice">Feed added.</p>
 <% elsif @notice == 'removed' %>
   <p class="notice">Feed removed.</p>
+<% elsif @notice == 'refreshed' %>
+  <p class="notice">
+    Refreshed (status: <%= params['status'] %>;
+    <%= params['imported'] %> new article<%= 's' unless params['imported'] == '1' %>).
+  </p>
+<% elsif @notice == 'refreshed-all' %>
+  <p class="notice">
+    Refresh-all complete:
+    ok=<%= params['ok'] || 0 %>,
+    not_modified=<%= params['not_modified'] || 0 %>,
+    error=<%= params['error'] || 0 %>,
+    <%= params['imported'] || 0 %> new article<%= 's' unless params['imported'] == '1' %>.
+  </p>
 <% elsif @notice %>
   <p class="notice"><%= @notice %></p>
 <% end %>
@@ -45,7 +58,12 @@
 
 <% if @feeds.any? %>
   <section class="benchmark-section">
-    <h3>Subscribed</h3>
+    <h3>
+      Subscribed
+      <form method="post" action="/admin/refresh/all" style="display:inline; margin-left:1em;">
+        <button type="submit">Refresh all</button>
+      </form>
+    </h3>
     <table class="feeds-table">
       <thead>
         <tr>
@@ -66,7 +84,10 @@
             <td><%= relative_time(feed['last_fetched_at']) %></td>
             <td><%= feed['last_status'] || '—' %></td>
             <td>
-              <form method="post" action="/feeds/<%= feed['id'] %>/delete" onsubmit="return confirm('Remove this feed and all its articles?');">
+              <form method="post" action="/admin/refresh/<%= feed['id'] %>" style="display:inline">
+                <button type="submit">Refresh</button>
+              </form>
+              <form method="post" action="/feeds/<%= feed['id'] %>/delete" style="display:inline" onsubmit="return confirm('Remove this feed and all its articles?');">
                 <button type="submit" class="danger">Remove</button>
               </form>
             </td>
