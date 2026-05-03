@@ -2,7 +2,7 @@
 
 A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: Tier 3 nearly complete.** Add feeds via the curated 25-feed catalog on `/feeds` (one-click Add per entry, grouped by category) or bulk-import via OPML. Teaser feeds (HN, Lobsters) auto-fall back to a readability fetch. `/article/:uid` shows an auto-extractive summary, an opt-in Claude LLM summary, and a "Related" panel of articles surfaced by FTS5 keyword overlap. `/dashboard` adds a 30-day articles chart, top-active-feeds, top-tags-this-week, and a trending-topics widget. Mark read / bookmark / archive, filter by state or tag, full-text search via SQLite FTS5. CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`.
+> **Status: Tier 3 + topic-first reading.** Add feeds via the curated 25-feed catalog on `/feeds` or bulk-import via OPML. Teaser feeds (HN, Lobsters) auto-fall back to a readability fetch. The new top-level `/topics` page surfaces the most-talked-about clusters across the last 7/14/30 days so reading is topic-first, not article-first — each cluster links to its full search results. `/article/:uid` shows an auto-extractive summary, an opt-in Claude LLM summary, and a "Related" panel of articles via FTS5 keyword overlap; external citations open in a new tab. `/dashboard` charts articles-per-day, top-active-feeds, top-tags-this-week, and trending topics. Mark read / bookmark / archive, filter by state or tag, full-text search via SQLite FTS5. CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`.
 
 ## Getting started
 
@@ -19,7 +19,8 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 
 | Page | URL | What it shows |
 |---|---|---|
-| Dashboard | `/dashboard` | Recent unread, top tags, feed-health banner |
+| Dashboard | `/dashboard` | Recent unread, top tags, feed-health banner, activity chart |
+| Topics | `/topics` | Trending term clusters with sample articles; 7/14/30-day window selector |
 | Articles | `/articles` | Main reading interface, paginated and filterable |
 | Article | `/article/:id` | Single article view + cached summary |
 | Feeds | `/feeds` | Manage RSS subscriptions |

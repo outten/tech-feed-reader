@@ -1,0 +1,39 @@
+<div class="page-header">
+  <div>
+    <h2>Topics</h2>
+    <p class="subtitle state-filter">
+      What's being talked about
+      <% [7, 14, 30].each do |d| %>
+        <a href="?days=<%= d %>"
+           class="<%= 'active' if @days == d %>">last <%= d %> days</a>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @topics.empty? %>
+  <div class="empty-state">
+    No topics surfaced in the last <%= @days %> day<%= 's' unless @days == 1 %>.
+    Try a wider window above, or
+    <% if FeedsStore.count.zero? %>
+      <a href="/feeds">add some feeds</a> first.
+    <% else %>
+      <a href="/feeds">refresh your feeds</a> to pull more articles.
+    <% end %>
+  </div>
+<% else %>
+  <ul class="topic-list">
+    <% @topics.each do |cluster| %>
+      <li class="topic-row">
+        <a class="tag-chip" href="/search?q=<%= CGI.escape(cluster[:term]) %>">
+          <%= h(cluster[:term]) %> <span class="muted">(<%= cluster[:count] %>)</span>
+        </a>
+        <span class="topic-samples">
+          <% cluster[:articles].each_with_index do |article, i| %>
+            <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a><%= ',' unless i == cluster[:articles].length - 1 %>
+          <% end %>
+        </span>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

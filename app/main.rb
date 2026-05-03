@@ -228,6 +228,22 @@ class TechFeedReader < Sinatra::Base
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
+  TOPICS_WINDOW_OPTIONS = { '7' => 7, '14' => 14, '30' => 30 }.freeze
+
+  # Topic-first reading surface: lists every detected cluster with the
+  # most-recent sample articles, in count-desc order. The dashboard
+  # widget shows the top 8; this page shows the full set so the user
+  # can scan "what's everyone talking about" without per-article
+  # scrolling. Each topic chip links to /search?q=<term> for the full
+  # article list (FTS5 already does the heavy lifting there).
+  get '/topics' do
+    requested   = params['days'].to_s
+    @days       = TOPICS_WINDOW_OPTIONS[requested] || 14
+    @topics     = TopicClusters.recent(days: @days, min_articles: 2, limit: 50)
+    @page_title = 'Topics'
+    erb :topics
+  end
+
   get '/feeds' do
     @page_title  = 'Feeds'
     @feeds       = FeedsStore.all
