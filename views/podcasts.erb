@@ -1,0 +1,69 @@
+<div class="page-header">
+  <div>
+    <h2>Podcasts</h2>
+    <p class="subtitle">
+      <% if @shows.empty? %>
+        No podcasts subscribed yet.
+      <% else %>
+        <%= @shows.length %> show<%= 's' unless @shows.length == 1 %> &middot;
+        latest episode <%= relative_time(@shows.first['latest_at']) %> &middot;
+        <a href="/articles?kind=podcast">Linear list &rarr;</a>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @shows.empty? %>
+  <div class="empty-state">
+    <p>
+      Subscribe to a podcast from the catalog at <a href="/feeds">/feeds</a> &rarr;
+      "Discover popular feeds" &rarr; "Podcasts". Once you click "+ Add" and the
+      next refresh runs, episodes show up here.
+    </p>
+  </div>
+<% else %>
+  <section class="benchmark-section">
+    <h3>Subscribed shows</h3>
+    <div class="podcast-shows">
+      <% @shows.each do |show| %>
+        <a class="podcast-show-card" href="/articles?feed_id=<%= show['id'] %>&kind=podcast">
+          <span class="podcast-show-title"><%= h(show['title'] || show['url']) %></span>
+          <span class="podcast-show-meta">
+            <%= show['episode_count'] %> episode<%= 's' unless show['episode_count'] == 1 %>
+            &middot; latest <%= relative_time(show['latest_at']) %>
+          </span>
+        </a>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="benchmark-section">
+    <h3>Recent episodes</h3>
+    <% if @recent_episodes.empty? %>
+      <p class="muted">No episodes ingested yet — try clicking "Refresh all" in the header.</p>
+    <% else %>
+      <ul class="podcast-episodes">
+        <% @recent_episodes.each do |ep| %>
+          <li class="podcast-card <%= ep['read'] == 1 ? 'read' : '' %>">
+            <div class="podcast-card-meta">
+              <% if (feed = (@feeds_by_id || {})[ep['feed_id']]) %>
+                <a class="podcast-card-show" href="/articles?feed_id=<%= feed['id'] %>&kind=podcast"><%= h(feed['title'] || feed['url']) %></a>
+              <% end %>
+              <span class="podcast-card-date"><%= relative_time(ep['published_at']) %></span>
+              <% if (dur = fmt_duration(ep['audio_duration_seconds'])) %>
+                <span class="podcast-card-duration"><%= dur %></span>
+              <% end %>
+            </div>
+            <a class="podcast-card-title" href="/article/<%= ep['uid'] %>"><%= h(ep['title']) %></a>
+            <% if ep['content_text'] && !ep['content_text'].to_s.empty? %>
+              <p class="podcast-card-excerpt"><%= h(ep['content_text'].to_s.gsub(/\s+/, ' ').strip[0, 240]) %><%= '…' if ep['content_text'].to_s.length > 240 %></p>
+            <% end %>
+            <div class="podcast-card-actions">
+              <a class="btn-primary" href="/article/<%= ep['uid'] %>">▶ Listen</a>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>

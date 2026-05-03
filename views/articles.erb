@@ -4,14 +4,22 @@
       Articles
       <% if @feed_filter %> &mdash; <%= h(@feed_filter['title'] || @feed_filter['url']) %><% end %>
       <% if @tag_filter %> &mdash; <span class="tag-chip"><%= h(@tag_filter['name']) %></span><% end %>
+      <% if @kind_filter == :podcast %> &mdash; <span class="badge podcast-badge">PODCAST</span><% end %>
     </h2>
     <% if @feed_filter || @tag_filter %>
       <p class="subtitle">Filtered. <a href="/articles">Clear filter</a>.</p>
     <% else %>
       <p class="subtitle state-filter">
         <% %i[all unread bookmarked archived].each do |state| %>
-          <a href="?state=<%= state %>"
+          <a href="?state=<%= state %><%= '&kind=podcast' if @kind_filter == :podcast %>"
              class="<%= 'active' if @state_filter == state %>"><%= state %></a>
+        <% end %>
+        &middot;
+        <% if @kind_filter == :podcast %>
+          <a href="?state=<%= @state_filter %>" class="active">podcasts only</a>
+          <a href="?state=<%= @state_filter %>">show all</a>
+        <% else %>
+          <a href="?state=<%= @state_filter %>&kind=podcast">podcasts only</a>
         <% end %>
       </p>
     <% end %>
