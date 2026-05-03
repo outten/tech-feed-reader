@@ -28,6 +28,7 @@ require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
+require_relative 'version'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -35,6 +36,7 @@ require_relative 'feed_catalog'
 # require in test (specs stub perform_async).
 require_relative 'sidekiq_config'
 require_relative 'workers/feed_refresh_worker'
+require 'sidekiq/api'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
@@ -140,11 +142,38 @@ class TechFeedReader < Sinatra::Base
       Rack::Utils.escape_html(text.to_s)
     end
 
+    # ---- /health probes -----------------------------------------------
+    # Each `check_*` method returns a hash shaped { status: 'ok'|'down'|
+    # 'disabled', ... } so the /health JSON is uniform across deps. They
+    # rescue any underlying error and surface the message; nothing here
+    # should be able to take the route down.
+
+    def check_db
+      Database.connection.execute('SELECT 1').first
+      { status: 'ok' }
+    rescue => e
+      { status: 'down', error: e.message }
+    end
+
+    def check_redis
+      Sidekiq.redis { |r| r.ping }
+      { status: 'ok' }
+    rescue => e
+      { status: 'down', error: e.message }
+    end
+
+    def check_sidekiq
+      processes = Sidekiq::ProcessSet.new
+      { status: processes.size.positive? ? 'ok' : 'no_workers',
+        workers: processes.size }
+    rescue => e
+      { status: 'down', error: e.message }
+    end
+
     # Probe Sidekiq for queue depth + worker count. Returns
     # `{ ok: false, error: 'connection refused' }` when Redis is down so
     # /admin doesn't 500 in environments without a worker process.
     def sidekiq_stats
-      require 'sidekiq/api'
       stats = Sidekiq::Stats.new
       processes = Sidekiq::ProcessSet.new
       {
@@ -199,6 +228,50 @@ class TechFeedReader < Sinatra::Base
   end
 
   # ---- Routes ---------------------------------------------------------
+
+  # Liveness + readiness probe. Designed for `curl` and uptime monitors:
+  # always returns JSON, no auth, no session, no template rendering.
+  #
+  # Status codes:
+  #   200 — every critical dependency is up. SQLite is the only true
+  #         critical dep; Redis being down only degrades async refresh.
+  #   503 — SQLite is unreachable. The web app can't serve articles
+  #         without it, so this is the one we want load balancers to
+  #         pull traffic away from.
+  #
+  # The `current_time` field (TOD) is the server clock at the moment
+  # this handler runs, useful for spotting clock-skew issues against
+  # external systems.
+  get '/health' do
+    content_type :json
+
+    db_status = check_db
+    redis_check = check_redis
+
+    overall =
+      if db_status[:status] != 'ok'
+        'fail'
+      elsif redis_check[:status] != 'ok'
+        'degraded'
+      else
+        'ok'
+      end
+
+    status(503) if overall == 'fail'
+
+    {
+      status:         overall,
+      version:        AppVersion::GIT_SHA,
+      started_at:     AppVersion::STARTED_AT.iso8601,
+      uptime_seconds: AppVersion.uptime_seconds,
+      current_time:   Time.now.utc.iso8601,
+      checks: {
+        db:      db_status,
+        redis:   redis_check,
+        sidekiq: check_sidekiq
+      }
+    }.to_json
+  end
 
   get '/' do
     redirect '/dashboard'

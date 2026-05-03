@@ -118,6 +118,8 @@
       <tr><td>Platform</td>       <td class="mono"><%= h(RUBY_PLATFORM) %></td></tr>
       <tr><td>RACK_ENV</td>       <td class="mono"><%= h(ENV['RACK_ENV'] || 'development') %></td></tr>
       <tr><td>LOG_LEVEL</td>      <td class="mono"><%= h(ENV['LOG_LEVEL'] || '(default)') %></td></tr>
+      <tr><td>Version (git)</td>  <td class="mono"><%= h(AppVersion::GIT_SHA) %></td></tr>
+      <tr><td>Started at</td>     <td class="mono"><%= h(AppVersion::STARTED_AT.iso8601) %> &middot; <%= AppVersion.uptime_seconds %>s uptime</td></tr>
     </tbody>
   </table>
 </section>
@@ -127,6 +129,7 @@
   <ul>
     <li><a href="/admin/cache">/admin/cache</a> — per-feed cache age + manual refresh</li>
     <li><a href="/admin/health">/admin/health</a> — feed-fetch observation history</li>
-    <li><a href="/admin/sidekiq">/admin/sidekiq</a> — background-job UI <em class="muted">(after TODO-029)</em></li>
+    <li><a href="/admin/sidekiq">/admin/sidekiq</a> — background-job Web UI</li>
+    <li><a href="/health">/health</a> — JSON liveness + dependency probes (no auth, for uptime monitors)</li>
   </ul>
 </section>
