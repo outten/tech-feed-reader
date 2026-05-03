@@ -27,7 +27,7 @@ RSpec.describe 'podcast end-to-end' do
   end
 
   describe 'GET /article/:uid for a podcast episode' do
-    it 'renders the player markup, the PODCAST badge, and links the player JS' do
+    it 'renders the play-episode button (with audio metadata in data-attrs) and the PODCAST badge' do
       feed   = FeedsStore.add(url: 'https://example.com/podcast/feed', title: 'Test Podcast Show')
       parsed = FeedParser.parse(body, feed_url: feed['url'])
       ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
@@ -38,14 +38,17 @@ RSpec.describe 'podcast end-to-end' do
       expect(last_response.status).to eq(200)
       expect(last_response.body).to include('class="badge podcast-badge"')
       expect(last_response.body).to include('PODCAST')
-      expect(last_response.body).to include('class="podcast-player"')
-      expect(last_response.body).to include('https://cdn.example.com/audio/ep-12.mp3')
-      expect(last_response.body).to include('podcast-player.js')
+      # New structure: a "Play episode" button wired to the global
+      # mini-player. No <audio> on the article page itself; audio
+      # element lives in the layout under #global-player.
+      expect(last_response.body).to include('class="play-episode')
+      expect(last_response.body).to include('data-audio-url="https://cdn.example.com/audio/ep-12.mp3"')
+      expect(last_response.body).to include('global-player.js')
     end
   end
 
   describe 'GET /article/:uid for a non-podcast article' do
-    it 'omits the player markup and the PODCAST badge' do
+    it 'omits the play-episode button and the PODCAST badge' do
       feed = FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Plain blog')
       ArticlesStore.import(feed_id: feed['id'], entries: [{
         uid: 'plainblogab12', title: 'Plain post',
@@ -57,9 +60,8 @@ RSpec.describe 'podcast end-to-end' do
 
       get '/article/plainblogab12'
       expect(last_response.status).to eq(200)
-      expect(last_response.body).not_to include('class="podcast-player"')
+      expect(last_response.body).not_to include('class="play-episode')
       expect(last_response.body).not_to include('PODCAST')
-      expect(last_response.body).not_to include('podcast-player.js')
     end
   end
 

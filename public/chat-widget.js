@@ -20,6 +20,12 @@
 
   var root = document.getElementById('chat-widget');
   if (!root) return;
+  // Guarded init — the chat-widget div is data-turbo-permanent so its
+  // DOM + listeners survive Turbo navigations. The script body
+  // re-executes on every body swap; this guard prevents double-binding
+  // and avoids re-firing /chat/health on every page change.
+  if (root.dataset.inited === '1') return;
+  root.dataset.inited = '1';
 
   var toggleBtn = root.querySelector('#chat-widget-toggle');
   var panel     = root.querySelector('#chat-widget-panel');
@@ -33,8 +39,14 @@
 
   var STORAGE_PREFIX = 'tfr.chat.';
   var MAX_HISTORY    = 16; // pairs we keep in localStorage; server caps independently
-  var storageKey     = STORAGE_PREFIX + (window.location.pathname || '/');
-  var pageContext    = window.PAGE_CONTEXT || { title: document.title, excerpt: '' };
+
+  // Read fresh on every call so Turbo navigations (which swap <body>
+  // and replace the inline window.PAGE_CONTEXT script) are picked up
+  // without a re-bootstrap.
+  function currentStorageKey() { return STORAGE_PREFIX + (window.location.pathname || '/'); }
+  function currentPageContext() {
+    return window.PAGE_CONTEXT || { title: document.title, excerpt: '' };
+  }
 
   // ---- bootstrap -------------------------------------------------------
   fetch('/chat/health', { credentials: 'same-origin' })
@@ -47,10 +59,18 @@
       renderHistory();
     });
 
+  // Refresh per-page state when Turbo finishes a navigation. Without
+  // this the widget would still reference the prior page's thread +
+  // context excerpt.
+  document.addEventListener('turbo:load', function () {
+    paintContextLabel();
+    renderHistory();
+  });
+
   // ---- helpers ---------------------------------------------------------
   function loadHistory() {
     try {
-      var raw = window.localStorage.getItem(storageKey);
+      var raw = window.localStorage.getItem(currentStorageKey());
       if (!raw) return [];
       var parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
@@ -60,17 +80,17 @@
   function saveHistory(history) {
     try {
       var trimmed = history.slice(-MAX_HISTORY * 2);
-      window.localStorage.setItem(storageKey, JSON.stringify(trimmed));
+      window.localStorage.setItem(currentStorageKey(), JSON.stringify(trimmed));
     } catch (_) {}
   }
 
   function clearHistory() {
-    try { window.localStorage.removeItem(storageKey); } catch (_) {}
+    try { window.localStorage.removeItem(currentStorageKey()); } catch (_) {}
     messagesEl.innerHTML = '';
   }
 
   function paintContextLabel() {
-    var t = (pageContext.title || '').trim();
+    var t = (currentPageContext().title || '').trim();
     if (t.length > 60) t = t.slice(0, 57) + '…';
     contextEl.textContent = t ? 'about ' + t : '';
   }
@@ -121,7 +141,7 @@
     if (history.length === 0) {
       var hint = document.createElement('div');
       hint.className = 'chat-msg chat-msg-hint';
-      hint.textContent = pageContext.excerpt
+      hint.textContent = currentPageContext().excerpt
         ? 'Ask a question about this page — I can see its content.'
         : 'Ask anything. I don\'t have content from this page, so questions about it will be limited.';
       messagesEl.appendChild(hint);
@@ -158,8 +178,8 @@
         history: history.slice(0, -1), // server gets prior turns; new message ships separately
         context: {
           url:     window.location.pathname,
-          title:   pageContext.title || '',
-          excerpt: pageContext.excerpt || ''
+          title:   currentPageContext().title || '',
+          excerpt: currentPageContext().excerpt || ''
         }
       })
     })

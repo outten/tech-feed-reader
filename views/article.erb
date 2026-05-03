@@ -20,36 +20,25 @@
     </p>
 
     <% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>
-      <div class="podcast-player"
-           data-uid="<%= h(@article['uid']) %>"
-           data-duration-seconds="<%= @article['audio_duration_seconds'] %>">
-        <audio
-          preload="metadata"
-          src="<%= h(@article['audio_url']) %>"
-          <% if @article['audio_mime_type'] && !@article['audio_mime_type'].to_s.empty? %>
-            type="<%= h(@article['audio_mime_type']) %>"
-          <% end %>
-        ></audio>
-        <div class="player-row">
-          <button type="button" class="player-btn player-skip-back" aria-label="Skip back 15 seconds" title="Skip back 15s">
-            <span class="player-icon">⟲</span><span class="player-icon-label">15</span>
-          </button>
-          <button type="button" class="player-btn player-play" aria-label="Play / pause" title="Play / pause">▶</button>
-          <button type="button" class="player-btn player-skip-forward" aria-label="Skip forward 30 seconds" title="Skip forward 30s">
-            <span class="player-icon">⟳</span><span class="player-icon-label">30</span>
-          </button>
-          <span class="player-time">
-            <span class="player-current">0:00</span><span class="player-time-sep"> / </span><span class="player-duration">—</span>
-          </span>
-          <input type="range" class="player-scrubber" min="0" max="100" value="0" step="0.1" aria-label="Seek">
-          <select class="player-rate" aria-label="Playback rate">
-            <option value="1">1×</option>
-            <option value="1.25">1.25×</option>
-            <option value="1.5">1.5×</option>
-            <option value="1.75">1.75×</option>
-            <option value="2">2×</option>
-          </select>
-        </div>
+      <%# Single button that loads this episode into the persistent
+          mini-player at the bottom of the screen (see views/layout.erb
+          + public/global-player.js). All controls live in the
+          mini-player so audio survives Turbo navigations. The button
+          label flips to "▶ Resume" / "❚❚ Pause" when the player is
+          on this episode. %>
+      <div class="play-episode-row">
+        <button type="button" class="play-episode btn-primary"
+                data-uid="<%= h(@article['uid']) %>"
+                data-audio-url="<%= h(@article['audio_url']) %>"
+                data-audio-mime="<%= h(@article['audio_mime_type'] || '') %>"
+                data-title="<%= h(@article['title']) %>"
+                data-article-url="/article/<%= h(@article['uid']) %>"
+                data-duration="<%= @article['audio_duration_seconds'] %>">
+          ▶ Play episode
+        </button>
+        <% if @article['audio_duration_seconds'] %>
+          <span class="play-episode-duration muted"><%= fmt_duration(@article['audio_duration_seconds']) %></span>
+        <% end %>
       </div>
     <% end %>
 
@@ -180,10 +169,6 @@
     </p>
   </footer>
 </article>
-
-<% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>
-  <script src="/podcast-player.js?v=<%= asset_mtime('public/podcast-player.js') %>"></script>
-<% end %>
 
 <script>
   // Retrofit external citations inside .article-body so they open in a
