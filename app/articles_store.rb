@@ -4,6 +4,7 @@ require_relative 'tags_applier'
 require_relative 'summary_store'
 require_relative 'summarizer/extractive'
 require_relative 'providers/readability'
+require_relative 'metrics'
 
 # Wrapper around the `articles` table. Returns hash-rows (matching
 # Database#results_as_hash) so callers can pass them straight into ERB.
@@ -198,6 +199,7 @@ module ArticlesStore
         generate_extractive_for(article_id, entry)
       end
     end
+    Metrics::ARTICLES_IMPORTED.increment(by: inserted) if inserted.positive?
     inserted
   end
 
@@ -227,6 +229,7 @@ module ArticlesStore
       summary = Summarizer::Extractive.summarize(body)
       return if summary.empty?
       SummaryStore.upsert(article_id, extractive: summary)
+      Metrics::SUMMARIES_GENERATED.increment(labels: { kind: 'extractive' })
     end
 
     # When a feed body looks like a teaser (Lobsters / HN "Comments"

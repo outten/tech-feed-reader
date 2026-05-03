@@ -1,5 +1,6 @@
 require 'anthropic'
 require_relative '../logger'
+require_relative '../metrics'
 
 # LLM summary backend. One-shot Anthropic API call per "Summarize with
 # Claude" click on /article/:uid. Output lands in summaries.llm +
@@ -70,6 +71,7 @@ module Summarizer
       end
 
       AppLogger.info('claude_summarize_done', model: MODEL, latency_ms: latency, output_length: text.length)
+      Metrics::SUMMARIES_GENERATED.increment(labels: { kind: 'llm' })
       Result.new(status: :ok, text: text, model: MODEL)
     rescue Anthropic::Errors::APIError => e
       AppLogger.error('claude_summarize', status: :error, class: e.class.name, message: e.message)

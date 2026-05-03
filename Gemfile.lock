@@ -50,6 +50,8 @@ GEM
     nokogiri (1.19.3-x86_64-linux-musl)
       racc (~> 1.4)
     ostruct (0.6.3)
+    prometheus-client (4.2.5)
+      base64
     puma (8.0.1)
       nio4r (~> 2.0)
     racc (1.8.1)
@@ -127,6 +129,7 @@ DEPENDENCIES
   feedjira
   loofah
   ostruct
+  prometheus-client (~> 4.2)
   puma
   rack-test
   rackup (~> 2.3)
