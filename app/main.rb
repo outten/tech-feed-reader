@@ -29,6 +29,8 @@ require_relative 'recommendation'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'version'
+require_relative 'metrics'
+require_relative 'metrics_middleware'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -271,6 +273,32 @@ class TechFeedReader < Sinatra::Base
         sidekiq: check_sidekiq
       }
     }.to_json
+  end
+
+  # Prometheus scrape endpoint. Refreshes the gauges that aren't
+  # event-driven (counts, queue depth, uptime) just before exporting,
+  # so a scrape always reflects the latest snapshot.
+  #
+  # No auth — this is a single-user app and the metrics are
+  # operationally useful from the host's local network. If you ever
+  # expose this beyond localhost, put a reverse proxy in front and
+  # restrict /metrics there.
+  get '/metrics' do
+    Metrics::FEEDS_SUBSCRIBED.set(FeedsStore.count)
+    Metrics::ARTICLES_TOTAL.set(ArticlesStore.count)
+    Metrics::UPTIME.set(AppVersion.uptime_seconds)
+
+    # Sidekiq stats hit Redis; protect the route from a Redis outage so
+    # /metrics still emits the SQLite-derived gauges.
+    begin
+      Metrics::SIDEKIQ_QUEUE_DEPTH.set(Sidekiq::Stats.new.enqueued)
+      Metrics::SIDEKIQ_WORKERS.set(Sidekiq::ProcessSet.new.size)
+    rescue StandardError
+      # Leave gauges at last known value (or 0 on first call).
+    end
+
+    content_type 'text/plain; version=0.0.4; charset=utf-8'
+    Prometheus::Client::Formats::Text.marshal(Metrics::REGISTRY)
   end
 
   get '/' do
@@ -838,6 +866,7 @@ if __FILE__ == $PROGRAM_NAME
       run Sidekiq::Web
     end
     map '/' do
+      use MetricsMiddleware
       run TechFeedReader.new
     end
   end

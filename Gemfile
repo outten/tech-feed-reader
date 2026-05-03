@@ -56,3 +56,9 @@ gem 'sidekiq', '~> 7.3'
 # timeout arg, which 3.0 dropped). Without this pin Bundler picks up
 # 3.x and the scheduled-job poller crashes on boot.
 gem 'connection_pool', '~> 2.4'
+
+# Prometheus client — exposes /metrics in the Prometheus exposition
+# format (text/plain; version=0.0.4). Pure-Ruby in-memory registry;
+# no external store needed. Registry is process-local, so the web
+# process and the worker process each expose their own metrics.
+gem 'prometheus-client', '~> 4.2'

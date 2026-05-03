@@ -4,6 +4,7 @@ require_relative 'feed_parser'
 require_relative 'feeds_store'
 require_relative 'health_registry'
 require_relative 'logger'
+require_relative 'metrics'
 
 # Orchestrator: takes a feed row, GETs the URL with conditional-GET
 # headers, parses on 200, records status + ETag + Last-Modified +
@@ -32,7 +33,8 @@ module FeedFetcher
     AppLogger.info('feed_fetch_start', feed_id: feed['id'], url: feed['url'])
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     result  = HealthRegistry.measure(feed['id']) { fetch_feed_impl(feed) }
-    latency = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    latency = (elapsed * 1000).round
     AppLogger.info(
       'feed_fetch_done',
       feed_id:      feed['id'],
@@ -42,6 +44,8 @@ module FeedFetcher
       latency_ms:   latency,
       error:        result.error&.to_s
     )
+    Metrics::FEED_FETCHES.increment(labels: { status: result.status.to_s })
+    Metrics::FEED_FETCH_DURATION.observe(elapsed)
     result
   end
 
