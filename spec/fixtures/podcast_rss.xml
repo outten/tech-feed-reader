@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Test Podcast Show</title>
+    <link>https://example.com/podcast</link>
+    <description>A fixture podcast feed for parser tests.</description>
+    <itunes:author>Example Host</itunes:author>
+
+    <item>
+      <title>Episode 12 — On Building Things</title>
+      <link>https://example.com/podcast/12</link>
+      <guid isPermaLink="false">ep-12</guid>
+      <pubDate>Sat, 02 May 2026 09:00:00 +0000</pubDate>
+      <description>&lt;p&gt;Show notes for episode 12.&lt;/p&gt;</description>
+      <enclosure url="https://cdn.example.com/audio/ep-12.mp3" type="audio/mpeg" length="32145678"/>
+      <itunes:duration>1:23:45</itunes:duration>
+    </item>
+
+    <item>
+      <title>Episode 11 — Mid-form runtime (mm:ss)</title>
+      <link>https://example.com/podcast/11</link>
+      <guid isPermaLink="false">ep-11</guid>
+      <pubDate>Sat, 25 Apr 2026 09:00:00 +0000</pubDate>
+      <description>&lt;p&gt;Short form episode.&lt;/p&gt;</description>
+      <enclosure url="https://cdn.example.com/audio/ep-11.mp3" type="audio/mpeg" length="9876543"/>
+      <itunes:duration>42:15</itunes:duration>
+    </item>
+
+    <item>
+      <title>Episode 10 — Raw seconds</title>
+      <link>https://example.com/podcast/10</link>
+      <guid isPermaLink="false">ep-10</guid>
+      <pubDate>Sat, 18 Apr 2026 09:00:00 +0000</pubDate>
+      <description>&lt;p&gt;Old episode with bare seconds.&lt;/p&gt;</description>
+      <enclosure url="https://cdn.example.com/audio/ep-10.mp3" type="audio/mpeg" length="5000000"/>
+      <itunes:duration>3600</itunes:duration>
+    </item>
+
+    <item>
+      <title>Bonus — text-only entry, no enclosure</title>
+      <link>https://example.com/podcast/bonus</link>
+      <guid isPermaLink="false">bonus-1</guid>
+      <pubDate>Sat, 11 Apr 2026 09:00:00 +0000</pubDate>
+      <description>&lt;p&gt;Just a blog post in the same feed.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

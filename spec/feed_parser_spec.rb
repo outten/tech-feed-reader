@@ -15,7 +15,8 @@ RSpec.describe FeedParser do
     it 'normalises every entry to the same shape' do
       e = result[:entries].first
       expect(e.keys).to contain_exactly(
-        :uid, :title, :url, :author, :published_at, :content_html, :content_text
+        :uid, :title, :url, :author, :published_at, :content_html, :content_text,
+        :audio_url, :audio_mime_type, :audio_duration_seconds
       )
     end
 

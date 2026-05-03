@@ -1180,8 +1180,10 @@ html.dark .tag-chip-add:hover { background: #1c2c4f; color: #6ea3ff; border-colo
 }
 .badge.bookmarked { background: #fff8d6; color: #8a6d00; }
 .badge.archived   { background: #efeff5; color: #6e6e73; }
-html.dark .badge            { background: #2c2c2e; color: #aeaeb2; }
-html.dark .badge.bookmarked { background: #4a3a00; color: #ffe68a; }
+.badge.podcast-badge { background: #e9d6ff; color: #5e1f9c; letter-spacing: 0.06em; }
+html.dark .badge                  { background: #2c2c2e; color: #aeaeb2; }
+html.dark .badge.bookmarked       { background: #4a3a00; color: #ffe68a; }
+html.dark .badge.podcast-badge    { background: #3a1d5e; color: #d6b8ff; }
 
 /* State filter row above article lists.                              */
 .state-filter a {
@@ -1475,3 +1477,112 @@ html.dark button.header-icon-btn:hover { background: #2c2c2e; }
 .header-toast.error { background: #d70015; }
 html.dark .header-toast { background: #f5f5f7; color: #1d1d1f; }
 html.dark .header-toast.error { background: #ff453a; color: #fff; }
+
+/* ----- Podcast player -------------------------------------------------
+   Sticky bar that lives just under the article header. The user can
+   scrub, skip, and change playback rate while scrolling through the
+   show notes below. <audio> stays in the DOM (no CSS hides it) but
+   the native controls are not rendered — we drive the element through
+   .podcast-player JS instead. */
+.podcast-player {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: 1rem 0 1.5rem;
+  padding: 0.6rem 0.85rem;
+  background: #f5f5f7;
+  border: 1px solid #d2d2d7;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+html.dark .podcast-player {
+  background: #1c1c1e;
+  border-color: #3a3a3c;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.podcast-player audio { display: none; }
+
+.podcast-player .player-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.podcast-player .player-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.2rem;
+  padding: 0 0.65rem;
+  border: 1px solid #d2d2d7;
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.podcast-player .player-btn:hover { background: #e8e8ed; }
+html.dark .podcast-player .player-btn {
+  background: #2c2c2e;
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+}
+html.dark .podcast-player .player-btn:hover { background: #3a3a3c; }
+
+.podcast-player .player-play { font-weight: 600; min-width: 3rem; }
+
+/* Skip buttons stack the curve glyph + the seconds label so the icons
+   read like the standard "⟲ 15" / "⟳ 30" controls every podcast app
+   uses. */
+.podcast-player .player-skip-back,
+.podcast-player .player-skip-forward {
+  flex-direction: column;
+  gap: 0;
+  height: 2.4rem;
+  padding: 0.15rem 0.55rem;
+}
+.podcast-player .player-icon { font-size: 0.95rem; line-height: 0.95; }
+.podcast-player .player-icon-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-top: 0.1rem;
+}
+
+.podcast-player .player-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+  color: #1d1d1f;
+  white-space: nowrap;
+}
+.podcast-player .player-time-sep { color: #6e6e73; }
+html.dark .podcast-player .player-time     { color: #f5f5f7; }
+html.dark .podcast-player .player-time-sep { color: #8e8e93; }
+
+.podcast-player .player-scrubber {
+  flex: 1 1 auto;
+  min-width: 8rem;
+  cursor: pointer;
+}
+
+.podcast-player .player-rate {
+  height: 2.2rem;
+  padding: 0 0.55rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d1d1f;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+html.dark .podcast-player .player-rate {
+  background: #2c2c2e;
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+}
+
+@media (max-width: 720px) {
+  .podcast-player .player-scrubber { order: 99; flex-basis: 100%; }
+}

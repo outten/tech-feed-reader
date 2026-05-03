@@ -105,6 +105,9 @@
     <ul class="news-list">
       <% @articles.each do |article| %>
         <li class="news-item">
+          <% if article['audio_url'] && !article['audio_url'].to_s.empty? %>
+            <span class="badge podcast-badge" title="Podcast episode">PODCAST</span>
+          <% end %>
           <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
           <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
           <div class="news-meta">
