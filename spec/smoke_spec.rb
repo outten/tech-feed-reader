@@ -20,7 +20,7 @@ RSpec.describe 'TechFeedReader smoke' do
     expect(last_response.body).to include('Dashboard')
   end
 
-  %w[/articles /feeds /tags /search /admin/health /admin/cache].each do |path|
+  %w[/articles /topics /feeds /tags /search /admin/health /admin/cache].each do |path|
     it "renders #{path}" do
       get path
       expect(last_response.status).to eq(200)

@@ -11,6 +11,7 @@
     <span class="logo">Tech Feed Reader</span>
     <nav>
       <a href="/dashboard" class="<%= %w[/ /dashboard].include?(request.path_info) ? 'active' : '' %>">Dashboard</a>
+      <a href="/topics"    class="<%= request.path_info == '/topics'   ? 'active' : '' %>">Topics</a>
       <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
       <a href="/feeds"     class="<%= request.path_info == '/feeds'    ? 'active' : '' %>">Feeds</a>
       <a href="/tags"      class="<%= request.path_info == '/tags'     ? 'active' : '' %>">Tags</a>
