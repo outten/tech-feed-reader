@@ -234,14 +234,36 @@ class TechFeedReader < Sinatra::Base
   # most-recent sample articles, in count-desc order. The dashboard
   # widget shows the top 8; this page shows the full set so the user
   # can scan "what's everyone talking about" without per-article
-  # scrolling. Each topic chip links to /search?q=<term> for the full
-  # article list (FTS5 already does the heavy lifting there).
+  # scrolling. Each topic chip drills into /topics/:term.
   get '/topics' do
     requested   = params['days'].to_s
     @days       = TOPICS_WINDOW_OPTIONS[requested] || 14
     @topics     = TopicClusters.recent(days: @days, min_articles: 2, limit: 50)
     @page_title = 'Topics'
     erb :topics
+  end
+
+  # Topic detail: synthesised "what's happening in <term>" view.
+  # Pulls articles matching the term via FTS5, joins their cached
+  # extractive summaries (auto-generated at import time), and renders
+  # a "Highlights" panel (first sentence of each article's summary)
+  # plus the full article list with summaries inline. One round-trip
+  # to the DB; no Claude call by default (the summaries are already
+  # there from import).
+  get '/topics/:term' do |term|
+    @term        = term.to_s
+    @articles    = ArticlesStore.for_topic(@term, limit: 30)
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @page_title  = "Topic: #{@term}"
+
+    @highlights = @articles.filter_map do |article|
+      summary = article['summary'].to_s.strip
+      next if summary.empty?
+      first_sentence = summary.split(/(?<=[.!?])\s+/).first
+      [first_sentence&.strip, article] if first_sentence && !first_sentence.strip.empty?
+    end.first(10)
+
+    erb :topic
   end
 
   get '/feeds' do

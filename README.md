@@ -21,6 +21,7 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 |---|---|---|
 | Dashboard | `/dashboard` | Recent unread, top tags, feed-health banner, activity chart |
 | Topics | `/topics` | Trending term clusters with sample articles; 7/14/30-day window selector |
+| Topic detail | `/topics/:term` | Synthesized "highlights" + every article in the cluster, summaries inline |
 | Articles | `/articles` | Main reading interface, paginated and filterable |
 | Article | `/article/:id` | Single article view + cached summary |
 | Feeds | `/feeds` | Manage RSS subscriptions |

@@ -35,7 +35,7 @@ RSpec.describe 'GET /topics' do
     get '/topics'
     expect(last_response.body).to include('kubernetes')
     expect(last_response.body).to match(/K1|K2|K3/)
-    expect(last_response.body).to include('/search?q=kubernetes')
+    expect(last_response.body).to include('/topics/kubernetes')
   end
 
   it 'honours ?days= window selector (clamped to 7/14/30)' do
