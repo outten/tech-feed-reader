@@ -1,0 +1,24 @@
+<%# Single <tr> for the feeds table. Used both server-side from
+    feeds.erb's loop and emitted as JSON `row_html` from /api/feeds
+    so JS-inserted rows match server-rendered ones byte-for-byte. %>
+<tr data-feed-id="<%= feed['id'] %>">
+  <td>
+    <% if feed['title'] && !feed['title'].to_s.empty? %>
+      <%= h(feed['title']) %>
+    <% else %>
+      <em class="muted">(unset)</em>
+    <% end %>
+  </td>
+  <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"><%= h(feed['url']) %></a></td>
+  <td class="num"><%= feed['fetch_interval_seconds'] %>s</td>
+  <td class="muted"><%= relative_time(feed['last_fetched_at']) %></td>
+  <td class="muted"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
+  <td>
+    <form method="post" action="/admin/refresh/<%= feed['id'] %>" class="js-refresh-feed" style="display:inline">
+      <button type="submit" class="refresh-btn">Refresh</button>
+    </form>
+    <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed" style="display:inline">
+      <button type="submit" class="danger">Remove</button>
+    </form>
+  </td>
+</tr>

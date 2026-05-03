@@ -2,15 +2,17 @@
   <div>
     <h2>Feeds</h2>
     <p class="subtitle">
-      Manage subscribed RSS / Atom sources. <%= @feeds.length %> active.
+      Manage subscribed RSS / Atom sources. <span id="feed-count"><%= @feeds.length %></span> active.
     </p>
   </div>
   <% if @feeds.any? %>
-    <form method="post" action="/admin/refresh/all">
+    <form method="post" action="/admin/refresh/all" class="js-refresh-all">
       <button type="submit" class="refresh-btn">Refresh all</button>
     </form>
   <% end %>
 </div>
+
+<div id="flash-mount" aria-live="polite"></div>
 
 <% if @notice == 'added' %>
   <div class="notice">Feed added.</div>
@@ -71,7 +73,7 @@
 
 <div class="portfolio-add">
   <h3>Add a feed</h3>
-  <form method="post" action="/feeds" class="portfolio-form">
+  <form method="post" action="/feeds" class="portfolio-form js-add-feed">
     <label>
       URL
       <input type="url" name="url" required placeholder="https://example.com/feed.xml">
@@ -108,45 +110,23 @@
   </p>
 </div>
 
-<% if @feeds.any? %>
-  <table class="data-table" style="margin-top:2rem">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>URL</th>
-        <th>Interval</th>
-        <th>Last fetched</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @feeds.each do |feed| %>
-        <tr>
-          <td>
-            <% if feed['title'] && !feed['title'].to_s.empty? %>
-              <%= h(feed['title']) %>
-            <% else %>
-              <em class="muted">(unset)</em>
-            <% end %>
-          </td>
-          <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"><%= h(feed['url']) %></a></td>
-          <td class="num"><%= feed['fetch_interval_seconds'] %>s</td>
-          <td class="muted"><%= relative_time(feed['last_fetched_at']) %></td>
-          <td class="muted"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
-          <td>
-            <form method="post" action="/admin/refresh/<%= feed['id'] %>" style="display:inline">
-              <button type="submit" class="refresh-btn">Refresh</button>
-            </form>
-            <form method="post" action="/feeds/<%= feed['id'] %>/delete" style="display:inline" onsubmit="return confirm('Remove this feed and all its articles?');">
-              <button type="submit" class="danger">Remove</button>
-            </form>
-          </td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
+<table class="data-table feeds-table" style="margin-top:2rem<%= '; display:none' if @feeds.empty? %>">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>URL</th>
+      <th>Interval</th>
+      <th>Last fetched</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @feeds.each do |feed| %>
+      <%= erb :_feed_row, locals: { feed: feed }, layout: false %>
+    <% end %>
+  </tbody>
+</table>
 
 <section class="benchmark-section" style="margin-top:2.5rem">
   <h3>Discover popular feeds</h3>
@@ -162,7 +142,7 @@
     <ul class="catalog-list">
       <% entries.each do |entry| %>
         <% subscribed = @subscribed.include?(entry[:url]) %>
-        <li class="catalog-row <%= 'subscribed' if subscribed %>">
+        <li class="catalog-row <%= 'subscribed' if subscribed %>" data-catalog-url="<%= h(entry[:url]) %>">
           <div class="catalog-meta">
             <span class="catalog-title"><%= h(entry[:title]) %></span>
             <span class="catalog-blurb"><%= h(entry[:blurb]) %></span>
@@ -171,7 +151,7 @@
           <% if subscribed %>
             <span class="badge subscribed-badge">✓ Subscribed</span>
           <% else %>
-            <form method="post" action="/feeds/catalog/add">
+            <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
               <input type="hidden" name="url" value="<%= h(entry[:url]) %>">
               <button type="submit" class="btn-primary">+ Add</button>
             </form>
@@ -181,3 +161,5 @@
     </ul>
   <% end %>
 </section>
+
+<script src="/feeds.js?v=<%= asset_mtime('public/feeds.js') %>"></script>

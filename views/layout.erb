@@ -34,7 +34,7 @@
       <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
       <a href="/admin"     class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
     </nav>
-    <form method="post" action="/admin/refresh/all" class="header-refresh-form">
+    <form method="post" action="/admin/refresh/all" class="header-refresh-form js-header-refresh">
       <button type="submit" id="header-refresh" class="header-icon-btn"
               title="Refresh all feeds now" aria-label="Refresh all feeds">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"
@@ -45,6 +45,7 @@
         </svg>
       </button>
     </form>
+    <div id="header-flash" aria-live="polite"></div>
     <button id="theme-toggle" type="button" title="Toggle light / dark theme" aria-label="Toggle light / dark theme">🌙</button>
   </header>
   <main>
@@ -75,5 +76,6 @@
       });
     })();
   </script>
+  <script src="/header-refresh.js?v=<%= asset_mtime('public/header-refresh.js') %>"></script>
 </body>
 </html>
