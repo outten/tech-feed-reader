@@ -83,7 +83,7 @@
       <ul class="topic-list">
         <% @topic_clusters.each do |cluster| %>
           <li class="topic-row">
-            <a class="tag-chip" href="/search?q=<%= CGI.escape(cluster[:term]) %>">
+            <a class="tag-chip" href="/topics/<%= CGI.escape(cluster[:term]) %>">
               <%= h(cluster[:term]) %> <span class="muted">(<%= cluster[:count] %>)</span>
             </a>
             <span class="topic-samples">

@@ -34,7 +34,7 @@
       <% @topics.each do |cluster| %>
         <tr>
           <td class="topic-cell">
-            <a class="tag-chip" href="/search?q=<%= CGI.escape(cluster[:term]) %>"><%= h(cluster[:term]) %></a>
+            <a class="tag-chip" href="/topics/<%= CGI.escape(cluster[:term]) %>"><%= h(cluster[:term]) %></a>
           </td>
           <td class="num"><%= cluster[:count] %></td>
           <td class="topic-samples">

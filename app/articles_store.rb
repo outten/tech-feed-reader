@@ -91,6 +91,27 @@ module ArticlesStore
     db.execute(sql, [tag_id, limit, offset])
   end
 
+  # Articles matching an FTS5 term, with their cached extractive
+  # summaries inline (`summary` column) so the /topics/:term view can
+  # render a "highlights" panel without a follow-up SummaryStore loop.
+  # Ordered by FTS5 BM25 rank (most relevant first). Returns [] for
+  # blank input or on FTS5 query syntax errors — same fallthrough as
+  # ArticlesStore.search.
+  def for_topic(term, limit: 30)
+    return [] if term.to_s.strip.empty?
+    db.execute(<<~SQL, [term.to_s.strip, limit])
+      SELECT a.*, s.extractive AS summary, rank
+      FROM articles a
+      JOIN articles_fts f ON a.id = f.rowid
+      LEFT JOIN summaries s ON s.article_id = a.id
+      WHERE articles_fts MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    SQL
+  rescue SQLite3::SQLException
+    []
+  end
+
   # Full-text search via the articles_fts virtual table. `rank` is FTS5's
   # built-in relevance score (lower = better). Empty / blank queries
   # return [] instead of raising — FTS5 errors on empty MATCH terms.

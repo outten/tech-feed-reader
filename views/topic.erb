@@ -1,0 +1,67 @@
+<div class="page-header">
+  <div>
+    <h2>
+      Topic: <span class="tag-chip"><%= h(@term) %></span>
+    </h2>
+    <p class="subtitle">
+      <% if @articles.empty? %>
+        No articles match this topic.
+      <% else %>
+        <%= @articles.length %> recent article<%= 's' unless @articles.length == 1 %> mentioning <code><%= h(@term) %></code>
+        &middot; <a href="/topics">&larr; All topics</a>
+        &middot; <a href="/search?q=<%= CGI.escape(@term) %>">View as search results</a>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @articles.empty? %>
+  <div class="empty-state">
+    Either nothing's been imported with that term, or the term isn't a
+    valid FTS5 query. Try the <a href="/search">search page</a> with
+    quoted phrases or AND/OR/NOT operators.
+  </div>
+<% else %>
+  <% if @highlights.any? %>
+    <section class="benchmark-section">
+      <h3>Highlights</h3>
+      <p class="subtitle">
+        First sentence of each article's auto-summary — read these instead of every full article.
+      </p>
+      <ul class="news-list">
+        <% @highlights.each do |sentence, article| %>
+          <li class="news-item">
+            <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+            <p class="excerpt"><%= h(sentence) %></p>
+            <div class="news-meta">
+              <% if (feed = @feeds_by_id[article['feed_id']]) %>
+                <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+              <% end %>
+              <span><%= relative_time(article['published_at']) %></span>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
+  <section class="benchmark-section" style="margin-top:1.5rem">
+    <h3>All articles in this topic</h3>
+    <ul class="news-list">
+      <% @articles.each do |article| %>
+        <li class="news-item">
+          <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+          <% if article['summary'] && !article['summary'].to_s.empty? %>
+            <p class="excerpt"><%= h(article['summary']) %></p>
+          <% end %>
+          <div class="news-meta">
+            <% if (feed = @feeds_by_id[article['feed_id']]) %>
+              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+            <% end %>
+            <span><%= relative_time(article['published_at']) %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
