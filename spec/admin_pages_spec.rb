@@ -12,6 +12,15 @@ RSpec.describe 'admin pages' do
   end
 
   describe 'GET /admin' do
+    # `sidekiq_stats` lazily talks to Redis; stub it so this spec stays
+    # hermetic regardless of whether Redis is running locally / in CI.
+    before do
+      allow_any_instance_of(TechFeedReader).to receive(:sidekiq_stats).and_return(
+        ok: true, enqueued: 0, scheduled: 0, retries: 0, dead: 0,
+        processed: 0, failed: 0, workers: 0
+      )
+    end
+
     it 'renders system overview with counts, db size, and integration rows' do
       FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
 
@@ -24,6 +33,21 @@ RSpec.describe 'admin pages' do
       expect(last_response.body).to include('Claude (LLM summarizer)')
       expect(last_response.body).to include('Sidekiq (background refresh)')
       expect(last_response.body).to include('/admin/sidekiq')
+    end
+
+    it 'shows the no-worker-running hint when Redis is up but no workers are connected' do
+      get '/admin'
+      expect(last_response.body).to include('redis up, no worker running')
+      expect(last_response.body).to include('make sidekiq')
+    end
+
+    it 'reports the Redis error when sidekiq_stats fails' do
+      allow_any_instance_of(TechFeedReader).to receive(:sidekiq_stats).and_return(
+        ok: false, error: 'Connection refused - 127.0.0.1:6379'
+      )
+      get '/admin'
+      expect(last_response.body).to include('redis unreachable')
+      expect(last_response.body).to include('Connection refused')
     end
   end
 
