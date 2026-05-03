@@ -149,8 +149,9 @@ module ArticlesStore
 
     sql = <<~SQL
       INSERT OR IGNORE INTO articles
-        (uid, feed_id, title, url, author, published_at, content_html, content_text)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (uid, feed_id, title, url, author, published_at, content_html, content_text,
+         audio_url, audio_mime_type, audio_duration_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     SQL
 
     rules    = TagsStore.all  # snapshot once per import batch
@@ -167,7 +168,8 @@ module ArticlesStore
           entry[:uid], feed_id,
           entry[:title].to_s, entry[:url].to_s,
           entry[:author], entry[:published_at],
-          entry[:content_html].to_s, entry[:content_text].to_s
+          entry[:content_html].to_s, entry[:content_text].to_s,
+          entry[:audio_url], entry[:audio_mime_type], entry[:audio_duration_seconds]
         ])
         next if db.changes.zero?  # uid was a duplicate, skip tag + summary
 

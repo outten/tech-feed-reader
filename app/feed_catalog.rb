@@ -20,7 +20,8 @@ module FeedCatalog
     engineering: 'Engineering blogs',
     ai:          'AI / ML',
     security:    'Security',
-    personal:    'Personal blogs'
+    personal:    'Personal blogs',
+    podcast:     'Podcasts'
   }.freeze
 
   CATALOG = [
@@ -109,7 +110,30 @@ module FeedCatalog
       blurb: 'Long, data-driven essays on engineering and orgs.' },
     { url: 'https://ciechanow.ski/atom.xml', title: 'Bartosz Ciechanowski', category: :personal,
       interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
-      blurb: 'Interactive technical explainers (rare, exceptional posts).' }
+      blurb: 'Interactive technical explainers (rare, exceptional posts).' },
+
+    # ---- podcasts (6) -------------------------------------------------
+    # All ship audio enclosures (parsed by FeedParser into audio_url etc.)
+    # so the article view renders the player. Most include itunes:duration
+    # so the runtime shows immediately, before <audio> loads metadata.
+    { url: 'https://changelog.com/podcast/feed', title: 'The Changelog', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Long-running interviews with people building the open source world.' },
+    { url: 'https://feeds.simplecast.com/dxZsm5kX', title: 'Software Engineering Daily', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Daily technical interviews on infrastructure, languages, and platforms.' },
+    { url: 'https://api.substack.com/feed/podcast/1517410.rss', title: 'Latent Space', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Engineering-focused conversations on the AI / LLM stack.' },
+    { url: 'https://lexfridman.com/feed/podcast/', title: 'Lex Fridman Podcast', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Long-form interviews with technologists, scientists, and public figures.' },
+    { url: 'https://softskills.audio/feed.xml', title: 'Soft Skills Engineering', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Weekly listener-question advice on the non-code side of engineering.' },
+    { url: 'https://acquired.fm/episodes?format=rss', title: 'Acquired', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Deep, multi-hour business histories of major tech companies and deals.' }
   ].freeze
 
   module_function
