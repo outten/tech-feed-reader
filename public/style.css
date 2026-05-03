@@ -1815,6 +1815,11 @@ html.dark .chat-toggle:hover { background: #2a94ff; }
   flex-direction: column;
   overflow: hidden;
 }
+/* The bare `hidden` attribute defaults to display:none, but the
+   .chat-panel rule above sets display:flex, which overrides it. We
+   need an explicit !important here so the panel actually starts
+   closed and only opens when the user clicks the toggle button. */
+.chat-panel[hidden] { display: none !important; }
 html.dark .chat-panel { background: #1c1c1e; border-color: #2c2c2e; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); }
 
 .chat-panel-header {
