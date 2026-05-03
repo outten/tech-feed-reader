@@ -55,6 +55,32 @@
   <footer>
     <small>Tech Feed Reader &mdash; Public RSS aggregation for personal use.</small>
   </footer>
+
+  <%# Chat widget — floating button bottom-right opens a panel that
+      sends the user's message + the page context to /chat. Hidden by
+      chat-widget.js until /chat/health says the API key is configured. %>
+  <div id="chat-widget" hidden>
+    <button id="chat-widget-toggle" type="button" class="chat-toggle" title="Chat about this page" aria-label="Chat about this page" aria-expanded="false">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22"
+           fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+    <div id="chat-widget-panel" class="chat-panel" hidden>
+      <header class="chat-panel-header">
+        <span class="chat-panel-title">Chat <span class="chat-panel-context muted"></span></span>
+        <button type="button" class="chat-panel-clear" title="Clear thread for this page" aria-label="Clear thread">⟲</button>
+        <button type="button" class="chat-panel-close" title="Close" aria-label="Close">✕</button>
+      </header>
+      <div class="chat-panel-messages" role="log" aria-live="polite"></div>
+      <form class="chat-panel-form">
+        <textarea class="chat-panel-input" rows="2" placeholder="Ask about this page…" aria-label="Chat input"></textarea>
+        <button type="submit" class="chat-panel-send">Send</button>
+      </form>
+    </div>
+  </div>
+
   <script>
     /* Theme toggle — wires the header button to flip the class on
        <html>, persists the choice to localStorage, and updates the
@@ -77,6 +103,21 @@
       });
     })();
   </script>
+
+  <%# Page context for the chat widget. Routes can populate
+      @chat_context = { title:, excerpt: } to give the assistant
+      something to ground its answers in. URL is filled in client-side
+      from location.pathname so we don't have to thread it through.
+      .to_json alone JSON-escapes quotes but leaves `</` intact, which
+      lets a `</script>` substring in the title or excerpt break out
+      of this inline <script>. The gsub closes that hole. %>
+  <script>
+    window.PAGE_CONTEXT = {
+      title:   <%= ((@chat_context && @chat_context[:title])   || @page_title || 'Tech Feed Reader').to_json.gsub('</', '<\/') %>,
+      excerpt: <%= ((@chat_context && @chat_context[:excerpt]) || '').to_json.gsub('</', '<\/') %>
+    };
+  </script>
   <script src="/header-refresh.js?v=<%= asset_mtime('public/header-refresh.js') %>"></script>
+  <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>
 </body>
 </html>

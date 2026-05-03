@@ -3,13 +3,10 @@ require 'sinatra/base'
 require 'json'
 require 'time'
 require 'cgi'
-require 'dotenv'
 
-# Load credentials (Anthropic API key for Tier 2 summarization, etc.).
-# `.credentials` is canonical; `.env` is a Dotenv default that we honour
-# but don't write to. Both are git-ignored.
-Dotenv.load(File.expand_path('../../.credentials', __FILE__))
-Dotenv.load(File.expand_path('../../.env', __FILE__))
+# Loads .credentials + .env and aliases CLAUDE_API_KEY → ANTHROPIC_API_KEY
+# so the Anthropic SDK picks it up. See app/credentials.rb.
+require_relative 'credentials'
 
 require_relative 'logger'
 require_relative 'database'
@@ -24,6 +21,7 @@ require_relative 'scheduler'
 require_relative 'summary_store'
 require_relative 'summarizer/extractive'
 require_relative 'summarizer/claude'
+require_relative 'chat'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
@@ -116,6 +114,18 @@ class TechFeedReader < Sinatra::Base
     end
 
     # Used in feed-fetch UI; ISO8601 timestamps become "2 minutes ago".
+    # JSON body parser for routes that take application/json. Returns
+    # nil on malformed input so the caller can 400 cleanly without a
+    # raised exception leaking out of the route block.
+    def parse_json_body
+      raw = request.body.read
+      request.body.rewind
+      return nil if raw.to_s.strip.empty?
+      JSON.parse(raw)
+    rescue JSON::ParserError
+      nil
+    end
+
     def relative_time(iso)
       return '—' if iso.nil? || iso.to_s.empty?
       t = iso.is_a?(Time) ? iso : (Time.parse(iso.to_s) rescue nil)
@@ -378,6 +388,13 @@ class TechFeedReader < Sinatra::Base
     @related         = Recommendation.for_article(@article, limit: 5)
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title      = @article['title']
+    # Chat context — give the assistant the article body (capped) so
+    # it can answer questions about what the user is reading. The
+    # widget reads window.PAGE_CONTEXT and posts it to /chat.
+    @chat_context    = {
+      title:   @article['title'].to_s,
+      excerpt: @article['content_text'].to_s
+    }
     erb :article
   end
 
@@ -402,6 +419,49 @@ class TechFeedReader < Sinatra::Base
   # "Summarize with Claude"). Cached forever per article id; never
   # auto-invalidated. The button is hidden in the view when
   # Summarizer::Claude.available? is false (no API key set).
+  # Chat backend for the floating widget. Stateless on the server —
+  # the widget keeps the message thread in localStorage (per page URL)
+  # and replays it on every turn. Body is JSON:
+  #   { message, history: [{role, content}, ...], context: {url, title, excerpt} }
+  # Response shape mirrors Chat::Claude::Result.
+  post '/chat' do
+    content_type :json
+
+    payload = parse_json_body
+    halt 400, { status: 'error', error: 'invalid JSON body' }.to_json unless payload
+
+    result = Chat::Claude.respond(
+      message: payload['message'].to_s,
+      history: payload['history'] || [],
+      context: {
+        url:     payload.dig('context', 'url').to_s,
+        title:   payload.dig('context', 'title').to_s,
+        excerpt: payload.dig('context', 'excerpt').to_s
+      }
+    )
+
+    case result.status
+    when :ok
+      { status: 'ok', reply: result.text, model: result.model, usage: result.usage }.to_json
+    when :unavailable
+      status 503
+      { status: 'unavailable', error: 'Claude not configured (set CLAUDE_API_KEY in .credentials)' }.to_json
+    when :empty
+      status 400
+      { status: 'empty', error: 'message cannot be empty' }.to_json
+    else
+      status 500
+      { status: 'error', error: result.error.to_s }.to_json
+    end
+  end
+
+  # Lightweight probe so the widget's bootstrap JS can hide the button
+  # entirely when Claude isn't configured.
+  get '/chat/health' do
+    content_type :json
+    { available: Chat::Claude.available?, model: Chat::Claude::MODEL }.to_json
+  end
+
   post '/article/:uid/summarize/llm' do |uid|
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
