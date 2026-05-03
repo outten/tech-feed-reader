@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all
 
 install:
 	bundle install
@@ -103,3 +103,18 @@ sidekiq-otel:
 	OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
 	OTEL_SERVICE_NAME=tech-feed-reader \
 	bundle exec sidekiq -r ./app/sidekiq_boot.rb -c 5
+
+# One-shot dev session: starts Jaeger, Redis (if not already up), the web
+# app, and the Sidekiq worker — all in the background — then opens
+# browser tabs to the app and Jaeger UI. PIDs in tmp/pids/, logs in
+# tmp/logs/. Idempotent: re-running detects already-running processes
+# and skips. Set SKIP_JAEGER=1 to skip the Docker step.
+run-all:
+	@./scripts/run_all.sh
+
+# Symmetric teardown for `make run-all`. Sends SIGTERM, waits 8s for a
+# graceful exit, then SIGKILL. Only stops the Redis it started itself
+# (a pre-existing brew-services Redis is left alone). Removes the
+# Jaeger container.
+stop-all:
+	@./scripts/stop_all.sh
