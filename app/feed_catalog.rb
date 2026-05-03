@@ -119,7 +119,7 @@ module FeedCatalog
     { url: 'https://changelog.com/podcast/feed', title: 'The Changelog', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Long-running interviews with people building the open source world.' },
-    { url: 'https://feeds.simplecast.com/dxZsm5kX', title: 'Software Engineering Daily', category: :podcast,
+    { url: 'https://audioboom.com/channels/5166624.rss', title: 'Software Engineering Daily', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Daily technical interviews on infrastructure, languages, and platforms.' },
     { url: 'https://api.substack.com/feed/podcast/1517410.rss', title: 'Latent Space', category: :podcast,
@@ -131,7 +131,7 @@ module FeedCatalog
     { url: 'https://softskills.audio/feed.xml', title: 'Soft Skills Engineering', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Weekly listener-question advice on the non-code side of engineering.' },
-    { url: 'https://acquired.fm/episodes?format=rss', title: 'Acquired', category: :podcast,
+    { url: 'https://feeds.transistor.fm/acquired', title: 'Acquired', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Deep, multi-hour business histories of major tech companies and deals.' }
   ].freeze

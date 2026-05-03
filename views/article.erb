@@ -20,7 +20,9 @@
     </p>
 
     <% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>
-      <div class="podcast-player" data-duration-seconds="<%= @article['audio_duration_seconds'] %>">
+      <div class="podcast-player"
+           data-uid="<%= h(@article['uid']) %>"
+           data-duration-seconds="<%= @article['audio_duration_seconds'] %>">
         <audio
           preload="metadata"
           src="<%= h(@article['audio_url']) %>"

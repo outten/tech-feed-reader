@@ -8,6 +8,13 @@
  * If `data-duration-seconds` is present (parsed from itunes:duration at
  * import time), we paint the runtime immediately so the user sees how
  * long the episode is before audio metadata loads.
+ *
+ * Resume-where-you-left-off: playback position is saved to localStorage
+ * keyed by the article uid (set on root via data-uid). We save on
+ * timeupdate (throttled), seek, pause, and tab hide; we restore on
+ * loadedmetadata. We don't restore in the first 30 s (avoid jumping
+ * over the cold open) and we clear when within 30 s of the end so a
+ * finished episode doesn't auto-resume on the credits.
  */
 (function () {
   'use strict';
@@ -25,9 +32,45 @@
   var scrubber     = root.querySelector('.player-scrubber');
   var rateSelect   = root.querySelector('.player-rate');
 
-  var SKIP_BACK_S    = 15;
-  var SKIP_FORWARD_S = 30;
-  var scrubbing      = false;
+  var SKIP_BACK_S        = 15;
+  var SKIP_FORWARD_S     = 30;
+  var RESUME_MIN_S       = 30;   // don't restore if user hadn't gotten past the cold open
+  var RESUME_TAIL_S      = 30;   // within last N s ⇒ treat as finished, don't restore
+  var SAVE_THROTTLE_MS   = 5000;
+  var STORAGE_KEY_PREFIX = 'tfr.podcast.position.';
+  var scrubbing          = false;
+  var lastSavedAt        = 0;
+  var uid                = root.dataset.uid || '';
+  var storageKey         = uid ? STORAGE_KEY_PREFIX + uid : null;
+
+  function readStored() {
+    if (!storageKey) return NaN;
+    try {
+      var raw = window.localStorage.getItem(storageKey);
+      if (!raw) return NaN;
+      var v = parseFloat(raw);
+      return isFinite(v) && v >= 0 ? v : NaN;
+    } catch (_) { return NaN; }
+  }
+
+  function writeStored(seconds) {
+    if (!storageKey) return;
+    try { window.localStorage.setItem(storageKey, String(seconds)); } catch (_) {}
+  }
+
+  function clearStored() {
+    if (!storageKey) return;
+    try { window.localStorage.removeItem(storageKey); } catch (_) {}
+  }
+
+  function maybeSavePosition(force) {
+    if (!storageKey || scrubbing) return;
+    if (!isFinite(audio.currentTime) || audio.currentTime < RESUME_MIN_S) return;
+    var now = Date.now();
+    if (!force && now - lastSavedAt < SAVE_THROTTLE_MS) return;
+    lastSavedAt = now;
+    writeStored(audio.currentTime);
+  }
 
   function fmt(seconds) {
     if (!isFinite(seconds) || seconds < 0) return '—';
@@ -59,11 +102,35 @@
   // before the browser pulls audio metadata.
   paintTime();
 
-  audio.addEventListener('loadedmetadata', paintTime);
-  audio.addEventListener('timeupdate',     paintTime);
-  audio.addEventListener('play',           paintPlayState);
-  audio.addEventListener('pause',          paintPlayState);
-  audio.addEventListener('ended',          paintPlayState);
+  audio.addEventListener('loadedmetadata', function () {
+    var stored = readStored();
+    if (isFinite(stored) && stored >= RESUME_MIN_S) {
+      var max = isFinite(audio.duration) ? audio.duration : Infinity;
+      if (stored < max - RESUME_TAIL_S) {
+        audio.currentTime = stored;
+      } else {
+        clearStored();
+      }
+    }
+    paintTime();
+  });
+  audio.addEventListener('timeupdate', function () {
+    paintTime();
+    maybeSavePosition(false);
+  });
+  audio.addEventListener('play',  paintPlayState);
+  audio.addEventListener('pause', function () {
+    paintPlayState();
+    maybeSavePosition(true);
+  });
+  audio.addEventListener('ended', function () {
+    paintPlayState();
+    clearStored();
+  });
+  audio.addEventListener('seeked',  function () { maybeSavePosition(true); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') maybeSavePosition(true);
+  });
 
   playBtn.addEventListener('click', function () {
     if (audio.paused) audio.play(); else audio.pause();
@@ -94,6 +161,7 @@
       audio.currentTime = (scrubber.value / 100) * audio.duration;
     }
     scrubbing = false;
+    maybeSavePosition(true);
   });
 
   rateSelect.addEventListener('change', function () {
