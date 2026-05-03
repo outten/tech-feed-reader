@@ -132,6 +132,19 @@ class TechFeedReader < Sinatra::Base
     def h(text)
       Rack::Utils.escape_html(text.to_s)
     end
+
+    # Format a byte count as 1.5 MB / 240 KB / 332 B for the admin
+    # dashboard. Inline to avoid pulling in ActiveSupport for one call
+    # site.
+    def number_to_human_size(bytes)
+      bytes = bytes.to_i
+      return '0 B' if bytes.zero?
+      units = %w[B KB MB GB TB]
+      i = (Math.log(bytes) / Math.log(1024)).to_i
+      i = units.length - 1 if i >= units.length
+      value = bytes.to_f / (1024**i)
+      format(i.zero? ? '%d %s' : '%.1f %s', value, units[i])
+    end
   end
 
   # ---- Routes ---------------------------------------------------------
@@ -481,6 +494,46 @@ class TechFeedReader < Sinatra::Base
     @tags_by_article = TagsStore.tags_for_articles(@results.map { |a| a['id'] })
     @page_title      = @query.empty? ? 'Search' : "Search: #{@query}"
     erb :search
+  end
+
+  # System overview — single page consolidating counts, DB size,
+  # HealthRegistry digest, scheduler "due now", and integration
+  # presence. Admin sub-pages (cache, health, future sidekiq) are
+  # listed at the bottom for navigation.
+  get '/admin' do
+    @page_title = 'Admin'
+
+    db = Database.connection
+    @counts = {
+      feeds:         FeedsStore.count,
+      articles:      ArticlesStore.count,
+      unread:        ReadStateStore.unread_count,
+      bookmarked:    ReadStateStore.bookmarked_count,
+      tags:          TagsStore.count,
+      article_tags:  db.execute('SELECT COUNT(*) AS c FROM article_tags').first['c'],
+      summaries:     db.execute('SELECT COUNT(*) AS c FROM summaries').first['c'],
+      summaries_llm: db.execute("SELECT COUNT(*) AS c FROM summaries WHERE llm IS NOT NULL AND llm != ''").first['c']
+    }
+
+    @db_path  = Database.path
+    @db_bytes =
+      if @db_path == ':memory:'
+        0
+      else
+        # Main file + WAL + shared-memory file. Each absent in fresh /
+        # newly-checkpointed databases — guard with File.exist?.
+        %W[#{@db_path} #{@db_path}-wal #{@db_path}-shm]
+          .sum { |f| File.exist?(f) ? File.size(f) : 0 }
+      end
+
+    @degraded            = HealthRegistry.degraded?
+    @health_enabled      = HealthRegistry.enabled?
+    @health_observations = HealthRegistry.observations.length
+
+    @due_now          = Scheduler.due_feeds(FeedsStore.all).length
+    @claude_available = Summarizer::Claude.available?
+
+    erb :admin
   end
 
   get '/admin/health' do
