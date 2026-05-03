@@ -1353,3 +1353,13 @@ body.dark .catalog-row { border-bottom-color: #2c2c2e; }
 body.dark .catalog-title { color: #f5f5f7; }
 body.dark .catalog-blurb { color: #c7c7cc; }
 body.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
+
+/* /topics page table — keeps the term-chip column to its content width
+   so all chips align flush-left, and lets the samples column take the
+   remaining width without squeezing the count. */
+.topics-table .topic-cell { white-space: nowrap; vertical-align: middle; }
+.topics-table .num         { white-space: nowrap; vertical-align: middle; min-width: 4rem; }
+.topics-table .topic-samples {
+  vertical-align: middle;
+  line-height: 1.5;
+}

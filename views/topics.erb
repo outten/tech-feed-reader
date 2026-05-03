@@ -22,18 +22,28 @@
     <% end %>
   </div>
 <% else %>
-  <ul class="topic-list">
-    <% @topics.each do |cluster| %>
-      <li class="topic-row">
-        <a class="tag-chip" href="/search?q=<%= CGI.escape(cluster[:term]) %>">
-          <%= h(cluster[:term]) %> <span class="muted">(<%= cluster[:count] %>)</span>
-        </a>
-        <span class="topic-samples">
-          <% cluster[:articles].each_with_index do |article, i| %>
-            <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a><%= ',' unless i == cluster[:articles].length - 1 %>
-          <% end %>
-        </span>
-      </li>
-    <% end %>
-  </ul>
+  <table class="data-table topics-table">
+    <thead>
+      <tr>
+        <th>Topic</th>
+        <th class="num">Articles</th>
+        <th>Recent samples</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @topics.each do |cluster| %>
+        <tr>
+          <td class="topic-cell">
+            <a class="tag-chip" href="/search?q=<%= CGI.escape(cluster[:term]) %>"><%= h(cluster[:term]) %></a>
+          </td>
+          <td class="num"><%= cluster[:count] %></td>
+          <td class="topic-samples">
+            <% cluster[:articles].each_with_index do |article, i| %>
+              <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a><%= ',' unless i == cluster[:articles].length - 1 %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
 <% end %>
