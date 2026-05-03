@@ -11,6 +11,7 @@ require 'dotenv'
 Dotenv.load(File.expand_path('../../.credentials', __FILE__))
 Dotenv.load(File.expand_path('../../.env', __FILE__))
 
+require_relative 'logger'
 require_relative 'database'
 require_relative 'feeds_store'
 require_relative 'articles_store'
@@ -57,6 +58,41 @@ class TechFeedReader < Sinatra::Base
     set :raise_errors, true
     set :dump_errors, false
     set :show_exceptions, false
+  end
+
+  # ---- Request logging ------------------------------------------------
+  # Every HTTP request logs a single JSON line to STDOUT with
+  # method / path / status / latency. Errors get a separate event
+  # before being re-raised. See app/logger.rb for the format.
+
+  before do
+    @request_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
+  after do
+    next if @request_started_at.nil?
+    ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - @request_started_at) * 1000).round
+    AppLogger.info(
+      'http_request',
+      method:     request.request_method,
+      path:       request.path_info,
+      query:      request.query_string.empty? ? nil : request.query_string,
+      status:     response.status,
+      latency_ms: ms
+    )
+  end
+
+  error do
+    err = env['sinatra.error']
+    AppLogger.error(
+      'http_error',
+      method:     request.request_method,
+      path:       request.path_info,
+      class:      err.class.name,
+      message:    err.message,
+      backtrace:  Array(err.backtrace).first(5)
+    )
+    raise err if settings.raise_errors?
   end
 
   helpers do

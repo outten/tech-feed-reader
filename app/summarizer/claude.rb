@@ -1,4 +1,5 @@
 require 'anthropic'
+require_relative '../logger'
 
 # LLM summary backend. One-shot Anthropic API call per "Summarize with
 # Claude" click on /article/:uid. Output lands in summaries.llm +
@@ -37,12 +38,20 @@ module Summarizer
     # Returns a Result. status is :ok on success, :unavailable if no API
     # key, :empty if the article has no content, :error otherwise.
     def summarize(title:, content_text:)
-      return Result.new(status: :unavailable) unless available?
+      unless available?
+        AppLogger.warn('claude_summarize', status: :unavailable, reason: 'ANTHROPIC_API_KEY not set')
+        return Result.new(status: :unavailable)
+      end
 
       body = content_text.to_s.strip
-      return Result.new(status: :empty) if body.empty?
+      if body.empty?
+        AppLogger.info('claude_summarize', status: :empty, title: title)
+        return Result.new(status: :empty)
+      end
 
-      body = body[0, MAX_CONTENT]
+      body    = body[0, MAX_CONTENT]
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      AppLogger.info('claude_summarize_start', model: MODEL, title: title, body_length: body.length)
       response = client.messages.create(
         model:      MODEL.to_sym,
         max_tokens: MAX_TOKENS,
@@ -51,15 +60,22 @@ module Summarizer
           { role: 'user', content: "Title: #{title}\n\n#{body}" }
         ]
       )
+      latency = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
 
       text_block = response.content.find { |b| b.type == :text }
       text       = text_block&.text.to_s.strip
-      return Result.new(status: :error, error: 'empty response') if text.empty?
+      if text.empty?
+        AppLogger.warn('claude_summarize', status: :error, reason: 'empty response', latency_ms: latency)
+        return Result.new(status: :error, error: 'empty response')
+      end
 
+      AppLogger.info('claude_summarize_done', model: MODEL, latency_ms: latency, output_length: text.length)
       Result.new(status: :ok, text: text, model: MODEL)
     rescue Anthropic::Errors::APIError => e
+      AppLogger.error('claude_summarize', status: :error, class: e.class.name, message: e.message)
       Result.new(status: :error, error: "#{e.class.name}: #{e.message}")
     rescue StandardError => e
+      AppLogger.error('claude_summarize', status: :error, class: e.class.name, message: e.message)
       Result.new(status: :error, error: "#{e.class.name}: #{e.message}")
     end
 

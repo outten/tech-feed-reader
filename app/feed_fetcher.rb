@@ -3,6 +3,7 @@ require_relative 'providers/http_client'
 require_relative 'feed_parser'
 require_relative 'feeds_store'
 require_relative 'health_registry'
+require_relative 'logger'
 
 # Orchestrator: takes a feed row, GETs the URL with conditional-GET
 # headers, parses on 200, records status + ETag + Last-Modified +
@@ -28,7 +29,20 @@ module FeedFetcher
   # + status + degraded? state. The wrap is a no-op in test env unless
   # ENV['HEALTH_REGISTRY']=1.
   def fetch_feed(feed)
-    HealthRegistry.measure(feed['id']) { fetch_feed_impl(feed) }
+    AppLogger.info('feed_fetch_start', feed_id: feed['id'], url: feed['url'])
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result  = HealthRegistry.measure(feed['id']) { fetch_feed_impl(feed) }
+    latency = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+    AppLogger.info(
+      'feed_fetch_done',
+      feed_id:      feed['id'],
+      url:          feed['url'],
+      status:       result.status,
+      entries:      result.entries.length,
+      latency_ms:   latency,
+      error:        result.error&.to_s
+    )
+    result
   end
 
   def fetch_feed_impl(feed)

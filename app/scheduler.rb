@@ -2,6 +2,7 @@ require 'time'
 require_relative 'feeds_store'
 require_relative 'articles_store'
 require_relative 'feed_fetcher'
+require_relative 'logger'
 
 # Polling logic shared by the long-running scripts/scheduler.rb, the
 # one-shot scripts/refresh_*.rb scripts, and the admin /admin/refresh
@@ -39,6 +40,14 @@ module Scheduler
   def refresh_one(feed)
     result   = FeedFetcher.fetch_feed(feed)
     imported = result.status == :ok ? ArticlesStore.import(feed_id: feed['id'], entries: result.entries) : 0
+    AppLogger.info(
+      'refresh_one',
+      feed_id:  feed['id'],
+      title:    feed['title'],
+      url:      feed['url'],
+      status:   result.status,
+      imported: imported
+    )
     [result, imported]
   end
 end

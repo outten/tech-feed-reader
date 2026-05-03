@@ -16,6 +16,8 @@ Dotenv.load(File.expand_path('../../.credentials', __FILE__))
 **Wired keys at v1**:
 - `ANTHROPIC_API_KEY` — Claude API for LLM-backed summarization (Tier 2). Optional at startup; the app degrades gracefully and falls back to the extractive summarizer.
 
+**Logging**: every HTTP request, feed fetch, refresh, and Claude call emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Tune verbosity with `LOG_LEVEL=debug|info|warn|error|fatal` (default `info` in dev / production, `fatal` in test so RSpec stays clean). Pipe through `jq` for pretty-printing: `make run | jq -c`.
+
 No other API keys required — RSS / Atom feeds are public and unauthenticated. **Never commit `.credentials` or `.env`** — both are git-ignored.
 
 ## Development commands
