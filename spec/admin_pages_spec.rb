@@ -11,6 +11,22 @@ RSpec.describe 'admin pages' do
     TechFeedReader
   end
 
+  describe 'GET /admin' do
+    it 'renders system overview with counts, db size, and integration rows' do
+      FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
+
+      get '/admin'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('System overview')
+      expect(last_response.body).to include('Feeds')
+      expect(last_response.body).to include('Articles')
+      expect(last_response.body).to include('Database')
+      expect(last_response.body).to include('Claude (LLM summarizer)')
+      expect(last_response.body).to include('Sidekiq (background refresh)')
+      expect(last_response.body).to include('/admin/sidekiq')
+    end
+  end
+
   describe 'GET /admin/cache' do
     it 'renders the empty state when no feeds exist' do
       get '/admin/cache'

@@ -32,6 +32,7 @@
       <a href="/feeds"     class="<%= request.path_info == '/feeds'    ? 'active' : '' %>">Feeds</a>
       <a href="/tags"      class="<%= request.path_info == '/tags'     ? 'active' : '' %>">Tags</a>
       <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
+      <a href="/admin"     class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
     </nav>
     <form method="post" action="/admin/refresh/all" class="header-refresh-form">
       <button type="submit" id="header-refresh" class="header-icon-btn"
