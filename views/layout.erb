@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tech Feed Reader<%= @page_title ? " — #{h(@page_title)}" : '' %></title>
   <link rel="stylesheet" href="/style.css?v=<%= asset_mtime('public/style.css') %>">
+  <script>
+    /* Theme bootstrap — runs before <body> renders so there's no FOUC.
+       Reads localStorage if set, otherwise honours the OS-level
+       prefers-color-scheme. Sets both `data-theme` (so JS like the
+       Chart.js init can branch on it) and the `dark` class (which the
+       CSS rules key off). */
+    (function () {
+      try {
+        var saved      = localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme      = saved || (prefersDark ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+      } catch (e) { /* private mode / blocked storage — fall back to default */ }
+    })();
+  </script>
 </head>
 <body>
   <header>
@@ -17,6 +33,7 @@
       <a href="/tags"      class="<%= request.path_info == '/tags'     ? 'active' : '' %>">Tags</a>
       <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
     </nav>
+    <button id="theme-toggle" type="button" title="Toggle light / dark theme" aria-label="Toggle light / dark theme">🌙</button>
   </header>
   <main>
     <%= yield %>
@@ -24,5 +41,27 @@
   <footer>
     <small>Tech Feed Reader &mdash; Public RSS aggregation for personal use.</small>
   </footer>
+  <script>
+    /* Theme toggle — wires the header button to flip the class on
+       <html>, persists the choice to localStorage, and updates the
+       button glyph (☀️ in dark mode, 🌙 in light). */
+    (function () {
+      var btn = document.getElementById('theme-toggle');
+      if (!btn) return;
+      function paint() {
+        var dark = document.documentElement.classList.contains('dark');
+        btn.textContent = dark ? '☀️' : '🌙';
+        btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+      }
+      paint();
+      btn.addEventListener('click', function () {
+        var dark = !document.documentElement.classList.contains('dark');
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) { /* ignore */ }
+        paint();
+      });
+    })();
+  </script>
 </body>
 </html>
