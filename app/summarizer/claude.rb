@@ -1,6 +1,7 @@
 require 'anthropic'
 require_relative '../logger'
 require_relative '../metrics'
+require_relative '../tracing'
 
 # LLM summary backend. One-shot Anthropic API call per "Summarize with
 # Claude" click on /article/:uid. Output lands in summaries.llm +
@@ -53,14 +54,29 @@ module Summarizer
       body    = body[0, MAX_CONTENT]
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       AppLogger.info('claude_summarize_start', model: MODEL, title: title, body_length: body.length)
-      response = client.messages.create(
-        model:      MODEL.to_sym,
-        max_tokens: MAX_TOKENS,
-        system_:    SYSTEM_PROMPT,
-        messages:   [
-          { role: 'user', content: "Title: #{title}\n\n#{body}" }
-        ]
-      )
+      response = Tracing.in_span(
+        'llm.summarize',
+        attributes: {
+          'llm.vendor'      => 'anthropic',
+          'llm.model'       => MODEL,
+          'llm.input_chars' => body.length,
+          'article.title'   => title.to_s
+        }
+      ) do |span|
+        r = client.messages.create(
+          model:      MODEL.to_sym,
+          max_tokens: MAX_TOKENS,
+          system_:    SYSTEM_PROMPT,
+          messages:   [
+            { role: 'user', content: "Title: #{title}\n\n#{body}" }
+          ]
+        )
+        if span.respond_to?(:set_attribute) && r.respond_to?(:usage) && r.usage
+          span.set_attribute('llm.input_tokens',  r.usage.input_tokens.to_i)
+          span.set_attribute('llm.output_tokens', r.usage.output_tokens.to_i)
+        end
+        r
+      end
       latency = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
 
       text_block = response.content.find { |b| b.type == :text }

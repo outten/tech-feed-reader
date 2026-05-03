@@ -1,0 +1,121 @@
+<div class="page-header">
+  <div>
+    <h2>Traces</h2>
+    <p class="subtitle">
+      In-memory ring buffer of finished spans &mdash; process-local, clears
+      on restart. Holds the most recent <%= @capacity %> spans.
+      <% if @otlp_enabled %>
+        Spans are also exported via OTLP to <code><%= h(@endpoint) %></code>.
+      <% else %>
+        No external exporter configured &mdash; set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>
+        to also ship to a collector (Jaeger, Tempo, Honeycomb, …).
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<section class="benchmark-section">
+  <h3>Configuration</h3>
+  <table class="data-table">
+    <tbody>
+      <tr><td>SDK active</td>     <td>
+        <% if @enabled %>
+          <span class="badge bookmarked">yes</span>
+        <% else %>
+          <span class="badge">no-op (test env)</span>
+        <% end %>
+      </td></tr>
+      <tr><td>Service name</td>   <td class="mono"><%= h(@service_name) %></td></tr>
+      <tr><td>OTLP exporter</td>  <td>
+        <% if @otlp_enabled %>
+          <span class="badge bookmarked">enabled</span>
+          <code><%= h(@endpoint) %></code>
+        <% else %>
+          <span class="badge">disabled</span>
+          set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> to enable
+        <% end %>
+      </td></tr>
+      <tr><td>Recorder</td>       <td><%= @count %> / <%= @capacity %> spans buffered</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<% if @traces.empty? %>
+  <div class="empty-state" style="margin-top:2rem">
+    <% if @focus_trace_id && !@focus_trace_id.empty? %>
+      No spans for trace <code><%= h(@focus_trace_id) %></code>.
+      <a href="/admin/traces">See all traces</a>.
+    <% else %>
+      No spans recorded yet. Browse a few pages, refresh a feed, or
+      summarize an article &mdash; spans will appear here on the next
+      request.
+    <% end %>
+  </div>
+<% else %>
+  <% if @focus_trace_id && !@focus_trace_id.empty? %>
+    <p style="margin-top:1.5rem"><a href="/admin/traces">&larr; All traces</a></p>
+  <% end %>
+
+  <section class="benchmark-section" style="margin-top:1.5rem">
+    <h3>
+      <% if @focus_trace_id && !@focus_trace_id.empty? %>
+        Trace <code><%= h(@focus_trace_id) %></code>
+      <% else %>
+        Recent traces
+      <% end %>
+    </h3>
+
+    <% @traces.each do |trace| %>
+      <div class="trace-card">
+        <div class="trace-card-header">
+          <span class="trace-card-name">
+            <a href="/admin/traces?trace=<%= h(trace[:trace_id]) %>"><%= h(trace[:root_name]) %></a>
+          </span>
+          <span class="trace-card-meta muted">
+            <%= relative_time(trace[:start_time]) %> &middot;
+            <%= trace[:spans].length %> span<%= 's' unless trace[:spans].length == 1 %> &middot;
+            <%= trace[:duration_ms] %>ms
+          </span>
+        </div>
+        <table class="data-table trace-spans">
+          <thead>
+            <tr><th>Span</th><th>Kind</th><th>Duration</th><th>Status</th><th>Attributes</th></tr>
+          </thead>
+          <tbody>
+            <% min_start = trace[:spans].first.start_timestamp %>
+            <% trace[:spans].each do |span| %>
+              <% offset_ms = ((span.start_timestamp - min_start) / 1_000_000.0).round(2) %>
+              <% dur_ms    = ((span.end_timestamp - span.start_timestamp) / 1_000_000.0).round(2) %>
+              <% indent    = span.parent_span_id == OpenTelemetry::Trace::INVALID_SPAN_ID ? 0 : 1 %>
+              <tr>
+                <td>
+                  <span style="display:inline-block; padding-left: <%= indent * 1 %>rem">
+                    <% if indent.positive? %>&#8627;&nbsp;<% end %><code><%= h(span.name) %></code>
+                  </span>
+                  <% if offset_ms.positive? %>
+                    <span class="muted">+<%= offset_ms %>ms</span>
+                  <% end %>
+                </td>
+                <td class="muted"><%= h(span.kind.to_s.sub('SPAN_KIND_', '').downcase) %></td>
+                <td class="num"><%= dur_ms %>ms</td>
+                <td>
+                  <% if span.status.code == OpenTelemetry::Trace::Status::ERROR %>
+                    <span class="badge">error</span>
+                    <span class="muted"><%= h(span.status.description) %></span>
+                  <% else %>
+                    <span class="muted">ok</span>
+                  <% end %>
+                </td>
+                <td class="trace-attrs">
+                  <% (span.attributes || {}).each do |k, v| %>
+                    <span class="trace-attr"><code><%= h(k) %></code>=<%= h(v.to_s) %></span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+<% end %>

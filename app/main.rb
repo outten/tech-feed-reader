@@ -29,6 +29,7 @@ require_relative 'recommendation'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'version'
+require_relative 'tracing'
 require_relative 'metrics'
 require_relative 'metrics_middleware'
 
@@ -784,6 +785,11 @@ class TechFeedReader < Sinatra::Base
     @health_enabled      = HealthRegistry.enabled?
     @health_observations = HealthRegistry.observations.length
 
+    @tracing_enabled = Tracing.enabled?
+    @tracing_otlp    = Tracing.otlp_enabled?
+    @tracing_endpoint = Tracing.endpoint
+    @tracing_spans   = Tracing::Recorder.count
+
     @due_now          = Scheduler.due_feeds(FeedsStore.all).length
     @claude_available = Summarizer::Claude.available?
 
@@ -802,6 +808,44 @@ class TechFeedReader < Sinatra::Base
     @feeds_by_id   = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @enabled       = HealthRegistry.enabled?
     erb :admin_health
+  end
+
+  # In-memory trace browser. Reads from the process-local
+  # Tracing::Recorder ring buffer (size TRACING_RECORDER_CAPACITY,
+  # default 200 finished spans). Spans are grouped into traces by
+  # hex_trace_id and sorted newest trace first; within a trace, spans
+  # render in start-time order so the parent-child structure is
+  # readable. ?trace=<hex_trace_id> filters down to one trace.
+  get '/admin/traces' do
+    @page_title    = 'Traces'
+    @enabled       = Tracing.enabled?
+    @otlp_enabled  = Tracing.otlp_enabled?
+    @endpoint      = Tracing.endpoint
+    @service_name  = Tracing.service_name
+    @capacity      = Tracing::Recorder.capacity
+    @count         = Tracing::Recorder.count
+
+    spans = Tracing::Recorder.spans
+    grouped = spans.group_by { |s| s.hex_trace_id }
+    @traces = grouped.map do |trace_id, trace_spans|
+      ordered  = trace_spans.sort_by(&:start_timestamp)
+      start_ns = ordered.first.start_timestamp
+      end_ns   = ordered.map(&:end_timestamp).max
+      {
+        trace_id:    trace_id,
+        spans:       ordered,
+        start_time:  Time.at(start_ns / 1_000_000_000.0).utc,
+        duration_ms: ((end_ns - start_ns) / 1_000_000.0).round(2),
+        root_name:   (ordered.find { |s| s.parent_span_id == OpenTelemetry::Trace::INVALID_SPAN_ID } || ordered.first).name
+      }
+    end.sort_by { |t| -t[:start_time].to_f }
+
+    @focus_trace_id = params['trace'].to_s
+    if !@focus_trace_id.empty?
+      @traces = @traces.select { |t| t[:trace_id] == @focus_trace_id }
+    end
+
+    erb :admin_traces
   end
 
   get '/admin/cache' do

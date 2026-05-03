@@ -86,6 +86,24 @@
         </td>
       </tr>
       <tr>
+        <td>OpenTelemetry tracing</td>
+        <td>
+          <% if @tracing_enabled %>
+            <span class="badge bookmarked">enabled</span>
+            <%= @tracing_spans %> span<%= 's' unless @tracing_spans == 1 %> in the buffer &middot;
+            <% if @tracing_otlp %>
+              OTLP &rarr; <code><%= h(@tracing_endpoint) %></code>
+            <% else %>
+              in-memory only &middot; set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> for OTLP export
+            <% end %>
+            &middot; <a href="/admin/traces">browse traces</a>
+          <% else %>
+            <span class="badge">no-op</span>
+            (disabled in test env)
+          <% end %>
+        </td>
+      </tr>
+      <tr>
         <td>Sidekiq (background refresh)</td>
         <td>
           <% if @sidekiq[:ok] %>
@@ -129,6 +147,7 @@
   <ul>
     <li><a href="/admin/cache">/admin/cache</a> — per-feed cache age + manual refresh</li>
     <li><a href="/admin/health">/admin/health</a> — feed-fetch observation history</li>
+    <li><a href="/admin/traces">/admin/traces</a> — recent OpenTelemetry spans (in-memory ring buffer)</li>
     <li><a href="/admin/sidekiq">/admin/sidekiq</a> — background-job Web UI</li>
     <li><a href="/health">/health</a> — JSON liveness + dependency probes (no auth, for uptime monitors)</li>
     <li><a href="/metrics">/metrics</a> — Prometheus exposition format (counters, gauges, histograms)</li>

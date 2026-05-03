@@ -5,5 +5,6 @@
 require 'dotenv/load'
 require_relative 'database'
 require_relative 'logger'
+require_relative 'tracing'
 require_relative 'sidekiq_config'
 require_relative 'workers/feed_refresh_worker'
