@@ -144,26 +144,29 @@ footer {
 }
 .footer-freshness { display: block; margin-top: 0.25rem; opacity: 0.7; }
 
-/* Dark mode */
-body.dark {
+/* Dark mode — `html.dark body` wins specificity over the plain `body`
+   ruleset above, so the body's background flips when the toggle adds
+   `dark` to the html element. */
+html.dark,
+html.dark body {
   background: #1c1c1e;
   color: #f5f5f7;
 }
-body.dark header {
+html.dark header {
   background: rgba(28,28,30,0.9);
   box-shadow: 0 1px 0 rgba(255,255,255,0.06);
 }
-body.dark .logo { color: #f5f5f7; }
-body.dark nav a { color: #aeaeb2; }
-body.dark nav a:hover { background: #2c2c2e; }
-body.dark nav a.active { color: #0a84ff; }
-body.dark button#theme-toggle { border-color: #3a3a3c; color: #f5f5f7; }
-body.dark .summary-table { background: #2c2c2e; box-shadow: none; }
-body.dark .summary-table th { background: #1c1c1e; color: #8e8e93; }
-body.dark .summary-table td { border-color: #3a3a3c; }
-body.dark .chart-box { background: #2c2c2e; }
-body.dark .chart-box h3 { color: #f5f5f7; }
-body.dark footer { border-color: #3a3a3c; }
+html.dark .logo { color: #f5f5f7; }
+html.dark nav a { color: #aeaeb2; }
+html.dark nav a:hover { background: #2c2c2e; }
+html.dark nav a.active { color: #0a84ff; }
+html.dark button#theme-toggle { border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .summary-table { background: #2c2c2e; box-shadow: none; }
+html.dark .summary-table th { background: #1c1c1e; color: #8e8e93; }
+html.dark .summary-table td { border-color: #3a3a3c; }
+html.dark .chart-box { background: #2c2c2e; }
+html.dark .chart-box h3 { color: #f5f5f7; }
+html.dark footer { border-color: #3a3a3c; }
 
 /* ---- Stale cache banner ---- */
 .stale-banner {
@@ -179,7 +182,7 @@ body.dark footer { border-color: #3a3a3c; }
   gap: 0.5rem;
 }
 .stale-icon { font-size: 1rem; }
-body.dark .stale-banner {
+html.dark .stale-banner {
   background: #3a2e00;
   border-color: #ffc107;
   color: #ffd55a;
@@ -250,9 +253,9 @@ body.dark .stale-banner {
 
 .chart-no-data { text-align: center; padding: 1rem 0; }
 
-body.dark .analysis-title h2 { color: #f5f5f7; }
-body.dark .refresh-btn { background: #3a3a3c; border-color: #48484a; color: #aeaeb2; }
-body.dark .refresh-btn:hover { background: #48484a; }
+html.dark .analysis-title h2 { color: #f5f5f7; }
+html.dark .refresh-btn { background: #3a3a3c; border-color: #48484a; color: #aeaeb2; }
+html.dark .refresh-btn:hover { background: #48484a; }
 .analysis-section {
   background: #fff;
   border-radius: 14px;
@@ -423,15 +426,15 @@ body.dark .refresh-btn:hover { background: #48484a; }
 .tv-readout .positive { color: #34c759; font-weight: 600; }
 .tv-readout .negative { color: #ff3b30; font-weight: 600; }
 
-body.dark .tv-chart-host { background: #2c2c2e; }
-body.dark .tv-pane + .tv-pane { border-top-color: #3a3a3c; }
-body.dark .tv-readout {
+html.dark .tv-chart-host { background: #2c2c2e; }
+html.dark .tv-pane + .tv-pane { border-top-color: #3a3a3c; }
+html.dark .tv-readout {
   background: rgba(28, 28, 30, 0.75);
   color: #aeaeb2;
   box-shadow: none;
 }
-body.dark .tv-readout b,
-body.dark .tv-readout .tv-readout-date { color: #f5f5f7; }
+html.dark .tv-readout b,
+html.dark .tv-readout .tv-readout-date { color: #f5f5f7; }
 
 /* News panel (analysis page) */
 .news-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1rem; }
@@ -450,42 +453,42 @@ body.dark .tv-readout .tv-readout-date { color: #f5f5f7; }
 .news-summary { margin: 0.45rem 0 0; font-size: 0.88rem; line-height: 1.5; color: #3a3a3c; }
 
 /* Dark mode extensions */
-body.dark .market-signals-section h3 { color: #f5f5f7; }
-body.dark .signal-card { background: #2c2c2e; box-shadow: none; }
-body.dark .signal-card-symbol { color: #0a84ff; }
-body.dark .signal-card-price { color: #f5f5f7; }
-body.dark .analyst-type { background: #3a3a3c; color: #aeaeb2; }
-body.dark .analysis-section { background: #2c2c2e; box-shadow: none; }
-body.dark .analysis-section h3 { color: #f5f5f7; }
-body.dark .analyst-label { color: #f5f5f7; }
-body.dark .analyst-bar-wrap { background: #3a3a3c; }
-body.dark .profile-description p { color: #aeaeb2; }
-body.dark .field-value { color: #f5f5f7; }
-body.dark .ext-link { border-color: #0a84ff; color: #0a84ff; }
-body.dark .ext-link:hover { background: #0a84ff; color: #fff; }
-body.dark .period-btn { background: #3a3a3c; border-color: #48484a; color: #aeaeb2; }
-body.dark .period-btn:hover { background: #48484a; }
-body.dark .period-btn.active { background: #0a84ff; color: #fff; border-color: #0a84ff; }
-body.dark .type-badge { background: #3a3a3c; color: #aeaeb2; }
-body.dark .type-etf  { background: #003366; color: #6cb4ff; }
-body.dark .type-adr  { background: #3d2000; color: #ffd080; }
-body.dark .type-fund { background: #2d0066; color: #c080ff; }
-body.dark .region-link { color: #aeaeb2; border-bottom-color: #555; }
-body.dark .region-link:hover { color: #0a84ff; border-bottom-color: #0a84ff; }
-body.dark .cache-meta { color: #aeaeb2; }
-body.dark .cache-table th { border-bottom-color: #48484a; }
-body.dark .cache-table td { border-bottom-color: #3a3a3c; }
-body.dark .cache-table tr.stale-row td { background: #2d2700; }
-body.dark .type-candle  { background: #003318; color: #44cc77; }
-body.dark .type-analyst { background: #330000; color: #ff8080; }
-body.dark .type-profile { background: #001133; color: #6699ff; }
-body.dark .type-quote   { background: #2c2c2e; color: #aeaeb2; }
-body.dark .data-table thead th { border-bottom-color: #3a3a3c; }
-body.dark .data-table tbody td { border-top-color: #3a3a3c; color: #f5f5f7; }
-body.dark .data-table .muted   { color: #8e8e93; }
-body.dark .news-item { border-bottom-color: #3a3a3c; }
-body.dark .news-headline { color: #0a84ff; }
-body.dark .news-summary { color: #aeaeb2; }
+html.dark .market-signals-section h3 { color: #f5f5f7; }
+html.dark .signal-card { background: #2c2c2e; box-shadow: none; }
+html.dark .signal-card-symbol { color: #0a84ff; }
+html.dark .signal-card-price { color: #f5f5f7; }
+html.dark .analyst-type { background: #3a3a3c; color: #aeaeb2; }
+html.dark .analysis-section { background: #2c2c2e; box-shadow: none; }
+html.dark .analysis-section h3 { color: #f5f5f7; }
+html.dark .analyst-label { color: #f5f5f7; }
+html.dark .analyst-bar-wrap { background: #3a3a3c; }
+html.dark .profile-description p { color: #aeaeb2; }
+html.dark .field-value { color: #f5f5f7; }
+html.dark .ext-link { border-color: #0a84ff; color: #0a84ff; }
+html.dark .ext-link:hover { background: #0a84ff; color: #fff; }
+html.dark .period-btn { background: #3a3a3c; border-color: #48484a; color: #aeaeb2; }
+html.dark .period-btn:hover { background: #48484a; }
+html.dark .period-btn.active { background: #0a84ff; color: #fff; border-color: #0a84ff; }
+html.dark .type-badge { background: #3a3a3c; color: #aeaeb2; }
+html.dark .type-etf  { background: #003366; color: #6cb4ff; }
+html.dark .type-adr  { background: #3d2000; color: #ffd080; }
+html.dark .type-fund { background: #2d0066; color: #c080ff; }
+html.dark .region-link { color: #aeaeb2; border-bottom-color: #555; }
+html.dark .region-link:hover { color: #0a84ff; border-bottom-color: #0a84ff; }
+html.dark .cache-meta { color: #aeaeb2; }
+html.dark .cache-table th { border-bottom-color: #48484a; }
+html.dark .cache-table td { border-bottom-color: #3a3a3c; }
+html.dark .cache-table tr.stale-row td { background: #2d2700; }
+html.dark .type-candle  { background: #003318; color: #44cc77; }
+html.dark .type-analyst { background: #330000; color: #ff8080; }
+html.dark .type-profile { background: #001133; color: #6699ff; }
+html.dark .type-quote   { background: #2c2c2e; color: #aeaeb2; }
+html.dark .data-table thead th { border-bottom-color: #3a3a3c; }
+html.dark .data-table tbody td { border-top-color: #3a3a3c; color: #f5f5f7; }
+html.dark .data-table .muted   { color: #8e8e93; }
+html.dark .news-item { border-bottom-color: #3a3a3c; }
+html.dark .news-headline { color: #0a84ff; }
+html.dark .news-summary { color: #aeaeb2; }
 
 /* ============================================================
    §4 — Search, Watchlist, Alerts, Compare
@@ -544,8 +547,8 @@ body.dark .news-summary { color: #aeaeb2; }
 .search-result-item.search-discover.loading { opacity: 0.6; }
 .search-result-item.search-discover.loading .sr-name::after { content: ' …'; }
 .search-result-item.search-discover.error .sr-name { color: #d70015; }
-body.dark .search-result-item.search-discover { border-top-color: #3a3a3c; }
-body.dark .search-result-item.search-discover.error .sr-name { color: #ff453a; }
+html.dark .search-result-item.search-discover { border-top-color: #3a3a3c; }
+html.dark .search-result-item.search-discover.error .sr-name { color: #ff453a; }
 
 /* ---- Watchlist button on analysis page ------------------- */
 .watchlist-btn {
@@ -663,33 +666,33 @@ body.dark .search-result-item.search-discover.error .sr-name { color: #ff453a; }
 .compare-chart-host canvas { width: 100% !important; height: 100% !important; }
 
 /* ---- Dark-mode overrides --------------------------------- */
-body.dark .search-box input {
+html.dark .search-box input {
   background: rgba(44,44,46,0.7);
   border-color: #3a3a3c;
   color: #f5f5f7;
 }
-body.dark .search-results { background: #1c1c1e; border-color: #3a3a3c; }
-body.dark .search-result-item.highlight,
-body.dark .search-result-item:hover { background: #2c2c2e; }
-body.dark .sr-name   { color: #f5f5f7; }
-body.dark .sr-region { color: #8e8e93; }
-body.dark .watchlist-btn,
-body.dark .export-btn {
+html.dark .search-results { background: #1c1c1e; border-color: #3a3a3c; }
+html.dark .search-result-item.highlight,
+html.dark .search-result-item:hover { background: #2c2c2e; }
+html.dark .sr-name   { color: #f5f5f7; }
+html.dark .sr-region { color: #8e8e93; }
+html.dark .watchlist-btn,
+html.dark .export-btn {
   background: #2c2c2e;
   border-color: #3a3a3c;
   color: #f5f5f7;
 }
-body.dark .watchlist-btn[data-state="on"] {
+html.dark .watchlist-btn[data-state="on"] {
   background: #0a84ff; border-color: #0a84ff; color: #fff;
 }
-body.dark .alert-form input,
-body.dark .alert-form select,
-body.dark .compare-form input,
-body.dark .compare-form select {
+html.dark .alert-form input,
+html.dark .alert-form select,
+html.dark .compare-form input,
+html.dark .compare-form select {
   background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7;
 }
-body.dark .alert-row { border-bottom-color: #2c2c2e; }
-body.dark .alert-list { border-top-color: #3a3a3c; }
+html.dark .alert-row { border-bottom-color: #2c2c2e; }
+html.dark .alert-list { border-top-color: #3a3a3c; }
 
 /* ---------- Portfolio (§1) ---------- */
 .portfolio-summary {
@@ -778,21 +781,21 @@ body.dark .alert-list { border-top-color: #3a3a3c; }
 }
 .link-btn:hover { background: rgba(0,0,0,0.05); color: #d70015; }
 
-body.dark .summary-card,
-body.dark .portfolio-add {
+html.dark .summary-card,
+html.dark .portfolio-add {
   background: #1c1c1e;
   border-color: #2c2c2e;
 }
-body.dark .summary-label { color: #98989d; }
-body.dark .summary-sub { color: #98989d; }
-body.dark .portfolio-form label { color: #d1d1d6; }
-body.dark .portfolio-form input {
+html.dark .summary-label { color: #98989d; }
+html.dark .summary-sub { color: #98989d; }
+html.dark .portfolio-form label { color: #d1d1d6; }
+html.dark .portfolio-form input {
   background: #1c1c1e;
   border-color: #3a3a3c;
   color: #f5f5f7;
 }
-body.dark .link-btn { color: #98989d; }
-body.dark .link-btn:hover { background: rgba(255,255,255,0.06); color: #ff453a; }
+html.dark .link-btn { color: #98989d; }
+html.dark .link-btn:hover { background: rgba(255,255,255,0.06); color: #ff453a; }
 
 .position-section .position-grid {
   display: grid;
@@ -846,10 +849,10 @@ body.dark .link-btn:hover { background: rgba(255,255,255,0.06); color: #ff453a; 
 }
 .sell-form .data-source { margin: 0; flex: 1 1 100%; font-size: 0.78rem; }
 
-body.dark .lot-detail-wrap { background: #1c1c1e; }
-body.dark .lot-detail-table th, body.dark .lot-detail-table td { border-bottom-color: #2c2c2e; }
-body.dark .lot-detail-table th { color: #98989d; }
-body.dark .sell-form input { background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .lot-detail-wrap { background: #1c1c1e; }
+html.dark .lot-detail-table th, html.dark .lot-detail-table td { border-bottom-color: #2c2c2e; }
+html.dark .lot-detail-table th { color: #98989d; }
+html.dark .sell-form input { background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7; }
 
 .admin-actions {
   display: flex;
@@ -875,8 +878,8 @@ body.dark .sell-form input { background: #1c1c1e; border-color: #3a3a3c; color: 
   width: 110px;
 }
 .admin-action-form .data-source { margin: 0; font-size: 0.78rem; }
-body.dark .admin-action-form { background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7; }
-body.dark .admin-action-form input[type="text"] { background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .admin-action-form { background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .admin-action-form input[type="text"] { background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7; }
 
 .fidelity-import {
   margin: 12px 0 16px;
@@ -899,8 +902,8 @@ body.dark .admin-action-form input[type="text"] { background: #1c1c1e; border-co
   border-radius: 3px;
   font-size: 0.85em;
 }
-body.dark .fidelity-import { background: #1c1c1e; border-color: #3a3a3c; }
-body.dark .fidelity-import-form code { background: rgba(255, 255, 255, 0.08); }
+html.dark .fidelity-import { background: #1c1c1e; border-color: #3a3a3c; }
+html.dark .fidelity-import-form code { background: rgba(255, 255, 255, 0.08); }
 
 .lot-detail-inline {
   margin-top: 10px;
@@ -914,7 +917,7 @@ body.dark .fidelity-import-form code { background: rgba(255, 255, 255, 0.08); }
 }
 .lot-detail-inline summary:hover { text-decoration: underline; }
 .lot-detail-inline .lot-detail-table { margin-top: 6px; }
-body.dark .lot-detail-inline summary { color: #0a84ff; }
+html.dark .lot-detail-inline summary { color: #0a84ff; }
 
 /* ---------- Tax-lot badges + wash-sale ---------- */
 .signal-badge.holding-short   { background: #fff4d6; color: #5a4500; }
@@ -933,12 +936,12 @@ body.dark .lot-detail-inline summary { color: #0a84ff; }
   font-size: 0.86rem;
   border-radius: 4px;
 }
-body.dark .signal-badge.holding-short   { background: #3a2f00; color: #ffe69c; }
-body.dark .signal-badge.holding-long    { background: #1d3a25; color: #a3d8a3; }
-body.dark .signal-badge.holding-mixed   { background: #2d2d80; color: #d8d8ff; }
-body.dark .signal-badge.holding-unknown { background: #2c2c2e; color: #98989d; }
-body.dark .signal-badge.holding-wash    { background: #5a1010; color: #ffb0b0; }
-body.dark .wash-sale-warning            { background: #3a2f00; color: #ffe69c; border-left-color: #f59e0b; }
+html.dark .signal-badge.holding-short   { background: #3a2f00; color: #ffe69c; }
+html.dark .signal-badge.holding-long    { background: #1d3a25; color: #a3d8a3; }
+html.dark .signal-badge.holding-mixed   { background: #2d2d80; color: #d8d8ff; }
+html.dark .signal-badge.holding-unknown { background: #2c2c2e; color: #98989d; }
+html.dark .signal-badge.holding-wash    { background: #5a1010; color: #ffb0b0; }
+html.dark .wash-sale-warning            { background: #3a2f00; color: #ffe69c; border-left-color: #f59e0b; }
 
 .benchmark-section { margin-top: 16px; }
 .benchmark-section h3 { margin-bottom: 8px; }
@@ -980,13 +983,13 @@ body.dark .wash-sale-warning            { background: #3a2f00; color: #ffe69c; b
   border-top: none;
   border-radius: 0 0 8px 8px;
 }
-body.dark .positions-collapsible-summary {
+html.dark .positions-collapsible-summary {
   background: #1c1c1e;
   border-color: #3a3a3c;
   color: #f5f5f7;
 }
-body.dark .positions-collapsible-summary:hover { background: #2c2c2e; }
-body.dark .positions-chevron { color: #98989d; }
+html.dark .positions-collapsible-summary:hover { background: #2c2c2e; }
+html.dark .positions-chevron { color: #98989d; }
 
 /* ---------- Correlation heatmap ---------- */
 .corr-heatmap-wrap {
@@ -1039,9 +1042,9 @@ body.dark .positions-chevron { color: #98989d; }
 .corr-legend-label { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #6e6e73; padding: 0 4px; }
 .corr-legend-tip   { margin-left: 8px; }
 
-body.dark .corr-heatmap .corr-row-label,
-body.dark .corr-heatmap .corr-col-label { color: #f5f5f7; }
-body.dark .corr-legend-label { color: #8e8e93; }
+html.dark .corr-heatmap .corr-row-label,
+html.dark .corr-heatmap .corr-col-label { color: #f5f5f7; }
+html.dark .corr-legend-label { color: #8e8e93; }
 
 /* ---------- Degradation banner ---------- */
 .degradation-banner {
@@ -1074,14 +1077,14 @@ body.dark .corr-legend-label { color: #8e8e93; }
   cursor: pointer;
   text-decoration: underline;
 }
-body.dark .degradation-banner {
+html.dark .degradation-banner {
   background: #3a2f00;
   color: #ffe69c;
   border-color: #6b5400;
 }
-body.dark .degradation-banner .banner-link,
-body.dark .degradation-banner .link-btn { color: #ffe69c; }
-body.dark .degradation-banner .banner-link:hover { color: #fff; }
+html.dark .degradation-banner .banner-link,
+html.dark .degradation-banner .link-btn { color: #ffe69c; }
+html.dark .degradation-banner .banner-link:hover { color: #fff; }
 
 /* ---- tech-feed-reader additions ---------------------------------- */
 
@@ -1095,7 +1098,7 @@ body.dark .degradation-banner .banner-link:hover { color: #fff; }
   font-size: 0.88rem;
   color: #b30000;
 }
-body.dark .error {
+html.dark .error {
   background: #3a1a1a;
   color: #ff8b80;
   border-color: #5a2828;
@@ -1119,8 +1122,8 @@ body.dark .error {
   padding: 0 2px;
   border-radius: 2px;
 }
-body.dark .excerpt      { color: #c7c7cc; }
-body.dark .excerpt mark { background: #5a4a00; color: #fff8d6; }
+html.dark .excerpt      { color: #c7c7cc; }
+html.dark .excerpt mark { background: #5a4a00; color: #fff8d6; }
 
 /* Tag chips: small pill links applied to articles or in filters.    */
 .tag-chip {
@@ -1158,10 +1161,10 @@ body.dark .excerpt mark { background: #5a4a00; color: #fff8d6; }
   cursor: pointer;
 }
 .tag-chip-add:hover { background: #f0f4ff; color: #0071e3; border-color: #d2e1f9; }
-body.dark .tag-chip      { background: #1c2c4f; color: #6ea3ff; border-color: #2a3d66; }
-body.dark .tag-chip:hover{ background: #2a3d66; }
-body.dark .tag-chip-add  { color: #aeaeb2; border-color: #48484a; }
-body.dark .tag-chip-add:hover { background: #1c2c4f; color: #6ea3ff; border-color: #2a3d66; }
+html.dark .tag-chip      { background: #1c2c4f; color: #6ea3ff; border-color: #2a3d66; }
+html.dark .tag-chip:hover{ background: #2a3d66; }
+html.dark .tag-chip-add  { color: #aeaeb2; border-color: #48484a; }
+html.dark .tag-chip-add:hover { background: #1c2c4f; color: #6ea3ff; border-color: #2a3d66; }
 
 /* Read / bookmark / archive badges on listing rows.                 */
 .badge {
@@ -1177,8 +1180,8 @@ body.dark .tag-chip-add:hover { background: #1c2c4f; color: #6ea3ff; border-colo
 }
 .badge.bookmarked { background: #fff8d6; color: #8a6d00; }
 .badge.archived   { background: #efeff5; color: #6e6e73; }
-body.dark .badge            { background: #2c2c2e; color: #aeaeb2; }
-body.dark .badge.bookmarked { background: #4a3a00; color: #ffe68a; }
+html.dark .badge            { background: #2c2c2e; color: #aeaeb2; }
+html.dark .badge.bookmarked { background: #4a3a00; color: #ffe68a; }
 
 /* State filter row above article lists.                              */
 .state-filter a {
@@ -1223,7 +1226,7 @@ body.dark .badge.bookmarked { background: #4a3a00; color: #ffe68a; }
 .reading-view .article-body img { max-width: 100%; height: auto; border-radius: 6px; }
 .reading-view .article-body pre  { overflow-x: auto; }
 .reading-view .article-footer { margin-top: 1.5rem; }
-body.dark .reading-view .article-body { background: #1c1c1e; border-color: #2c2c2e; }
+html.dark .reading-view .article-body { background: #1c1c1e; border-color: #2c2c2e; }
 
 /* Prev / next pager.                                                  */
 .pager {
@@ -1264,7 +1267,7 @@ button.danger:hover { background: #d70015; }
   text-align: center;
   color: #6e6e73;
 }
-body.dark .empty-state { background: #1c1c1e; border-color: #3a3a3c; }
+html.dark .empty-state { background: #1c1c1e; border-color: #3a3a3c; }
 
 /* Stat cards on the dashboard.                                        */
 .stat-cards {
@@ -1277,7 +1280,7 @@ body.dark .empty-state { background: #1c1c1e; border-color: #3a3a3c; }
 .stat-cards .summary-label { font-size: 0.78rem; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat-cards .summary-value { font-size: 1.5rem; font-weight: 600; color: #1d1d1f; }
 .stat-cards .summary-sub   { font-size: 0.78rem; color: #8e8e93; }
-body.dark .stat-cards .summary-value { color: #f5f5f7; }
+html.dark .stat-cards .summary-value { color: #f5f5f7; }
 
 /* Dashboard activity widgets — chart container + side-by-side grid.   */
 .dashboard-grid {
@@ -1297,7 +1300,7 @@ body.dark .stat-cards .summary-value { color: #f5f5f7; }
   position: relative;
   height: 180px;
 }
-body.dark .chart-box { background: #1c1c1e; border-color: #2c2c2e; }
+html.dark .chart-box { background: #1c1c1e; border-color: #2c2c2e; }
 
 /* Trending topics list — one row per topic, term chip + sample titles. */
 .topic-list { list-style: none; padding: 0; margin: 0; }
@@ -1314,9 +1317,9 @@ body.dark .chart-box { background: #1c1c1e; border-color: #2c2c2e; }
 .topic-samples { color: #6e6e73; }
 .topic-samples a { color: #6e6e73; text-decoration: none; margin-right: 0.2rem; }
 .topic-samples a:hover { color: #0071e3; text-decoration: underline; }
-body.dark .topic-row { border-bottom-color: #2c2c2e; }
-body.dark .topic-samples,
-body.dark .topic-samples a { color: #aeaeb2; }
+html.dark .topic-row { border-bottom-color: #2c2c2e; }
+html.dark .topic-samples,
+html.dark .topic-samples a { color: #aeaeb2; }
 
 /* Feed catalog — discover popular feeds.                              */
 .catalog-category {
@@ -1349,10 +1352,10 @@ body.dark .topic-samples a { color: #aeaeb2; }
 .catalog-blurb { font-size: 0.88rem; color: #3a3a3c; }
 .catalog-url { font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subscribed-badge { background: #e8f5e9; color: #1b5e20; }
-body.dark .catalog-row { border-bottom-color: #2c2c2e; }
-body.dark .catalog-title { color: #f5f5f7; }
-body.dark .catalog-blurb { color: #c7c7cc; }
-body.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
+html.dark .catalog-row { border-bottom-color: #2c2c2e; }
+html.dark .catalog-title { color: #f5f5f7; }
+html.dark .catalog-blurb { color: #c7c7cc; }
+html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
 
 /* /topics page table — keeps the term-chip column to its content width
    so all chips align flush-left, and lets the samples column take the
