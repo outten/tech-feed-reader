@@ -168,6 +168,22 @@ class TechFeedReader < Sinatra::Base
       erb :_feed_row, locals: { feed: feed }, layout: false
     end
 
+    # Format a duration in seconds as "12:34" or "1:23:45". Returns
+    # nil for nil / zero so the view can decide whether to render the
+    # span at all.
+    def fmt_duration(seconds)
+      s = seconds.to_i
+      return nil if s <= 0
+      h = s / 3600
+      m = (s % 3600) / 60
+      sec = s % 60
+      if h > 0
+        format('%d:%02d:%02d', h, m, sec)
+      else
+        format('%d:%02d', m, sec)
+      end
+    end
+
     # Format a byte count as 1.5 MB / 240 KB / 332 B for the admin
     # dashboard. Inline to avoid pulling in ActiveSupport for one call
     # site.
@@ -219,17 +235,32 @@ class TechFeedReader < Sinatra::Base
     @state_filter = (params['state'] || 'all').to_sym
     @state_filter = :all unless ARTICLES_STATE_FILTERS.include?(@state_filter)
 
+    @kind_filter = params['kind'].to_s == 'podcast' ? :podcast : :all
+
     @articles = if @tag_filter
                   ArticlesStore.for_tag(tag_id, limit: @per_page, offset: offset, state: @state_filter)
                 elsif @feed_filter
                   ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset, state: @state_filter)
                 else
-                  ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter)
+                  ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter, kind: @kind_filter)
                 end
 
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @tags_by_article = TagsStore.tags_for_articles(@articles.map { |a| a['id'] })
     erb :articles
+  end
+
+  # Browse view across every subscribed podcast feed. Top of the page
+  # surfaces each show with its episode count + latest-episode age,
+  # so the user can spot the freshest show at a glance. Below, the
+  # most recent N episodes across all shows render as cards — each
+  # card links to /article/:uid where the player lives.
+  get '/podcasts' do
+    @page_title       = 'Podcasts'
+    @shows            = ArticlesStore.podcast_feeds
+    @recent_episodes  = ArticlesStore.recent(limit: 25, kind: :podcast)
+    @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :podcasts
   end
 
   get '/article/:uid' do |uid|

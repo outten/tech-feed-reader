@@ -70,13 +70,32 @@ module ArticlesStore
   # populated from a LEFT JOIN on read_state — so callers don't have to
   # follow up with a per-article ReadStateStore.get. Optional state:
   # filter (:unread | :bookmarked | :archived | :all) lets callers ask
-  # for only the rows they want without re-issuing the query.
-  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    db.execute(state_query(filter: state), [limit, offset])
+  # for only the rows they want without re-issuing the query. `kind:`
+  # narrows to :podcast (audio_url IS NOT NULL) when wanted.
+  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all)
+    db.execute(state_query(filter: state, kind: kind), [limit, offset])
   end
 
   def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
     db.execute(state_query(scope: 'a.feed_id = ?', filter: state), [feed_id, limit, offset])
+  end
+
+  # Distinct feeds whose imported articles include at least one audio
+  # enclosure — i.e. the user's subscribed podcasts. Used by /podcasts
+  # to build the show grouping. Returns hash-rows with episode counts
+  # and the most-recent published_at so the view can surface "freshest
+  # show first" ordering.
+  def podcast_feeds
+    db.execute(<<~SQL)
+      SELECT f.id, f.title, f.url,
+             COUNT(a.id)         AS episode_count,
+             MAX(a.published_at) AS latest_at
+      FROM feeds f
+      JOIN articles a ON a.feed_id = f.id
+      WHERE a.audio_url IS NOT NULL
+      GROUP BY f.id
+      ORDER BY latest_at DESC NULLS LAST, f.title ASC
+    SQL
   end
 
   # Articles tagged with the given tag id, with read-state columns and
@@ -228,8 +247,9 @@ module ArticlesStore
 
     # Build a SELECT a.*, read_state... over articles LEFT JOIN read_state
     # with optional WHERE-scope (e.g. "a.feed_id = ?"), an optional extra
-    # FROM-clause join (used by for_tag), and a read-state filter.
-    def state_query(scope: nil, filter: :all, from_extra: nil)
+    # FROM-clause join (used by for_tag), a read-state filter, and an
+    # article-kind filter (:podcast → audio_url IS NOT NULL).
+    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all)
       where_clauses = []
       where_clauses << scope if scope
       case filter
@@ -238,6 +258,11 @@ module ArticlesStore
       when :archived   then where_clauses << 'rs.archived = 1'
       when :all        then # no extra clause
       else raise ArgumentError, "Unknown read-state filter: #{filter.inspect}"
+      end
+      case kind
+      when :podcast then where_clauses << 'a.audio_url IS NOT NULL'
+      when :all     then # no extra clause
+      else raise ArgumentError, "Unknown kind filter: #{kind.inspect}"
       end
 
       where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"
