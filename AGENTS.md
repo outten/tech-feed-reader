@@ -158,8 +158,11 @@ db/
     001_init.sql           # initial schema; new files added per feature PR
 views/                     # ERB templates — mirror t-money's UI patterns
 public/
-  style.css                # ported from t-money for visual consistency
-  app.js                   # search box + tag-filter behaviour
+  style.css                # ported from t-money + tech-feed-reader extensions.
+                           # No separate app.js — search and tag-filter ended up
+                           # server-side; the few client-side bits (theme toggle,
+                           # dashboard chart, article-link retrofit) are inline
+                           # <script> blocks in the relevant views.
 scripts/
   migrate.rb               # one-shot migration runner (also auto-run on web boot)
   seed_feeds.rb            # insert the v1-kickoff starter feed list (idempotent)
@@ -207,7 +210,7 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 - **[AGENTS.md](AGENTS.md)** — this file (developer/agent reference)
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — PR workflow (branch / commit style / tests / CI / merge)
 - [DEVELOPER.md](DEVELOPER.md) — pointer to AGENTS.md (kept for legacy reference)
-- README.md — user-facing overview (TBD as features ship)
-- TODO.md — roadmap (TBD; mirrors t-money's shipped / open / dropped structure)
+- README.md — user-facing overview (status note + page list, kept current per PR)
+  - There is no TODO.md — roadmap is tracked in SPEC.md's tier list and in PR history; the in-conversation todo list keeps a working copy of in-flight work.
 
 **Workflow rule**: every PR that changes behaviour should update the relevant docs in the same PR — see [CONTRIBUTING.md](CONTRIBUTING.md) and the workflow rule inherited from `t-money`'s memory layer.

@@ -31,7 +31,7 @@ Branch naming: `outten/TODO-NNN` where `NNN` is the next sequential number (late
 ## 2. Implement
 
 - **Tests are required for new behaviour.** RSpec; tests live in `spec/`.
-- **Update the relevant docs in the same PR** ([SPEC.md](SPEC.md), [AGENTS.md](AGENTS.md), README.md, TODO.md — whichever the change touches). The bar is "no doc reads as untrue after this PR." Don't leave docs to be reconciled later.
+- **Update the relevant docs in the same PR** ([SPEC.md](SPEC.md), [AGENTS.md](AGENTS.md), README.md — whichever the change touches). The bar is "no doc reads as untrue after this PR." Don't leave docs to be reconciled later.
 - **Mind the cache-only render contract** if you touch `/articles`, `/dashboard`, or any feed-fetching path. Page renders MUST NOT fire feed fetches — see [AGENTS.md → Caching architecture](AGENTS.md). The hard assertions live in `spec/articles_perf_spec.rb` once it exists.
 - Run `make test` early and often.
 
@@ -159,7 +159,7 @@ These are saved in agent memory so future sessions honour them (inherited from `
 | Project brief | [SPEC.md](SPEC.md) |
 | Architecture / caching contract / store inventory | [AGENTS.md](AGENTS.md) |
 | Feature surface / page list | README.md |
-| Roadmap (shipped / open / dropped) | TODO.md |
+| Roadmap (shipped / open / dropped) | SPEC.md tier list + PR history |
 | Cache-only render contract enforcer | `spec/articles_perf_spec.rb` |
 | CI definition | `.github/workflows/ci.yml` |
 | Branch naming + commit style + PR body template | this file |
