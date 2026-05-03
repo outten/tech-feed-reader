@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest
 
 install:
 	bundle install
@@ -118,3 +118,13 @@ run-all:
 # Jaeger container.
 stop-all:
 	@./scripts/stop_all.sh
+
+# Compose + send the daily digest email. Pulls every unread article
+# whose published_at is within the last DIGEST_WINDOW_HOURS (default
+# 24), joins each row to its cached summary (LLM > extractive >
+# excerpt), and ships text + HTML via SMTP to DIGEST_TO. Required env
+# in .credentials: SMTP_HOST/PORT/USERNAME/PASSWORD/FROM, DIGEST_TO.
+# Wire to cron / launchd to fire daily — see scripts/send_digest.rb
+# for an example crontab entry.
+digest:
+	bundle exec ruby scripts/send_digest.rb
