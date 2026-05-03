@@ -141,3 +141,23 @@
     </p>
   </footer>
 </article>
+
+<script>
+  // Retrofit external citations inside .article-body so they open in a
+  // new tab, even for articles that were imported before Sanitizer
+  // started annotating links. New imports already get target="_blank"
+  // baked in at sanitization time; this is the back-compat sweep.
+  (function () {
+    var here = window.location.host;
+    document.querySelectorAll('.article-body a[href]').forEach(function (a) {
+      var href = a.getAttribute('href') || '';
+      if (!/^https?:\/\//i.test(href)) return;
+      try {
+        var url = new URL(href);
+        if (url.host === here) return;
+      } catch (e) { /* malformed href, treat as external */ }
+      a.target = '_blank';
+      a.rel    = 'noopener noreferrer';
+    });
+  })();
+</script>

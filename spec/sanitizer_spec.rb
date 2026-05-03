@@ -33,6 +33,27 @@ RSpec.describe Sanitizer do
       expect(out).to include('<code>x = 1</code>')
     end
 
+    it 'opens external citations in a new tab with safe rel attributes' do
+      html = '<p>See <a href="https://example.com/source">the source</a>.</p>'
+      out  = Sanitizer.sanitize_html(html)
+      expect(out).to include('target="_blank"')
+      expect(out).to include('rel="noopener noreferrer"')
+      expect(out).to include('href="https://example.com/source"')
+    end
+
+    it 'leaves relative / fragment links alone (not external citations)' do
+      html = '<p>See <a href="/local/page">here</a> and <a href="#section">section</a>.</p>'
+      out  = Sanitizer.sanitize_html(html)
+      expect(out).not_to include('target="_blank"')
+      expect(out).to include('href="/local/page"')
+      expect(out).to include('href="#section"')
+    end
+
+    it 'tolerates anchors with no href attribute' do
+      html = '<p>Bare <a>anchor</a> with no href.</p>'
+      expect { Sanitizer.sanitize_html(html) }.not_to raise_error
+    end
+
     it 'returns empty string for nil / empty input' do
       expect(Sanitizer.sanitize_html(nil)).to eq('')
       expect(Sanitizer.sanitize_html('')).to eq('')
