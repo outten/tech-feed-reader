@@ -42,3 +42,17 @@ gem 'sqlite3'
 # Claude" button stays hidden and the existing pure-Ruby extractive
 # summary keeps working.
 gem 'anthropic'
+
+# Background job runner — used to enqueue feed refresh work so the web
+# request that triggered the refresh returns immediately. The worker
+# process is started separately via `make sidekiq`. Sidekiq pulls in
+# `redis` transitively and connects via REDIS_URL (default
+# redis://localhost:6379/0).
+gem 'sidekiq', '~> 7.3'
+
+# Pin connection_pool to the 2.x line — Sidekiq 7.3 declares
+# `connection_pool >= 2.3.0` but is incompatible with the 3.x rewrite
+# (Sidekiq::Scheduled::Poller#initial_wait calls TimedStack#pop with a
+# timeout arg, which 3.0 dropped). Without this pin Bundler picks up
+# 3.x and the scheduled-job poller crashes on boot.
+gem 'connection_pool', '~> 2.4'

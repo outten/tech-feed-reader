@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis
 
 install:
 	bundle install
@@ -48,3 +48,17 @@ refresh-feed:
 # systemd so it auto-restarts; or run under tmux during dev.
 scheduler:
 	bundle exec ruby scripts/scheduler.rb $(OPTS)
+
+# Background worker — pops FeedRefreshWorker jobs off Redis and runs the
+# fetch + sanitize + import. Required for the header refresh button to
+# do anything (without it the job sits in the queue). Concurrency 5 is
+# plenty for a single-user app; bump with -c if you add more workers.
+# Needs Redis listening on REDIS_URL (default redis://localhost:6379/0).
+sidekiq:
+	bundle exec sidekiq -r ./app/sidekiq_boot.rb -c 5
+
+# Convenience: start a foreground Redis if you don't already have one
+# running. macOS users typically `brew services start redis` instead so
+# it auto-starts on login; this target is for ad-hoc dev sessions.
+redis:
+	redis-server

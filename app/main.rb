@@ -29,6 +29,13 @@ require_relative 'recommendation'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 
+# Sidekiq client config + the worker class. Loading the config only
+# registers Sidekiq.configure_client/server blocks — no Redis
+# connection happens until the first perform_async, so this is safe to
+# require in test (specs stub perform_async).
+require_relative 'sidekiq_config'
+require_relative 'workers/feed_refresh_worker'
+
 # Auto-migrate on boot for dev / production so `make run` always sees an
 # up-to-date schema. Test env stays hermetic — specs that need tables
 # call Database.migrate! themselves against the in-memory DB.
@@ -131,6 +138,27 @@ class TechFeedReader < Sinatra::Base
     # would be an XSS vector.
     def h(text)
       Rack::Utils.escape_html(text.to_s)
+    end
+
+    # Probe Sidekiq for queue depth + worker count. Returns
+    # `{ ok: false, error: 'connection refused' }` when Redis is down so
+    # /admin doesn't 500 in environments without a worker process.
+    def sidekiq_stats
+      require 'sidekiq/api'
+      stats = Sidekiq::Stats.new
+      processes = Sidekiq::ProcessSet.new
+      {
+        ok:        true,
+        enqueued:  stats.enqueued,
+        scheduled: stats.scheduled_size,
+        retries:   stats.retry_size,
+        dead:      stats.dead_size,
+        processed: stats.processed,
+        failed:    stats.failed,
+        workers:   processes.size
+      }
+    rescue => e
+      { ok: false, error: e.message }
     end
 
     # Format a byte count as 1.5 MB / 240 KB / 332 B for the admin
@@ -533,6 +561,10 @@ class TechFeedReader < Sinatra::Base
     @due_now          = Scheduler.due_feeds(FeedsStore.all).length
     @claude_available = Summarizer::Claude.available?
 
+    # Sidekiq stats — wrapped so a Redis outage shows the worker as
+    # offline rather than 500ing the whole admin page.
+    @sidekiq = sidekiq_stats
+
     erb :admin
   end
 
@@ -563,28 +595,55 @@ class TechFeedReader < Sinatra::Base
   # matches the static path first. Otherwise the URL string "all" gets
   # parsed as a feed_id (= 0) and the request 404s.
   post '/admin/refresh/all' do
-    summary = { ok: 0, not_modified: 0, error: 0, imported: 0 }
-    FeedsStore.all.each do |feed|
-      result, imported = Scheduler.refresh_one(feed)
-      summary[result.status] = (summary[result.status] || 0) + 1
-      summary[:imported]    += imported
-    end
-    qs = summary.map { |k, v| "#{k}=#{v}" }.join('&')
-    redirect to("/feeds?notice=refreshed-all&#{qs}")
+    feeds = FeedsStore.all
+    feeds.each { |f| FeedRefreshWorker.perform_async(f['id']) }
+    AppLogger.info('refresh_all_enqueued', count: feeds.length)
+    redirect to("/feeds?notice=queued-all&count=#{feeds.length}")
   end
 
-  # Refresh a single feed: fetch + parse + sanitize + import. Synchronous
-  # (single-user app, no queue needed at v1). Redirects to /feeds with a
-  # status notice so the form-based UI stays simple.
+  # Refresh a single feed: enqueue a FeedRefreshWorker job. Returns
+  # immediately; the worker process picks the job off the queue and
+  # does the fetch + sanitize + import.
   post '/admin/refresh/:feed_id' do |feed_id|
     feed = FeedsStore.find(feed_id.to_i)
     redirect to('/feeds?error=not-found') unless feed
 
-    result, imported = Scheduler.refresh_one(feed)
-    redirect to("/feeds?notice=refreshed&status=#{result.status}&imported=#{imported}")
+    FeedRefreshWorker.perform_async(feed['id'])
+    AppLogger.info('refresh_one_enqueued', feed_id: feed['id'], title: feed['title'])
+    redirect to("/feeds?notice=queued&feed_id=#{feed['id']}")
   end
 
   # ---- Boot -----------------------------------------------------------
+end
 
-  run! if app_file == $PROGRAM_NAME
+# Compose the runtime Rack app: Sinatra at the root + Sidekiq::Web
+# mounted at /admin/sidekiq. Sidekiq::Web is itself a Rack app that
+# expects a session for CSRF on its POST actions (retry / kill jobs);
+# we wire a cookie session scoped to its mount point so the main app's
+# routes stay session-free.
+#
+# In test env we never start the server (rspec uses Rack::Test against
+# TechFeedReader directly), so this whole block is gated on direct
+# script invocation.
+if __FILE__ == $PROGRAM_NAME
+  require 'sidekiq/web'
+  require 'rack/session/cookie'
+  require 'securerandom'
+  require 'rackup/handler'
+
+  Sidekiq::Web.use Rack::Session::Cookie,
+                   secret:    ENV['SIDEKIQ_WEB_SECRET'] || SecureRandom.hex(32),
+                   same_site: :lax
+
+  combined = Rack::Builder.app do
+    map '/admin/sidekiq' do
+      run Sidekiq::Web
+    end
+    map '/' do
+      run TechFeedReader.new
+    end
+  end
+
+  host = ENV['RACK_ENV'] == 'production' ? '0.0.0.0' : 'localhost'
+  Rackup::Handler.get('puma').run(combined, Port: 4567, Host: host)
 end

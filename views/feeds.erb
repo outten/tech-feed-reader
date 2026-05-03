@@ -29,6 +29,15 @@
     error=<%= h(params['error'] || '0') %>,
     <%= h(params['imported'] || '0') %> new article<%= 's' unless params['imported'] == '1' %>.
   </div>
+<% elsif @notice == 'queued-all' %>
+  <div class="notice">
+    Queued <strong><%= h(params['count'] || '0') %></strong> feed<%= 's' unless params['count'] == '1' %> for refresh.
+    Watch <a href="/admin/sidekiq">/admin/sidekiq</a> for progress.
+  </div>
+<% elsif @notice == 'queued' %>
+  <div class="notice">
+    Queued feed for refresh. Watch <a href="/admin/sidekiq">/admin/sidekiq</a> for progress.
+  </div>
 <% elsif @notice == 'imported' %>
   <div class="notice">
     Imported OPML &middot;

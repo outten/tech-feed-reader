@@ -18,14 +18,13 @@ RSpec.describe 'header refresh button' do
     end
   end
 
-  it 'still hits the existing POST /admin/refresh/all flow when clicked' do
-    FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
-    response = instance_double(Net::HTTPSuccess, code: '304', body: '')
-    allow(response).to receive(:[]) { |_| nil }
-    allow(Providers::HttpClient).to receive(:get).and_return(response)
+  it 'enqueues a refresh job per feed when clicked' do
+    feed = FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
+    expect(FeedRefreshWorker).to receive(:perform_async).with(feed['id'])
 
     post '/admin/refresh/all'
     expect(last_response.status).to eq(302)
-    expect(last_response.headers['Location']).to include('/feeds?notice=refreshed-all')
+    expect(last_response.headers['Location']).to include('/feeds?notice=queued-all')
+    expect(last_response.headers['Location']).to include('count=1')
   end
 end

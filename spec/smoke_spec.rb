@@ -84,20 +84,14 @@ RSpec.describe 'TechFeedReader smoke' do
   end
 
   describe 'POST /admin/refresh/:feed_id' do
-    let(:rss_body) { File.read(File.expand_path('fixtures/rss20.xml', __dir__)) }
-
-    it 'fetches, imports, and redirects with refresh status' do
-      feed     = FeedsStore.add(url: 'https://example.com/feed.rss')
-      response = instance_double(Net::HTTPSuccess, code: '200', body: rss_body)
-      allow(response).to receive(:[]) { |_| nil }
-      allow(Providers::HttpClient).to receive(:get).and_return(response)
+    it 'enqueues a FeedRefreshWorker job and redirects with queued notice' do
+      feed = FeedsStore.add(url: 'https://example.com/feed.rss')
+      expect(FeedRefreshWorker).to receive(:perform_async).with(feed['id'])
 
       post "/admin/refresh/#{feed['id']}"
       expect(last_response.status).to eq(302)
-      expect(last_response.headers['Location']).to include('notice=refreshed')
-      expect(last_response.headers['Location']).to include('status=ok')
-      expect(last_response.headers['Location']).to include('imported=2')
-      expect(ArticlesStore.count).to eq(2)
+      expect(last_response.headers['Location']).to include('notice=queued')
+      expect(last_response.headers['Location']).to include("feed_id=#{feed['id']}")
     end
 
     it 'reports not-found for an unknown feed id' do
@@ -107,20 +101,16 @@ RSpec.describe 'TechFeedReader smoke' do
   end
 
   describe 'POST /admin/refresh/all' do
-    let(:rss_body) { File.read(File.expand_path('fixtures/rss20.xml', __dir__)) }
-
-    it 'iterates every feed and reports the summary' do
-      FeedsStore.add(url: 'https://a.example.com/rss')
-      FeedsStore.add(url: 'https://b.example.com/rss')
-      response = instance_double(Net::HTTPSuccess, code: '200', body: rss_body)
-      allow(response).to receive(:[]) { |_| nil }
-      allow(Providers::HttpClient).to receive(:get).and_return(response)
+    it 'enqueues one job per feed and redirects with the queued count' do
+      a = FeedsStore.add(url: 'https://a.example.com/rss')
+      b = FeedsStore.add(url: 'https://b.example.com/rss')
+      expect(FeedRefreshWorker).to receive(:perform_async).with(a['id'])
+      expect(FeedRefreshWorker).to receive(:perform_async).with(b['id'])
 
       post '/admin/refresh/all'
       expect(last_response.status).to eq(302)
-      expect(last_response.headers['Location']).to include('notice=refreshed-all')
-      expect(last_response.headers['Location']).to include('ok=2')
-      expect(last_response.headers['Location']).to include('imported=4')
+      expect(last_response.headers['Location']).to include('notice=queued-all')
+      expect(last_response.headers['Location']).to include('count=2')
     end
   end
 end

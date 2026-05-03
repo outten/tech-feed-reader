@@ -88,8 +88,22 @@
       <tr>
         <td>Sidekiq (background refresh)</td>
         <td>
-          <span class="badge">not yet wired</span>
-          ships in TODO-029 — Web UI will mount at <a href="/admin/sidekiq">/admin/sidekiq</a>
+          <% if @sidekiq[:ok] %>
+            <% if @sidekiq[:workers] > 0 %>
+              <span class="badge bookmarked">enabled</span>
+              <%= @sidekiq[:workers] %> worker<%= 's' unless @sidekiq[:workers] == 1 %> &middot;
+              <%= @sidekiq[:enqueued] %> queued &middot;
+              <%= @sidekiq[:processed] %> processed lifetime
+            <% else %>
+              <span class="badge">redis up, no worker running</span>
+              start with <code>make sidekiq</code> &middot;
+              <%= @sidekiq[:enqueued] %> waiting in queue
+            <% end %>
+            &middot; <a href="/admin/sidekiq">open Web UI</a>
+          <% else %>
+            <span class="badge">redis unreachable</span>
+            <code><%= h(@sidekiq[:error]) %></code>
+          <% end %>
         </td>
       </tr>
     </tbody>
