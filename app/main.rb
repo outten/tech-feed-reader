@@ -161,6 +161,13 @@ class TechFeedReader < Sinatra::Base
       { ok: false, error: e.message }
     end
 
+    # Render the per-row feeds-table partial. Used both by views/feeds.erb
+    # (server-side) and the /api/feeds endpoints (returned as `row_html`)
+    # so JS-inserted rows match server-rendered ones.
+    def render_feed_row(feed)
+      erb :_feed_row, locals: { feed: feed }, layout: false
+    end
+
     # Format a byte count as 1.5 MB / 240 KB / 332 B for the admin
     # dashboard. Inline to avoid pulling in ActiveSupport for one call
     # site.
@@ -404,6 +411,93 @@ class TechFeedReader < Sinatra::Base
     else
       redirect to('/feeds?error=not-found')
     end
+  end
+
+  # ---- JSON API (AJAX endpoints for the feeds page) ------------------
+  #
+  # These endpoints back the in-page add / remove / refresh interactions
+  # so the user keeps their scroll position. The HTML form-target routes
+  # above stay in place as a no-JS fallback. JSON shape on success:
+  #   { ok: true, feed: {...}, row_html: "<tr>...</tr>" }
+  # On error:
+  #   { ok: false, error: "duplicate-url", message: "..." }   (HTTP 422)
+  #   { ok: false, error: "not-found",     message: "..." }   (HTTP 404)
+  #
+  # `row_html` reuses views/_feed_row.erb so JS-inserted rows match the
+  # server-rendered ones byte-for-byte.
+
+  post '/api/feeds' do
+    content_type :json
+    url = params['url'].to_s.strip
+
+    unless url.match?(%r{\Ahttps?://\S+\z})
+      status 422
+      next({ ok: false, error: 'invalid-url', message: "That doesn't look like a valid http(s) URL." }.to_json)
+    end
+
+    title    = (params['title'] || '').strip
+    title    = nil if title.empty?
+    interval = params['fetch_interval_seconds'].to_i
+    interval = FeedsStore::PUBLISHER_INTERVAL if interval <= 0
+
+    begin
+      feed = FeedsStore.add(url: url, title: title, fetch_interval_seconds: interval)
+      status 201
+      { ok: true, feed: feed, row_html: render_feed_row(feed) }.to_json
+    rescue SQLite3::ConstraintException
+      status 422
+      { ok: false, error: 'duplicate-url', message: 'That feed is already subscribed.' }.to_json
+    end
+  end
+
+  delete '/api/feeds/:id' do |id|
+    content_type :json
+    if FeedsStore.remove(id.to_i)
+      { ok: true, id: id.to_i }.to_json
+    else
+      status 404
+      { ok: false, error: 'not-found', message: 'No feed with that id.' }.to_json
+    end
+  end
+
+  post '/api/feeds/catalog/add' do
+    content_type :json
+    url   = params['url'].to_s.strip
+    entry = FeedCatalog.find_by_url(url)
+
+    unless entry
+      status 422
+      next({ ok: false, error: 'not-in-catalog', message: "That URL isn't in the curated catalog." }.to_json)
+    end
+
+    if (existing = FeedsStore.find_by_url(url))
+      { ok: true, status: 'already-subscribed', feed: existing, row_html: render_feed_row(existing) }.to_json
+    else
+      feed = FeedsStore.add(url: entry[:url], title: entry[:title], fetch_interval_seconds: entry[:interval])
+      status 201
+      { ok: true, status: 'added', feed: feed, row_html: render_feed_row(feed) }.to_json
+    end
+  end
+
+  post '/api/admin/refresh/all' do
+    content_type :json
+    feeds = FeedsStore.all
+    feeds.each { |f| FeedRefreshWorker.perform_async(f['id']) }
+    AppLogger.info('refresh_all_enqueued', count: feeds.length, source: 'api')
+    { ok: true, queued: feeds.length }.to_json
+  end
+
+  post '/api/admin/refresh/:feed_id' do |feed_id|
+    content_type :json
+    feed = FeedsStore.find(feed_id.to_i)
+    unless feed
+      status 404
+      next({ ok: false, error: 'not-found', message: 'No feed with that id.' }.to_json)
+    end
+
+    FeedRefreshWorker.perform_async(feed['id'])
+    AppLogger.info('refresh_one_enqueued', feed_id: feed['id'], title: feed['title'], source: 'api')
+    { ok: true, feed_id: feed['id'] }.to_json
   end
 
   # Bulk import via OPML. Skips URLs already present so re-importing the
