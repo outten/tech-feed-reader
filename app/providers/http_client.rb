@@ -9,6 +9,10 @@ require 'uri'
 #     resets) — three attempts with linear backoff
 #   - cache-friendly headers passed through verbatim from the caller
 #     (If-Modified-Since, If-None-Match) so 304 responses are honoured
+#   - 301/302/307/308 redirect following with a hop limit, so feeds
+#     that publish a forwarding URL (e.g. simplecast → simplecastaudio)
+#     still get fetched. Conditional-GET headers are dropped on the
+#     redirected request because the new URL has its own etag space.
 #
 # Test env raises on any unstubbed call so an accidental network hit
 # during a spec run fails loudly instead of flaking the suite.
@@ -18,6 +22,7 @@ module Providers
     DEFAULT_TIMEOUT = 30  # seconds (open + read)
     MAX_RETRIES     = 2
     BACKOFF         = 1.0 # seconds, multiplied by attempt number
+    MAX_REDIRECTS   = 5
 
     TRANSIENT_ERRORS = [
       Net::OpenTimeout, Net::ReadTimeout,
@@ -31,9 +36,35 @@ module Providers
     # 4xx/5xx are not retried; only transport-layer failures are).
     # `headers` is a flat hash; nil/empty values are dropped so
     # `{'If-Modified-Since' => nil}` doesn't produce a malformed header.
+    #
+    # 3xx redirects are followed up to MAX_REDIRECTS hops; the loop
+    # raises if the limit is exceeded, and the final non-redirect
+    # response is returned to the caller. Conditional-GET headers are
+    # only sent on the first hop — they belong to the original URL's
+    # cache state, not the redirect target.
     def get(url, headers: {}, timeout: DEFAULT_TIMEOUT)
       check_test_env!
 
+      current_url = url
+      hops        = 0
+      first_hop   = true
+
+      loop do
+        response = perform_get(current_url, headers: first_hop ? headers : {}, timeout: timeout)
+        return response unless redirect?(response)
+
+        hops += 1
+        raise "Too many redirects (>#{MAX_REDIRECTS}) starting from #{url}" if hops > MAX_REDIRECTS
+
+        location = response['Location'].to_s
+        raise "Redirect with no Location header from #{current_url}" if location.empty?
+
+        current_url = URI.join(current_url, location).to_s
+        first_hop   = false
+      end
+    end
+
+    def perform_get(url, headers:, timeout:)
       uri = URI.parse(url)
       raise ArgumentError, "Unsupported URL scheme: #{uri.scheme}" unless %w[http https].include?(uri.scheme)
 
@@ -52,6 +83,10 @@ module Providers
       with_retries do
         http.start { |h| h.request(req) }
       end
+    end
+
+    def redirect?(response)
+      %w[301 302 307 308].include?(response.code.to_s)
     end
 
     class << self
