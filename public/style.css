@@ -1366,3 +1366,63 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
   vertical-align: middle;
   line-height: 1.5;
 }
+
+/* ---- Mobile responsive (≤720px) ----------------------------------- */
+/* Compact header so logo + nav + theme toggle fit; soften padding on
+   the main content area; let .data-table scroll horizontally rather
+   than overflow the page; collapse multi-column form grids and the
+   catalog row's flex layout into single columns. */
+@media (max-width: 720px) {
+  header {
+    padding: 0.55rem 1rem;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .logo { font-size: 1rem; margin-right: 0; }
+  nav {
+    flex-basis: 100%;
+    order: 3;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem;
+  }
+  nav a { padding: 0.25rem 0.5rem; font-size: 0.85rem; }
+  button#theme-toggle { order: 2; padding: 0.25rem 0.7rem; font-size: 0.8rem; }
+
+  main { padding: 0 1rem; margin: 1rem auto; }
+  h2 { font-size: 1.3rem; }
+  h3 { font-size: 1rem; }
+
+  /* Tables — wrap each in its own horizontal scroll viewport so a wide
+     row doesn't break the layout. Slightly smaller font + tighter
+     cell padding so the common case still fits without scrolling. */
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 0.85rem;
+  }
+  .data-table th, .data-table td { padding: 0.4rem 0.6rem; }
+
+  /* Form grids — collapse to one column. */
+  .portfolio-form { grid-template-columns: 1fr; }
+
+  /* Catalog rows — stack the meta/blurb above the Add button. */
+  .catalog-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .catalog-meta { min-width: 0; }
+
+  /* Reading view — slimmer side padding so prose fills the screen. */
+  .reading-view .article-body { padding: 0.9rem 1.1rem; }
+
+  /* Stat cards — smaller value type so 3 fit on phones. */
+  .stat-cards { gap: 0.5rem; }
+  .stat-cards .summary-value { font-size: 1.25rem; }
+
+  /* Topics page table — already inside .data-table, but the samples
+     column gets cramped on phones; force it to wrap inline. */
+  .topics-table .topic-samples { white-space: normal; }
+}
