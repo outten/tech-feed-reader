@@ -117,13 +117,13 @@ module FeedCatalog
     # so the article view renders the player. Most include itunes:duration
     # so the runtime shows immediately, before <audio> loads metadata.
     { url: 'https://changelog.com/podcast/feed', title: 'The Changelog', category: :podcast,
-      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: true,
       blurb: 'Long-running interviews with people building the open source world.' },
     { url: 'https://feeds.simplecast.com/dxZsm5kX', title: 'Software Engineering Daily', category: :podcast,
-      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: true,
       blurb: 'Daily technical interviews on infrastructure, languages, and platforms.' },
     { url: 'https://api.substack.com/feed/podcast/1517410.rss', title: 'Latent Space', category: :podcast,
-      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: true,
       blurb: 'Engineering-focused conversations on the AI / LLM stack.' },
     { url: 'https://lexfridman.com/feed/podcast/', title: 'Lex Fridman Podcast', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,

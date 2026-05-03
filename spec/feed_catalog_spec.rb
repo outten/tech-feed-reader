@@ -41,6 +41,17 @@ RSpec.describe FeedCatalog do
       expect(defaults).to all(satisfy { |e| e[:seed] == true })
       expect(defaults.length).to be >= 3
     end
+
+    it 'seeds the three most clearly tech-focused podcasts' do
+      titles = FeedCatalog.seed_defaults
+        .select { |e| e[:category] == :podcast }
+        .map { |e| e[:title] }
+      expect(titles).to contain_exactly(
+        'The Changelog',
+        'Software Engineering Daily',
+        'Latent Space'
+      )
+    end
   end
 
   describe '.find_by_url' do

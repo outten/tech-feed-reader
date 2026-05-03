@@ -7,13 +7,14 @@ require_relative '../app/feeds_store'
 RSpec.describe 'scripts/seed_feeds.rb' do
   let(:script_path) { File.expand_path('../../scripts/seed_feeds.rb', __FILE__) }
 
-  it 'seeds the v1-kickoff feed list' do
+  it 'seeds the kickoff feed list (5 RSS + 3 podcasts)' do
     expect { silence_stdout { load(script_path) } }
-      .to change { FeedsStore.count }.from(0).to(5)
+      .to change { FeedsStore.count }.from(0).to(8)
 
     titles = FeedsStore.all.map { |f| f['title'] }
     expect(titles).to contain_exactly(
-      'Hacker News', 'Lobsters', 'Ars Technica', 'The Verge', 'Simon Willison'
+      'Hacker News', 'Lobsters', 'Ars Technica', 'The Verge', 'Simon Willison',
+      'The Changelog', 'Software Engineering Daily', 'Latent Space'
     )
   end
 
