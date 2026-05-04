@@ -38,15 +38,26 @@
 <% else %>
   <ul class="news-list">
     <% @articles.each do |article| %>
-      <li class="news-item <%= article['read'] == 1 ? 'read' : '' %>">
-        <% if article['audio_url'] && !article['audio_url'].to_s.empty? %>
-          <span class="badge podcast-badge" title="Podcast episode">PODCAST</span>
-        <% end %>
-        <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
-        <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
-        <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
-        <% (@tags_by_article[article['id']] || []).each do |tag| %>
-          <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+      <%
+        is_podcast = article['audio_url'] && !article['audio_url'].to_s.empty?
+        kind_icon  = is_podcast ? '🎧' : '📄'
+        kind_label = is_podcast ? 'Podcast episode' : 'Article'
+      %>
+      <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= is_podcast ? 'news-item-podcast' : 'news-item-article' %>">
+        <%# Whole left+title block is one click target, opens in a new
+            tab so Cmd-W returns the user to the list. %>
+        <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener">
+          <span class="news-kind-icon" title="<%= kind_label %>" aria-label="<%= kind_label %>"><%= kind_icon %></span>
+          <span class="news-headline"><%= h(article['title']) %></span>
+        </a>
+        <% if article['bookmarked'] == 1 || article['archived'] == 1 || (@tags_by_article[article['id']] || []).any? %>
+          <div class="news-row-badges">
+            <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
+            <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
+            <% (@tags_by_article[article['id']] || []).each do |tag| %>
+              <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+            <% end %>
+          </div>
         <% end %>
         <div class="news-meta">
           <% if (feed = feed_for(article)) %>

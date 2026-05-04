@@ -437,20 +437,70 @@ html.dark .tv-readout b,
 html.dark .tv-readout .tv-readout-date { color: #f5f5f7; }
 
 /* News panel (analysis page) */
-.news-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1rem; }
-.news-item { padding-bottom: 1rem; border-bottom: 1px solid #f2f2f7; }
-.news-item:last-child { border-bottom: none; padding-bottom: 0; }
+.news-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid #f0f0f5;
+}
+html.dark .news-list { border-top-color: #2c2c2e; }
+.news-item {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #f0f0f5;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+html.dark .news-item { border-bottom-color: #2c2c2e; }
+.news-item:hover { background: #f5f5f7; }
+html.dark .news-item:hover { background: #2c2c2e; }
+
+/* The icon + headline are one big anchor — click anywhere on it to
+   open the article in a new tab. Generous padding gives a Fitts'-law
+   click target (HN-style row-link). Display is grid so the icon
+   column stays a fixed width while the headline wraps. */
+.news-row-main {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  text-decoration: none;
+  color: inherit;
+}
+.news-kind-icon {
+  font-size: 1.1rem;
+  line-height: 1.4;
+  text-align: center;
+  user-select: none;
+  flex-shrink: 0;
+}
 .news-headline {
   font-size: 0.96rem;
   font-weight: 600;
   color: #0071e3;
-  text-decoration: none;
   line-height: 1.4;
 }
-.news-headline:hover { text-decoration: underline; }
-.news-meta { display: flex; gap: 0.75rem; margin-top: 0.3rem; font-size: 0.78rem; color: #8e8e93; }
+.news-row-main:hover .news-headline { text-decoration: underline; }
+html.dark .news-headline { color: #0a84ff; }
+
+.news-row-badges {
+  margin: 0.3rem 0 0 2.35rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.news-meta {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.3rem 0 0 2.35rem;
+  font-size: 0.78rem;
+  color: #8e8e93;
+}
 .news-source { font-weight: 500; }
-.news-summary { margin: 0.45rem 0 0; font-size: 0.88rem; line-height: 1.5; color: #3a3a3c; }
+.news-summary { margin: 0.45rem 0 0 2.35rem; font-size: 0.88rem; line-height: 1.5; color: #3a3a3c; }
 
 /* Dark mode extensions */
 html.dark .market-signals-section h3 { color: #f5f5f7; }
@@ -1106,8 +1156,10 @@ html.dark .error {
 
 /* Reading-list rows — read articles dim, badges sit inline.         */
 .news-item.read .news-headline { color: #6e6e73; font-weight: 500; }
+.news-item.read .news-kind-icon { opacity: 0.4; }
 .news-item.read .news-summary,
 .news-item.read .excerpt        { color: #8e8e93; }
+html.dark .news-item.read .news-headline { color: #8e8e93; }
 
 /* FTS5 snippet excerpt below the headline.                          */
 .excerpt {

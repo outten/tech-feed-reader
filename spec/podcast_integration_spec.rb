@@ -66,14 +66,46 @@ RSpec.describe 'podcast end-to-end' do
   end
 
   describe 'GET /articles' do
-    it 'shows the PODCAST badge on rows whose article has audio_url' do
+    it 'tags podcast rows with the headphone icon (and the article rows with the page icon)' do
       feed   = FeedsStore.add(url: 'https://example.com/podcast/feed', title: 'Test Podcast Show')
       parsed = FeedParser.parse(body, feed_url: feed['url'])
       ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
 
+      # Add one non-audio article so we can assert both icons appear.
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'plainarticle1', title: 'Plain post',
+        url: 'https://example.com/plain', author: nil,
+        published_at: '2026-05-04T12:00:00Z',
+        content_html: '<p>Body</p>', content_text: 'Body',
+        audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
+      }])
+
       get '/articles'
       expect(last_response.status).to eq(200)
-      expect(last_response.body).to include('class="badge podcast-badge"')
+      # Podcast row: 🎧 in the kind-icon span + .news-item-podcast on <li>
+      expect(last_response.body).to include('news-item-podcast')
+      expect(last_response.body).to include('🎧')
+      expect(last_response.body).to include('aria-label="Podcast episode"')
+      # Article row: 📄 + .news-item-article
+      expect(last_response.body).to include('news-item-article')
+      expect(last_response.body).to include('📄')
+      expect(last_response.body).to include('aria-label="Article"')
+    end
+
+    it 'opens article links in a new tab so Cmd-W returns to the list' do
+      feed = FeedsStore.add(url: 'https://example.com/feed', title: 'Feed')
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'newtabarticle', title: 'A',
+        url: 'https://example.com/a', author: nil,
+        published_at: '2026-05-04T12:00:00Z',
+        content_html: '<p>Body</p>', content_text: 'Body',
+        audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
+      }])
+
+      get '/articles'
+      # The headline anchor (the row-main link to /article/UID) carries
+      # target="_blank" + rel="noopener".
+      expect(last_response.body).to match(%r{<a class="news-row-main" href="/article/newtabarticle"[^>]*target="_blank"[^>]*rel="noopener"})
     end
   end
 end
