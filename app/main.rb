@@ -522,6 +522,52 @@ class TechFeedReader < Sinatra::Base
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
+  # Apply one read-state action to many articles in a single request,
+  # so the /articles bulk-toolbar can mark / archive / bookmark a
+  # selection in one round-trip instead of N. JSON in, JSON out;
+  # returns a per-uid result list so the UI can flag any uids that
+  # didn't resolve. Cap is 500 uids per call to keep the SQL bounded.
+  BULK_ACTIONS = {
+    'read'       => ->(id) { ReadStateStore.mark_read(id,       read:  true)  },
+    'unread'     => ->(id) { ReadStateStore.mark_read(id,       read:  false) },
+    'bookmark'   => ->(id) { ReadStateStore.mark_bookmarked(id, value: true)  },
+    'unbookmark' => ->(id) { ReadStateStore.mark_bookmarked(id, value: false) },
+    'archive'    => ->(id) { ReadStateStore.mark_archived(id,   value: true)  },
+    'unarchive'  => ->(id) { ReadStateStore.mark_archived(id,   value: false) }
+  }.freeze
+  BULK_UIDS_MAX = 500
+
+  post '/api/articles/bulk' do
+    content_type :json
+    payload = parse_json_body
+    halt 400, { status: 'error', error: 'invalid JSON body' }.to_json unless payload
+
+    action = payload['action'].to_s
+    handler = BULK_ACTIONS[action]
+    unless handler
+      halt 400, { status: 'error', error: "unknown action: #{action}",
+                  allowed: BULK_ACTIONS.keys }.to_json
+    end
+
+    uids = Array(payload['uids']).map(&:to_s).reject(&:empty?).uniq.first(BULK_UIDS_MAX)
+    halt 400, { status: 'error', error: 'uids must be a non-empty array' }.to_json if uids.empty?
+
+    applied = 0
+    results = uids.map do |uid|
+      article = ArticlesStore.find_by_uid(uid)
+      if article
+        handler.call(article['id'])
+        applied += 1
+        { uid: uid, ok: true }
+      else
+        { uid: uid, ok: false, error: 'not_found' }
+      end
+    end
+
+    AppLogger.info('bulk_apply', action: action, applied: applied, total: uids.length)
+    { status: 'ok', action: action, applied: applied, total: uids.length, results: results }.to_json
+  end
+
   TOPICS_WINDOW_OPTIONS = { '7' => 7, '14' => 14, '30' => 30 }.freeze
 
   # Topic-first reading surface: lists every detected cluster with the

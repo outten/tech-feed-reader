@@ -36,6 +36,17 @@
     <% end %>
   </div>
 <% else %>
+  <%# Sticky bulk-action toolbar; appears once a row checkbox is
+      ticked. Wired by public/bulk-actions.js. %>
+  <div id="bulk-toolbar" class="bulk-toolbar" hidden role="toolbar" aria-label="Bulk actions">
+    <span class="bulk-toolbar-count"><span data-bulk-count>0</span> selected</span>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="read">Mark read</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="unread">Mark unread</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="bookmark">Bookmark</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="archive">Archive</button>
+    <button type="button" class="bulk-toolbar-btn bulk-toolbar-clear">Clear</button>
+  </div>
+
   <ul class="news-list">
     <% @articles.each do |article| %>
       <%
@@ -44,6 +55,7 @@
         kind_label = is_podcast ? 'Podcast episode' : 'Article'
       %>
       <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= is_podcast ? 'news-item-podcast' : 'news-item-article' %>">
+        <input type="checkbox" class="news-item-check" data-uid="<%= h(article['uid']) %>" aria-label="Select article">
         <%# Whole left+title block is one click target, opens in a new
             tab so Cmd-W returns the user to the list. %>
         <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener">
@@ -82,3 +94,5 @@
     <% end %>
   </nav>
 <% end %>
+
+<script src="/bulk-actions.js?v=<%= asset_mtime('public/bulk-actions.js') %>"></script>
