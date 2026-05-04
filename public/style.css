@@ -1940,3 +1940,26 @@ html.dark .chat-panel-input { background: #1c1c1e; color: #f5f5f7; border-color:
 html.dark .chat-panel-send { background: #0a84ff; }
 html.dark .chat-panel-send:hover:not(:disabled) { background: #2a94ff; }
 html.dark .chat-panel-send:disabled { background: #3a3a3c; }
+
+/* ---- Digests ----------------------------------------------------------
+   /digests is a list table styled like .data-table; the per-digest
+   detail view drops a Digests.build_html fragment under .digest-items. */
+.digest-meta { margin-bottom: 1rem; font-size: 0.9rem; }
+.digest-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.digest-item {
+  border-top: 1px solid #f0f0f5;
+  padding: 0.85rem 0;
+}
+.digest-item:first-child { border-top: none; }
+html.dark .digest-item { border-top-color: #2c2c2e; }
+.digest-item-title { font-weight: 600; font-size: 1rem; line-height: 1.35; }
+.digest-item-title a { color: #1d1d1f; text-decoration: none; }
+html.dark .digest-item-title a { color: #f5f5f7; }
+.digest-item-title a:hover { color: #0071e3; }
+.digest-item-meta { font-size: 0.85rem; margin: 0.2rem 0 0.4rem; }
+.digest-item-summary { color: #3a3a3c; font-size: 0.92rem; line-height: 1.45; }
+html.dark .digest-item-summary { color: #aeaeb2; }

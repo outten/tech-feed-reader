@@ -2,22 +2,19 @@ require 'cgi'
 require 'time'
 require_relative 'database'
 require_relative 'logger'
-require_relative 'sanitizer'
 
-# Builds the daily-digest email body. Pulls every UNREAD article whose
-# published_at falls within the last `window_hours`, joins each row to
-# its feed (for the "from" label) and to its cached SummaryStore row
-# (LLM if present, else extractive, else a content_text excerpt as a
-# last-ditch fallback), and renders both a plain-text and a minimal
-# HTML body.
+# Builds a daily digest of the user's unread articles. Pulls every
+# UNREAD row whose published_at falls within the last `window_hours`,
+# joins each to its feed (for the "from" label) and to its cached
+# SummaryStore row (LLM if present, else extractive, else a
+# content_text excerpt as a last-ditch fallback). Renders both a
+# plain-text body (kept for ops legibility / future email re-use) and
+# an HTML fragment that drops directly into the /digests/:id page.
 #
-# Stateless: the SQL is bounded by `window_hours` (default 24), so two
-# runs in the same day will surface the same articles. That's a
-# feature for ad-hoc `make digest` runs; for cron use, fire it once
-# per day and the user gets one email.
-#
-# No mailing happens here. Hand the result to Mailer.deliver.
-module Digest
+# Module name is plural to avoid clashing with Ruby's built-in
+# `Digest` (SHA1, MD5, …). Storage lives in DigestStore; this module
+# is purely the composer.
+module Digests
   Result = Struct.new(:subject, :text, :html, :count, :window_hours, :generated_at, keyword_init: true)
 
   DEFAULT_WINDOW_HOURS = 24
@@ -39,6 +36,15 @@ module Digest
       window_hours: window_hours,
       generated_at: now
     )
+  end
+
+  # Compose + persist. Returns [id, Result] so callers can log the
+  # row id and report the count in one go.
+  def generate_and_store!(window_hours: DEFAULT_WINDOW_HOURS, limit: DEFAULT_LIMIT, now: Time.now.utc)
+    require_relative 'digest_store'
+    result = compose(window_hours: window_hours, limit: limit, now: now)
+    id = DigestStore.create(result)
+    [id, result]
   end
 
   # Exposed for specs; pulls the raw rows + their summary fields.
@@ -92,47 +98,25 @@ module Digest
           lines << ""
         end
       end
-      lines << "—"
-      lines << "Open the app: open /articles?state=unread"
       lines.join("\n")
     end
 
+    # HTML fragment (no <html>/<head>/<body>/<style>) using app CSS
+    # classes — drops directly into views/digest.erb under <main>.
     def build_html(rows, count, hours, now)
       header = <<~HTML
-        <!DOCTYPE html>
-        <html><head><meta charset="UTF-8">
-        <style>
-          body { font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1d1d1f; max-width: 680px; margin: 0 auto; padding: 24px; }
-          h1 { font-size: 18px; margin: 0 0 4px; }
-          .meta { color: #6e6e73; font-size: 13px; margin-bottom: 24px; }
-          .item { padding: 12px 0; border-top: 1px solid #f0f0f5; }
-          .item:first-of-type { border-top: none; }
-          .title { font-weight: 600; font-size: 15px; }
-          .title a { color: #1d1d1f; text-decoration: none; }
-          .title a:hover { color: #0071e3; }
-          .feed { color: #6e6e73; font-size: 13px; margin: 2px 0 6px; }
-          .summary { color: #3a3a3c; font-size: 14px; }
-          .empty { color: #6e6e73; padding: 24px 0; text-align: center; }
-          .pod { background: #e9d6ff; color: #5e1f9c; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; margin-left: 6px; }
-          footer { color: #8e8e93; font-size: 12px; margin-top: 32px; padding-top: 12px; border-top: 1px solid #f0f0f5; }
-        </style>
-        </head><body>
-        <h1>Tech Feed Reader — Daily digest</h1>
-        <div class="meta">Last #{hours} hours · #{count} unread</div>
+        <div class="digest-meta muted">
+          Generated #{h(now.iso8601)} · last #{hours}h · #{count} unread
+        </div>
       HTML
 
       body = if rows.empty?
-        '<div class="empty">No new articles in the last %d hours.</div>' % hours
+        '<div class="empty-state">No new articles in the last %d hours.</div>' % hours
       else
-        rows.map { |row| render_item_html(row, now) }.join("\n")
+        '<ol class="digest-items">' + rows.map { |row| render_item_html(row, now) }.join + '</ol>'
       end
 
-      footer = <<~HTML
-        <footer>Generated #{h(now.iso8601)} · open <code>/articles?state=unread</code> in the app.</footer>
-        </body></html>
-      HTML
-
-      header + body + footer
+      header + body
     end
 
     def render_item_html(row, now)
@@ -141,14 +125,14 @@ module Digest
       feed     = h(row['feed_title'].to_s)
       published = h(relative_when(row['published_at'], now))
       summary  = h(pick_summary(row))
-      pod_badge = row['audio_url'] ? '<span class="pod">PODCAST</span>' : ''
+      pod_badge = row['audio_url'] ? ' <span class="badge podcast-badge">PODCAST</span>' : ''
       title_html = url.empty? ? title : %(<a href="#{url}" target="_blank" rel="noopener">#{title}</a>)
       <<~HTML
-        <div class="item">
-          <div class="title">#{title_html}#{pod_badge}</div>
-          <div class="feed">#{feed} · #{published}</div>
-          #{summary.empty? ? '' : %(<div class="summary">#{summary}</div>)}
-        </div>
+        <li class="digest-item">
+          <div class="digest-item-title">#{title_html}#{pod_badge}</div>
+          <div class="digest-item-meta muted">#{feed} · #{published}</div>
+          #{summary.empty? ? '' : %(<div class="digest-item-summary">#{summary}</div>)}
+        </li>
       HTML
     end
 

@@ -1,0 +1,16 @@
+<div class="page-header">
+  <div>
+    <h2><%= h(@digest['subject']) %></h2>
+    <p class="subtitle">
+      <a href="/digests">&larr; All digests</a>
+      &middot; generated <%= relative_time(@digest['generated_at']) %>
+      (<code><%= h(@digest['generated_at']) %></code>)
+    </p>
+  </div>
+</div>
+
+<%# The stored html_body is a self-contained fragment built by
+    Digests.build_html. CGI-escaped at composition time, so safe to
+    drop in unescaped here — see spec/digests_spec.rb for the XSS
+    audit that locks this in. %>
+<%= @digest['html_body'] %>

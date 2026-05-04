@@ -63,13 +63,6 @@ gem 'connection_pool', '~> 2.4'
 # process and the worker process each expose their own metrics.
 gem 'prometheus-client', '~> 4.2'
 
-# Email delivery for the daily digest. The mail gem wraps Net::SMTP
-# with a friendlier API + multipart support (we send text + HTML).
-# All SMTP details are env-driven (SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
-# SMTP_PASSWORD, SMTP_FROM, DIGEST_TO) — no defaults, so a missing
-# config fails loudly when `make digest` runs.
-gem 'mail', '~> 2.8'
-
 # OpenTelemetry — distributed tracing. The SDK only activates when
 # OTEL_EXPORTER_OTLP_ENDPOINT is set, so dev runs without an OTel
 # collector configured pay zero overhead (the API package returns

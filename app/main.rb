@@ -22,6 +22,8 @@ require_relative 'summary_store'
 require_relative 'summarizer/extractive'
 require_relative 'summarizer/claude'
 require_relative 'chat'
+require_relative 'digests'
+require_relative 'digest_store'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
@@ -373,6 +375,21 @@ class TechFeedReader < Sinatra::Base
     @recent_episodes  = ArticlesStore.recent(limit: 25, kind: :podcast)
     @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     erb :podcasts
+  end
+
+  # Stored digests, newest first. `make digest` (cron) appends to this
+  # list; the detail view renders the saved html_body inline.
+  get '/digests' do
+    @page_title = 'Digests'
+    @digests    = DigestStore.recent(limit: 100)
+    erb :digests
+  end
+
+  get '/digests/:id' do |id|
+    @digest = DigestStore.find(id)
+    halt 404, 'Digest not found' unless @digest
+    @page_title = @digest['subject']
+    erb :digest
   end
 
   get '/article/:uid' do |uid|

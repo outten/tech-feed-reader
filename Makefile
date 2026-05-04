@@ -119,12 +119,12 @@ run-all:
 stop-all:
 	@./scripts/stop_all.sh
 
-# Compose + send the daily digest email. Pulls every unread article
+# Compose + persist a digest snapshot. Pulls every unread article
 # whose published_at is within the last DIGEST_WINDOW_HOURS (default
 # 24), joins each row to its cached summary (LLM > extractive >
-# excerpt), and ships text + HTML via SMTP to DIGEST_TO. Required env
-# in .credentials: SMTP_HOST/PORT/USERNAME/PASSWORD/FROM, DIGEST_TO.
-# Wire to cron / launchd to fire daily — see scripts/send_digest.rb
-# for an example crontab entry.
+# excerpt), and inserts a row into the digests table. Browse the
+# stored digests at /digests in the web app. Wire to cron / launchd
+# to fire daily — see scripts/generate_digest.rb for an example
+# crontab entry.
 digest:
-	bundle exec ruby scripts/send_digest.rb
+	bundle exec ruby scripts/generate_digest.rb
