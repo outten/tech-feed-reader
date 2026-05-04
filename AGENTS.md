@@ -1,22 +1,54 @@
 # Agent Instructions — Tech Feed Reader
 
-> **Status: greenfield seed.** This file describes the *target* architecture and conventions inherited from `t-money-terminal`. Update it as code lands so it stays a current-state reference, not a planning document.
+Operational reference for agents (and humans) working in this repo. The user-facing brief lives in [SPEC.md](SPEC.md); this file focuses on architecture, gotchas, and conventions that aren't obvious from a quick code read. Update it as code lands so it stays a current-state reference, not a planning document.
 
-Operational reference for agents (and humans) working in this repo. The user-facing brief lives in [SPEC.md](SPEC.md); this file focuses on architecture, gotchas, and conventions that aren't obvious from a quick code read.
+## Working with the user
+
+**Pause for explicit user go-ahead before any of these — every time, no exceptions:**
+
+- `git commit`
+- `git push`
+- `gh pr create`
+- `gh pr merge`
+- `git pull` after a merge to re-sync local
+
+If the user grants batch authority for a specific run ("commit, push, merge when CI is green"), honour exactly that scope — but do **not** extrapolate to the next feature. The next round needs its own approval. A previous "yes" is not a standing yes. (See also [CONTRIBUTING.md → Memory-backed workflow rules](CONTRIBUTING.md#memory-backed-workflow-rules) — this file restates the rule because it's load-bearing and easy to miss.)
+
+**Standard flow** (per [CONTRIBUTING.md](CONTRIBUTING.md)):
+
+1. Branch off main into `outten/TODO-NNN`. Don't push to `main` directly.
+2. Implement + write tests + update docs in the same change.
+3. `make test` locally → must be 0 failures.
+4. **Pause.** Show the user the diff / commit message; wait for explicit approval before staging.
+5. Commit, push the branch, open the PR (`gh pr create`).
+6. **Wait for CI green** on the PR before claiming "shipped" — CI is at [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs RSpec + script syntax check on every push to `main` and every PR.
+7. **Pause.** Wait for the user to merge the PR (or to grant explicit authority to merge after green CI).
+8. After merge, sync local: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
+
+**Documentation rule** — every PR that changes behaviour updates the touched docs in the same PR. The bar is "no doc reads as untrue after this PR." Concretely, when shipping a new page or module, update:
+- [README.md](README.md) page table + status line
+- AGENTS.md (this file) — if there's a new module / store / external integration / convention worth documenting
+- [CONTRIBUTING.md](CONTRIBUTING.md) — only if the process itself changed
+
+Don't leave docs to be reconciled later.
 
 ## Setup & credentials
 
-Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by Dotenv but `.credentials` is canonical.
+Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [`app/credentials.rb`](app/credentials.rb), which is required at the top of `app/main.rb` and `app/sidekiq_boot.rb` so both processes get the same env. `.credentials` wins — `.env` is honoured but secondary.
 
-```ruby
-# app/main.rb
-Dotenv.load(File.expand_path('../../.credentials', __FILE__))
-```
+**Key aliasing**: `app/credentials.rb` aliases `CLAUDE_API_KEY → ANTHROPIC_API_KEY` at load time, since the Anthropic SDK reads `ANTHROPIC_API_KEY` from env but the friendlier name is what users put in `.credentials`. Set either; the app uses whichever is present.
 
-**Wired keys at v1**:
-- `ANTHROPIC_API_KEY` — Claude API for LLM-backed summarization (Tier 2). Optional at startup; the app degrades gracefully and falls back to the extractive summarizer.
+**Wired keys**:
 
-**Logging**: every HTTP request, feed fetch, refresh, and Claude call emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Tune verbosity with `LOG_LEVEL=debug|info|warn|error|fatal` (default `info` in dev / production, `fatal` in test so RSpec stays clean). Pipe through `jq` for pretty-printing: `make run | jq -c`.
+| Key | Purpose |
+|---|---|
+| `CLAUDE_API_KEY` (or `ANTHROPIC_API_KEY`) | Claude API for LLM summarization, the `/chat` widget, and digest summaries. Optional at startup — the app degrades gracefully (extractive summarizer; chat widget hides itself; digests fall back to extractive / excerpt). |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | When set, the OpenTelemetry SDK installs the OTLP exporter alongside the in-memory recorder; spans flow to your collector (Jaeger / Tempo / Honeycomb / …). Unset → recorder-only, browse at `/admin/traces`. |
+| `OTEL_SERVICE_NAME` | Resource attribute attached to every span. Defaults to `tech-feed-reader`. |
+| `TRACING_RECORDER_CAPACITY` | Ring-buffer size for `Tracing::Recorder` (default `200`). |
+| `REDIS_URL` | Sidekiq broker. Defaults to `redis://localhost:6379/0`. |
+
+**Logging**: every HTTP request, feed fetch, refresh, Claude call, chat turn, digest run, and Sidekiq job emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Tune verbosity with `LOG_LEVEL=debug|info|warn|error|fatal` (default `info` in dev / production, `fatal` in test so RSpec stays clean). Pipe through `jq` for pretty-printing: `make run | jq -c`.
 
 No other API keys required — RSS / Atom feeds are public and unauthenticated. **Never commit `.credentials` or `.env`** — both are git-ignored.
 
@@ -32,7 +64,18 @@ make test                    # RSpec
 make refresh-feeds           # poll every feed in FeedsStore once
 make refresh-feed FEED=...   # poll one feed by URL or id
 make scheduler               # long-running poller honouring per-feed intervals
-make summarize ARTICLE=...   # one-off summarize (CLI; mirrors the on-page button)
+make sidekiq                 # background-job worker (needs Redis up)
+make redis                   # foreground Redis (alternative to brew services)
+make digest                  # generate + persist a digest snapshot (read at /digests; cron-friendly)
+```
+
+**One-shot dev session orchestration** — pre-canned for tracing-enabled local runs:
+```bash
+make run-all                 # Jaeger + Redis (if needed) + web + sidekiq, all backgrounded; opens browser tabs
+make stop-all                # symmetric teardown (only stops the Redis it started itself)
+make jaeger / jaeger-stop    # just the Jaeger container
+make serve-otel              # `make serve` with OTEL_EXPORTER_OTLP_ENDPOINT pointed at local Jaeger
+make sidekiq-otel            # same wiring for the Sidekiq worker
 ```
 
 `make run` auto-migrates on boot, so `make migrate` is mainly for CI / scripts that need the DB up before the web process starts.
@@ -83,12 +126,13 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | Table | Purpose |
 |---|---|
 | `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status |
-| `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text |
+| `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text, audio_url, audio_mime_type, audio_duration_seconds |
 | `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via INSERT/UPDATE/DELETE triggers |
 | `read_state` | Per-article state: read, bookmarked, archived, opened_at |
 | `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
 | `article_tags` | Many-to-many join between articles and tags |
 | `summaries` | Cached summaries: extractive (always) + llm (on demand) |
+| `digests` | Stored digest snapshots produced by `make digest`: subject, text_body, html_body, generated_at, window_hours, article_count |
 | `schema_migrations` | Migration runner state |
 
 `HealthRegistry` is in-memory only (bounded ring buffer of feed-fetch observations); surfaces at `/admin/health`, clears on process restart.
@@ -132,48 +176,113 @@ Mirror `t-money`'s `try_providers` pattern: log to `HealthRegistry.measure`, ret
 
 In-memory only; clears on process restart. Tests opt in via `ENV['HEALTH_REGISTRY']=1`.
 
-## Project structure (target)
+## Claude integration
+
+Two consumer modules sit on top of the `anthropic` SDK; both gracefully degrade when no key is set.
+
+- **[`Summarizer::Claude`](app/summarizer/claude.rb)** — one-shot LLM summary on `/article/:uid` ("Summarize with Claude" button). Uses `claude-opus-4-7`. Cached in the `summaries` table (column `llm`); never invalidated on feed re-fetch (LLM calls are expensive — see gotcha #7 below).
+- **[`Chat::Claude`](app/chat.rb)** — conversational backend for the floating chat widget. Stateless on the server: each turn ships `{message, history, context: {url, title, excerpt}}`; the widget keeps history in `localStorage` keyed by `tfr.chat.<pathname>`. Uses `claude-sonnet-4-6` (chat trades depth for latency vs. the Opus summarizer). History capped to `MAX_HISTORY_TURNS` pairs; excerpt capped to `MAX_CONTEXT_CHARS`.
+
+Both are wrapped in OTel `llm.summarize` / `llm.chat` spans with token-count attributes (see Tracing below).
+
+The chat widget UI lives in [`public/chat-widget.js`](public/chat-widget.js) + the `<div id="chat-widget" data-turbo-permanent>` in [`views/layout.erb`](views/layout.erb). It hides itself entirely when `/chat/health` reports `available: false` (no API key). Per-page context flows via `window.PAGE_CONTEXT` set by an inline script in the layout — routes can populate `@chat_context = { title:, excerpt: }` to override the default (see [`/article/:uid`](app/main.rb) for an example that ships the article body).
+
+## OpenTelemetry tracing
+
+[`app/tracing.rb`](app/tracing.rb) boots the OTel SDK in non-test env. Auto-instrumentation via `opentelemetry-instrumentation-all` covers Sinatra, Rack, Net::HTTP, Sidekiq, and SQLite — every HTTP request, outbound fetch, job, and SQL query becomes a span automatically. Manual spans wrap `FeedFetcher#fetch_feed` (`feed.fetch`) and the two Claude paths (`llm.summarize`, `llm.chat`).
+
+**Two span processors run side-by-side**:
+
+- `RecorderProcessor` — process-local ring buffer (size `TRACING_RECORDER_CAPACITY`, default 200). Always on. Powers [`/admin/traces`](app/main.rb) so traces are useful out of the box without any external collector.
+- `BatchSpanProcessor` + OTLP exporter — installed only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Ships spans to your collector (Jaeger / Tempo / Honeycomb / …). The OTLP gem is lazy-loaded so dev runs without the env var pay zero protobuf init cost.
+
+Web and worker each have their own recorder (process-local). Cross-process correlation requires the OTLP exporter — `make run-all` wires the local Jaeger automatically.
+
+## Digests
+
+[`Digests`](app/digests.rb) (note plural — avoids clashing with Ruby's stdlib `Digest`) composes a snapshot of unread articles in the last `DIGEST_WINDOW_HOURS` (default 24). Joins `articles ↔ feeds ↔ read_state ↔ summaries` in one query; summary precedence is **LLM → extractive → 240-char content excerpt**. Renders both a plain-text body and an HTML fragment that drops directly into `views/digest.erb`.
+
+Persistence is in [`DigestStore`](app/digest_store.rb) → the `digests` table. The cron entry point is [`scripts/generate_digest.rb`](scripts/generate_digest.rb) (`make digest`); each run inserts a new row, so wiring it once a day yields one row per day. Browse at `/digests`; detail at `/digests/:id`.
+
+No email — earlier iterations shipped via SMTP; the user's preference is to keep digests in-app. The composer's text body is kept around as a debugging aid and for any future re-export.
+
+## Persistent mini-player (Hotwire Turbo)
+
+The `<audio>` element + mini-player UI live in [`views/layout.erb`](views/layout.erb) under `<div id="global-player" data-turbo-permanent>`. Hotwire Turbo (loaded via CDN in `<head>`) intercepts link clicks + form submits and swaps `<body>` via XHR, but `data-turbo-permanent` elements survive untouched — so audio keeps playing across navigations. Same trick keeps the `#chat-widget` panel + open state across navs.
+
+The singleton player API lives in [`public/global-player.js`](public/global-player.js) as `window.Player` (`load`, `pause`, `resume`, `toggle`, `close`, `state`, `isActive`, `isPlaying`). Article pages render a `<button class="play-episode" data-…>` that calls `Player.load(...)` instead of carrying their own `<audio>`.
+
+**Two flavours of localStorage persistence**:
+
+- `tfr.podcast.now_playing` — full snapshot (uid, url, mime, title, articleUrl, duration, currentTime, paused, rate). Restored on hard reload; resumes paused since browsers block autoplay on a fresh document.
+- `tfr.podcast.position.<uid>` — per-episode resume position (existing convention). Cleared on `ended`.
+
+**Turbo migration notes** — body-level `<script>` tags re-execute on every Turbo body swap. Scripts that should bind once need a guard (see `window.__playerInited` in `global-player.js` and the `dataset.inited` check in `chat-widget.js`). Scripts that should rebind every nav (e.g. the article-page hookup of the play-episode button) can run unconditionally.
+
+## Project structure
 
 ```
 app/
-  main.rb                  # Sinatra routes; auto-migrates on boot
-  database.rb              # SQLite handle + migration runner
-  feed_fetcher.rb          # orchestrator: conditional GET → parse → update FeedsStore
-  feed_parser.rb           # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom
-  sanitizer.rb             # loofah whitelist; sanitize_html + text_only
+  main.rb                          # Sinatra routes; auto-migrates on boot
+  credentials.rb                   # loads .credentials/.env; aliases CLAUDE_API_KEY → ANTHROPIC_API_KEY
+  database.rb                      # SQLite handle + migration runner
+  logger.rb                        # JSON-line structured logger
+  version.rb                       # AppVersion::GIT_SHA + STARTED_AT (used by /health, OTel resource)
+  feed_fetcher.rb                  # conditional GET → parse → update FeedsStore (wrapped in OTel feed.fetch span)
+  feed_parser.rb                   # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom
+  feed_catalog.rb                  # curated 25-feed catalog + seed_defaults
+  sanitizer.rb                     # loofah whitelist; sanitize_html + text_only
   providers/
-    http_client.rb         # shared user-agent + retry/backoff + scheme guard
-    readability.rb         # extract main content from origin URL (teaser-feed fallback)
-    archive.rb             # archive.org fallback (Tier 3)
-  feeds_store.rb           # SQLite-backed wrapper (CRUD on the feeds table)
-  articles_store.rb        # SQLite-backed wrapper (CRUD on articles + FTS5)
-  read_state_store.rb      # lazy per-article read / bookmark / archive state
-  tags_store.rb            # (Tier 2)
-  summary_store.rb         # (Tier 2)
-  summarizer/              # (Tier 2)
-    extractive.rb          # TextRank-style; pure Ruby
-    claude.rb              # Anthropic SDK wrapper
-  health_registry.rb       # bounded ring buffer of feed-fetch observations
-  scheduler.rb             # due-feed picker + refresh_one helper (used by scripts + admin)
+    http_client.rb                 # shared user-agent + retry/backoff + 301/302 redirect-following
+    readability.rb                 # main-content extraction (teaser-feed fallback)
+  feeds_store.rb                   # CRUD on feeds
+  articles_store.rb                # CRUD on articles + FTS5
+  read_state_store.rb              # per-article read / bookmark / archive
+  tags_store.rb                    # tag rules + many-to-many links
+  tags_applier.rb                  # tag-rule matcher used at import time
+  summary_store.rb                 # extractive + LLM summaries
+  summarizer/
+    extractive.rb                  # TextRank-style; pure Ruby
+    claude.rb                      # Anthropic SDK wrapper for summaries (Opus)
+  chat.rb                          # Chat::Claude — chat backend, page-context system prompt (Sonnet)
+  digests.rb                       # composer for the daily-digest snapshot (text + HTML fragment)
+  digest_store.rb                  # CRUD on the digests table
+  recommendation.rb                # FTS5-overlap "Related" panel
+  topic_clusters.rb                # /topics term-clustering across the recent window
+  health_registry.rb               # bounded ring buffer of feed-fetch observations
+  metrics.rb                       # Prometheus registry + counter / gauge / histogram defs
+  metrics_middleware.rb            # Rack middleware: per-request counter + histogram
+  sidekiq_metrics_middleware.rb    # mirrors metrics_middleware for Sidekiq jobs
+  tracing.rb                       # OpenTelemetry SDK boot + RecorderProcessor (in-memory) + optional OTLP exporter
+  scheduler.rb                     # due-feed picker + refresh_one helper
+  sidekiq_boot.rb                  # worker boot file: requires credentials + tracing + workers
+  sidekiq_config.rb                # Sidekiq client/server config + middleware wiring
+  workers/
+    feed_refresh_worker.rb         # background job that refreshes a single feed
 db/
   migrations/
-    001_init.sql           # initial schema; new files added per feature PR
-views/                     # ERB templates — mirror t-money's UI patterns
+    001_init.sql                   # initial schema
+    002_articles_audio.sql         # audio_url + audio_mime_type + audio_duration_seconds on articles
+    003_digests.sql                # digests table
+views/                             # ERB templates
 public/
-  style.css                # ported from t-money + tech-feed-reader extensions.
-                           # No separate app.js — search and tag-filter ended up
-                           # server-side; the few client-side bits (theme toggle,
-                           # dashboard chart, article-link retrofit) are inline
-                           # <script> blocks in the relevant views.
+  style.css                        # all CSS lives here (light + dark)
+  global-player.js                 # singleton Player + mini-player UI bindings
+  chat-widget.js                   # floating chat button + panel + /chat client
+  header-refresh.js                # AJAX refresh-all button
+  feeds.js                         # /feeds page interactions (add feed, etc.)
 scripts/
-  migrate.rb               # one-shot migration runner (also auto-run on web boot)
-  seed_feeds.rb            # insert the v1-kickoff starter feed list (idempotent)
-  scheduler.rb             # long-running poller; reads feeds table, honours per-feed TTL
-  refresh_feed.rb          # one-shot poll of a single feed (id or URL)
-  refresh_feeds.rb         # one-shot poll of every feed
-spec/                      # RSpec
-data/                      # SQLite DB + raw-feed cache (git-ignored)
-.github/workflows/ci.yml   # RSpec + scripts syntax check on push to main + every PR
+  migrate.rb                       # one-shot migration runner (web boot also auto-migrates)
+  seed_feeds.rb                    # insert FeedCatalog::seed_defaults
+  scheduler.rb                     # long-running poller
+  refresh_feed.rb                  # poll one feed (id or URL)
+  refresh_feeds.rb                 # poll every feed once
+  generate_digest.rb               # compose + persist a digest (cron entry point; `make digest`)
+  backfill_audio.rb                # one-shot recovery: fill NULL audio_url for articles whose feed publishes enclosures
+  run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for a one-command dev session
+spec/                              # RSpec (test env: in-memory SQLite, no real HTTP)
+data/                              # SQLite DB + raw-feed cache (git-ignored)
+.github/workflows/ci.yml           # RSpec + scripts syntax check on push to main + every PR
 ```
 
 ## Testing
@@ -213,6 +322,6 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — PR workflow (branch / commit style / tests / CI / merge)
 - [DEVELOPER.md](DEVELOPER.md) — pointer to AGENTS.md (kept for legacy reference)
 - README.md — user-facing overview (status note + page list, kept current per PR)
-  - There is no TODO.md — roadmap is tracked in SPEC.md's tier list and in PR history; the in-conversation todo list keeps a working copy of in-flight work.
+- [TODO.md](TODO.md) — informal scratch list of UI / UX ideas the user wants to discuss before implementing. Not a roadmap (that's still SPEC.md's tier list); read it when the user references items by section heading.
 
 **Workflow rule**: every PR that changes behaviour should update the relevant docs in the same PR — see [CONTRIBUTING.md](CONTRIBUTING.md) and the workflow rule inherited from `t-money`'s memory layer.
