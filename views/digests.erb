@@ -6,7 +6,19 @@
       (typically wired to cron). Each row links to the full body.
     </p>
   </div>
+  <form method="post" action="/digests">
+    <button type="submit" class="btn-primary"
+            title="Compose + store a digest right now (same as `make digest`)">
+      Generate now
+    </button>
+  </form>
 </div>
+
+<% if params['notice'] == 'generated' %>
+  <div class="notice">
+    Digest generated &mdash; <strong><%= h(params['count']) %></strong> unread article<%= 's' unless params['count'] == '1' %> in the window.
+  </div>
+<% end %>
 
 <% if @digests.empty? %>
   <div class="empty-state">

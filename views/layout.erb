@@ -44,6 +44,22 @@
       <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
       <a href="/admin"     class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
     </nav>
+    <a href="/bus" class="header-icon-btn <%= 'active' if request.path_info == '/bus' %>"
+       title="Bus mode — recent podcast episodes short enough for the commute"
+       aria-label="Bus mode">
+      <%# Stylised side-view bus: body, two windows, two wheels. 20×16
+          to match the refresh icon's visual weight. %>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 18" width="20" height="16"
+           fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="11" rx="2"/>
+        <line x1="2" y1="7" x2="22" y2="7"/>
+        <line x1="9" y1="2" x2="9" y2="7"/>
+        <line x1="15" y1="2" x2="15" y2="7"/>
+        <circle cx="7" cy="14" r="2"/>
+        <circle cx="17" cy="14" r="2"/>
+      </svg>
+    </a>
     <form method="post" action="/admin/refresh/all" class="header-refresh-form js-header-refresh">
       <button type="submit" id="header-refresh" class="header-icon-btn"
               title="Refresh all feeds now" aria-label="Refresh all feeds">
