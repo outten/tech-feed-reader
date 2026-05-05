@@ -7,7 +7,7 @@
   </div>
   <% if @feeds.any? %>
     <form method="post" action="/admin/refresh/all" class="js-refresh-all">
-      <button type="submit" class="refresh-btn">Refresh all</button>
+      <button type="submit" class="refresh-btn" title="Enqueue a fetch for every subscribed feed (background)">Refresh all</button>
     </form>
   <% end %>
 </div>
@@ -86,7 +86,7 @@
       Poll interval (seconds)
       <input type="number" name="fetch_interval_seconds" min="60" value="<%= FeedsStore::PUBLISHER_INTERVAL %>">
     </label>
-    <button type="submit" class="btn-primary">Add</button>
+    <button type="submit" class="btn-primary" title="Subscribe to this feed and queue an initial fetch">Add</button>
   </form>
   <p class="subtitle" style="margin-top:0.75rem">
     Suggested intervals: 900s for high-frequency feeds (HN, Lobsters), 3600s
@@ -100,9 +100,9 @@
   <form method="post" action="/feeds/import" enctype="multipart/form-data" class="portfolio-form">
     <label class="full-width">
       Import from OPML file
-      <input type="file" name="file" accept=".opml,.xml,application/xml,text/x-opml" required>
+      <input type="file" name="file" accept=".opml,.xml,application/xml,text/x-opml" required title="Pick a .opml or .xml file exported from another reader">
     </label>
-    <button type="submit" class="btn-primary">Import</button>
+    <button type="submit" class="btn-primary" title="Add every feed from the OPML file (already-subscribed URLs are skipped)">Import</button>
   </form>
   <p class="subtitle" style="margin-top:0.75rem">
     Re-import is idempotent — feeds whose URL is already subscribed are
@@ -149,11 +149,11 @@
             <span class="muted catalog-url"><%= h(entry[:url]) %></span>
           </div>
           <% if subscribed %>
-            <span class="badge subscribed-badge">✓ Subscribed</span>
+            <span class="badge subscribed-badge" title="This feed is already in your subscriptions">✓ Subscribed</span>
           <% else %>
             <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
               <input type="hidden" name="url" value="<%= h(entry[:url]) %>">
-              <button type="submit" class="btn-primary">+ Add</button>
+              <button type="submit" class="btn-primary" title="Subscribe to &lsquo;<%= h(entry[:title]) %>&rsquo; and queue an initial fetch">+ Add</button>
             </form>
           <% end %>
         </li>

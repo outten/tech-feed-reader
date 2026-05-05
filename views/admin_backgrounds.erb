@@ -1,0 +1,56 @@
+<div class="page-header">
+  <div>
+    <h2>Background pool</h2>
+    <p class="subtitle">
+      Picsum image IDs that <code>page-background.js</code> rotates through
+      for the page background. Refreshing wipes the pool and writes a fresh
+      batch of <%= @target_pool_size %> random images fetched from
+      <a href="https://picsum.photos" target="_blank" rel="noopener">Picsum</a>.
+    </p>
+  </div>
+  <form method="post" action="/admin/backgrounds/refresh">
+    <button type="submit" class="refresh-btn"
+            title="Wipe the pool and pull <%= @target_pool_size %> fresh random images from Picsum">
+      Refresh pool
+    </button>
+  </form>
+</div>
+
+<% if params['notice'] == 'refreshed' %>
+  <div class="notice">
+    Pool refreshed &mdash; loaded <strong><%= h(params['count']) %></strong> new image<%= 's' unless params['count'] == '1' %>.
+  </div>
+<% elsif params['error'] == 'refresh-failed' %>
+  <div class="error">
+    Refresh failed: <code><%= h(params['msg']) %></code>. Check your connection and try again; the previous pool is intact.
+  </div>
+<% end %>
+
+<% if @using_default %>
+  <div class="notice">
+    No custom pool yet &mdash; the page background uses the bundled curated
+    nature set (<%= @default_ids.length %> IDs: <code><%= h(@default_ids.join(', ')) %></code>).
+    Click <strong>Refresh pool</strong> above to replace it with random Picsum picks.
+  </div>
+<% else %>
+  <section class="benchmark-section">
+    <h3>Current pool (<%= @entries.length %>)</h3>
+    <div class="bg-pool-grid">
+      <% @entries.each do |entry| %>
+        <figure class="bg-pool-card">
+          <a href="<%= h(entry['unsplash_url']) %>" target="_blank" rel="noopener"
+             title="Open the original on Unsplash">
+            <img src="https://picsum.photos/id/<%= entry['picsum_id'] %>/320/180"
+                 alt="Picsum image <%= entry['picsum_id'] %> by <%= h(entry['author']) %>"
+                 width="320" height="180" loading="lazy">
+          </a>
+          <figcaption>
+            <span class="muted">id <%= entry['picsum_id'] %></span>
+            &middot;
+            <%= h(entry['author']) || '—' %>
+          </figcaption>
+        </figure>
+      <% end %>
+    </div>
+  </section>
+<% end %>

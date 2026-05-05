@@ -5,7 +5,8 @@
       What's being talked about
       <% [7, 14, 30].each do |d| %>
         <a href="?days=<%= d %>"
-           class="<%= 'active' if @days == d %>">last <%= d %> days</a>
+           class="<%= 'active' if @days == d %>"
+           title="Re-cluster topics across articles from the last <%= d %> days">last <%= d %> days</a>
       <% end %>
     </p>
   </div>
@@ -34,7 +35,7 @@
       <% @topics.each do |cluster| %>
         <tr>
           <td class="topic-cell">
-            <a class="tag-chip" href="/topics/<%= CGI.escape(cluster[:term]) %>"><%= h(cluster[:term]) %></a>
+            <a class="tag-chip" href="/topics/<%= CGI.escape(cluster[:term]) %>" title="Open the cluster page for &lsquo;<%= h(cluster[:term]) %>&rsquo;"><%= h(cluster[:term]) %></a>
           </td>
           <td class="num"><%= cluster[:count] %></td>
           <td class="topic-samples">

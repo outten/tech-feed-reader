@@ -45,7 +45,7 @@ module FeedsStore
   # successful poll. Unknown keys are silently ignored.
   def update(id, **fields)
     allowed = %i[
-      title fetch_interval_seconds
+      title fetch_interval_seconds image_url
       last_fetched_at last_etag last_modified last_status
     ]
     cols = fields.slice(*allowed)

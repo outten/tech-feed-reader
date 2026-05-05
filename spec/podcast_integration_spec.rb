@@ -24,6 +24,17 @@ RSpec.describe 'podcast end-to-end' do
     expect(audio['audio_url']).to eq('https://cdn.example.com/audio/ep-12.mp3')
     expect(audio['audio_mime_type']).to eq('audio/mpeg')
     expect(audio['audio_duration_seconds']).to eq(1 * 3600 + 23 * 60 + 45)
+    # Episode-level cover art is also persisted on the article row.
+    expect(audio['image_url']).to eq('https://cdn.example.com/ep-12-art.jpg')
+  end
+
+  it 'persists per-entry image_url through ArticlesStore.import (when the feed declares one)' do
+    feed   = FeedsStore.add(url: 'https://example.com/podcast/feed', title: 'Test Podcast Show')
+    parsed = FeedParser.parse(body, feed_url: feed['url'])
+    ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
+
+    ep11 = ArticlesStore.recent(limit: 10).find { |r| r['title'].start_with?('Episode 11') }
+    expect(ep11['image_url']).to be_nil  # ep11 has no per-item itunes:image
   end
 
   describe 'GET /article/:uid for a podcast episode' do
