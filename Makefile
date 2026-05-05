@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune
 
 install:
 	bundle install
@@ -128,3 +128,12 @@ stop-all:
 # crontab entry.
 digest:
 	bundle exec ruby scripts/generate_digest.rb
+
+# Retention sweep — delete articles older than RETENTION_DAYS (default
+# 7). Bookmarked articles are always preserved; set PRUNE_KEEP_UNREAD=1
+# to also keep unread items past the window. Cascades clean up
+# read_state, summaries, article_tags, and the articles_fts index.
+# `make refresh-feeds` calls this automatically at the end of every
+# refresh cycle (override with PRUNE_ON_REFRESH=0).
+prune:
+	bundle exec ruby scripts/prune_articles.rb
