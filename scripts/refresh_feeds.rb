@@ -4,11 +4,17 @@
 # starter set this is fine. The long-running scripts/scheduler.rb is
 # the right tool once polling cadence matters.
 #
+# After every refresh, sweeps articles older than RETENTION_DAYS
+# (default 7). Bookmarked articles are always preserved; set
+# PRUNE_KEEP_UNREAD=1 to also keep unread items past the window.
+# PRUNE_ON_REFRESH=0 disables the sweep for this run.
+#
 # Usage:
 #   make refresh-feeds
 require_relative '../app/database'
 require_relative '../app/feeds_store'
 require_relative '../app/scheduler'
+require_relative '../app/pruner'
 
 Database.migrate!
 
@@ -37,5 +43,13 @@ end
 puts ''
 puts "Summary: ok=#{summary[:ok]}  not_modified=#{summary[:not_modified]}  " \
      "error=#{summary[:error]}  imported=#{summary[:imported]}"
+
+if ENV['PRUNE_ON_REFRESH'] != '0'
+  retention_days = Integer(ENV.fetch('RETENTION_DAYS', Pruner::DEFAULT_RETENTION_DAYS), 10)
+  keep_unread    = ENV['PRUNE_KEEP_UNREAD'] == '1'
+  result = Pruner.prune_old(retention_days: retention_days, keep_unread: keep_unread)
+  puts "Pruned: #{result.deleted} article#{'s' unless result.deleted == 1} older than #{retention_days}d (cutoff #{result.cutoff})  " \
+       "kept_bookmarked=#{result.kept_bookmarked}#{keep_unread ? "  kept_unread=#{result.kept_unread}" : ''}"
+end
 
 exit(summary[:error].positive? && summary[:ok].zero? ? 1 : 0)

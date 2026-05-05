@@ -47,6 +47,9 @@ Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [
 | `OTEL_SERVICE_NAME` | Resource attribute attached to every span. Defaults to `tech-feed-reader`. |
 | `TRACING_RECORDER_CAPACITY` | Ring-buffer size for `Tracing::Recorder` (default `200`). |
 | `REDIS_URL` | Sidekiq broker. Defaults to `redis://localhost:6379/0`. |
+| `RETENTION_DAYS` | Article retention window for [`Pruner`](app/pruner.rb). Default `7`. Sweep runs at the end of `make refresh-feeds` and standalone via `make prune`. |
+| `PRUNE_KEEP_UNREAD` | Set to `1` to preserve unread articles past the retention window (default sweeps unread + read). Bookmarked articles are always kept. |
+| `PRUNE_ON_REFRESH` | Set to `0` to skip the post-refresh sweep on a given `make refresh-feeds` run. |
 
 **Logging**: every HTTP request, feed fetch, refresh, Claude call, chat turn, digest run, and Sidekiq job emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Tune verbosity with `LOG_LEVEL=debug|info|warn|error|fatal` (default `info` in dev / production, `fatal` in test so RSpec stays clean). Pipe through `jq` for pretty-printing: `make run | jq -c`.
 
@@ -67,6 +70,7 @@ make scheduler               # long-running poller honouring per-feed intervals
 make sidekiq                 # background-job worker (needs Redis up)
 make redis                   # foreground Redis (alternative to brew services)
 make digest                  # generate + persist a digest snapshot (read at /digests; cron-friendly)
+make prune                   # delete articles older than RETENTION_DAYS (default 7); bookmarks always kept
 ```
 
 **One-shot dev session orchestration** — pre-canned for tracing-enabled local runs:
@@ -97,6 +101,13 @@ data/cache/
 ```
 
 Article bodies, extracted content, and summaries all live in SQLite — not on disk.
+
+**Retention policy** — articles older than `RETENTION_DAYS` (default 7) get swept by [`Pruner`](app/pruner.rb). Bookmarked articles are always preserved regardless of age; set `PRUNE_KEEP_UNREAD=1` to also preserve unread items past the window. Cascades take care of `read_state`, `summaries`, `article_tags`, and the `articles_fts` index — one DELETE on `articles` is sufficient. Wired in two places:
+
+- `scripts/refresh_feeds.rb` runs `Pruner.prune_old` at the end of every refresh-all cycle. Override with `PRUNE_ON_REFRESH=0` to skip the sweep on a given run.
+- `make prune` (= `scripts/prune_articles.rb`) runs the same sweep standalone — useful in cron / launchd if you want a separate retention cadence from the refresh cadence.
+
+The cutoff is `COALESCE(published_at, fetched_at) < now - retention_days`, so feeds that don't ship a publish date still get swept based on when we first saw them.
 
 **Per-feed TTL** (analogous to `t-money`'s market-aware TTL) — the `feeds.fetch_interval_seconds` column is the source of truth; the table below is just the suggested default at add-time:
 
@@ -249,6 +260,7 @@ app/
   digest_store.rb                  # CRUD on the digests table
   recommendation.rb                # FTS5-overlap "Related" panel
   topic_clusters.rb                # /topics term-clustering across the recent window
+  pruner.rb                        # retention sweep — delete articles older than RETENTION_DAYS; bookmarks always kept
   health_registry.rb               # bounded ring buffer of feed-fetch observations
   metrics.rb                       # Prometheus registry + counter / gauge / histogram defs
   metrics_middleware.rb            # Rack middleware: per-request counter + histogram
@@ -278,6 +290,7 @@ scripts/
   refresh_feed.rb                  # poll one feed (id or URL)
   refresh_feeds.rb                 # poll every feed once
   generate_digest.rb               # compose + persist a digest (cron entry point; `make digest`)
+  prune_articles.rb                # delete articles older than RETENTION_DAYS (`make prune`); bookmarks always kept
   backfill_audio.rb                # one-shot recovery: fill NULL audio_url for articles whose feed publishes enclosures
   run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for a one-command dev session
 spec/                              # RSpec (test env: in-memory SQLite, no real HTTP)
