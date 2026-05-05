@@ -2213,3 +2213,88 @@ html.dark .bulk-toolbar { background: #1c1c1e; border-color: #3a3a3c; box-shadow
 html.dark .bulk-toolbar-btn { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
 html.dark .bulk-toolbar-btn:hover:not(:disabled) { background: #3a3a3c; }
 .bulk-toolbar-clear { margin-left: auto; }
+
+/* ---- Phase 3 feedback signal ---------------------------------------
+   Three surfaces share the same colour palette:
+     up   = green (#34c759 / dark #30d158)
+     down = red   (#ff3b30 / dark #ff453a)
+   Idle / cleared state is the existing button colour, so the active
+   state lights up clearly when the user has voted. */
+
+/* /article/:uid action row */
+.feedback-btn.feedback-on-up   { background: #34c759 !important; color: #fff !important; border-color: #34c759 !important; }
+.feedback-btn.feedback-on-down { background: #ff3b30 !important; color: #fff !important; border-color: #ff3b30 !important; }
+html.dark .feedback-btn.feedback-on-up   { background: #30d158 !important; border-color: #30d158 !important; }
+html.dark .feedback-btn.feedback-on-down { background: #ff453a !important; border-color: #ff453a !important; }
+
+/* /articles row inline 👍/👎 — hidden by default, revealed on row
+   hover. When the user has actually voted, .feedback-set keeps the
+   chosen button visible regardless of hover so the vote is always
+   discoverable. */
+.news-row-feedback {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.news-item:hover .news-row-feedback,
+.news-row-feedback.feedback-set { opacity: 1; }
+.news-row-feedback form { display: inline; margin: 0; }
+.feedback-row-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  filter: grayscale(0.4);
+  opacity: 0.75;
+  transition: filter 0.1s, opacity 0.1s, background 0.1s;
+}
+.feedback-row-btn:hover { background: #f0f0f5; filter: none; opacity: 1; }
+html.dark .feedback-row-btn:hover { background: #2c2c2e; }
+.feedback-row-btn.is-on { filter: none; opacity: 1; background: #e0f5e6; }
+.feedback-row-btn.is-on[aria-label="Thumbs down"] { background: #ffe0de; }
+html.dark .feedback-row-btn.is-on { background: #1d3a23; }
+html.dark .feedback-row-btn.is-on[aria-label="Thumbs down"] { background: #3a1a18; }
+/* The badge container had display: flex from the original layout but
+   we made it always-rendered now (so the hover affordances have
+   somewhere to live). When there are no persistent badges, suppress
+   the gap. */
+.news-row-badges.is-empty { gap: 0; }
+
+/* /feeds row weight controls — small +/− pills around the live
+   weight readout. Default state (1.00×) is muted; non-default is
+   highlighted to make it clear which feeds are weighted. */
+.feed-row-weight {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.4rem;
+  font-size: 0.85rem;
+}
+.feed-weight-btn {
+  background: #fff;
+  border: 1px solid #d2d2d7;
+  border-radius: 4px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #1d1d1f;
+}
+.feed-weight-btn:hover { background: #e8e8ed; }
+html.dark .feed-weight-btn { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
+html.dark .feed-weight-btn:hover { background: #3a3a3c; }
+.feed-weight-display {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2rem;
+  text-align: center;
+  color: #1d1d1f;
+  font-weight: 600;
+}
+html.dark .feed-weight-display { color: #f5f5f7; }
+.feed-row-weight.is-default .feed-weight-display { color: #8e8e93; font-weight: 400; }

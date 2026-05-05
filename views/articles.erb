@@ -70,15 +70,34 @@
         <% if thumb_url && !thumb_url.to_s.empty? %>
           <img class="news-item-thumb" src="<%= h(thumb_url) %>" alt="" loading="lazy">
         <% end %>
-        <% if article['bookmarked'] == 1 || article['archived'] == 1 || (@tags_by_article[article['id']] || []).any? %>
-          <div class="news-row-badges">
-            <% if article['bookmarked'] == 1 %><span class="badge bookmarked" title="Bookmarked">★</span><% end %>
-            <% if article['archived']   == 1 %><span class="badge archived"   title="Archived">archived</span><% end %>
-            <% (@tags_by_article[article['id']] || []).each do |tag| %>
-              <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>" title="Filter to articles tagged &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
-            <% end %>
-          </div>
-        <% end %>
+        <% feedback_value = article['feedback'].to_i %>
+        <% has_persistent_badges = article['bookmarked'] == 1 || article['archived'] == 1 || feedback_value != 0 || (@tags_by_article[article['id']] || []).any? %>
+        <div class="news-row-badges <%= 'is-empty' unless has_persistent_badges %>">
+          <% if article['bookmarked'] == 1 %><span class="badge bookmarked" title="Bookmarked">★</span><% end %>
+          <% if article['archived']   == 1 %><span class="badge archived"   title="Archived">archived</span><% end %>
+          <% (@tags_by_article[article['id']] || []).each do |tag| %>
+            <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>" title="Filter to articles tagged &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
+          <% end %>
+          <%# Phase 3 — small inline 👍/👎 affordances. Permanent when
+              the user has already given feedback (so the active state
+              stays visible), revealed on row hover otherwise. %>
+          <span class="news-row-feedback <%= 'feedback-set' if feedback_value != 0 %>">
+            <form method="post" action="/article/<%= article['uid'] %>/feedback">
+              <input type="hidden" name="value" value="<%= feedback_value == 1 ? '0' : '1' %>">
+              <input type="hidden" name="return_to" value="<%= h(request.fullpath) %>">
+              <button type="submit" class="feedback-row-btn <%= 'is-on' if feedback_value == 1 %>"
+                      title="<%= feedback_value == 1 ? 'Clear the thumbs-up on this article' : 'Thumbs up — boost articles like this one in the For-You sort' %>"
+                      aria-label="Thumbs up">👍</button>
+            </form>
+            <form method="post" action="/article/<%= article['uid'] %>/feedback">
+              <input type="hidden" name="value" value="<%= feedback_value == -1 ? '0' : '-1' %>">
+              <input type="hidden" name="return_to" value="<%= h(request.fullpath) %>">
+              <button type="submit" class="feedback-row-btn <%= 'is-on' if feedback_value == -1 %>"
+                      title="<%= feedback_value == -1 ? 'Clear the thumbs-down on this article' : 'Thumbs down — demote articles like this one in the For-You sort' %>"
+                      aria-label="Thumbs down">👎</button>
+            </form>
+          </span>
+        </div>
         <div class="news-meta">
           <% if (feed = feed_for(article)) %>
             <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>" title="Show only articles from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
