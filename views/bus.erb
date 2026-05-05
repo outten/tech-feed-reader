@@ -1,0 +1,59 @@
+<div class="page-header">
+  <div>
+    <h2>🚌 Bus mode</h2>
+    <p class="subtitle">
+      Recent podcast episodes <strong>≤ <%= @max_minutes %> minutes</strong> long &mdash;
+      pick something short enough for the commute. Shows the
+      <%= @episodes.length %> freshest match<%= 'es' unless @episodes.length == 1 %>.
+      <span class="state-filter" style="margin-left:0.75rem">
+        <% [10, 15, 20, 30, 45].each do |m| %>
+          <a href="?max_minutes=<%= m %>"
+             class="<%= 'active' if @max_minutes == m %>"
+             title="Re-filter to episodes ≤ <%= m %> minutes long"><%= m %>m</a>
+        <% end %>
+      </span>
+    </p>
+  </div>
+</div>
+
+<% if @episodes.empty? %>
+  <div class="empty-state">
+    No podcast episodes under <%= @max_minutes %> minutes are in the database
+    yet. Bump the cutoff above &mdash; or refresh the feeds via
+    <a href="/feeds">/feeds</a> to pull more episodes.
+  </div>
+<% else %>
+  <ul class="podcast-episodes">
+    <% @episodes.each do |ep| %>
+      <%
+        feed_row = (@feeds_by_id || {})[ep['feed_id']]
+        ep_image = ep['image_url'].to_s.empty? ? (feed_row && feed_row['image_url']) : ep['image_url']
+      %>
+      <li class="podcast-card <%= ep['read'] == 1 ? 'read' : '' %> <%= 'has-image' if ep_image && !ep_image.to_s.empty? %>">
+        <% if ep_image && !ep_image.to_s.empty? %>
+          <a class="podcast-card-image" href="/article/<%= ep['uid'] %>" title="Open episode page">
+            <img src="<%= h(ep_image) %>" alt="" loading="lazy">
+          </a>
+        <% end %>
+        <div class="podcast-card-body">
+          <div class="podcast-card-meta">
+            <% if feed_row %>
+              <a class="podcast-card-show" href="/articles?feed_id=<%= feed_row['id'] %>&kind=podcast" title="See all episodes from <%= h(feed_row['title'] || feed_row['url']) %>"><%= h(feed_row['title'] || feed_row['url']) %></a>
+            <% end %>
+            <span class="podcast-card-date" title="Published <%= h(ep['published_at']) %>"><%= relative_time(ep['published_at']) %></span>
+            <% if (dur = fmt_duration(ep['audio_duration_seconds'])) %>
+              <span class="podcast-card-duration" title="Episode runtime"><%= dur %></span>
+            <% end %>
+          </div>
+          <a class="podcast-card-title" href="/article/<%= ep['uid'] %>" title="Open episode page"><%= h(ep['title']) %></a>
+          <% if ep['content_text'] && !ep['content_text'].to_s.empty? %>
+            <p class="podcast-card-excerpt"><%= h(ep['content_text'].to_s.gsub(/\s+/, ' ').strip[0, 240]) %><%= '…' if ep['content_text'].to_s.length > 240 %></p>
+          <% end %>
+          <div class="podcast-card-actions">
+            <a class="btn-primary" href="/article/<%= ep['uid'] %>" title="Open episode (use the persistent mini-player to listen)">▶ Listen</a>
+          </div>
+        </div>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

@@ -1647,7 +1647,7 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
    per-feed result counts in the flash. Match the theme-toggle pill
    shape so the two icon buttons feel like a set. */
 .header-refresh-form { margin: 0; }
-button.header-icon-btn {
+.header-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1660,10 +1660,15 @@ button.header-icon-btn {
   font-size: 0.9rem;
   line-height: 1;
 }
-button.header-icon-btn:hover { background: #e8e8ed; }
-button.header-icon-btn:active svg { transform: rotate(90deg); transition: transform 0.2s; }
-html.dark button.header-icon-btn { border-color: #3a3a3c; color: #f5f5f7; }
-html.dark button.header-icon-btn:hover { background: #2c2c2e; }
+.header-icon-btn:hover { background: #e8e8ed; }
+.header-icon-btn:active svg { transform: rotate(90deg); transition: transform 0.2s; }
+html.dark .header-icon-btn { border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .header-icon-btn:hover { background: #2c2c2e; }
+/* Anchor-shaped header icons (e.g. the bus button) need link styles
+   reset so they don't inherit the generic underline / blue color. */
+a.header-icon-btn { text-decoration: none; }
+a.header-icon-btn.active { background: #e8e8ed; }
+html.dark a.header-icon-btn.active { background: #2c2c2e; }
 
 /* Header refresh toast — anchored to the right of the header so it sits
    adjacent to the icon button. Auto-clears in JS after ~3.5s. */

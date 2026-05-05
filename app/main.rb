@@ -370,6 +370,28 @@ class TechFeedReader < Sinatra::Base
   # so the user can spot the freshest show at a glance. Below, the
   # most recent N episodes across all shows render as cards — each
   # card links to /article/:uid where the player lives.
+  # Bus mode — "what's short enough for my commute?" Lists recent
+  # podcast episodes whose runtime is at-or-under the cutoff. Default
+  # 15 minutes; override via ?max_minutes= for a longer commute.
+  BUS_DEFAULT_MAX_MINUTES = 15
+  BUS_MAX_MINUTES_LIMIT   = 90  # absolute ceiling so a malicious URL can't pull the full corpus
+  BUS_LIMIT               = 25
+
+  get '/bus' do
+    @page_title       = 'Bus mode'
+    requested_minutes = params['max_minutes'].to_s
+    @max_minutes      = requested_minutes.match?(/\A\d+\z/) ? requested_minutes.to_i.clamp(1, BUS_MAX_MINUTES_LIMIT) : BUS_DEFAULT_MAX_MINUTES
+    @cutoff_seconds   = @max_minutes * 60
+
+    @episodes    = ArticlesStore.recent(
+      limit:                BUS_LIMIT,
+      kind:                 :podcast,
+      max_duration_seconds: @cutoff_seconds
+    )
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :bus
+  end
+
   get '/podcasts' do
     @page_title       = 'Podcasts'
     @shows            = ArticlesStore.podcast_feeds
@@ -391,6 +413,19 @@ class TechFeedReader < Sinatra::Base
     halt 404, 'Digest not found' unless @digest
     @page_title = @digest['subject']
     erb :digest
+  end
+
+  # Manual digest trigger — same code path as `make digest` (the cron
+  # script), but kicked off from the /digests page button. Composition
+  # is fast (one SQL pull + render, ~50ms typical) so we run inline
+  # rather than enqueueing to Sidekiq. ?window_hours and ?limit
+  # override the defaults if the user wants a longer or wider digest.
+  post '/digests' do
+    window = (params['window_hours'].to_s.match?(/\A\d+\z/) ? params['window_hours'].to_i : Digests::DEFAULT_WINDOW_HOURS).clamp(1, 720)
+    limit  = (params['limit'].to_s.match?(/\A\d+\z/)        ? params['limit'].to_i        : Digests::DEFAULT_LIMIT).clamp(1, 200)
+    id, result = Digests.generate_and_store!(window_hours: window, limit: limit)
+    AppLogger.info('digest_manual_trigger', id: id, count: result.count, window_hours: window)
+    redirect to("/digests/#{id}?notice=generated&count=#{result.count}")
   end
 
   get '/article/:uid' do |uid|

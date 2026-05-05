@@ -73,8 +73,12 @@ module ArticlesStore
   # filter (:unread | :bookmarked | :archived | :all) lets callers ask
   # for only the rows they want without re-issuing the query. `kind:`
   # narrows to :podcast (audio_url IS NOT NULL) when wanted.
-  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all)
-    db.execute(state_query(filter: state, kind: kind), [limit, offset])
+  # max_duration_seconds, when set, bounds the query to articles whose
+  # audio_duration_seconds is non-NULL and ≤ the given threshold —
+  # used by /bus ("what's short enough for my commute?").
+  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil)
+    sql = state_query(filter: state, kind: kind, max_duration_seconds: max_duration_seconds)
+    db.execute(sql, [limit, offset])
   end
 
   def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
@@ -253,7 +257,7 @@ module ArticlesStore
     # with optional WHERE-scope (e.g. "a.feed_id = ?"), an optional extra
     # FROM-clause join (used by for_tag), a read-state filter, and an
     # article-kind filter (:podcast → audio_url IS NOT NULL).
-    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all)
+    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all, max_duration_seconds: nil)
       where_clauses = []
       where_clauses << scope if scope
       case filter
@@ -267,6 +271,14 @@ module ArticlesStore
       when :podcast then where_clauses << 'a.audio_url IS NOT NULL'
       when :all     then # no extra clause
       else raise ArgumentError, "Unknown kind filter: #{kind.inspect}"
+      end
+      if max_duration_seconds
+        # Inlined as a number, not a placeholder, so the existing
+        # callers' [limit, offset] / [feed_id, limit, offset] arg
+        # arrays don't have to grow. Coerced to integer to keep the
+        # SQL safe even if a string sneaks in.
+        cutoff = Integer(max_duration_seconds)
+        where_clauses << "a.audio_duration_seconds IS NOT NULL AND a.audio_duration_seconds <= #{cutoff}"
       end
 
       where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"

@@ -77,4 +77,68 @@ RSpec.describe 'Digest routes' do
       expect(last_response.status).to eq(404)
     end
   end
+
+  describe 'POST /digests (manual trigger)' do
+    def add_unread_article(uid:, hours_ago:)
+      feed = FeedsStore.find_by_url('https://x.com/manualfeed') ||
+             FeedsStore.add(url: 'https://x.com/manualfeed', title: 'Feed')
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: uid, title: "Article #{uid}",
+        url: "https://x.com/#{uid}", author: nil,
+        published_at: (Time.now.utc - hours_ago * 3600).iso8601,
+        content_html: '<p>x</p>', content_text: 'x',
+        audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
+      }])
+    end
+
+    it 'composes + stores a digest and redirects to its detail page with the count' do
+      add_unread_article(uid: 'manualart001', hours_ago: 2)
+      add_unread_article(uid: 'manualart002', hours_ago: 4)
+
+      expect { post '/digests' }.to change { DigestStore.count }.by(1)
+      expect(last_response.status).to eq(302)
+      expect(last_response.headers['Location']).to match(%r{/digests/\d+\?notice=generated&count=2})
+    end
+
+    it 'honours ?window_hours and ?limit overrides' do
+      add_unread_article(uid: 'recentitem01', hours_ago: 5)
+      add_unread_article(uid: 'oldfromweek1', hours_ago: 24 * 5)  # outside default 24h window
+
+      post '/digests', { window_hours: '168', limit: '10' }
+      expect(last_response.status).to eq(302)
+      detail_id = last_response.headers['Location'][%r{/digests/(\d+)}, 1].to_i
+      row = DigestStore.find(detail_id)
+      expect(row['window_hours']).to eq(168)
+      expect(row['article_count']).to eq(2)  # both fall inside the 7-day window
+    end
+
+    it 'falls back to the defaults when the params are non-numeric' do
+      post '/digests', { window_hours: 'spaceship', limit: 'twenty' }
+      detail_id = last_response.headers['Location'][%r{/digests/(\d+)}, 1].to_i
+      row = DigestStore.find(detail_id)
+      expect(row['window_hours']).to eq(Digests::DEFAULT_WINDOW_HOURS)
+    end
+
+    it 'clamps wildly large window_hours to a sane ceiling' do
+      post '/digests', { window_hours: '99999' }
+      detail_id = last_response.headers['Location'][%r{/digests/(\d+)}, 1].to_i
+      expect(DigestStore.find(detail_id)['window_hours']).to be <= 720  # one month
+    end
+
+    it 'renders the Generate-now button on /digests' do
+      get '/digests'
+      expect(last_response.body).to include('action="/digests"')
+      expect(last_response.body).to include('Generate now')
+    end
+
+    it 'includes a /digests link in /admin Sub-pages' do
+      allow_any_instance_of(TechFeedReader).to receive(:sidekiq_stats).and_return(
+        ok: true, enqueued: 0, scheduled: 0, retries: 0, dead: 0,
+        processed: 0, failed: 0, workers: 0
+      )
+      get '/admin'
+      expect(last_response.body).to include('href="/digests"')
+      expect(last_response.body).to include('Generate now')
+    end
+  end
 end
