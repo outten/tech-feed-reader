@@ -288,6 +288,7 @@ module ArticlesStore
                COALESCE(rs.read, 0)       AS read,
                COALESCE(rs.bookmarked, 0) AS bookmarked,
                COALESCE(rs.archived, 0)   AS archived,
+               COALESCE(rs.feedback, 0)   AS feedback,
                rs.opened_at               AS opened_at
         FROM articles a
         LEFT JOIN read_state rs ON a.id = rs.article_id

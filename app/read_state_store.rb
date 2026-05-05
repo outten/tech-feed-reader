@@ -21,6 +21,7 @@ module ReadStateStore
       'read'       => 0,
       'bookmarked' => 0,
       'archived'   => 0,
+      'feedback'   => 0,
       'opened_at'  => nil
     }
   end
@@ -44,6 +45,19 @@ module ReadStateStore
     upsert(article_id, archived: value)
   end
 
+  # Set per-article feedback (Phase 3 valence signal). Accepted values:
+  #   +1 → thumbs up      (boost in the Phase 6 ranker)
+  #   -1 → thumbs down    (demote)
+  #    0 → cleared / unset (default state)
+  # Toggle semantics: the route layer flips +1↔0 / -1↔0; this method
+  # just persists whatever it's given. Out-of-range values raise so a
+  # mistyped param doesn't silently corrupt data.
+  FEEDBACK_VALUES = [-1, 0, 1].freeze
+  def mark_feedback(article_id, value:)
+    raise ArgumentError, "feedback must be -1, 0, or +1 (got #{value.inspect})" unless FEEDBACK_VALUES.include?(value)
+    upsert(article_id, feedback: value)
+  end
+
   def unread_count
     db.execute(<<~SQL).first['c']
       SELECT COUNT(*) AS c
@@ -63,22 +77,23 @@ module ReadStateStore
     # Single mutator under the hood. Reads the current row (or default),
     # overlays the requested fields, and writes back via INSERT OR
     # REPLACE so we don't need separate insert/update branches.
-    def upsert(article_id, read: nil, bookmarked: nil, archived: nil, opened_at: nil)
+    def upsert(article_id, read: nil, bookmarked: nil, archived: nil, feedback: nil, opened_at: nil)
       current = get(article_id)
       next_row = {
         read:       (read.nil?       ? current['read']       : (read       ? 1 : 0)),
         bookmarked: (bookmarked.nil? ? current['bookmarked'] : (bookmarked ? 1 : 0)),
         archived:   (archived.nil?   ? current['archived']   : (archived   ? 1 : 0)),
+        feedback:   (feedback.nil?   ? current['feedback']   : feedback.to_i),
         opened_at:  (opened_at.nil?  ? current['opened_at']  : opened_at)
       }
 
       sql = <<~SQL
-        INSERT OR REPLACE INTO read_state(article_id, read, bookmarked, archived, opened_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO read_state(article_id, read, bookmarked, archived, feedback, opened_at)
+        VALUES (?, ?, ?, ?, ?, ?)
       SQL
       db.execute(sql, [
         article_id, next_row[:read], next_row[:bookmarked],
-        next_row[:archived], next_row[:opened_at]
+        next_row[:archived], next_row[:feedback], next_row[:opened_at]
       ])
       get(article_id)
     end

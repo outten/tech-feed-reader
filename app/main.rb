@@ -25,6 +25,7 @@ require_relative 'chat'
 require_relative 'digests'
 require_relative 'digest_store'
 require_relative 'background_pool'
+require_relative 'feed_feedback_store'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
@@ -210,7 +211,8 @@ class TechFeedReader < Sinatra::Base
     # (server-side) and the /api/feeds endpoints (returned as `row_html`)
     # so JS-inserted rows match server-rendered ones.
     def render_feed_row(feed)
-      erb :_feed_row, locals: { feed: feed }, layout: false
+      weight = FeedFeedbackStore.weight_for(feed['id'])
+      erb :_feed_row, locals: { feed: feed, weight: weight }, layout: false
     end
 
     # Format a duration in seconds as "12:34" or "1:23:45". Returns
@@ -558,6 +560,36 @@ class TechFeedReader < Sinatra::Base
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
+  # Phase 3 — per-article 👍/👎 valence. Body param `value` ∈ {1, -1, 0}.
+  # Toggle behaviour lives at the UI layer (the button form posts the
+  # next state — clicking 👍 when already +1 posts 0 to clear).
+  post '/article/:uid/feedback' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    value = case params['value'].to_s
+            when '1', '+1' then 1
+            when '-1'      then -1
+            when '0', ''   then 0
+            else                halt 400, 'feedback value must be -1, 0, or +1'
+            end
+    ReadStateStore.mark_feedback(article['id'], value: value)
+    AppLogger.info('article_feedback', uid: uid, value: value)
+    redirect to(params['return_to'] || "/article/#{uid}")
+  end
+
+  # Phase 3 — per-feed weighting. Body param `direction` ∈ up | down | reset.
+  # Each click bumps by FeedFeedbackStore::STEP (0.25), clamped to
+  # [FLOOR, CEILING]. :reset deletes the row.
+  post '/feeds/:id/feedback' do |id|
+    feed = FeedsStore.find(id.to_i)
+    halt 404 unless feed
+    direction = params['direction'].to_s.to_sym
+    halt 400, 'direction must be up, down, or reset' unless FeedFeedbackStore::DIRECTIONS.include?(direction)
+    weight = FeedFeedbackStore.bump(feed['id'], direction: direction)
+    AppLogger.info('feed_feedback', feed_id: feed['id'], direction: direction, weight: weight)
+    redirect to(params['return_to'] || '/feeds')
+  end
+
   # Apply one read-state action to many articles in a single request,
   # so the /articles bulk-toolbar can mark / archive / bookmark a
   # selection in one round-trip instead of N. JSON in, JSON out;
@@ -650,6 +682,9 @@ class TechFeedReader < Sinatra::Base
     @catalog     = FeedCatalog.by_category
     @subscribed  = @feeds.map { |f| f['url'] }.to_set
     @categories  = FeedCatalog::CATEGORIES
+    # Phase 3 — per-feed weights for the show-more / show-less controls
+    # in the feed-row actions column. Default 1.0 for unweighted feeds.
+    @feed_weights = FeedFeedbackStore.weights_by_feed_id(@feeds.map { |f| f['id'] })
     erb :feeds
   end
 
