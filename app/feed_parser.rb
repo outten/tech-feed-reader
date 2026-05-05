@@ -9,7 +9,9 @@ require_relative 'sanitizer'
 #
 # Output shape:
 #   {
-#     title:   String|nil,                     # feed-level title
+#     title:     String|nil,                   # feed-level title
+#     image_url: String|nil,                   # channel-level cover art
+#                                              #   (itunes:image / RSS <image>)
 #     entries: [
 #       {
 #         uid:                    String,      # SHA1(feed_url + entry.url)[0,12]
@@ -19,6 +21,8 @@ require_relative 'sanitizer'
 #         published_at:           String|nil (ISO8601),
 #         content_html:           String (sanitized),
 #         content_text:           String (plain),
+#         image_url:              String|nil,  # per-entry thumbnail
+#                                              #   (itunes:image / media:thumbnail / first <img>)
 #         audio_url:              String|nil,  # <enclosure ... type="audio/*">
 #         audio_mime_type:        String|nil,
 #         audio_duration_seconds: Integer|nil  # parsed from itunes:duration
@@ -34,8 +38,9 @@ module FeedParser
     body.scrub!('?')
     feed = Feedjira.parse(body)
     {
-      title:   feed.title,
-      entries: feed.entries.map { |e| normalise(e, feed_url: feed_url) }
+      title:     feed.title,
+      image_url: extract_channel_image(feed),
+      entries:   feed.entries.map { |e| normalise(e, feed_url: feed_url) }
     }
   end
 
@@ -61,10 +66,51 @@ module FeedParser
         published_at:           entry.published&.utc&.iso8601,
         content_html:           Sanitizer.sanitize_html(raw),
         content_text:           Sanitizer.text_only(raw),
+        image_url:              extract_entry_image(entry, raw),
         audio_url:              audio_url,
         audio_mime_type:        audio_type,
         audio_duration_seconds: extract_duration(entry)
       }
+    end
+
+    # Channel-level cover art. iTunes RSS exposes both an <image> block
+    # (parsed by feedjira into RSSImage with .url) and an <itunes:image>
+    # href; either is fine. Plain RSS / Atom may have only <image> or
+    # nothing — we return nil and the view degrades gracefully.
+    def extract_channel_image(feed)
+      itunes = feed.respond_to?(:itunes_image) ? feed.itunes_image.to_s.strip : ''
+      return itunes unless itunes.empty?
+      img = feed.respond_to?(:image) ? feed.image : nil
+      return nil if img.nil?
+      url = img.respond_to?(:url) ? img.url.to_s.strip : img.to_s.strip
+      url.empty? ? nil : url
+    end
+
+    # Per-entry thumbnail / hero image. Falls through three sources in
+    # priority order:
+    #   1. <itunes:image>     — set on iTunes-podcast episodes
+    #   2. entry.image        — feedjira's normalised accessor for
+    #                           <media:thumbnail>, <media:content image/*>,
+    #                           or Atom <link rel="enclosure" image/*>
+    #   3. first <img> in the body HTML — last resort for blogs that
+    #                           don't declare a thumbnail in the feed
+    #                           but do embed images inline
+    def extract_entry_image(entry, content_html)
+      itunes = entry.respond_to?(:itunes_image) ? entry.itunes_image.to_s.strip : ''
+      return itunes unless itunes.empty?
+      direct = entry.respond_to?(:image) ? entry.image.to_s.strip : ''
+      return direct unless direct.empty?
+      first_img_src(content_html)
+    end
+
+    # Extract the src of the first <img> in an HTML fragment. Only
+    # accepts http(s) absolute URLs — relative paths would 404 since
+    # we render them outside the publisher's domain. Returns nil if no
+    # qualifying image is present.
+    def first_img_src(html)
+      return nil if html.nil? || html.empty?
+      match = html.to_s.match(/<img\b[^>]*\bsrc=(["'])(https?:[^"']+)\1/i)
+      match && match[2]
     end
 
     # Pick the first audio enclosure off the entry. feedjira exposes

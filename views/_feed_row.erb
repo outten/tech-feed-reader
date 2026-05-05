@@ -9,16 +9,16 @@
       <em class="muted">(unset)</em>
     <% end %>
   </td>
-  <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"><%= h(feed['url']) %></a></td>
-  <td class="num"><%= feed['fetch_interval_seconds'] %>s</td>
-  <td class="muted"><%= relative_time(feed['last_fetched_at']) %></td>
-  <td class="muted"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
+  <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank" title="Open the raw feed XML in a new tab"><%= h(feed['url']) %></a></td>
+  <td class="num" title="Poll interval — how often the scheduler refreshes this feed"><%= feed['fetch_interval_seconds'] %>s</td>
+  <td class="muted" title="Last fetch time"><%= relative_time(feed['last_fetched_at']) %></td>
+  <td class="muted" title="HTTP status of the most recent fetch"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
   <td>
     <form method="post" action="/admin/refresh/<%= feed['id'] %>" class="js-refresh-feed" style="display:inline">
-      <button type="submit" class="refresh-btn">Refresh</button>
+      <button type="submit" class="refresh-btn" title="Fetch this feed now (background job)">Refresh</button>
     </form>
     <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed" style="display:inline">
-      <button type="submit" class="danger">Remove</button>
+      <button type="submit" class="danger" title="Unsubscribe from this feed and delete its imported articles">Remove</button>
     </form>
   </td>
 </tr>

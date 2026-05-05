@@ -27,10 +27,10 @@
     <tbody>
       <% @digests.each do |d| %>
         <tr>
-          <td class="muted"><%= relative_time(d['generated_at']) %></td>
-          <td class="muted"><%= d['window_hours'] %>h</td>
-          <td class="num"><%= d['article_count'] %></td>
-          <td><a href="/digests/<%= d['id'] %>"><%= h(d['subject']) %></a></td>
+          <td class="muted" title="Generated <%= h(d['generated_at']) %>"><%= relative_time(d['generated_at']) %></td>
+          <td class="muted" title="Window of unread articles included in the digest"><%= d['window_hours'] %>h</td>
+          <td class="num" title="Articles included in this digest"><%= d['article_count'] %></td>
+          <td><a href="/digests/<%= d['id'] %>" title="Open the full digest"><%= h(d['subject']) %></a></td>
         </tr>
       <% end %>
     </tbody>

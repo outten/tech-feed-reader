@@ -62,7 +62,12 @@
     <%= yield %>
   </main>
   <footer>
-    <small>Tech Feed Reader &mdash; Public RSS aggregation for personal use.</small>
+    <small>
+      Tech Feed Reader &mdash; Public RSS aggregation for personal use.
+      &middot;
+      <a href="#" data-bg-shuffle title="Pick a new random nature background">shuffle background</a>
+      <span data-bg-attribution class="bg-attribution"></span>
+    </small>
   </footer>
 
   <%# Persistent mini-player — pinned bottom of the viewport, holds
@@ -162,7 +167,14 @@
       title:   <%= ((@chat_context && @chat_context[:title])   || @page_title || 'Tech Feed Reader').to_json.gsub('</', '<\/') %>,
       excerpt: <%= ((@chat_context && @chat_context[:excerpt]) || '').to_json.gsub('</', '<\/') %>
     };
+    <%# Picsum IDs for the page-background rotation. /admin/backgrounds
+        rewrites the underlying table; if it's empty we fall back to
+        BackgroundPool::DEFAULT_IDS, which mirrors the bundled curated
+        set. ERB escapes nothing here since the values are integers,
+        but JSON-encoding is still the safe channel. %>
+    window.PAGE_BACKGROUND_IDS = <%= BackgroundPool.ids.to_json %>;
   </script>
+  <script src="/page-background.js?v=<%= asset_mtime('public/page-background.js') %>"></script>
   <script src="/global-player.js?v=<%= asset_mtime('public/global-player.js') %>"></script>
   <script src="/header-refresh.js?v=<%= asset_mtime('public/header-refresh.js') %>"></script>
   <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>

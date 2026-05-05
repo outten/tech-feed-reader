@@ -85,7 +85,8 @@ module FeedFetcher
         status:        code.to_s,
         last_etag:     response['ETag'],
         last_modified: response['Last-Modified'],
-        backfill_title: feed['title'].nil? || feed['title'].to_s.empty? ? parsed[:title] : nil
+        backfill_title: feed['title'].nil? || feed['title'].to_s.empty? ? parsed[:title] : nil,
+        backfill_image: feed['image_url'].nil? || feed['image_url'].to_s.empty? ? parsed[:image_url] : nil
       )
       Result.new(
         status:  :ok,
@@ -105,13 +106,14 @@ module FeedFetcher
   class << self
     private
 
-    def record_status(feed, status:, last_etag: nil, last_modified: nil, backfill_title: nil)
+    def record_status(feed, status:, last_etag: nil, last_modified: nil, backfill_title: nil, backfill_image: nil)
       fields = {
         last_fetched_at: Time.now.utc.iso8601,
         last_status:     status
       }
       fields[:last_etag]     = last_etag     if last_etag
       fields[:last_modified] = last_modified if last_modified
+      fields[:image_url]     = backfill_image if backfill_image
       fields[:title]         = backfill_title if backfill_title
 
       FeedsStore.update(feed['id'], **fields)

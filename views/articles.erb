@@ -40,11 +40,11 @@
       ticked. Wired by public/bulk-actions.js. %>
   <div id="bulk-toolbar" class="bulk-toolbar" hidden role="toolbar" aria-label="Bulk actions">
     <span class="bulk-toolbar-count"><span data-bulk-count>0</span> selected</span>
-    <button type="button" class="bulk-toolbar-btn" data-bulk-action="read">Mark read</button>
-    <button type="button" class="bulk-toolbar-btn" data-bulk-action="unread">Mark unread</button>
-    <button type="button" class="bulk-toolbar-btn" data-bulk-action="bookmark">Bookmark</button>
-    <button type="button" class="bulk-toolbar-btn" data-bulk-action="archive">Archive</button>
-    <button type="button" class="bulk-toolbar-btn bulk-toolbar-clear">Clear</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="read"     title="Mark every selected article as read">Mark read</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="unread"   title="Mark every selected article as unread">Mark unread</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="bookmark" title="Save every selected article (★)">Bookmark</button>
+    <button type="button" class="bulk-toolbar-btn" data-bulk-action="archive"  title="Archive every selected article (hides from default views)">Archive</button>
+    <button type="button" class="bulk-toolbar-btn bulk-toolbar-clear"          title="Deselect all">Clear</button>
   </div>
 
   <ul class="news-list">
@@ -53,29 +53,37 @@
         is_podcast = article['audio_url'] && !article['audio_url'].to_s.empty?
         kind_icon  = is_podcast ? '🎧' : '📄'
         kind_label = is_podcast ? 'Podcast episode' : 'Article'
+        feed_row   = (@feeds_by_id || {})[article['feed_id']]
+        # Per-article image first; for podcasts fall back to the show's
+        # cover art so episodes without their own thumbnail still show
+        # the show artwork.
+        thumb_url  = article['image_url'].to_s.empty? ? (is_podcast && feed_row && feed_row['image_url']) : article['image_url']
       %>
-      <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= is_podcast ? 'news-item-podcast' : 'news-item-article' %>">
-        <input type="checkbox" class="news-item-check" data-uid="<%= h(article['uid']) %>" aria-label="Select article">
+      <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= is_podcast ? 'news-item-podcast' : 'news-item-article' %> <%= 'has-thumb' if thumb_url && !thumb_url.to_s.empty? %>">
+        <input type="checkbox" class="news-item-check" data-uid="<%= h(article['uid']) %>" aria-label="Select article" title="Select for bulk action">
         <%# Whole left+title block is one click target, opens in a new
             tab so Cmd-W returns the user to the list. %>
-        <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener">
+        <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener" title="Open in new tab">
           <span class="news-kind-icon" title="<%= kind_label %>" aria-label="<%= kind_label %>"><%= kind_icon %></span>
           <span class="news-headline"><%= h(article['title']) %></span>
         </a>
+        <% if thumb_url && !thumb_url.to_s.empty? %>
+          <img class="news-item-thumb" src="<%= h(thumb_url) %>" alt="" loading="lazy">
+        <% end %>
         <% if article['bookmarked'] == 1 || article['archived'] == 1 || (@tags_by_article[article['id']] || []).any? %>
           <div class="news-row-badges">
-            <% if article['bookmarked'] == 1 %><span class="badge bookmarked">★</span><% end %>
-            <% if article['archived']   == 1 %><span class="badge archived">archived</span><% end %>
+            <% if article['bookmarked'] == 1 %><span class="badge bookmarked" title="Bookmarked">★</span><% end %>
+            <% if article['archived']   == 1 %><span class="badge archived"   title="Archived">archived</span><% end %>
             <% (@tags_by_article[article['id']] || []).each do |tag| %>
-              <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+              <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>" title="Filter to articles tagged &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
             <% end %>
           </div>
         <% end %>
         <div class="news-meta">
           <% if (feed = feed_for(article)) %>
-            <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+            <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>" title="Show only articles from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
           <% end %>
-          <span><%= relative_time(article['published_at']) %></span>
+          <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
           <% if article['author'] && !article['author'].to_s.empty? %>
             <span><%= h(article['author']) %></span>
           <% end %>

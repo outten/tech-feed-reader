@@ -24,6 +24,7 @@ require_relative 'summarizer/claude'
 require_relative 'chat'
 require_relative 'digests'
 require_relative 'digest_store'
+require_relative 'background_pool'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
@@ -978,6 +979,28 @@ class TechFeedReader < Sinatra::Base
       .execute('SELECT feed_id, COUNT(*) AS c FROM articles GROUP BY feed_id')
       .each_with_object({}) { |row, h| h[row['feed_id']] = row['c'] }
     erb :admin_cache
+  end
+
+  # Page-background pool admin: shows the Picsum IDs that
+  # public/page-background.js currently rotates through, with author
+  # attribution + a link to refresh the pool against Picsum's
+  # /v2/list endpoint. Empty pool falls back to a curated default
+  # baked into BackgroundPool::DEFAULT_IDS.
+  get '/admin/backgrounds' do
+    @page_title       = 'Background pool'
+    @entries          = BackgroundPool.entries
+    @default_ids      = BackgroundPool::DEFAULT_IDS
+    @using_default    = @entries.empty?
+    @target_pool_size = BackgroundPool::POOL_TARGET_SIZE
+    erb :admin_backgrounds
+  end
+
+  post '/admin/backgrounds/refresh' do
+    inserted = BackgroundPool.refresh!
+    redirect to("/admin/backgrounds?notice=refreshed&count=#{inserted}")
+  rescue BackgroundPool::RefreshError => e
+    AppLogger.warn('background_pool_refresh_failed', error: e.message)
+    redirect to("/admin/backgrounds?error=refresh-failed&msg=#{CGI.escape(e.message)}")
   end
 
   # Refresh every feed in FeedsStore. Iterates synchronously; for the

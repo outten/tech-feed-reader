@@ -2,7 +2,7 @@
   <div>
     <h2><%= h(@digest['subject']) %></h2>
     <p class="subtitle">
-      <a href="/digests">&larr; All digests</a>
+      <a href="/digests" title="Back to all stored digests">&larr; All digests</a>
       &middot; generated <%= relative_time(@digest['generated_at']) %>
       (<code><%= h(@digest['generated_at']) %></code>)
     </p>

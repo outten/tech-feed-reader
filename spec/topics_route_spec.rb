@@ -56,8 +56,10 @@ RSpec.describe 'GET /topics' do
     get '/topics?days=bogus'
     expect(last_response.body).to include('rust')
     expect(last_response.body).to include('class="active"')
-    # The 14-day pill is the default-active one.
-    expect(last_response.body).to match(/<a href="\?days=14"\s+class="active">last 14 days/)
+    # The 14-day pill is the default-active one. The anchor carries
+    # href + class + (now) a title= tooltip — assert each separately
+    # so the regex doesn't break on attribute reordering / new attrs.
+    expect(last_response.body).to match(/<a href="\?days=14"[^>]*class="active"[^>]*>last 14 days/)
   end
 
   it 'exposes Topics in the main nav' do

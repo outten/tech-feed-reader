@@ -7,7 +7,7 @@
       <% else %>
         <%= @shows.length %> show<%= 's' unless @shows.length == 1 %> &middot;
         latest episode <%= relative_time(@shows.first['latest_at']) %> &middot;
-        <a href="/articles?kind=podcast">Linear list &rarr;</a>
+        <a href="/articles?kind=podcast" title="Show every episode in a single chronological list">Linear list &rarr;</a>
       <% end %>
     </p>
   </div>
@@ -26,7 +26,11 @@
     <h3>Subscribed shows</h3>
     <div class="podcast-shows">
       <% @shows.each do |show| %>
-        <a class="podcast-show-card" href="/articles?feed_id=<%= show['id'] %>&kind=podcast">
+        <a class="podcast-show-card" href="/articles?feed_id=<%= show['id'] %>&kind=podcast"
+           title="See all episodes from <%= h(show['title'] || show['url']) %>">
+          <% if show['image_url'] && !show['image_url'].to_s.empty? %>
+            <img class="podcast-show-cover" src="<%= h(show['image_url']) %>" alt="" loading="lazy">
+          <% end %>
           <span class="podcast-show-title"><%= h(show['title'] || show['url']) %></span>
           <span class="podcast-show-meta">
             <%= show['episode_count'] %> episode<%= 's' unless show['episode_count'] == 1 %>
@@ -44,22 +48,33 @@
     <% else %>
       <ul class="podcast-episodes">
         <% @recent_episodes.each do |ep| %>
-          <li class="podcast-card <%= ep['read'] == 1 ? 'read' : '' %>">
-            <div class="podcast-card-meta">
-              <% if (feed = (@feeds_by_id || {})[ep['feed_id']]) %>
-                <a class="podcast-card-show" href="/articles?feed_id=<%= feed['id'] %>&kind=podcast"><%= h(feed['title'] || feed['url']) %></a>
-              <% end %>
-              <span class="podcast-card-date"><%= relative_time(ep['published_at']) %></span>
-              <% if (dur = fmt_duration(ep['audio_duration_seconds'])) %>
-                <span class="podcast-card-duration"><%= dur %></span>
-              <% end %>
-            </div>
-            <a class="podcast-card-title" href="/article/<%= ep['uid'] %>"><%= h(ep['title']) %></a>
-            <% if ep['content_text'] && !ep['content_text'].to_s.empty? %>
-              <p class="podcast-card-excerpt"><%= h(ep['content_text'].to_s.gsub(/\s+/, ' ').strip[0, 240]) %><%= '…' if ep['content_text'].to_s.length > 240 %></p>
+          <%
+            feed_row = (@feeds_by_id || {})[ep['feed_id']]
+            ep_image = ep['image_url'].to_s.empty? ? (feed_row && feed_row['image_url']) : ep['image_url']
+          %>
+          <li class="podcast-card <%= ep['read'] == 1 ? 'read' : '' %> <%= 'has-image' if ep_image && !ep_image.to_s.empty? %>">
+            <% if ep_image && !ep_image.to_s.empty? %>
+              <a class="podcast-card-image" href="/article/<%= ep['uid'] %>" title="Open episode page">
+                <img src="<%= h(ep_image) %>" alt="" loading="lazy">
+              </a>
             <% end %>
-            <div class="podcast-card-actions">
-              <a class="btn-primary" href="/article/<%= ep['uid'] %>">▶ Listen</a>
+            <div class="podcast-card-body">
+              <div class="podcast-card-meta">
+                <% if feed_row %>
+                  <a class="podcast-card-show" href="/articles?feed_id=<%= feed_row['id'] %>&kind=podcast" title="See all episodes from <%= h(feed_row['title'] || feed_row['url']) %>"><%= h(feed_row['title'] || feed_row['url']) %></a>
+                <% end %>
+                <span class="podcast-card-date" title="Published <%= h(ep['published_at']) %>"><%= relative_time(ep['published_at']) %></span>
+                <% if (dur = fmt_duration(ep['audio_duration_seconds'])) %>
+                  <span class="podcast-card-duration" title="Episode runtime"><%= dur %></span>
+                <% end %>
+              </div>
+              <a class="podcast-card-title" href="/article/<%= ep['uid'] %>" title="Open episode page"><%= h(ep['title']) %></a>
+              <% if ep['content_text'] && !ep['content_text'].to_s.empty? %>
+                <p class="podcast-card-excerpt"><%= h(ep['content_text'].to_s.gsub(/\s+/, ' ').strip[0, 240]) %><%= '…' if ep['content_text'].to_s.length > 240 %></p>
+              <% end %>
+              <div class="podcast-card-actions">
+                <a class="btn-primary" href="/article/<%= ep['uid'] %>" title="Open episode (use the persistent mini-player to listen)">▶ Listen</a>
+              </div>
             </div>
           </li>
         <% end %>

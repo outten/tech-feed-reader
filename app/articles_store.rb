@@ -88,7 +88,7 @@ module ArticlesStore
   # show first" ordering.
   def podcast_feeds
     db.execute(<<~SQL)
-      SELECT f.id, f.title, f.url,
+      SELECT f.id, f.title, f.url, f.image_url,
              COUNT(a.id)         AS episode_count,
              MAX(a.published_at) AS latest_at
       FROM feeds f
@@ -170,8 +170,8 @@ module ArticlesStore
     sql = <<~SQL
       INSERT OR IGNORE INTO articles
         (uid, feed_id, title, url, author, published_at, content_html, content_text,
-         audio_url, audio_mime_type, audio_duration_seconds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         audio_url, audio_mime_type, audio_duration_seconds, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     SQL
 
     rules    = TagsStore.all  # snapshot once per import batch
@@ -189,7 +189,8 @@ module ArticlesStore
           entry[:title].to_s, entry[:url].to_s,
           entry[:author], entry[:published_at],
           entry[:content_html].to_s, entry[:content_text].to_s,
-          entry[:audio_url], entry[:audio_mime_type], entry[:audio_duration_seconds]
+          entry[:audio_url], entry[:audio_mime_type], entry[:audio_duration_seconds],
+          entry[:image_url]
         ])
         next if db.changes.zero?  # uid was a duplicate, skip tag + summary
 
