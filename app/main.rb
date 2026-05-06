@@ -26,6 +26,7 @@ require_relative 'digests'
 require_relative 'digest_store'
 require_relative 'background_pool'
 require_relative 'feed_feedback_store'
+require_relative 'mute_rules_store'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'topic_clusters'
@@ -643,6 +644,33 @@ class TechFeedReader < Sinatra::Base
     redirect to(params['return_to'] || '/feeds')
   end
 
+  # Phase 5 — mute filters. Hard-hide rules; matching articles
+  # disappear from /articles and any state_query-backed list, but stay
+  # in the DB and remain reachable via /search.
+  #
+  # POST /mutes        body: kind ∈ {keyword,author,feed}, value (non-empty)
+  # POST /mutes/delete body: kind, value
+  post '/mutes' do
+    kind  = params['kind'].to_s
+    value = params['value'].to_s
+    halt 400, "kind must be one of #{MuteRulesStore::KINDS.join(', ')}" unless MuteRulesStore::KINDS.include?(kind)
+    halt 400, 'value must be non-empty' if value.strip.empty?
+
+    added = MuteRulesStore.add(kind: kind, value: value)
+    AppLogger.info('mute_rule_add', kind: kind, value: value, added: added)
+    redirect to(params['return_to'] || "/feeds?notice=#{added ? 'mute-added' : 'mute-duplicate'}&kind=#{kind}&value=#{CGI.escape(value)}")
+  end
+
+  post '/mutes/delete' do
+    kind  = params['kind'].to_s
+    value = params['value'].to_s
+    halt 400 unless MuteRulesStore::KINDS.include?(kind)
+
+    removed = MuteRulesStore.remove(kind: kind, value: value)
+    AppLogger.info('mute_rule_remove', kind: kind, value: value, removed: removed)
+    redirect to(params['return_to'] || "/feeds?notice=#{removed.positive? ? 'mute-removed' : 'mute-not-found'}")
+  end
+
   # Apply one read-state action to many articles in a single request,
   # so the /articles bulk-toolbar can mark / archive / bookmark a
   # selection in one round-trip instead of N. JSON in, JSON out;
@@ -738,6 +766,9 @@ class TechFeedReader < Sinatra::Base
     # Phase 3 — per-feed weights for the show-more / show-less controls
     # in the feed-row actions column. Default 1.0 for unweighted feeds.
     @feed_weights = FeedFeedbackStore.weights_by_feed_id(@feeds.map { |f| f['id'] })
+    # Phase 5 — surface the mute rules in the "Muted" subsection.
+    # Hash keyed by kind so the view can render three small lists.
+    @mute_rules = MuteRulesStore.all.group_by { |r| r['kind'] }
     erb :feeds
   end
 

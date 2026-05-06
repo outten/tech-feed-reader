@@ -281,6 +281,25 @@ module ArticlesStore
         where_clauses << "a.audio_duration_seconds IS NOT NULL AND a.audio_duration_seconds <= #{cutoff}"
       end
 
+      # Phase 5 — hide articles that match any mute_rules row. Single
+      # NOT EXISTS sub-query that dispatches on `mr.kind`, so it's a
+      # no-op (sub-query returns no rows ⇒ NOT EXISTS is true) when
+      # mute_rules is empty. The PK index on mute_rules + the kind
+      # index keep this cheap even with hundreds of rules. Keyword
+      # match uses LIKE with leading + trailing wildcards (substring,
+      # case-insensitive on ASCII per SQLite's default LIKE). Caveat:
+      # a literal `%` or `_` in a keyword rule is treated as a LIKE
+      # wildcard — fine for v1, document if it bites a user.
+      where_clauses << <<~SQL.strip
+        NOT EXISTS (
+          SELECT 1 FROM mute_rules mr
+          WHERE
+              (mr.kind = 'keyword' AND (a.title LIKE '%' || mr.value || '%' OR a.content_text LIKE '%' || mr.value || '%'))
+           OR (mr.kind = 'author'  AND a.author = mr.value)
+           OR (mr.kind = 'feed'    AND a.feed_id = CAST(mr.value AS INTEGER))
+        )
+      SQL
+
       where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"
 
       <<~SQL
