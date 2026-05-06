@@ -225,6 +225,34 @@
     </section>
   <% end %>
 
+  <%# Phase 7 — Read next card. Hidden until the user scrolls past
+      the bottom-of-content sentinel (so it doesn't compete with the
+      Related panel above). Single suggestion, opens in a new tab to
+      match /articles row behaviour. Server-side picked: For You
+      ranker preferred, FTS5 "Related" fallback when corpus is cold. %>
+  <% if @read_next %>
+    <div class="read-next-sentinel" aria-hidden="true"></div>
+    <aside class="read-next-card" hidden data-read-next>
+      <div class="read-next-label">
+        Read next
+        <% if @read_next['_score'] %>
+          <span class="muted" title="Personalised relevance score (recency × per-feed weight × corpus overlap)">&middot; relevance pick</span>
+        <% else %>
+          <span class="muted" title="Content-similarity match via FTS5 — no personalised signal yet">&middot; related pick</span>
+        <% end %>
+      </div>
+      <a class="read-next-headline" href="/article/<%= @read_next['uid'] %>" target="_blank" rel="noopener" title="Open the next suggested article in a new tab">
+        <%= h(@read_next['title']) %>
+      </a>
+      <div class="read-next-meta">
+        <% if (rn_feed = (@feeds_by_id || {})[@read_next['feed_id']]) %>
+          <span class="news-source"><%= h(rn_feed['title'] || rn_feed['url']) %></span>
+        <% end %>
+        <span><%= relative_time(@read_next['published_at']) %></span>
+      </div>
+    </aside>
+  <% end %>
+
   <footer class="article-footer">
     <p class="subtitle">
       Article id: <code><%= @article['uid'] %></code>
@@ -232,6 +260,31 @@
     </p>
   </footer>
 </article>
+
+<% if @read_next %>
+  <script>
+    // Phase 7 — slide the Read-next card in once the user has scrolled
+    // far enough that the article body is mostly behind them. Single
+    // IntersectionObserver on a sentinel element placed right before
+    // the card; once the sentinel is in view, reveal the card with a
+    // CSS slide-in. Script only emitted when the card is rendered.
+    (function () {
+      var sentinel = document.querySelector('.read-next-sentinel');
+      var card     = document.querySelector('.read-next-card');
+      if (!sentinel || !card || !('IntersectionObserver' in window)) return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            card.removeAttribute('hidden');
+            card.classList.add('read-next-card-visible');
+            io.disconnect(); // one-shot — no need to keep observing
+          }
+        });
+      }, { rootMargin: '0px 0px -10% 0px' });
+      io.observe(sentinel);
+    })();
+  </script>
+<% end %>
 
 <script>
   // Retrofit external citations inside .article-body so they open in a

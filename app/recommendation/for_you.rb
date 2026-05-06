@@ -140,6 +140,21 @@ module Recommendation
       0.5**(age_h / HALF_LIFE_HOURS.to_f)
     end
 
+    # Phase 7 — single-suggestion picker for the "Read next" card on
+    # /article/:uid. Returns the highest-scored unread article that
+    # isn't `article` itself, or nil if the user has no positive
+    # corpus yet (caller falls back to FTS5 "Related"). The "no
+    # positive corpus" check is what differentiates the personalised
+    # signal from chronological — when there's nothing to personalise
+    # against, FTS5 content-similarity is the better fallback.
+    def next_after(article, now: Time.now.utc)
+      return nil if article.nil?
+      return nil if positive_corpus.empty?
+
+      ranked = score_window(state: :unread, limit: 25, offset: 0, now: now)
+      ranked.find { |a| a['id'] != article['id'] }
+    end
+
     def age_hours(published_at, now)
       return Float::INFINITY if published_at.to_s.empty?
       t = Time.parse(published_at).utc

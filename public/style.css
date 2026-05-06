@@ -2351,3 +2351,49 @@ html.dark .mute-row { border-color: #3a3a3c; }
   margin-right: 0.25rem;
 }
 html.dark .mute-keyword-form input[type="text"] { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+
+/* ---- Phase 7 Read-next card -----------------------------------------
+   Single-suggestion card revealed by JS once the user scrolls past
+   the sentinel. Slide-in via CSS; the [hidden] attribute keeps it out
+   of layout until the JS removes it. Looks like a slim version of a
+   .news-item to match the rest of the surface. */
+.read-next-card {
+  display: block;
+  margin: 1.5rem 0 1rem 0;
+  padding: 1rem 1.1rem;
+  border-left: 4px solid #0071e3;
+  background: rgba(0, 113, 227, 0.04);
+  border-radius: 6px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.read-next-card-visible { opacity: 1; transform: translateY(0); }
+.read-next-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0071e3;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.read-next-headline {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  text-decoration: none;
+  line-height: 1.35;
+}
+.read-next-headline:hover { text-decoration: underline; }
+.read-next-meta {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: #6e6e73;
+  display: flex;
+  gap: 0.6rem;
+}
+html.dark .read-next-card     { background: rgba(10, 132, 255, 0.08); border-left-color: #0a84ff; }
+html.dark .read-next-headline { color: #f5f5f7; }
+html.dark .read-next-label    { color: #0a84ff; }
+html.dark .read-next-meta     { color: #98989d; }

@@ -127,11 +127,12 @@ Passive feedback: the global player tracks % consumed. ≥80% = treat like 👍;
 
 ## "Read next" suggestion on /article/:uid
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-044, awaiting user approval to commit + open PR
 
-When the user finishes an article (scrolls to bottom OR clicks "Mark read"), surface a "Read next" card with the highest-relevance unread match — leverages the existing Recommendation engine + the new feedback signal.
+When the user scrolls past the bottom of the article body, a "Read next" card slides in with the highest-relevance unread match — leverages the For You ranker + the existing FTS5 fallback.
 
-- [ ] Card slides in below the article body when triggered. Single recommendation, not a panel of five.
-- [ ] Click → opens in a new tab (matches the `/articles` row behaviour).
-- [ ] If no signal yet, falls back to the existing FTS5 "Related" pick.
-- [ ] Specs: trigger conditions; correct fallback when no positive corpus exists.
+- [x] Card slides in below the article body when the user scrolls past a sentinel. Single recommendation. CSS-driven slide-in via `.read-next-card-visible` class set by a one-shot IntersectionObserver.
+- [x] Click → opens in a new tab (matches the `/articles` row behaviour).
+- [x] Fallback chain: For You ranker first; if `Recommendation::ForYou.next_after` returns nil (cold start — empty positive corpus), use the top FTS5 "Related" hit. If neither has anything, the card simply isn't rendered.
+- [x] Card label flips between "relevance pick" and "related pick" depending on which path produced the suggestion, so the user can see at a glance whether the ranker is in play yet.
+- [x] Specs: 9 examples in [spec/read_next_spec.rb](spec/read_next_spec.rb) covering `next_after` (nil article, empty corpus, top-scoring with non-empty corpus, current-article exclusion) + view-surface (FTS5 fallback path, ranker path, no-card empty case, current-article never linked back, new-tab `target="_blank"`).
