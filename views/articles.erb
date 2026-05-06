@@ -12,23 +12,36 @@
       <p class="subtitle state-filter">
         <% %i[all unread bookmarked archived].each do |state| %>
           <a href="?state=<%= state %><%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
-             class="<%= 'active' if @state_filter == state %>"><%= state %></a>
+             class="<%= 'active' if @state_filter == state && @sort_filter != :relevance %>"><%= state %></a>
         <% end %>
         &middot;
         <% if @kind_filter == :podcast %>
-          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %>" class="active">podcasts only</a>
-          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %>">show all</a>
+          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %><%= '&sort=relevance' if @sort_filter == :relevance %>" class="active">podcasts only</a>
+          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %><%= '&sort=relevance' if @sort_filter == :relevance %>">show all</a>
         <% else %>
-          <a href="?state=<%= @state_filter %>&kind=podcast<%= '&view=skim' if @view_filter == :skim %>">podcasts only</a>
+          <a href="?state=<%= @state_filter %>&kind=podcast<%= '&view=skim' if @view_filter == :skim %><%= '&sort=relevance' if @sort_filter == :relevance %>">podcasts only</a>
         <% end %>
         &middot;
         <%# Skim toggle: title + summary only, larger type. Same query
             string carries the active state + kind filter so toggling
             view doesn't clobber the user's other choices. %>
         <% if @view_filter == :skim %>
-          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %>" class="active">skim</a>
+          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %><%= '&sort=relevance' if @sort_filter == :relevance %>" class="active">skim</a>
         <% else %>
-          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %>&view=skim">skim</a>
+          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %>&view=skim<%= '&sort=relevance' if @sort_filter == :relevance %>">skim</a>
+        <% end %>
+        &middot;
+        <%# Phase 6 — For You ranker. Forces state=unread (re-ranking
+            already-read articles is rarely useful), so the chip both
+            sets sort=relevance and clears any non-unread state. %>
+        <% if @sort_filter == :relevance %>
+          <a href="?state=unread<%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
+             class="active for-you"
+             title="Relevance-ranked unread. Click to switch back to chronological.">For You</a>
+        <% else %>
+          <a href="?state=unread&sort=relevance<%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
+             class="for-you"
+             title="Personalised relevance order: blended of recency × per-feed weight × overlap with your 👍 + bookmarked corpus, demoted by 👎 + skip + archive. Click to enable.">For You</a>
         <% end %>
       </p>
     <% end %>

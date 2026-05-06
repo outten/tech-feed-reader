@@ -29,6 +29,7 @@ require_relative 'feed_feedback_store'
 require_relative 'mute_rules_store'
 require_relative 'opml'
 require_relative 'recommendation'
+require_relative 'recommendation/for_you'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'version'
@@ -369,11 +370,21 @@ class TechFeedReader < Sinatra::Base
 
     @kind_filter = params['kind'].to_s == 'podcast' ? :podcast : :all
     @view_filter = params['view'].to_s == 'skim' ? :skim : :default
+    @sort_filter = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     @articles = if @tag_filter
                   ArticlesStore.for_tag(tag_id, limit: @per_page, offset: offset, state: @state_filter)
                 elsif @feed_filter
                   ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset, state: @state_filter)
+                elsif @sort_filter == :relevance
+                  # Phase 6 — For You ranker. Forces state=:unread for
+                  # the relevance feed (re-ranking already-read articles
+                  # is rarely what the user wants); the chips above still
+                  # render so they can flip back to chronological with
+                  # any state.
+                  @state_filter = :unread
+                  Recommendation::ForYou.score_window(state: :unread, kind: @kind_filter,
+                                                      limit: @per_page, offset: offset)
                 else
                   ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter, kind: @kind_filter)
                 end
