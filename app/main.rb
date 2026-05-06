@@ -599,6 +599,37 @@ class TechFeedReader < Sinatra::Base
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
+  # Phase 4 — passive listened-percent signal posted by the global
+  # player. Accepts JSON `{signal: -1|0|1, listened_pct: 0..1}`. The
+  # listened_pct is logged for telemetry but the persisted signal is
+  # whatever the player resolved to (≥80% ⇒ +1, <10% with >30s
+  # playback ⇒ -1). Explicit feedback (Phase 3) always wins — the
+  # store's mark_passive_feedback no-ops if `feedback != 0`.
+  #
+  # Uses sendBeacon from the player on pagehide, so the response body
+  # is best-effort; we still return JSON for the on-ended path which
+  # uses fetch().
+  post '/api/podcasts/:uid/feedback' do |uid|
+    content_type :json
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'unknown uid') unless article
+
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    signal = body['signal']
+    halt 400, JSON.generate(error: 'signal must be -1, 0, or +1') unless [-1, 0, 1].include?(signal)
+
+    listened_pct = body['listened_pct'].to_f
+    explicit_present = ReadStateStore.get(article['id'])['feedback'].to_i != 0
+    ReadStateStore.mark_passive_feedback(article['id'], value: signal)
+
+    AppLogger.info('podcast_passive_feedback',
+                   uid: uid, signal: signal, listened_pct: listened_pct,
+                   explicit_present: explicit_present)
+
+    JSON.generate(ok: true, applied: !explicit_present, explicit_present: explicit_present)
+  end
+
   # Phase 3 — per-feed weighting. Body param `direction` ∈ up | down | reset.
   # Each click bumps by FeedFeedbackStore::STEP (0.25), clamped to
   # [FLOOR, CEILING]. :reset deletes the row.
