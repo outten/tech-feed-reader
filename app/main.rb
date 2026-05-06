@@ -475,6 +475,12 @@ class TechFeedReader < Sinatra::Base
     @summary         = SummaryStore.find(@article['id'])
     @claude_available = Summarizer::Claude.available?
     @related         = Recommendation.for_article(@article, limit: 5)
+    # Phase 7 — single-card "Read next" suggestion below the article
+    # body. Tries the personalised For You ranker first; when the
+    # positive corpus is empty (cold start) or it can't pick a row,
+    # falls back to the existing FTS5 "Related" top hit.
+    @read_next       = Recommendation::ForYou.next_after(@article) ||
+                       @related.find { |a| a['id'] != @article['id'] }
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title      = @article['title']
     # Chat context — give the assistant the article body (capped) so
