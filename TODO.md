@@ -34,29 +34,29 @@ There will always be more unread than a user can consume. These items collective
 
 ## Per-item & per-feed feedback signal
 
-**Status: `not implemented`**
+**Status: `merged`** — commit `c8ba317`.
 
-The foundation for everything below. Capture explicit user valence on each article + per feed, store it, expose it cheaply to the ranker.
+The foundation for the personalisation phases below. Captures explicit user valence on each article + per feed, store it, expose it cheaply to the ranker (Phase 6).
 
-- [ ] **Schema**: new `feedback` column (or table) keyed on `(article_id, value INT IN {-1, 0, +1}, created_at)`. Per-feed feedback as a separate small table `feed_feedback (feed_id, weight REAL, updated_at)`.
-- [ ] **UI on /article/:uid**: thumbs-up / thumbs-down buttons in the actions row alongside Mark read / Bookmark / Archive. Toggle behaviour (clicking 👍 again clears it).
-- [ ] **UI on /articles row**: small inline 👍 / 👎 affordances on hover (don't pollute the cleaner row layout we just shipped — appear on hover only).
-- [ ] **UI on /feeds**: a "show more / show less from this source" control per feed row that bumps the per-feed weight up or down by a fixed step.
-- [ ] **Specs**: round-trip persistence; idempotent toggle; `state_query` doesn't change on read paths (no perf regression).
+- [x] **Schema**: `read_state.feedback INTEGER NOT NULL DEFAULT 0` (∈ {-1, 0, +1}); `feed_feedback (feed_id PK, weight REAL DEFAULT 1.0, updated_at)` with ON DELETE CASCADE on the feed.
+- [x] **UI on /article/:uid**: thumbs-up / thumbs-down forms in the actions row alongside Mark read / Bookmark / Archive. Toggle behaviour (clicking 👍 again clears it).
+- [x] **UI on /articles row**: inline 👍 / 👎 affordances revealed on row hover; permanent visible state when the user has voted.
+- [x] **UI on /feeds**: per-row +/− pills around a 1.00× weight readout. `FeedFeedbackStore.bump` clamps to [0.25, 3.0].
+- [x] **Specs**: 20 examples in [spec/feedback_store_spec.rb](spec/feedback_store_spec.rb) + 19 in [spec/feedback_routes_spec.rb](spec/feedback_routes_spec.rb).
 
-Cold-start safe: an unset signal is treated as 0, identical to today.
+Cold-start safe: an unset signal is treated as 0, identical to pre-Phase-3.
 
 ## Relevance-ranked "For You" view on /articles
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-043, awaiting user approval to commit + open PR
 
 Adds a sort option that orders unread by a personalised score instead of `published_at DESC`. The default stays chronological so the existing flow doesn't regress.
 
-- [ ] **Score**: blended of (recency decay × per-feed weight × keyword-overlap with the user's positive corpus − keyword-overlap with the negative corpus). Positive corpus = bookmarked + 👍. Negative corpus = 👎 + archived-without-reading.
-- [ ] **Implementation**: TF-IDF over `articles_fts` for the overlap terms; precompute the user's term vector at render time (cheap — `articles_fts.bm25` is built in). No background job needed at v1.
-- [ ] **Toggle**: `?sort=relevance` on /articles; new state-filter chip "For You" alongside the existing all/unread/bookmarked/archived chips.
-- [ ] **Hard cap on negative weight**: a single 👎 shouldn't hide a topic — clamp the demotion so disliked items still surface but lower in the list.
-- [ ] **Specs**: empty corpus → identical to chronological; positive-only corpus boosts overlap; negative weight is clamped.
+- [x] **Score**: `recency_decay × per_feed_weight × (1 + α·positive_overlap) × max(NEGATIVE_FLOOR, 1 − β·negative_overlap)`. Positive corpus = bookmarked + 👍 + passive +1. Negative corpus = 👎 + passive -1 + archived-without-reading. Half-life 48h on the recency decay; α=β=0.5 boost/damp; NEGATIVE_FLOOR=0.4 keeps a single 👎 from hiding a topic.
+- [x] **Implementation**: pure-compute scorer in [app/recommendation/for_you.rb](app/recommendation/for_you.rb). Pulls top-20 distinctive tokens from each corpus (reusing `Recommendation.top_keywords` + its stopword list); per-candidate overlap is set-intersection on the candidate's title tokens, saturating at OVERLAP_SAT=5 matches. Title-only tokenization on the candidate side keeps the 500-row scoring window fast (titles average ~60 chars vs. content_text averaging ~5KB).
+- [x] **Toggle**: `?sort=relevance` on /articles; "For You" chip in the state-filter row alongside the existing chips. Forces state=unread when active (re-ranking already-read articles is rarely useful).
+- [x] **Hard cap on negative weight**: NEGATIVE_FLOOR=0.4 clamps `neg_factor`. A single 👎 can't zero out an article — it just sinks ~60%.
+- [x] **Specs**: 19 examples in [spec/for_you_spec.rb](spec/for_you_spec.rb) covering empty-corpus → chronological collapse, positive-corpus boost, negative-corpus damp + floor, per-feed-weight multiplication, 48h half-life decay, overlap saturation, corpus selection (incl. archive+read NOT counting as negative — that's the user filing away, not rejecting), score_window orchestration, and the full route + view-surface.
 
 ## AI-assisted daily triage
 
@@ -78,7 +78,7 @@ These don't need a personalisation signal — pure triage UX wins.
 
 ## Bulk actions on /articles
 
-**Status: `tests`** — outten/TODO-038, awaiting user approval to commit + open PR
+**Status: `merged`** — commit `2d45a02`.
 
 Checkbox per row + a sticky toolbar at the top with "Mark read / Mark unread / Bookmark / Archive" applied to the selected rows. Turns "10 minutes of clicking" into "5 seconds of triage."
 
@@ -92,7 +92,7 @@ Checkbox per row + a sticky toolbar at the top with "Mark read / Mark unread / B
 
 ## Skim mode
 
-**Status: `tests`** — outten/TODO-040, awaiting user approval to commit + open PR
+**Status: `merged`** — commit `a91be6c`.
 
 A `/articles?view=skim` query that renders title + cached summary only (no body excerpt, no tags, no meta noise) at a larger font, optimised for fast scan-and-triage. Each row still has the row-link to the full article.
 
@@ -104,7 +104,7 @@ A `/articles?view=skim` query that renders title + cached summary only (no body 
 
 ## Mute filters: keywords, authors, feeds
 
-**Status: `tests`** — outten/TODO-042, awaiting user approval to commit + open PR
+**Status: `merged`** — commit `4234961`.
 
 Per-user negative filters that completely hide matching articles from `/articles` (still in the DB, retrievable via search). Different from per-feed weight: muting is a hard hide, weighting is a soft demotion.
 
@@ -116,7 +116,7 @@ Per-user negative filters that completely hide matching articles from `/articles
 
 ## Listened-percent signal for podcasts
 
-**Status: `tests`** — outten/TODO-041, awaiting user approval to commit + open PR
+**Status: `merged`** — commit `0684bdb`.
 
 Passive feedback: the global player tracks % consumed. ≥80% = treat like 👍; <10% with >30s of playback (i.e. genuine skip, not a 3-second tap) = treat like 👎. Cheap, doesn't require active interaction.
 

@@ -142,6 +142,8 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4) |
 | `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore` |
 | `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`, composite PK on `(kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
+
+**Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (FTS5 BM25, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected.
 | `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
 | `article_tags` | Many-to-many join between articles and tags |
 | `summaries` | Cached summaries: extractive (always) + llm (on demand) |
