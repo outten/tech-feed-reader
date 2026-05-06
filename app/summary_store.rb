@@ -15,6 +15,18 @@ module SummaryStore
     db.execute('SELECT * FROM summaries WHERE article_id = ?', [article_id]).first
   end
 
+  # Batch lookup for views that need summaries for many articles in one
+  # render (e.g. /articles?view=skim). Returns a {article_id => row}
+  # hash so the caller can index without a per-row .find call. Returns
+  # an empty hash when ids is empty so the caller doesn't need to guard.
+  def find_for_ids(article_ids)
+    ids = Array(article_ids).compact
+    return {} if ids.empty?
+    placeholders = (['?'] * ids.length).join(', ')
+    rows = db.execute("SELECT * FROM summaries WHERE article_id IN (#{placeholders})", ids)
+    rows.each_with_object({}) { |row, h| h[row['article_id']] = row }
+  end
+
   def has_extractive?(article_id)
     row = find(article_id)
     !row.nil? && !row['extractive'].to_s.empty?
