@@ -118,6 +118,20 @@ class TechFeedReader < Sinatra::Base
     end
 
     # Used in feed-fetch UI; ISO8601 timestamps become "2 minutes ago".
+    # Skim-mode summary line: prefer LLM, fall back to extractive,
+    # else a content_text excerpt. Mirrors the precedence chain used
+    # by Digests.pick_summary so the two views read consistently.
+    SKIM_EXCERPT_FALLBACK_CHARS = 240
+    def skim_summary_for(article, summary_row)
+      llm = summary_row && summary_row['llm'].to_s.strip
+      return llm unless llm.nil? || llm.empty?
+      extractive = summary_row && summary_row['extractive'].to_s.strip
+      return extractive unless extractive.nil? || extractive.empty?
+      excerpt = article['content_text'].to_s.strip
+      return '' if excerpt.empty?
+      excerpt.length > SKIM_EXCERPT_FALLBACK_CHARS ? "#{excerpt[0, SKIM_EXCERPT_FALLBACK_CHARS].rstrip}…" : excerpt
+    end
+
     # JSON body parser for routes that take application/json. Returns
     # nil on malformed input so the caller can 400 cleanly without a
     # raised exception leaking out of the route block.
@@ -353,6 +367,7 @@ class TechFeedReader < Sinatra::Base
     @state_filter = :all unless ARTICLES_STATE_FILTERS.include?(@state_filter)
 
     @kind_filter = params['kind'].to_s == 'podcast' ? :podcast : :all
+    @view_filter = params['view'].to_s == 'skim' ? :skim : :default
 
     @articles = if @tag_filter
                   ArticlesStore.for_tag(tag_id, limit: @per_page, offset: offset, state: @state_filter)
@@ -364,6 +379,13 @@ class TechFeedReader < Sinatra::Base
 
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @tags_by_article = TagsStore.tags_for_articles(@articles.map { |a| a['id'] })
+    # Skim mode shows a summary line per row — batch-fetch the cached
+    # summaries for the page so the view doesn't N+1 SummaryStore.find.
+    @summaries_by_article_id = if @view_filter == :skim
+                                 SummaryStore.find_for_ids(@articles.map { |a| a['id'] })
+                               else
+                                 {}
+                               end
     erb :articles
   end
 

@@ -92,13 +92,15 @@ Checkbox per row + a sticky toolbar at the top with "Mark read / Mark unread / B
 
 ## Skim mode
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-040, awaiting user approval to commit + open PR
 
 A `/articles?view=skim` query that renders title + cached summary only (no body excerpt, no tags, no meta noise) at a larger font, optimised for fast scan-and-triage. Each row still has the row-link to the full article.
 
-- [ ] CSS-only mostly — a `.news-list.skim` modifier that hides `.news-meta` and `.news-row-badges`, enlarges `.news-headline`, shows a summary line below.
-- [ ] Toggle in the page header (chip alongside the state filters).
-- [ ] Specs: rendered HTML reflects the toggle; summary line populated when SummaryStore has a row, else falls back to a content_text excerpt.
+- [x] CSS — `.news-list.skim` modifier hides `.news-meta` and `.news-row-badges`, enlarges `.news-headline`, surfaces a 3-line-clamped summary aligned under the headline.
+- [x] Toggle in the page header (chip alongside the state filters); preserves `state` and `kind` filters when toggling.
+- [x] Summary precedence: LLM > extractive > 240-char content_text excerpt (with ellipsis on truncation). Implemented as `skim_summary_for` helper in [app/main.rb](app/main.rb).
+- [x] `SummaryStore.find_for_ids(article_ids)` — batch lookup so the view doesn't N+1 across the page.
+- [x] Specs: 13 examples in [spec/skim_mode_spec.rb](spec/skim_mode_spec.rb) covering chip state on/off + filter preservation, `.news-list.skim` modifier, full summary precedence chain (incl. truncation + empty-content fallback), invalid `?view=` value handling, and the new `find_for_ids` lookup.
 
 ## Mute filters: keywords, authors, feeds
 

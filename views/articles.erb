@@ -11,15 +11,24 @@
     <% else %>
       <p class="subtitle state-filter">
         <% %i[all unread bookmarked archived].each do |state| %>
-          <a href="?state=<%= state %><%= '&kind=podcast' if @kind_filter == :podcast %>"
+          <a href="?state=<%= state %><%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
              class="<%= 'active' if @state_filter == state %>"><%= state %></a>
         <% end %>
         &middot;
         <% if @kind_filter == :podcast %>
-          <a href="?state=<%= @state_filter %>" class="active">podcasts only</a>
-          <a href="?state=<%= @state_filter %>">show all</a>
+          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %>" class="active">podcasts only</a>
+          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %>">show all</a>
         <% else %>
-          <a href="?state=<%= @state_filter %>&kind=podcast">podcasts only</a>
+          <a href="?state=<%= @state_filter %>&kind=podcast<%= '&view=skim' if @view_filter == :skim %>">podcasts only</a>
+        <% end %>
+        &middot;
+        <%# Skim toggle: title + summary only, larger type. Same query
+            string carries the active state + kind filter so toggling
+            view doesn't clobber the user's other choices. %>
+        <% if @view_filter == :skim %>
+          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %>" class="active">skim</a>
+        <% else %>
+          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %>&view=skim">skim</a>
         <% end %>
       </p>
     <% end %>
@@ -47,7 +56,7 @@
     <button type="button" class="bulk-toolbar-btn bulk-toolbar-clear"          title="Deselect all">Clear</button>
   </div>
 
-  <ul class="news-list">
+  <ul class="news-list <%= 'skim' if @view_filter == :skim %>">
     <% @articles.each do |article| %>
       <%
         is_podcast = article['audio_url'] && !article['audio_url'].to_s.empty?
@@ -69,6 +78,15 @@
         </a>
         <% if thumb_url && !thumb_url.to_s.empty? %>
           <img class="news-item-thumb" src="<%= h(thumb_url) %>" alt="" loading="lazy">
+        <% end %>
+        <% if @view_filter == :skim %>
+          <%
+            summary_row = @summaries_by_article_id[article['id']]
+            summary_text = skim_summary_for(article, summary_row)
+          %>
+          <% unless summary_text.empty? %>
+            <p class="news-summary-skim"><%= h(summary_text) %></p>
+          <% end %>
         <% end %>
         <% feedback_value = article['feedback'].to_i %>
         <% has_persistent_badges = article['bookmarked'] == 1 || article['archived'] == 1 || feedback_value != 0 || (@tags_by_article[article['id']] || []).any? %>
