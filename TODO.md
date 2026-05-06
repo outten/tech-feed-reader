@@ -115,14 +115,14 @@ Per-user negative filters that completely hide matching articles from `/articles
 
 ## Listened-percent signal for podcasts
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-041, awaiting user approval to commit + open PR
 
-Passive feedback: the global player tracks % consumed. ≥80% = treat like 👍; ≤10% with skip = treat like 👎. Cheap, doesn't require active interaction.
+Passive feedback: the global player tracks % consumed. ≥80% = treat like 👍; <10% with >30s of playback (i.e. genuine skip, not a 3-second tap) = treat like 👎. Cheap, doesn't require active interaction.
 
-- [ ] `tfr.podcast.listened` localStorage key (per uid) tracks max-position-reached.
-- [ ] On `ended` or on `pagehide` after threshold crossed, POST to `/api/podcasts/:uid/feedback` with the auto-derived signal.
-- [ ] Server merges with the explicit thumbs-feedback table — explicit wins over passive.
-- [ ] Specs: 80%-listened triggers the POST; <10%-listened with explicit close also triggers (negative).
+- [x] `tfr.podcast.listened.<uid>` localStorage key tracks max-currentTime-reached so scrubbing back doesn't undo progress.
+- [x] On `ended` ⇒ fetch `/api/podcasts/:uid/feedback` with `signal: 1`. On `pagehide` ⇒ `navigator.sendBeacon` with `signal: 1` (≥80%) or `signal: -1` (<10% AND >30s playback). Once-per-load idempotence so `ended` doesn't double-fire on the subsequent `pagehide`.
+- [x] `read_state.passive_feedback` column (Phase 4 migration `007_passive_feedback.sql`); explicit-wins guard lives in `ReadStateStore.mark_passive_feedback` so any future caller (cron, batch import) inherits it.
+- [x] Specs: 18 examples in [spec/passive_feedback_spec.rb](spec/passive_feedback_spec.rb) covering store-level explicit-wins (passive can't overwrite explicit; persists when explicit clears), validation, and the full route surface (200 happy path, 200 + applied:false when explicit present, 404 unknown uid, 400 missing/invalid signal, 400 malformed JSON, JSON content-type).
 
 ## "Read next" suggestion on /article/:uid
 

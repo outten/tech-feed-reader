@@ -62,6 +62,22 @@
     var STORAGE_NOW      = 'tfr.podcast.now_playing';
     var STORAGE_POS      = 'tfr.podcast.position.';
 
+    // Phase 4 — passive listened-percent signal. We track the max
+    // currentTime reached (not just current) so a user who scrubs
+    // back doesn't downgrade their own signal. Two terminal signals:
+    //   ended     ⇒ +1 (listened to completion)
+    //   pagehide  ⇒ +1 if pct ≥ 0.80
+    //              -1 if pct < 0.10 AND >30s of actual playback
+    //   else       ⇒ no post (ambiguous; listening but not done)
+    // The 30s lower bound on the negative path keeps a 3-second
+    // "what's this?" tap from getting demoted. Sent at most once per
+    // (episode, signal) — guarded by a session set.
+    var STORAGE_LISTENED   = 'tfr.podcast.listened.';
+    var POSITIVE_THRESHOLD = 0.80;
+    var NEGATIVE_THRESHOLD = 0.10;
+    var NEGATIVE_MIN_TIME  = 30;        // seconds of actual playback before a low-% counts as "skip"
+    var passiveSent = {};               // { uid: 'positive' | 'negative' } — once-per-load guard
+
     var state = null;          // { uid, url, mime, title, articleUrl, duration }
     var scrubbing = false;
     var lastSavedAt = 0;
@@ -107,6 +123,59 @@
     }
     function clearPosition(uid) {
       try { localStorage.removeItem(STORAGE_POS + uid); } catch (_) {}
+    }
+    // Phase 4 — track the high-watermark currentTime reached for an
+    // episode. Stored as seconds; writePct() also stores the duration
+    // at the time so listened_pct survives a hard reload even if
+    // audio.duration hasn't loaded yet on restoration.
+    function readListenedSeconds(uid) {
+      try {
+        var raw = localStorage.getItem(STORAGE_LISTENED + uid);
+        var v = raw ? parseFloat(raw) : NaN;
+        return isFinite(v) && v >= 0 ? v : 0;
+      } catch (_) { return 0; }
+    }
+    function writeListenedSeconds(uid, seconds) {
+      try { localStorage.setItem(STORAGE_LISTENED + uid, String(seconds)); } catch (_) {}
+    }
+    function postPassive(uid, signal, listenedPct, useBeacon) {
+      // Once-per-load idempotence: a positive on `ended` shouldn't
+      // double-fire on the subsequent pagehide.
+      var key = signal === 1 ? 'positive' : 'negative';
+      if (passiveSent[uid] === key) return;
+      passiveSent[uid] = key;
+
+      var url = '/api/podcasts/' + encodeURIComponent(uid) + '/feedback';
+      var payload = JSON.stringify({ signal: signal, listened_pct: listenedPct });
+      try {
+        if (useBeacon && navigator.sendBeacon) {
+          // sendBeacon must use a Blob with a JSON content-type for
+          // Sinatra's request.body parser to see it correctly.
+          navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+        } else {
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true
+          }).catch(function () { /* best-effort, drop errors */ });
+        }
+      } catch (_) { /* best-effort */ }
+    }
+    // Resolves the current passive signal for the active episode, or
+    // null if it's still ambiguous. Caller passes whether to apply the
+    // negative-path 30s minimum (false on `ended`, true on `pagehide`).
+    function resolvePassiveSignal(opts) {
+      if (!state || !state.uid) return null;
+      var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (state.duration || 0);
+      if (dur <= 0) return null;
+      var maxReached = Math.max(audio.currentTime || 0, readListenedSeconds(state.uid));
+      var pct = maxReached / dur;
+      if (pct >= POSITIVE_THRESHOLD || (opts && opts.completed)) return { signal: 1, pct: pct };
+      if (opts && opts.requireMinTime && pct < NEGATIVE_THRESHOLD && maxReached >= NEGATIVE_MIN_TIME) {
+        return { signal: -1, pct: pct };
+      }
+      return null;
     }
 
     // ---- formatting ----
@@ -158,12 +227,25 @@
       if (state && !scrubbing && now - lastSavedAt > SAVE_THROTTLE_MS) {
         writeNow();
         if (audio.currentTime > RESUME_TAIL_S) writePosition(state.uid, audio.currentTime);
+        // Phase 4: keep the listened-pct high-watermark in sync. We
+        // only ever bump it upward, so scrubbing back doesn't undo
+        // progress — same intent as positionStore.
+        if (state.uid && audio.currentTime > readListenedSeconds(state.uid)) {
+          writeListenedSeconds(state.uid, audio.currentTime);
+        }
       }
     });
     audio.addEventListener('play',  function () { paintPlay(); writeNow(); });
     audio.addEventListener('pause', function () { paintPlay(); writeNow(); });
     audio.addEventListener('ended', function () {
       paintPlay();
+      // Phase 4: full-listen is the cleanest positive signal we'll
+      // ever get. Resolve before clearing position, so duration is
+      // still valid.
+      if (state && state.uid) {
+        var resolved = resolvePassiveSignal({ completed: true });
+        if (resolved) postPassive(state.uid, resolved.signal, resolved.pct, false);
+      }
       if (state) clearPosition(state.uid);
       clearNow();
     });
@@ -178,6 +260,13 @@
       if (state) {
         writeNow();
         if (audio.currentTime > RESUME_TAIL_S) writePosition(state.uid, audio.currentTime);
+        if (state.uid && audio.currentTime > readListenedSeconds(state.uid)) {
+          writeListenedSeconds(state.uid, audio.currentTime);
+        }
+        // Phase 4: post the resolved passive signal. requireMinTime
+        // gates the negative path (don't fire 👎 on a 3s sample).
+        var resolved = resolvePassiveSignal({ requireMinTime: true });
+        if (resolved) postPassive(state.uid, resolved.signal, resolved.pct, true);
       }
     });
 

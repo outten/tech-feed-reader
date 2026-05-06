@@ -139,7 +139,8 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status |
 | `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text, audio_url, audio_mime_type, audio_duration_seconds |
 | `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via INSERT/UPDATE/DELETE triggers |
-| `read_state` | Per-article state: read, bookmarked, archived, opened_at |
+| `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4) |
+| `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore` |
 | `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
 | `article_tags` | Many-to-many join between articles and tags |
 | `summaries` | Cached summaries: extractive (always) + llm (on demand) |
