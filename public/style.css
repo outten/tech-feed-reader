@@ -2322,3 +2322,32 @@ html.dark .feed-weight-display { color: #f5f5f7; }
 }
 html.dark .news-summary-skim { color: #c0c0c5; }
 .news-item.read .news-summary-skim { color: #8e8e93; }
+
+/* ---- Phase 5 mute filters --------------------------------------------
+   /feeds Muted subsection — three small lists (keyword/author/feed)
+   plus an add form. /article/:uid keyword form lives inside .actions
+   so it picks up button styling for free; the inline input gets a
+   modest width so it doesn't dominate the row. */
+.mutes-section .mutes-add { gap: 0.75rem; align-items: end; }
+.mute-list { list-style: none; padding: 0; margin: 0.5rem 0 1.25rem 0; }
+.mute-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e5ea;
+}
+.mute-row:last-child { border-bottom: none; }
+.mute-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92rem; }
+.mute-since { font-size: 0.82rem; margin-left: auto; }
+html.dark .mute-row { border-color: #3a3a3c; }
+
+.mute-keyword-form input[type="text"] {
+  width: 12rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-right: 0.25rem;
+}
+html.dark .mute-keyword-form input[type="text"] { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }

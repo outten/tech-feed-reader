@@ -51,6 +51,14 @@
   <div class="notice">Added <strong><%= h(params['title']) %></strong> from the catalog.</div>
 <% elsif @notice == 'already-subscribed' %>
   <div class="notice"><strong><%= h(params['title']) %></strong> is already subscribed.</div>
+<% elsif @notice == 'mute-added' %>
+  <div class="notice">Muted <code><%= h(params['kind']) %>:<%= h(params['value']) %></code> &mdash; matching articles will be hidden from listings (still searchable).</div>
+<% elsif @notice == 'mute-duplicate' %>
+  <div class="notice">That mute rule already exists.</div>
+<% elsif @notice == 'mute-removed' %>
+  <div class="notice">Mute rule removed. Matching articles are back in the listings.</div>
+<% elsif @notice == 'mute-not-found' %>
+  <div class="notice">Mute rule was already gone.</div>
 <% elsif @notice %>
   <div class="notice"><%= h(@notice) %></div>
 <% end %>
@@ -159,6 +167,67 @@
         </li>
       <% end %>
     </ul>
+  <% end %>
+</section>
+
+<section class="benchmark-section mutes-section" id="mutes" style="margin-top:2.5rem">
+  <h3>Muted <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @mute_rules.values.flatten.length %> rule<%= 's' unless @mute_rules.values.flatten.length == 1 %>)</span></h3>
+  <p class="subtitle">
+    Hard-hide rules. Articles matching any rule below disappear from
+    <a href="/articles">/articles</a> and the dashboard, but stay in the database
+    and remain reachable via <a href="/search">/search</a>.
+  </p>
+
+  <form method="post" action="/mutes" class="portfolio-form mutes-add">
+    <label>
+      Kind
+      <select name="kind" required title="Keyword = substring match against title + body. Author = exact match. Feed = match by feed id.">
+        <option value="keyword">keyword</option>
+        <option value="author">author</option>
+        <option value="feed">feed</option>
+      </select>
+    </label>
+    <label>
+      Value
+      <input type="text" name="value" required placeholder="e.g. crypto, John Smith, or feed_id 42">
+    </label>
+    <button type="submit" class="btn-primary" title="Add this mute rule and hide matching articles from listings">Add mute</button>
+  </form>
+
+  <% MuteRulesStore::KINDS.each do |kind| %>
+    <% rows = @mute_rules[kind] || [] %>
+    <% next if rows.empty? %>
+    <h4 class="catalog-category"><%= kind.capitalize %> <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= rows.length %>)</span></h4>
+    <ul class="mute-list">
+      <% rows.each do |rule| %>
+        <li class="mute-row">
+          <% if kind == 'feed' %>
+            <% feed = FeedsStore.find(rule['value'].to_i) %>
+            <span class="mute-value">
+              <% if feed %>
+                <%= h(feed['title'] || feed['url']) %>
+                <span class="muted">&middot; feed_id <%= rule['value'] %></span>
+              <% else %>
+                <span class="muted">(deleted feed)</span>
+                feed_id <%= rule['value'] %>
+              <% end %>
+            </span>
+          <% else %>
+            <span class="mute-value"><%= h(rule['value']) %></span>
+          <% end %>
+          <span class="muted mute-since" title="Created <%= h(rule['created_at']) %>"><%= relative_time(rule['created_at']) %></span>
+          <form method="post" action="/mutes/delete" style="display:inline">
+            <input type="hidden" name="kind"  value="<%= h(rule['kind']) %>">
+            <input type="hidden" name="value" value="<%= h(rule['value']) %>">
+            <button type="submit" class="danger" title="Remove this mute rule and surface matching articles again">Unmute</button>
+          </form>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <% if @mute_rules.values.flatten.empty? %>
+    <p class="subtitle">No mute rules yet.</p>
   <% end %>
 </section>
 

@@ -141,6 +141,7 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via INSERT/UPDATE/DELETE triggers |
 | `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4) |
 | `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore` |
+| `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`, composite PK on `(kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
 | `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
 | `article_tags` | Many-to-many join between articles and tags |
 | `summaries` | Cached summaries: extractive (always) + llm (on demand) |

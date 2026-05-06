@@ -104,14 +104,15 @@ A `/articles?view=skim` query that renders title + cached summary only (no body 
 
 ## Mute filters: keywords, authors, feeds
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-042, awaiting user approval to commit + open PR
 
 Per-user negative filters that completely hide matching articles from `/articles` (still in the DB, retrievable via search). Different from per-feed weight: muting is a hard hide, weighting is a soft demotion.
 
-- [ ] Schema: `mute_rules (kind, value, created_at)` where kind ∈ `{keyword, author, feed}`.
-- [ ] UI: `/feeds` gets a "Muted" subsection; `/article/:uid` actions include "Mute author" / "Mute this keyword" (with the keyword inferred from the article's top tag or extracted by the server).
-- [ ] Backend: `state_query` adds an `AND NOT EXISTS (mute_rule that matches)` clause when mutes are non-empty.
-- [ ] Specs: muted articles disappear from listings; still findable via /search; mute rule add/remove round-trips.
+- [x] Schema: `mute_rules (kind, value, created_at)` where kind ∈ `{keyword, author, feed}` (CHECK constraint on kind, composite PK on `(kind, value)` so re-adding is idempotent), `008_mute_rules.sql`.
+- [x] UI: `/feeds` "Muted" subsection with three small lists + an Add form; `/article/:uid` actions include "Mute author" (when an author is present) + an inline "Mute keyword" input.
+- [x] Backend: `ArticlesStore.state_query` adds a single `AND NOT EXISTS (mute_rule that matches)` sub-query that dispatches on `mr.kind`. Vacuously true when `mute_rules` is empty (no perf regression). Keyword match uses LIKE-substring (case-insensitive on ASCII per SQLite's default).
+- [x] /search bypasses state_query, so muted articles remain recoverable via FTS5.
+- [x] Specs: 30 examples in [spec/mute_rules_spec.rb](spec/mute_rules_spec.rb) covering CRUD + idempotence + whitespace trim + cross-kind composite-key, all three match shapes (keyword substring on title/body, author exact, feed by id), search-bypass, no-op when empty, full route surface (200/302 happy paths, 400 invalid kind/empty value, return_to honoured), and view-surface assertions for /feeds + /article.
 
 ## Listened-percent signal for podcasts
 
