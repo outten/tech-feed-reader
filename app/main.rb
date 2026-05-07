@@ -448,8 +448,42 @@ class TechFeedReader < Sinatra::Base
   get '/digests/:id' do |id|
     @digest = DigestStore.find(id)
     halt 404, 'Digest not found' unless @digest
-    @page_title = @digest['subject']
+    @page_title       = @digest['subject']
+    @claude_available = Summarizer::Claude.available?
     erb :digest
+  end
+
+  # Manual Claude summary of a digest. Cached on the row (one-shot
+  # per digest), so a re-visit of /digests/:id never re-spends tokens.
+  # Returns a notice when the row already has a summary, surfacing
+  # to the user that no API call was made. Inputs come from the
+  # digest's stored text_body, which is composed offline by
+  # `make digest`, so this route is fast and doesn't need Sidekiq.
+  post '/digests/:id/summarize' do |id|
+    digest = DigestStore.find(id)
+    halt 404 unless digest
+
+    if digest['llm_summary'].to_s.strip != ''
+      AppLogger.info('digest_summarize', id: id, status: :cached)
+      redirect to("/digests/#{id}?notice=already-summarized")
+    end
+
+    result = Summarizer::Claude.summarize_digest(
+      subject:   digest['subject'],
+      text_body: digest['text_body']
+    )
+    case result.status
+    when :ok
+      DigestStore.update_llm_summary(id, summary: result.text, model: result.model)
+      AppLogger.info('digest_summarize', id: id, status: :ok, model: result.model)
+      redirect to("/digests/#{id}?notice=llm-summarized&model=#{CGI.escape(result.model.to_s)}")
+    when :unavailable
+      redirect to("/digests/#{id}?error=llm-unavailable")
+    when :empty
+      redirect to("/digests/#{id}?error=empty-content")
+    else
+      redirect to("/digests/#{id}?error=llm-failed&msg=#{CGI.escape(result.error.to_s)}")
+    end
   end
 
   # Phase 8 — AI-assisted triage. GET shows the empty state with a

@@ -49,4 +49,20 @@ module DigestStore
   def count
     db.execute('SELECT COUNT(*) AS c FROM digests').first['c']
   end
+
+  # Cache a Claude-generated digest summary on the digest row. Called
+  # at most once per (id, manual click) — the route surfaces the
+  # cached value and hides the regenerate button so the user can't
+  # accidentally double-spend tokens. `model` is recorded alongside so
+  # we can show "summarised by claude-opus-4-7" in the UI.
+  def update_llm_summary(id, summary:, model:, generated_at: Time.now.utc.iso8601)
+    db.execute(<<~SQL, [summary.to_s, model.to_s, generated_at, id.to_i])
+      UPDATE digests
+      SET llm_summary       = ?,
+          llm_model         = ?,
+          llm_generated_at  = ?
+      WHERE id = ?
+    SQL
+    db.changes
+  end
 end

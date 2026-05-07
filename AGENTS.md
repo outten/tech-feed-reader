@@ -197,7 +197,7 @@ In-memory only; clears on process restart. Tests opt in via `ENV['HEALTH_REGISTR
 
 Two consumer modules sit on top of the `anthropic` SDK; both gracefully degrade when no key is set.
 
-- **[`Summarizer::Claude`](app/summarizer/claude.rb)** — one-shot LLM summary on `/article/:uid` ("Summarize with Claude" button). Uses `claude-opus-4-7`. Cached in the `summaries` table (column `llm`); never invalidated on feed re-fetch (LLM calls are expensive — see gotcha #7 below).
+- **[`Summarizer::Claude`](app/summarizer/claude.rb)** — two flavours, both `claude-opus-4-7`, both cached so re-visits never re-spend tokens. `.summarize` is the one-shot LLM summary on `/article/:uid` ("Summarize with Claude" button), cached in the `summaries` table (column `llm`). `.summarize_digest` is the digest-level executive summary on `/digests/:id`, cached on the `digests` row (`llm_summary` / `llm_model` / `llm_generated_at`); the button only renders when no cache exists, and the route hard-skips the API call when one does. Neither is invalidated on feed re-fetch — LLM calls are expensive (see gotcha #7 below).
 - **[`Chat::Claude`](app/chat.rb)** — conversational backend for the floating chat widget. Stateless on the server: each turn ships `{message, history, context: {url, title, excerpt}}`; the widget keeps history in `localStorage` keyed by `tfr.chat.<pathname>`. Uses `claude-sonnet-4-6` (chat trades depth for latency vs. the Opus summarizer). History capped to `MAX_HISTORY_TURNS` pairs; excerpt capped to `MAX_CONTEXT_CHARS`.
 
 Both are wrapped in OTel `llm.summarize` / `llm.chat` spans with token-count attributes (see Tracing below).
