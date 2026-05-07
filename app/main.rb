@@ -30,6 +30,7 @@ require_relative 'mute_rules_store'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'recommendation/for_you'
+require_relative 'triage/claude'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'version'
@@ -449,6 +450,41 @@ class TechFeedReader < Sinatra::Base
     halt 404, 'Digest not found' unless @digest
     @page_title = @digest['subject']
     erb :digest
+  end
+
+  # Phase 8 — AI-assisted triage. GET shows the empty state with a
+  # "Generate" button (same UX as manual digests); POST runs the
+  # triage and renders the result inline. No DB persistence v1 —
+  # corpus shifts daily anyway, and re-triggering is cheap. Refresh
+  # after POST does re-trigger (no PRG dance), which is the same
+  # trade-off we accept for /digests' manual button.
+  get '/triage' do
+    @page_title       = 'Triage'
+    @claude_available = Triage::Claude.available?
+    @triage_result    = nil
+    erb :triage
+  end
+
+  post '/triage' do
+    @page_title       = 'Triage'
+    @claude_available = Triage::Claude.available?
+    @triage_result    = Triage::Claude.run
+    AppLogger.info('triage_manual_trigger',
+                   status:        @triage_result.status,
+                   unread_count:  @triage_result.unread_count,
+                   must_read:     @triage_result.must_read.to_a.length,
+                   optional:      @triage_result.optional.to_a.length,
+                   skip:          @triage_result.skip.to_a.length)
+    # Look up titles + feed names so the view can render rows without
+    # a per-uid ArticlesStore.find_by_uid loop.
+    uids = (@triage_result.must_read.to_a + @triage_result.optional.to_a + @triage_result.skip.to_a)
+             .map { |e| e['uid'] }.compact
+    @articles_by_uid = uids.each_with_object({}) do |uid, h|
+      a = ArticlesStore.find_by_uid(uid)
+      h[uid] = a if a
+    end
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :triage
   end
 
   # Manual digest trigger — same code path as `make digest` (the cron

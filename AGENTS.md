@@ -143,7 +143,9 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore` |
 | `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`, composite PK on `(kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
 
-**Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (FTS5 BM25, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected.
+**Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (FTS5 BM25, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the FTS5 path when the corpus is cold.
+
+**Triage::Claude** ([app/triage/claude.rb](app/triage/claude.rb), Phase 8) — AI-assisted unread classification. Pulls up to 30 unread + 20 corpus exemplars per side, prompts Claude (Sonnet 4.6, not Opus — cost guard) for structured JSON, parses defensively (strips markdown fences, salvages JSON from prose, falls back to "skip all" on parse failure rather than 500ing). Surfaces at `/triage`; manual POST trigger only — no DB persistence v1.
 | `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
 | `article_tags` | Many-to-many join between articles and tags |
 | `summaries` | Cached summaries: extractive (always) + llm (on demand) |
