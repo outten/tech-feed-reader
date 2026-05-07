@@ -60,17 +60,17 @@ Adds a sort option that orders unread by a personalised score instead of `publis
 
 ## AI-assisted daily triage
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-045, awaiting user approval to commit + open PR
 
-Claude reads today's unread + the user's positive/negative corpus and returns a triage plan: "must-read N, optional N, skip rest" with one-line rationales. Slots into `/digests` as a new flavour or as a separate tab.
+Claude reads the unread queue + a sample of the user's positive/negative corpus and classifies each unread article into must-read / optional / skip with a one-line rationale.
 
-- [ ] **Module**: `Triage::Claude` — pulls unread + sample of recent positive/negative corpus + per-feed weights, prompts Claude with a structured-JSON output schema (groups + rationale per article).
-- [ ] **Surface**: new `/triage/today` page (or `/digests/triage`) that renders the structured output as three sections.
-- [ ] **Cost guard**: cap input tokens (e.g., 30 articles × 1KB excerpt + 20 corpus exemplars × 200 chars). Use `claude-sonnet-4-6` not Opus.
-- [ ] **Cron**: optional — extend `make digest` to also produce a triage row, or add `make triage` as a sibling target.
-- [ ] **Specs**: Anthropic SDK stubbed; verify the corpus is passed; verify the JSON parsing handles partial responses.
+- [x] **Module**: [`Triage::Claude`](app/triage/claude.rb) — pulls up to `UNREAD_LIMIT=30` recent unread + up to `CORPUS_EXEMPLAR_LIMIT=20` exemplars per side, prompts Claude with a structured-JSON output schema and a defensive parser (strips markdown fences, salvages a `{…}` block from surrounding prose, falls back to "skip everything" with `status: :parse_error` on un-parseable output rather than 500ing).
+- [x] **Surface**: `/triage` page with three sections (Must read 🔥 / Optional 👀 / Skip 🗑️). Manual trigger only — `POST /triage` runs the call inline, renders the result. Top nav gains a "Triage" link.
+- [x] **Cost guard**: input capped at `EXCERPT_CHARS=1000` per unread + `EXEMPLAR_CHARS=200` per corpus exemplar (~32 KB / ~5K input tokens). Uses `claude-sonnet-4-6` per the TODO.
+- [ ] **Cron**: deferred — `Triage::Claude.run` is process-local (no DB persistence yet). Adding a `make triage` target + a `triages` table is a small follow-up if a daily snapshot becomes useful.
+- [x] **Specs**: 17 examples in [spec/triage_spec.rb](spec/triage_spec.rb) covering env-key gating, SDK-stubbed happy path, markdown-fence stripping, prose-salvage parse, parse-error fallback, corpus inclusion, excerpt-length cap, model selection (Sonnet not Opus), unread limit, SDK error path, and the route surface (GET empty state / POST renders three groups with rationales / POST empty when no unread).
 
-Depends on the feedback signal above to be useful.
+Depends on the feedback signal (Phase 3) + passive signal (Phase 4) to be useful.
 
 # UX for "drowning in unread"
 

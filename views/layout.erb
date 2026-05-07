@@ -39,6 +39,7 @@
       <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
       <a href="/podcasts"  class="<%= request.path_info == '/podcasts' ? 'active' : '' %>">Podcasts</a>
       <a href="/digests"   class="<%= request.path_info.start_with?('/digests') ? 'active' : '' %>">Digests</a>
+      <a href="/triage"    class="<%= request.path_info == '/triage'   ? 'active' : '' %>">Triage</a>
       <a href="/feeds"     class="<%= request.path_info == '/feeds'    ? 'active' : '' %>">Feeds</a>
       <a href="/tags"      class="<%= request.path_info == '/tags'     ? 'active' : '' %>">Tags</a>
       <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
