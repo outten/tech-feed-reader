@@ -10,36 +10,41 @@
       <p class="subtitle">Filtered. <a href="/articles">Clear filter</a>.</p>
     <% else %>
       <p class="subtitle state-filter">
+        <%# Every chip uses `filter_url(...)` to preserve the rest of the
+            current filter state. Filter changes (state / kind / sort)
+            reset pagination via `page: nil` because the new filter
+            shows different articles — page 2 of "all" doesn't map to
+            page 2 of "unread". The Skim toggle does NOT reset page —
+            it's a presentation toggle, not a filter. %>
         <% %i[all unread bookmarked archived].each do |state| %>
-          <a href="?state=<%= state %><%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
+          <a href="<%= filter_url(state: state == :all ? nil : state, page: nil) %>"
              class="<%= 'active' if @state_filter == state && @sort_filter != :relevance %>"><%= state %></a>
         <% end %>
         &middot;
         <% if @kind_filter == :podcast %>
-          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %><%= '&sort=relevance' if @sort_filter == :relevance %>" class="active">podcasts only</a>
-          <a href="?state=<%= @state_filter %><%= '&view=skim' if @view_filter == :skim %><%= '&sort=relevance' if @sort_filter == :relevance %>">show all</a>
+          <a href="<%= filter_url %>" class="active">podcasts only</a>
+          <a href="<%= filter_url(kind: nil, page: nil) %>">show all</a>
         <% else %>
-          <a href="?state=<%= @state_filter %>&kind=podcast<%= '&view=skim' if @view_filter == :skim %><%= '&sort=relevance' if @sort_filter == :relevance %>">podcasts only</a>
+          <a href="<%= filter_url(kind: :podcast, page: nil) %>">podcasts only</a>
         <% end %>
         &middot;
-        <%# Skim toggle: title + summary only, larger type. Same query
-            string carries the active state + kind filter so toggling
-            view doesn't clobber the user's other choices. %>
+        <%# Skim toggle preserves `page` deliberately — view is a presentation
+            toggle so the user stays on whatever page they were reading. %>
         <% if @view_filter == :skim %>
-          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %><%= '&sort=relevance' if @sort_filter == :relevance %>" class="active">skim</a>
+          <a href="<%= filter_url(view: nil) %>" class="active">skim</a>
         <% else %>
-          <a href="?state=<%= @state_filter %><%= '&kind=podcast' if @kind_filter == :podcast %>&view=skim<%= '&sort=relevance' if @sort_filter == :relevance %>">skim</a>
+          <a href="<%= filter_url(view: :skim) %>">skim</a>
         <% end %>
         &middot;
         <%# Phase 6 — For You ranker. Forces state=unread (re-ranking
             already-read articles is rarely useful), so the chip both
             sets sort=relevance and clears any non-unread state. %>
         <% if @sort_filter == :relevance %>
-          <a href="?state=unread<%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
+          <a href="<%= filter_url(sort: nil, state: :unread, page: nil) %>"
              class="active for-you"
              title="Relevance-ranked unread. Click to switch back to chronological.">For You</a>
         <% else %>
-          <a href="?state=unread&sort=relevance<%= '&kind=podcast' if @kind_filter == :podcast %><%= '&view=skim' if @view_filter == :skim %>"
+          <a href="<%= filter_url(sort: :relevance, state: :unread, page: nil) %>"
              class="for-you"
              title="Personalised relevance order: blended of recency × per-feed weight × overlap with your 👍 + bookmarked corpus, demoted by 👎 + skip + archive. Click to enable.">For You</a>
         <% end %>
@@ -144,11 +149,11 @@
 
   <nav class="pager">
     <% if @page > 1 %>
-      <a href="?page=<%= @page - 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %><%= "&tag=#{@tag_filter['id']}" if @tag_filter %><%= "&state=#{@state_filter}" if @state_filter != :all %>">&larr; Prev</a>
+      <a href="<%= filter_url(page: (@page - 1 == 1 ? nil : @page - 1)) %>">&larr; Prev</a>
     <% end %>
     <span>Page <%= @page %></span>
     <% if @articles.length == @per_page %>
-      <a href="?page=<%= @page + 1 %><%= "&feed_id=#{@feed_filter['id']}" if @feed_filter %><%= "&tag=#{@tag_filter['id']}" if @tag_filter %><%= "&state=#{@state_filter}" if @state_filter != :all %>">Next &rarr;</a>
+      <a href="<%= filter_url(page: @page + 1) %>">Next &rarr;</a>
     <% end %>
   </nav>
 <% end %>

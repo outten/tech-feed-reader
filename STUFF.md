@@ -36,13 +36,43 @@ Done on outten/TODO-046. New `Summarizer::Claude.summarize_digest` + cached on t
 
 ## [ ] Cosmetics
 
-- on the top of page element in the article section, I see that the title of the article is jammed into a column that is too small with width. Consider having the title expand across all of the columns as one element. It should be able to be read clearly before the user decides if they want to engage it and/or thumbs up/down, etc it.
-- on the aricles page for an article, scrolling pins the first element at the top which is weird and makes it hard to read the other content. Please review and fix.
-- on the articles page for a podcast, the top element that have a picture of the podcast, pause/play button, mark unread, etc. doesn't fit in the element so things are rending outside the element. Can you fix, which can include a new layout.
-- on the artiles list page, when you engage skim mode, the picture on the right is over top of the first two lines of text. Can you fix, which can include a new layout.
-- on the dashboard page, the "Activity (last 30 days)" element has no content. Can you add what should be there? Or delete the element.
-- on the podcasts page, some of the podcasts don't have pictures. I see them in my Apple Podcast app. For example, the "The Ezra Klein Show". Can you recheck to see if you can get a link to it or not? No biggie if you can get it.
-- logging. Can you add more verbose logging. For example, I don't see page loads. development environments should log DEBUG and above. staging and production should log INFO and higher.
+Tracking branch: `outten/TODO-047`. Each sub-item gets its own status; the parent stays `[ ]` until all of them ship.
 
+### [ ] 1+2. Sticky-pin on `/article/:uid` (and the title cramp it caused)
 
+> "On the top of page element in the article section, I see that the title of the article is jammed into a column that is too small with width."
+> "On the articles page for an article, scrolling pins the first element at the top which is weird and makes it hard to read the other content."
 
+These were the same bug. The global rule `header { position: sticky; top: 0 }` in style.css unintentionally also targeted the inner `<header>` inside `<article class="reading-view"><header>...</header></article>`, pinning the entire article header (hero image + title + subtitle + actions row + tags) to the top while you scrolled the body — which is why both the title looked jammed (squashed into a sticky column) and the rest of the page felt wrong. Fix: scope the sticky to `body > header` only.
+
+### [ ] 3. Podcast actions row overflows on `/article/:uid`
+
+> "On the articles page for a podcast, the top element that have a picture of the podcast, pause/play button, mark unread, etc. doesn't fit in the element so things are rendering outside the element."
+
+`.reading-view .actions` was a flat flexbox with no `flex-wrap`. After Phases 3 + 5 added 👍 / 👎 / Mute author / Mute keyword (with an inline text input), the row ran past the right edge on narrow widths. Fix: `flex-wrap: wrap`, gap tightened, and the keyword-mute input narrowed so it doesn't dominate the wrap line.
+
+### [ ] 4. Skim-mode thumbnail overlaps the summary line
+
+> "On the articles list page, when you engage skim mode, the picture on the right is over top of the first two lines of text."
+
+`.news-summary-skim` only set a `margin-left` for icon alignment; it didn't reserve space on the right for the absolutely-positioned `.news-item-thumb` (64 px). Fix: hide the thumbnail entirely in skim mode — skim is for fast scan-and-triage, the picture isn't load-bearing here.
+
+### [ ] 5. Dashboard "Activity (last 30 days)" is empty
+
+> "On the dashboard page, the 'Activity (last 30 days)' element has no content. Can you add what should be there? Or delete the element."
+
+Real bug. `ArticlesStore.daily_counts(days: 30)` queries 30 days, but `RETENTION_DAYS=7` (the pruner sweeps anything older), so 23 of the 30 days are always zero. The chart shows axes + a flat line. Fix: drive the chart window from `RETENTION_DAYS` and re-label the section ("Activity (last N days)").
+
+### [ ] 6. Some podcasts on `/podcasts` are missing cover art
+
+> "Some of the podcasts don't have pictures. I see them in my Apple Podcast app. For example, the 'The Ezra Klein Show'. No biggie if you can get it."
+
+Genuine miss. `FeedParser` already extracts both `<itunes:image>` and `<image><url>`, but some publishers (Vox-published Ezra Klein among them) don't expose either at the channel level. Fix: new `Providers::ITunesLookup` module — queries the public iTunes Search API by show title, returns the first artwork URL — plus a one-shot `make backfill-podcast-images` script that fills `feeds.image_url` for podcast feeds where it's currently null.
+
+### [ ] 7. Verbose logging — dev DEBUG, request logs
+
+> "Can you add more verbose logging. For example, I don't see page loads. Development environments should log DEBUG and above. Staging and production should log INFO and higher."
+
+Two-part fix:
+- `app/logger.rb` flips its default to `debug` when `RACK_ENV` is unset/development; stays `info` for `RACK_ENV=staging` and `production`; stays `fatal` for `test` (so RSpec output stays clean). `LOG_LEVEL` env var still overrides.
+- New Sinatra `before` + `after` hooks emit a single `http_request` JSON line per request with `method`, `path`, `status`, `latency_ms`, `ip`. Logs every request including static assets (per the user's preference for full visibility).

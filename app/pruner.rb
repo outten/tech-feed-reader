@@ -28,6 +28,15 @@ module Pruner
 
   module_function
 
+  # Effective retention window for the running process. Reads ENV
+  # (set in .credentials / .env) and falls back to DEFAULT_RETENTION_DAYS.
+  # Exposed so other surfaces (dashboard activity chart) can match
+  # the prune window without re-implementing the env parse.
+  def effective_retention_days
+    raw = ENV['RETENTION_DAYS'].to_s.strip
+    raw.match?(/\A\d+\z/) ? raw.to_i : DEFAULT_RETENTION_DAYS
+  end
+
   # Returns a Result. `now` and `keep_unread` overridable for tests +
   # the env-var toggle the calling script reads.
   def prune_old(retention_days: DEFAULT_RETENTION_DAYS, keep_unread: false, now: Time.now.utc)

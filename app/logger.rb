@@ -46,8 +46,14 @@ module AppLogger
       logger
     end
 
+    # Cosmetics 7 — default verbosity by environment. Dev (no
+    # RACK_ENV, or RACK_ENV=development) defaults to debug so the
+    # operator sees every page load + every job tick. Staging /
+    # production stays at info — debug is too chatty for a long-
+    # running deploy. Test stays at fatal so RSpec output is clean.
+    # LOG_LEVEL still wins over the default in every env.
     def level_from_env
-      raw = ENV['LOG_LEVEL'] || (ENV['RACK_ENV'] == 'test' ? 'fatal' : 'info')
+      raw = ENV['LOG_LEVEL'] || default_level_for_env
       case raw.to_s.downcase
       when 'debug' then ::Logger::DEBUG
       when 'info'  then ::Logger::INFO
@@ -55,6 +61,14 @@ module AppLogger
       when 'error' then ::Logger::ERROR
       when 'fatal' then ::Logger::FATAL
       else              ::Logger::INFO
+      end
+    end
+
+    def default_level_for_env
+      case ENV['RACK_ENV'].to_s
+      when 'test'                     then 'fatal'
+      when 'staging', 'production'    then 'info'
+      else                                 'debug'  # development / unset
       end
     end
   end
