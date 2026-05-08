@@ -36,6 +36,8 @@ require_relative 'feed_catalog'
 require_relative 'version'
 require_relative 'tracing'
 require_relative 'metrics'
+require_relative 'request_log_middleware'
+require_relative 'pruner'
 require_relative 'metrics_middleware'
 
 # Sidekiq client config + the worker class. Loading the config only
@@ -82,22 +84,11 @@ class TechFeedReader < Sinatra::Base
   # method / path / status / latency. Errors get a separate event
   # before being re-raised. See app/logger.rb for the format.
 
-  before do
-    @request_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-  end
-
-  after do
-    next if @request_started_at.nil?
-    ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - @request_started_at) * 1000).round
-    AppLogger.info(
-      'http_request',
-      method:     request.request_method,
-      path:       request.path_info,
-      query:      request.query_string.empty? ? nil : request.query_string,
-      status:     response.status,
-      latency_ms: ms
-    )
-  end
+  # Cosmetics 7 — request logging is now done by RequestLogMiddleware
+  # at the Rack layer (see `use` block above), which catches static
+  # assets too. The old Sinatra before/after pair only saw dynamic
+  # routes, which is why "I don't see page loads" looked broken even
+  # though some loads were being logged.
 
   error do
     err = env['sinatra.error']
@@ -260,6 +251,42 @@ class TechFeedReader < Sinatra::Base
       value = bytes.to_f / (1024**i)
       format(i.zero? ? '%d %s' : '%.1f %s', value, units[i])
     end
+
+    # Build the /articles query string from the current filter state, with
+    # per-call overrides. Captures state / kind / view / sort / feed_id /
+    # tag / page so chip toggles and the pager don't have to hand-stitch
+    # the query string (and silently drop params they forgot about — that
+    # was the bug behind "turning on Skim reverts to page 1," because the
+    # skim toggle's hand-built URL didn't carry `page`).
+    #
+    # Defaults (state=:all, view=:default, sort=:chronological, kind=:all,
+    # page=1) are dropped from the URL — the bare `/articles` route
+    # already lands you in those, so emitting them only adds noise.
+    #
+    # Pass nil in `overrides` to clear an inherited param. Example:
+    #
+    #   filter_url(view: :skim)            # → preserves everything, adds skim
+    #   filter_url(view: nil)              # → preserves everything, removes skim
+    #   filter_url(state: :unread, page: nil) # changing state resets pagination
+    def filter_url(overrides = {})
+      current = {
+        state:   @state_filter == :all          ? nil : @state_filter,
+        kind:    @kind_filter == :podcast       ? :podcast    : nil,
+        view:    @view_filter == :skim          ? :skim       : nil,
+        sort:    @sort_filter == :relevance     ? :relevance  : nil,
+        feed_id: @feed_filter && @feed_filter['id'],
+        tag:     @tag_filter  && @tag_filter['id'],
+        page:    (@page && @page > 1)           ? @page       : nil
+      }
+
+      merged = current.merge(overrides)
+      # Iterate in a fixed canonical order so URLs are stable regardless
+      # of which override the caller passed first.
+      pairs = %i[state kind view sort feed_id tag page]
+                .map { |k| [k, merged[k]] }
+                .reject { |_, v| v.nil? || v.to_s.empty? }
+      pairs.empty? ? '?' : "?#{pairs.map { |k, v| "#{k}=#{v}" }.join('&')}"
+    end
   end
 
   # ---- Routes ---------------------------------------------------------
@@ -347,7 +374,11 @@ class TechFeedReader < Sinatra::Base
     @bookmark_count   = ReadStateStore.bookmarked_count
     @feed_count       = FeedsStore.count
     @degraded         = HealthRegistry.degraded?
-    @daily_counts     = ArticlesStore.daily_counts(days: 30)
+    # Cosmetics 5 — drive the activity chart from the actual retention
+    # window. RETENTION_DAYS=7 means anything older was already swept
+    # by Pruner, so a 30-day chart is mostly empty axes.
+    @activity_window  = Pruner.effective_retention_days
+    @daily_counts     = ArticlesStore.daily_counts(days: @activity_window)
     @top_feeds        = ArticlesStore.counts_by_feed(limit: 10)
     @top_tags_week    = TagsStore.top_in_window(days: 7, limit: 8)
     @topic_clusters   = TopicClusters.recent(days: 14, limit: 8)
@@ -1297,6 +1328,7 @@ if __FILE__ == $PROGRAM_NAME
       run Sidekiq::Web
     end
     map '/' do
+      use RequestLogMiddleware::App
       use MetricsMiddleware
       run TechFeedReader.new
     end

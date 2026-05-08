@@ -30,8 +30,8 @@ RSpec.describe 'GET /articles?view=skim' do
       add_article(uid: 'aaaaaaaaaaaa', title: 'A')
       get '/articles'
       expect(last_response.status).to eq(200)
-      # Default page (no kind filter): the off-state link adds view=skim.
-      expect(last_response.body).to include('<a href="?state=all&view=skim">skim</a>')
+      # Default page (no other filter): off-state link is just `?view=skim`.
+      expect(last_response.body).to include('<a href="?view=skim">skim</a>')
     end
 
     it 'renders the Skim chip in active state when ?view=skim is set' do
@@ -39,7 +39,8 @@ RSpec.describe 'GET /articles?view=skim' do
       get '/articles?view=skim'
       expect(last_response.status).to eq(200)
       # Active link drops view=skim from the href so clicking toggles off.
-      expect(last_response.body).to include('<a href="?state=all" class="active">skim</a>')
+      # No other params set ⇒ the link collapses to a bare `?`.
+      expect(last_response.body).to include('<a href="?" class="active">skim</a>')
     end
 
     it 'preserves state + kind filters when toggling Skim on/off' do
@@ -47,8 +48,65 @@ RSpec.describe 'GET /articles?view=skim' do
       get '/articles?state=unread&kind=podcast&view=skim'
       # The "skim → off" link keeps state=unread + kind=podcast.
       expect(last_response.body).to include('<a href="?state=unread&kind=podcast" class="active">skim</a>')
-      # The state-filter chips keep view=skim in their query.
-      expect(last_response.body).to include('href="?state=all&kind=podcast&view=skim"')
+      # The state-filter chips keep view=skim in their query (state=all
+      # default is dropped, kind=podcast + view=skim preserved).
+      expect(last_response.body).to include('href="?kind=podcast&view=skim"')
+    end
+
+    # Regression: the old hand-stitched skim toggle URL didn't include
+    # `page=`, so clicking "skim" while on page 2 navigated to
+    # ?state=…&view=skim and silently snapped back to page 1. The
+    # `filter_url` helper preserves every current filter param including
+    # page; the skim toggle is a presentation toggle, not a filter, so
+    # page is deliberately preserved (filter chips below clear page on
+    # change since the new filter would surface different articles).
+    it 'preserves the current page when toggling Skim on' do
+      add_article(uid: 'aaaaaaaaaaaa', title: 'A')
+      get '/articles?page=2'
+      expect(last_response.status).to eq(200)
+      # The skim-on link must include page=2 — without this, clicking
+      # "skim" on page 2 reverts to page 1.
+      expect(last_response.body).to include('<a href="?view=skim&page=2">skim</a>')
+    end
+
+    it 'preserves the current page when toggling Skim off' do
+      add_article(uid: 'aaaaaaaaaaaa', title: 'A')
+      get '/articles?view=skim&page=3'
+      # Active "skim → off" link still carries page=3.
+      expect(last_response.body).to include('<a href="?page=3" class="active">skim</a>')
+    end
+
+    it 'state-filter chips clear page (filter change resets pagination)' do
+      add_article(uid: 'aaaaaaaaaaaa', title: 'A')
+      get '/articles?state=unread&page=2'
+      # Switching state filter while on page 2 must NOT keep page=2 in
+      # the URL — the new filter shows different articles, so reset.
+      expect(last_response.body).to include('href="?state=bookmarked"')
+      expect(last_response.body).not_to include('href="?state=bookmarked&page=2"')
+    end
+
+    it 'pager Prev preserves view=skim across page changes' do
+      # Need enough articles so page 2 isn't empty (the pager only
+      # renders when @articles is non-empty). @per_page=50 + we want
+      # at least 1 article on page 2 → 51 total.
+      feed = FeedsStore.find_by_url('https://example.com/rss') ||
+             FeedsStore.add(url: 'https://example.com/rss', title: 'Example')
+      entries = (0..50).map do |i|
+        {
+          uid: "uid#{i.to_s.rjust(8, '0')}", title: "T#{i}",
+          url: "https://example.com/#{i}", author: nil,
+          published_at: '2026-05-04T12:00:00Z',
+          content_html: '<p>x</p>', content_text: 'x',
+          audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
+        }
+      end
+      ArticlesStore.import(feed_id: feed['id'], entries: entries)
+      get '/articles?view=skim&page=2'
+      expect(last_response.status).to eq(200)
+      # Prev link must keep view=skim so the toggle survives going back.
+      # @page-1 == 1 collapses `page` out of the URL (default 1), so we
+      # expect just `?view=skim`.
+      expect(last_response.body).to include('href="?view=skim">&larr; Prev</a>')
     end
   end
 

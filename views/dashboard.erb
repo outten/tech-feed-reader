@@ -34,7 +34,7 @@
 
 <% if @article_count.positive? %>
   <section class="benchmark-section">
-    <h3>Activity (last 30 days)</h3>
+    <h3>Activity (last <%= @activity_window %> day<%= 's' unless @activity_window == 1 %>)</h3>
     <div class="chart-box"><canvas id="dailyChart" height="80"></canvas></div>
   </section>
 

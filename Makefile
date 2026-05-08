@@ -137,3 +137,9 @@ digest:
 # refresh cycle (override with PRUNE_ON_REFRESH=0).
 prune:
 	bundle exec ruby scripts/prune_articles.rb
+
+# Cosmetics 6 — sweep podcast feeds whose image_url is null/empty
+# and try to fill it via the iTunes Search API. Idempotent; safe to
+# re-run after adding new podcasts. See app/providers/itunes_lookup.rb.
+backfill-podcast-images:
+	bundle exec ruby scripts/backfill_podcast_images.rb
