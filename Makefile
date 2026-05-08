@@ -143,3 +143,9 @@ prune:
 # re-run after adding new podcasts. See app/providers/itunes_lookup.rb.
 backfill-podcast-images:
 	bundle exec ruby scripts/backfill_podcast_images.rb
+
+# AI-assisted triage cron entry point — calls Triage::Claude.run +
+# persists the result via TriageStore. One Claude API call per run
+# (~$0.02–0.04). Browse stored runs at /triage; detail at /triage/:id.
+triage:
+	bundle exec ruby scripts/generate_triage.rb

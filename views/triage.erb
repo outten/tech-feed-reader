@@ -67,6 +67,12 @@
     </form>
   </p>
 
+  <% if @triage_id %>
+    <p class="subtitle" style="margin-top:0.5rem">
+      Stored as triage <code>#<%= @triage_id %></code>. <a href="/triage">All runs &rarr;</a>
+    </p>
+  <% end %>
+
   <% [
     [:must_read, 'Must read',  '🔥', 'Strong corpus match — start here.'],
     [:optional,  'Optional',   '👀', 'Might be interesting; could go either way.'],
@@ -105,4 +111,33 @@
       <% end %>
     </section>
   <% end %>
+<% end %>
+
+<% if @recent_runs && @recent_runs.any? %>
+  <section class="benchmark-section" style="margin-top:2.5rem">
+    <h3>Recent triage runs <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @recent_runs.length %>)</span></h3>
+    <p class="subtitle">Persisted runs (manual button + cron via <code>make triage</code>). Click any to revisit the classification.</p>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Generated</th>
+          <th class="num">Unread</th>
+          <th>Status</th>
+          <th>Model</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @recent_runs.each do |run| %>
+          <tr>
+            <td title="<%= h(run['generated_at']) %>"><%= relative_time(run['generated_at']) %></td>
+            <td class="num"><%= run['unread_count'] %></td>
+            <td><%= h(run['status']) %></td>
+            <td class="muted"><%= h(run['model'] || '—') %></td>
+            <td><a href="/triage/<%= run['id'] %>">View &rarr;</a></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
 <% end %>

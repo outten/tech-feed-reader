@@ -31,6 +31,7 @@ require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'recommendation/for_you'
 require_relative 'triage/claude'
+require_relative 'triage_store'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'version'
@@ -157,6 +158,34 @@ class TechFeedReader < Sinatra::Base
     # to ON DELETE CASCADE, but stay safe).
     def feed_for(article)
       (@feeds_by_id ||= {})[article['feed_id']]
+    end
+
+    # Triage helpers — used by the /triage routes to share rendering
+    # paths between live POST results and historical GET /triage/:id
+    # rows. The struct shape matches Triage::Claude::Result so the
+    # view template doesn't have to branch on data source.
+    def triage_struct_from_row(row)
+      Triage::Claude::Result.new(
+        status:        row['status'].to_sym,
+        must_read:     Array(row['must_read']),
+        optional:      Array(row['optional']),
+        skip:          Array(row['skip']),
+        model:         row['model'],
+        latency_ms:    row['latency_ms'],
+        input_tokens:  row['input_tokens'],
+        output_tokens: row['output_tokens'],
+        unread_count:  row['unread_count'].to_i,
+        error:         row['error']
+      )
+    end
+
+    def preload_articles_by_uid(result)
+      uids = (result.must_read.to_a + result.optional.to_a + result.skip.to_a)
+               .map { |e| e['uid'] }.compact
+      uids.each_with_object({}) do |uid, h|
+        a = ArticlesStore.find_by_uid(uid)
+        h[uid] = a if a
+      end
     end
 
     # HTML-escape helper for user-controlled strings reflected back into
@@ -517,16 +546,28 @@ class TechFeedReader < Sinatra::Base
     end
   end
 
-  # Phase 8 — AI-assisted triage. GET shows the empty state with a
-  # "Generate" button (same UX as manual digests); POST runs the
-  # triage and renders the result inline. No DB persistence v1 —
-  # corpus shifts daily anyway, and re-triggering is cheap. Refresh
-  # after POST does re-trigger (no PRG dance), which is the same
-  # trade-off we accept for /digests' manual button.
+  # Phase 8 — AI-assisted triage. /triage list view + manual trigger;
+  # POST persists into TriageStore + renders the new run inline.
+  # /triage/:id surfaces a historical run (cron entries from
+  # `make triage` or earlier manual clicks).
   get '/triage' do
     @page_title       = 'Triage'
     @claude_available = Triage::Claude.available?
+    @recent_runs      = TriageStore.recent(limit: 20)
     @triage_result    = nil
+    erb :triage
+  end
+
+  get '/triage/:id' do |id|
+    row = TriageStore.find(id)
+    halt 404, 'Triage not found' unless row
+    @page_title       = "Triage — #{row['generated_at']}"
+    @claude_available = Triage::Claude.available?
+    @recent_runs      = TriageStore.recent(limit: 20)
+    @triage_result    = triage_struct_from_row(row)
+    @articles_by_uid  = preload_articles_by_uid(@triage_result)
+    @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @triage_id        = row['id']
     erb :triage
   end
 
@@ -540,15 +581,14 @@ class TechFeedReader < Sinatra::Base
                    must_read:     @triage_result.must_read.to_a.length,
                    optional:      @triage_result.optional.to_a.length,
                    skip:          @triage_result.skip.to_a.length)
-    # Look up titles + feed names so the view can render rows without
-    # a per-uid ArticlesStore.find_by_uid loop.
-    uids = (@triage_result.must_read.to_a + @triage_result.optional.to_a + @triage_result.skip.to_a)
-             .map { |e| e['uid'] }.compact
-    @articles_by_uid = uids.each_with_object({}) do |uid, h|
-      a = ArticlesStore.find_by_uid(uid)
-      h[uid] = a if a
+    # Persist (skip the unavailable case — there's no row worth keeping).
+    if @triage_result.status != :unavailable
+      @triage_id = TriageStore.create(@triage_result)
+      AppLogger.info('triage_stored', id: @triage_id, status: @triage_result.status)
     end
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @recent_runs     = TriageStore.recent(limit: 20)
+    @articles_by_uid = preload_articles_by_uid(@triage_result)
+    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     erb :triage
   end
 
