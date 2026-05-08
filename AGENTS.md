@@ -51,7 +51,7 @@ Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [
 | `PRUNE_KEEP_UNREAD` | Set to `1` to preserve unread articles past the retention window (default sweeps unread + read). Bookmarked articles are always kept. |
 | `PRUNE_ON_REFRESH` | Set to `0` to skip the post-refresh sweep on a given `make refresh-feeds` run. |
 
-**Logging**: every HTTP request, feed fetch, refresh, Claude call, chat turn, digest run, and Sidekiq job emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Tune verbosity with `LOG_LEVEL=debug|info|warn|error|fatal` (default `info` in dev / production, `fatal` in test so RSpec stays clean). Pipe through `jq` for pretty-printing: `make run | jq -c`.
+**Logging**: every HTTP request, feed fetch, refresh, Claude call, chat turn, digest run, and Sidekiq job emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Per-request lines come from [`app/request_log_middleware.rb`](app/request_log_middleware.rb), which sits at the Rack layer so it sees static assets too (Sinatra `after` filters skip them). Defaults: `debug` in dev, `info` in `RACK_ENV=staging` / `production`, `fatal` in `test`. `LOG_LEVEL=debug|info|warn|error|fatal` overrides. Pipe through `jq` for pretty-printing: `make run | jq -c`.
 
 No other API keys required — RSS / Atom feeds are public and unauthenticated. **Never commit `.credentials` or `.env`** — both are git-ignored.
 
@@ -71,6 +71,7 @@ make sidekiq                 # background-job worker (needs Redis up)
 make redis                   # foreground Redis (alternative to brew services)
 make digest                  # generate + persist a digest snapshot (read at /digests; cron-friendly)
 make prune                   # delete articles older than RETENTION_DAYS (default 7); bookmarks always kept
+make backfill-podcast-images # fill feeds.image_url via iTunes Search for podcasts missing <itunes:image>
 ```
 
 **One-shot dev session orchestration** — pre-canned for tracing-enabled local runs:
@@ -184,6 +185,8 @@ For articles where the feed body is a snippet, not full content, fall through pr
 | Feed entry body | 1 | `FeedFetcher` (default) |
 | Readability extraction of original page | 2 | `Providers::Readability` (single shared HTTP client + retry) |
 | Archive.org / Wayback most-recent capture | 3 | `Providers::Archive` (last-resort, when origin returns 4xx/5xx) |
+
+**Other providers**: [`Providers::ITunesLookup`](app/providers/itunes_lookup.rb) — fall-back podcast cover-art lookup against the iTunes Search API (no auth, ~20 req/min). Used by `make backfill-podcast-images` (`scripts/backfill_podcast_images.rb`) to fill `feeds.image_url` for podcast feeds whose RSS doesn't expose `<itunes:image>` or `<image><url>` (Vox-published Ezra Klein, etc).
 
 Mirror `t-money`'s `try_providers` pattern: log to `HealthRegistry.measure`, return first non-empty.
 
