@@ -4,7 +4,52 @@
 
 ## One-liner
 
-A single-user web application that aggregates public, free RSS / Atom feeds for technology articles, with reading, tagging, search, and summarization tooling. Conventions inherited from `t-money-terminal` (Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh) but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
+A single-user web application that aggregates public, free RSS / Atom feeds **across multiple categories (technology, sports, …)**, with reading, tagging, search, summarization, and personalised relevance ranking. Conventions inherited from `t-money-terminal` (Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh) but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
+
+> **Note on this document.** SPEC.md is the v1 brief, kept as the historical baseline so the reasoning at kickoff stays auditable. The brief below is the original (technology-only, no recommendation engine). The **Scope evolution** section that follows records every place reality has diverged — what shipped, why we changed our mind, and where to find the current backlog. Treat that section, plus [TODO.md](TODO.md), as the source of truth for what the app does today.
+
+## Scope evolution (v1.0 → v1.x)
+
+The sections below this one are the v1 brief as written at kickoff. Things have moved since — recording the deltas explicitly so SPEC.md doesn't read as untrue.
+
+### Multi-category aggregation (sports broadens the surface)
+
+The original brief was "technology articles". As of v1.x the user's interests broadened to sports — **Philadelphia Eagles, Sixers, Union; New Zealand All Blacks + Black Ferns; Tennis (ATP/WTA broadly)**. The 10-phase Sports rollout is captured in [TODO.md](TODO.md) (Sports Phases S1–S10). Architecturally:
+
+- Existing news pipeline (RSS / Atom → `articles` → `/articles`) extends to sports news with no schema change beyond a `feeds.category` column.
+- A second, **structured** schema lands alongside the article schema for sports-specific data: `sports_leagues`, `sports_teams`, `sports_matches`, `sports_players`, `sports_follows`. This is genuinely new architecture — sports has scores, standings, fixtures, and per-player tracking that don't fit the article shape.
+- Two new providers — `Providers::ESPN` (NFL/NBA/MLS via reverse-engineered public endpoints) and `Providers::TheSportsDB` (rugby + tennis where ESPN doesn't reach). See TODO.md S4 for the source citations.
+
+### Personalised relevance — the v1 non-goal we changed our mind on
+
+The original brief lists "Recommendation engine ('you might like...'). Out of scope for v1." That's still in the **Non-goals** section below — and it is no longer true. Phases 3 / 4 / 6 / 7 / 8 shipped a complete personalisation stack:
+
+- **Phase 3** — explicit feedback signal (`👍/👎` per article + per-feed weight). Commit `c8ba317`.
+- **Phase 4** — passive feedback signal (≥80% listened ⇒ +1, <10% with >30s playback ⇒ -1 on podcasts). Commit `0684bdb`.
+- **Phase 6** — `Recommendation::ForYou` ranker on `/articles?sort=relevance`, blending recency × per-feed weight × ±corpus overlap. Commit `a738901`.
+- **Phase 7** — Read-next card on `/article/:uid` (For You pick + FTS5 fallback). Commit `e0cbb2c`.
+- **Phase 8** — AI-assisted triage at `/triage` (Claude classifies unread into must-read / optional / skip). Commit `9763085` + persistence in `3f2ac84`.
+
+The non-goal was right at the time (we needed to avoid premature personalisation), and the change of mind is intentional, not accidental.
+
+### Other deltas the original brief didn't anticipate
+
+- **Podcasts as first-class** — full audio pipeline, persistent mini-player surviving Turbo navigations, podcast-specific UX (Bus mode for short commute episodes). Multiple commits ending at `4a48f1e` and `42040f4`.
+- **Mute filters** (Phase 5) — keyword / author / feed hard-hide rules. Commit `4234961`.
+- **AI digest summaries** — Claude summarises a daily digest, cached per row. Commit `400468e`.
+- **Tracing + observability** — OpenTelemetry SDK, `/admin/traces`, optional OTLP exporter. Multiple commits.
+
+### Where to read what
+
+| Question | File |
+|---|---|
+| What was the original v1 vision? | rest of this file (sections below this one) |
+| What has actually shipped + what's queued next? | [TODO.md](TODO.md) |
+| What architectural patterns are load-bearing today? | [AGENTS.md](AGENTS.md) |
+| What user-facing asks did we resolve along the way? | [STUFF.md](STUFF.md) |
+| How do I work on this codebase? | [CONTRIBUTING.md](CONTRIBUTING.md) |
+
+---
 
 ## Goals
 
@@ -22,7 +67,7 @@ The user is one person reading ~50–200 articles a week across ~20–50 feeds. 
 - Mobile-native app — responsive web only.
 - Real-time push (websockets, server-sent events). Polling is fine.
 - Comments / annotations / sharing.
-- Recommendation engine ("you might like..."). Out of scope for v1.
+- ~~Recommendation engine ("you might like..."). Out of scope for v1.~~ **Superseded.** Personalised relevance ranker shipped in Phase 6 (`a738901`) and consumed by the Read-next card (Phase 7) and the AI triage (Phase 8). See the *Scope evolution* section above for why we changed our mind.
 
 ## Architecture (target)
 

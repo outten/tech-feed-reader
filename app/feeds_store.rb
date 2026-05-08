@@ -33,9 +33,13 @@ module FeedsStore
 
   # Add a new feed. Returns the inserted row's hash. Raises
   # SQLite3::ConstraintException if `url` is already present.
-  def add(url:, title: nil, fetch_interval_seconds: PUBLISHER_INTERVAL)
-    db.execute(<<~SQL, [url, title, fetch_interval_seconds])
-      INSERT INTO feeds(url, title, fetch_interval_seconds) VALUES (?, ?, ?)
+  # `topic` is the top-level grouping ('technology', 'sports',
+  # 'general'); defaults to 'general' so arbitrary URLs added via
+  # the /feeds form don't get mis-tagged. Catalog adds pass the
+  # right topic from the catalog entry.
+  def add(url:, title: nil, fetch_interval_seconds: PUBLISHER_INTERVAL, topic: 'general')
+    db.execute(<<~SQL, [url, title, fetch_interval_seconds, topic.to_s])
+      INSERT INTO feeds(url, title, fetch_interval_seconds, topic) VALUES (?, ?, ?, ?)
     SQL
     find(db.last_insert_row_id)
   end
@@ -45,7 +49,7 @@ module FeedsStore
   # successful poll. Unknown keys are silently ignored.
   def update(id, **fields)
     allowed = %i[
-      title fetch_interval_seconds image_url
+      title fetch_interval_seconds image_url topic
       last_fetched_at last_etag last_modified last_status
     ]
     cols = fields.slice(*allowed)

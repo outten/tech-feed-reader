@@ -34,6 +34,7 @@ require_relative 'triage/claude'
 require_relative 'triage_store'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
+require_relative 'sports_teams'
 require_relative 'version'
 require_relative 'tracing'
 require_relative 'metrics'
@@ -303,6 +304,7 @@ class TechFeedReader < Sinatra::Base
         kind:    @kind_filter == :podcast       ? :podcast    : nil,
         view:    @view_filter == :skim          ? :skim       : nil,
         sort:    @sort_filter == :relevance     ? :relevance  : nil,
+        topic:   @topic_filter,
         feed_id: @feed_filter && @feed_filter['id'],
         tag:     @tag_filter  && @tag_filter['id'],
         page:    (@page && @page > 1)           ? @page       : nil
@@ -311,7 +313,7 @@ class TechFeedReader < Sinatra::Base
       merged = current.merge(overrides)
       # Iterate in a fixed canonical order so URLs are stable regardless
       # of which override the caller passed first.
-      pairs = %i[state kind view sort feed_id tag page]
+      pairs = %i[state kind view sort topic feed_id tag page]
                 .map { |k| [k, merged[k]] }
                 .reject { |_, v| v.nil? || v.to_s.empty? }
       pairs.empty? ? '?' : "?#{pairs.map { |k, v| "#{k}=#{v}" }.join('&')}"
@@ -431,6 +433,11 @@ class TechFeedReader < Sinatra::Base
 
     @kind_filter = params['kind'].to_s == 'podcast' ? :podcast : :all
     @view_filter = params['view'].to_s == 'skim' ? :skim : :default
+    # Sports Phase S1 — top-level topic filter. Accepts any value
+    # in FeedCatalog::TOPICS plus 'general' for arbitrary URL-form
+    # adds; nil = no filter (default behaviour).
+    valid_topics = FeedCatalog::TOPICS.keys.map(&:to_s) + %w[general]
+    @topic_filter = valid_topics.include?(params['topic'].to_s) ? params['topic'].to_s : nil
     @sort_filter = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     @articles = if @tag_filter
@@ -447,7 +454,11 @@ class TechFeedReader < Sinatra::Base
                   Recommendation::ForYou.score_window(state: :unread, kind: @kind_filter,
                                                       limit: @per_page, offset: offset)
                 else
-                  ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter, kind: @kind_filter)
+                  ArticlesStore.recent(
+                    limit: @per_page, offset: offset,
+                    state: @state_filter, kind: @kind_filter,
+                    topic: @topic_filter
+                  )
                 end
 
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
@@ -495,6 +506,81 @@ class TechFeedReader < Sinatra::Base
     @recent_episodes  = ArticlesStore.recent(limit: 25, kind: :podcast)
     @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     erb :podcasts
+  end
+
+  # Sports overview (Phase S5, news-only v1). Aggregates the user's
+  # subscribed sports feeds + recent articles, broken out per sport
+  # (NFL / NBA / Soccer / Rugby / Tennis). Live scores / results /
+  # upcoming come later when Phase S3+ adds the structured-data
+  # tables; until then, this is the news-side equivalent of the
+  # podcast show grid.
+  get '/sports' do
+    @page_title  = 'Sports'
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    sports_feeds = @feeds_by_id.values.select { |f| f['topic'] == 'sports' }
+
+    # Per-sport subscribed-feed list, keyed by sub-category from the
+    # catalog where available (falls back to :other for any
+    # subscribed-but-uncatalogued URL).
+    @feeds_by_sport = sports_feeds.group_by do |f|
+      entry = FeedCatalog.find_by_url(f['url'])
+      entry ? entry[:category] : :other
+    end
+
+    # Per-sport recent article window. Single SQL pull (topic=sports)
+    # then bucket in Ruby — cheaper than N queries when most users
+    # only follow a couple of sports.
+    @recent_by_sport = Hash.new { |h, k| h[k] = [] }
+    if sports_feeds.any?
+      ArticlesStore.recent(limit: 100, topic: 'sports').each do |a|
+        feed  = @feeds_by_id[a['feed_id']]
+        next unless feed
+        entry = FeedCatalog.find_by_url(feed['url'])
+        sport = entry ? entry[:category] : :other
+        @recent_by_sport[sport] << a if @recent_by_sport[sport].length < 8
+      end
+    end
+    # Batch-load cached summaries for the rendered articles so the
+    # inline-summary line on each card doesn't N+1 SummaryStore.find.
+    rendered_ids = @recent_by_sport.values.flatten.map { |a| a['id'] }
+    @summaries_by_article_id = SummaryStore.find_for_ids(rendered_ids)
+
+    # Sports sub-categories from the catalog, in declaration order.
+    @sports_sub_categories = FeedCatalog::CATEGORIES.keys.select do |cat|
+      FeedCatalog::CATEGORY_TO_TOPIC[cat] == :sports
+    end
+    # Team buttons in the TOC — only render teams whose feed_urls
+    # overlap with the user's actual subscriptions. No point linking
+    # to /sports/team/eagles if the user hasn't subscribed to a
+    # single Eagles feed.
+    @teams_with_subs = SportsTeams.all.select do |team|
+      SportsTeams.subscribed_feeds_for(team).any?
+    end
+    erb :sports
+  end
+
+  # Per-team detail page. Aggregates every article + podcast episode
+  # from the team's catalog feed_urls (intersected with what the
+  # user has actually subscribed to). Same vertical-card layout as
+  # the /sports overview page so the visual language is consistent.
+  get '/sports/team/:slug' do |slug|
+    @team = SportsTeams.find(slug)
+    halt 404, erb(:article_not_found) unless @team
+
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @team_feeds  = SportsTeams.subscribed_feeds_for(@team)
+    feed_ids     = @team_feeds.map { |f| f['id'] }
+
+    # Fetch recent articles across the team's feeds. Per-feed-id
+    # dispatch keeps the SQL bounded: ArticlesStore.for_feed already
+    # exists, just collect across N (small) feeds and merge-sort.
+    @articles = feed_ids.flat_map do |fid|
+      ArticlesStore.for_feed(fid, limit: 25, state: :all)
+    end.sort_by { |a| a['published_at'].to_s }.reverse.first(50)
+
+    @summaries_by_article_id = SummaryStore.find_for_ids(@articles.map { |a| a['id'] })
+    @page_title  = @team[:name]
+    erb :sports_team
   end
 
   # Stored digests, newest first. `make digest` (cron) appends to this
@@ -942,7 +1028,11 @@ class TechFeedReader < Sinatra::Base
     if FeedsStore.find_by_url(url)
       redirect to("/feeds?notice=already-subscribed&title=#{CGI.escape(entry[:title])}")
     else
-      FeedsStore.add(url: entry[:url], title: entry[:title], fetch_interval_seconds: entry[:interval])
+      FeedsStore.add(
+        url: entry[:url], title: entry[:title],
+        fetch_interval_seconds: entry[:interval],
+        topic: FeedCatalog.topic_for(entry).to_s
+      )
       redirect to("/feeds?notice=catalog-added&title=#{CGI.escape(entry[:title])}")
     end
   end
@@ -1042,7 +1132,11 @@ class TechFeedReader < Sinatra::Base
     if (existing = FeedsStore.find_by_url(url))
       { ok: true, status: 'already-subscribed', feed: existing, row_html: render_feed_row(existing) }.to_json
     else
-      feed = FeedsStore.add(url: entry[:url], title: entry[:title], fetch_interval_seconds: entry[:interval])
+      feed = FeedsStore.add(
+        url: entry[:url], title: entry[:title],
+        fetch_interval_seconds: entry[:interval],
+        topic: FeedCatalog.topic_for(entry).to_s
+      )
       status 201
       { ok: true, status: 'added', feed: feed, row_html: render_feed_row(feed) }.to_json
     end

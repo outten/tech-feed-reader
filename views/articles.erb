@@ -48,6 +48,26 @@
              class="for-you"
              title="Personalised relevance order: blended of recency × per-feed weight × overlap with your 👍 + bookmarked corpus, demoted by 👎 + skip + archive. Click to enable.">For You</a>
         <% end %>
+        &middot;
+        <%# Sports Phase S1 — top-level topic chips (technology / sports).
+            Only render when the user has at least one feed in each
+            topic so single-topic users don't see a no-op control. %>
+        <% topics_in_use = (@feeds_by_id || {}).values.map { |f| f['topic'] }.uniq.compact %>
+        <% if (topics_in_use & %w[technology sports]).length >= 2 %>
+          <% if @topic_filter.nil? %>
+            <a href="<%= filter_url %>" class="active" title="Showing every topic">all topics</a>
+          <% else %>
+            <a href="<%= filter_url(topic: nil, page: nil) %>" title="Show every topic">all topics</a>
+          <% end %>
+          <% FeedCatalog::TOPICS.each do |key, label| %>
+            <% k = key.to_s %>
+            <% if @topic_filter == k %>
+              <a href="<%= filter_url(topic: nil, page: nil) %>" class="active" title="Click to show every topic"><%= label.downcase %></a>
+            <% else %>
+              <a href="<%= filter_url(topic: k, page: nil) %>" title="Show only <%= label.downcase %> articles"><%= label.downcase %></a>
+            <% end %>
+          <% end %>
+        <% end %>
       </p>
     <% end %>
   </div>
