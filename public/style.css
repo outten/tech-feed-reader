@@ -2437,3 +2437,184 @@ html.dark .triage-rationale { color: #aeaeb2; }
 .triage-must_read .news-item { border-left: 3px solid #34c759; padding-left: 0.6rem; }
 .triage-skip      .news-item { opacity: 0.7; }
 html.dark .triage-must_read .news-item { border-left-color: #30d158; }
+
+/* ---- Sports overview page (/sports) -------------------------------
+   Vertical-card article rows (title / summary / meta on separate
+   lines) plus a sticky TOC at the top so the user can jump between
+   sport sections without scrolling back up. The /articles list
+   keeps its existing horizontal one-line row layout — this richer
+   format is sports-page-specific. */
+
+.sports-toc {
+  position: sticky;
+  top: 60px;                /* clears the layout's sticky <body> > header */
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  margin: 0 -0.5rem 1.5rem;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid #e5e5ea;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+html.dark .sports-toc { background: rgba(28, 28, 30, 0.92); border-color: #3a3a3c; }
+
+.sports-toc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sports-toc-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6e6e73;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+html.dark .sports-toc-label { color: #98989d; }
+
+/* Per-team button — emoji or logo + short team name. Visually a
+   little louder than the sport anchor pills (they're the
+   first-class navigation for the team-centric mental model). */
+.sports-toc-team {
+  font-weight: 600;
+  border-color: #b6b6bb;
+}
+.sports-team-logo-sm,
+.sports-team-emoji-sm {
+  display: inline-block;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+  vertical-align: middle;
+}
+.sports-team-logo-sm { object-fit: contain; }
+
+/* Team detail page header — bigger logo or emoji next to the
+   team name. */
+.sports-team-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.sports-team-logo,
+.sports-team-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.sports-team-logo { object-fit: contain; }
+
+.sports-toc-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 999px;
+  background: #fff;
+  color: #1d1d1f;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.12s, border-color 0.12s;
+}
+.sports-toc-button:hover { background: #e8e8ed; border-color: #b6b6bb; }
+html.dark .sports-toc-button { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
+html.dark .sports-toc-button:hover { background: #3a3a3c; }
+
+/* Subscribed-feed chips, one per team-level source within a sport.
+   Smaller pills than the TOC buttons; click to filter /articles. */
+.sports-feed-chip {
+  display: inline-block;
+  margin: 0 0.4rem 0.35rem 0;
+  padding: 0.18rem 0.6rem;
+  font-size: 0.82rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 4px;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  text-decoration: none;
+}
+.sports-feed-chip:hover { background: #e8e8ed; }
+html.dark .sports-feed-chip { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
+html.dark .sports-feed-chip:hover { background: #3a3a3c; }
+
+/* Article cards — full-width, vertical stack, columns lined up. */
+.sports-article-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+.sports-article {
+  display: block;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #e5e5ea;
+}
+.sports-article:last-child { border-bottom: none; }
+html.dark .sports-article { border-color: #3a3a3c; }
+.sports-article.read { opacity: 0.65; }
+
+.sports-article-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.sports-article-title a {
+  color: #1d1d1f;
+  text-decoration: none;
+}
+.sports-article-title a:hover { color: #0071e3; text-decoration: underline; }
+html.dark .sports-article-title a { color: #f5f5f7; }
+html.dark .sports-article-title a:hover { color: #0a84ff; }
+
+.sports-article-summary {
+  margin: 0.25rem 0 0.4rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #3a3a3c;
+  /* 3-line clamp so a single very long article doesn't dominate
+     the section. Same approach as skim-mode summaries. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.dark .sports-article-summary { color: #c0c0c5; }
+
+.sports-article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: #6e6e73;
+}
+.sports-article-meta-sep { color: #c7c7cc; }
+.sports-article-source {
+  color: #6e6e73;
+  text-decoration: none;
+  font-weight: 500;
+}
+.sports-article-source:hover { color: #0071e3; text-decoration: underline; }
+html.dark .sports-article-meta { color: #98989d; }
+html.dark .sports-article-meta-sep { color: #48484a; }
+html.dark .sports-article-source { color: #98989d; }
+
+.sports-article-in-app {
+  color: #0071e3;
+  text-decoration: none;
+  font-weight: 500;
+}
+.sports-article-in-app:hover { text-decoration: underline; }
+html.dark .sports-article-in-app { color: #0a84ff; }

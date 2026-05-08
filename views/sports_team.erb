@@ -1,0 +1,94 @@
+<div class="page-header sports-team-header">
+  <div>
+    <h2>
+      <% if @team[:image_url] && !@team[:image_url].to_s.empty? %>
+        <img class="sports-team-logo" src="<%= h(@team[:image_url]) %>" alt="" loading="lazy">
+      <% else %>
+        <span class="sports-team-emoji" aria-hidden="true"><%= @team[:emoji] %></span>
+      <% end %>
+      <%= h(@team[:name]) %>
+    </h2>
+    <p class="subtitle">
+      <%= h(@team[:blurb]) %>
+      &middot; <a href="/sports">&larr; All sports</a>
+    </p>
+  </div>
+</div>
+
+<% if @team_feeds.empty? %>
+  <div class="empty-state">
+    <p>
+      You haven't subscribed to any <%= h(@team[:short_name]) %> feeds yet. Browse the
+      catalog at <a href="/feeds">/feeds</a> &rarr; "Discover popular feeds" &rarr;
+      "<%= h(FeedCatalog::CATEGORIES[@team[:sport]]) %>" and click "+ Add" on any of:
+    </p>
+    <ul>
+      <% @team[:feed_urls].each do |url| %>
+        <% entry = FeedCatalog.find_by_url(url) %>
+        <% next unless entry %>
+        <li><strong><%= h(entry[:title]) %></strong> &mdash; <%= h(entry[:blurb]) %></li>
+      <% end %>
+    </ul>
+  </div>
+<% else %>
+  <%# Subscribed-feed chips — same chip style as /sports. %>
+  <p class="subtitle sports-subscribed-feeds" style="margin-top:0.5rem">
+    <% @team_feeds.each do |feed| %>
+      <a class="sports-feed-chip" href="/articles?feed_id=<%= feed['id'] %>"
+         title="See every article from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
+    <% end %>
+  </p>
+
+  <% if @articles.empty? %>
+    <div class="empty-state">
+      <p>No articles ingested yet from these feeds. Try clicking <strong>Refresh all</strong> in the header.</p>
+    </div>
+  <% else %>
+    <ul class="sports-article-list">
+      <% @articles.each do |article| %>
+        <% feed         = (@feeds_by_id || {})[article['feed_id']] %>
+        <% summary_row  = (@summaries_by_article_id || {})[article['id']] %>
+        <% summary_text = skim_summary_for(article, summary_row) %>
+        <li class="sports-article <%= 'read' if article['read'] == 1 %>">
+          <h4 class="sports-article-title">
+            <% if article['url'] && !article['url'].to_s.empty? %>
+              <% host = (URI.parse(article['url']).host rescue nil) || 'publisher' %>
+              <a href="<%= h(article['url']) %>" target="_blank" rel="noopener noreferrer"
+                 title="Open at <%= h(host) %> (new tab)">
+                <%= h(article['title']) %>
+              </a>
+            <% else %>
+              <%= h(article['title']) %>
+            <% end %>
+          </h4>
+
+          <% unless summary_text.empty? %>
+            <p class="sports-article-summary"><%= h(summary_text) %></p>
+          <% end %>
+
+          <div class="sports-article-meta">
+            <% if feed %>
+              <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"
+                 title="Filter to this source"><%= h(feed['title'] || feed['url']) %></a>
+              <span class="sports-article-meta-sep">&middot;</span>
+            <% end %>
+            <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+            <% if article['author'] && !article['author'].to_s.empty? %>
+              <span class="sports-article-meta-sep">&middot;</span>
+              <span class="muted"><%= h(article['author']) %></span>
+            <% end %>
+            <% if article['audio_url'] && !article['audio_url'].to_s.empty? %>
+              <span class="sports-article-meta-sep">&middot;</span>
+              <span class="badge podcast-badge" title="Podcast episode">🎧</span>
+            <% end %>
+            <span class="sports-article-meta-sep">&middot;</span>
+            <a class="sports-article-in-app" href="/article/<%= article['uid'] %>"
+               title="Open the in-app reading view (summary + tags + feedback)">
+              Open in app &rarr;
+            </a>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+<% end %>

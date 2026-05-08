@@ -14,14 +14,49 @@ require_relative 'feeds_store'
 # category by insertion). Verify the URL parses by visiting it in a
 # browser before merging.
 module FeedCatalog
+  # Top-level grouping. Mirrors `feeds.topic` in the DB. Used by
+  # /articles?topic= filters and the catalog UI's section split.
+  TOPICS = {
+    technology: 'Technology',
+    sports:     'Sports'
+  }.freeze
+
+  # Sub-grouping inside a topic. Used as the H4 headings within the
+  # catalog browse list on /feeds.
   CATEGORIES = {
+    # Technology
     aggregator:  'Aggregators',
     publisher:   'Tech publishers',
     engineering: 'Engineering blogs',
     ai:          'AI / ML',
     security:    'Security',
     personal:    'Personal blogs',
-    podcast:     'Podcasts'
+    podcast:     'Podcasts',
+    # Sports (Phase S2)
+    nfl:         'NFL',
+    nba:         'NBA',
+    soccer:      'Soccer (MLS / international)',
+    rugby:       'Rugby',
+    tennis:      'Tennis'
+  }.freeze
+
+  # Map each sub-category to its top-level topic. Avoids duplicating
+  # `:topic => :technology` on every existing catalog entry — the
+  # derivation is single-sourced here. New categories must add a
+  # row or `topic_for` will raise.
+  CATEGORY_TO_TOPIC = {
+    aggregator:  :technology,
+    publisher:   :technology,
+    engineering: :technology,
+    ai:          :technology,
+    security:    :technology,
+    personal:    :technology,
+    podcast:     :technology,
+    nfl:         :sports,
+    nba:         :sports,
+    soccer:      :sports,
+    rugby:       :sports,
+    tennis:      :sports
   }.freeze
 
   CATALOG = [
@@ -178,7 +213,85 @@ module FeedCatalog
     # audio drama
     { url: 'https://starshipexcelsior.com/ExcelsiorRSS.rss', title: 'Starship Excelsior', category: :podcast,
       interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
-      blurb: 'Long-running Star Trek fan audio drama — full-cast adventures aboard the USS Excelsior.' }
+      blurb: 'Long-running Star Trek fan audio drama — full-cast adventures aboard the USS Excelsior.' },
+
+    # ============================================================
+    # Sports (Phase S2)
+    # ============================================================
+    # Curated to the user's specific interests: Philadelphia teams
+    # (Eagles / Sixers / Union), New Zealand rugby (All Blacks +
+    # Black Ferns coverage), and tennis broadly. Each URL was
+    # verified live (HTTP 200 + valid RSS/Atom signature) at the
+    # time of seed. None marked seed:true — sports adoption is
+    # opt-in via /feeds, not auto-installed.
+
+    # NFL — Philadelphia Eagles
+    { url: 'https://www.bleedinggreennation.com/rss/index.xml', title: 'Bleeding Green Nation', category: :nfl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: "SB Nation's Philadelphia Eagles community — beat-writer coverage, game previews, draft analysis." },
+
+    # NBA — Philadelphia 76ers
+    { url: 'https://www.libertyballers.com/rss/index.xml', title: 'Liberty Ballers', category: :nba,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: "SB Nation's Philadelphia 76ers community — game recaps, trade analysis, roster moves." },
+
+    # MLS — Philadelphia Union (and US/world soccer context)
+    { url: 'https://phillysoccerpage.net/feed/', title: 'The Philly Soccer Page', category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent Philadelphia Union coverage — match previews, recaps, podcast episodes.' },
+
+    # Rugby — All Blacks + Black Ferns + world rugby
+    { url: 'https://feeds.bbci.co.uk/sport/rugby-union/rss.xml', title: 'BBC Rugby Union', category: :rugby,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC Sport rugby union — All Blacks, Black Ferns, Six Nations, World Cup coverage.' },
+    { url: 'https://www.rnz.co.nz/rss/sport.xml', title: 'RNZ Sport', category: :rugby,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: "Radio New Zealand sport — All Blacks-heavy coverage from NZ's national broadcaster." },
+
+    # Tennis — ATP / WTA / Grand Slams
+    { url: 'https://www.espn.com/espn/rss/tennis/news', title: 'ESPN Tennis', category: :tennis,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'ATP, WTA, and Grand Slam tournament coverage from ESPN.' },
+    { url: 'https://feeds.bbci.co.uk/sport/tennis/rss.xml', title: 'BBC Tennis', category: :tennis,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC Sport tennis — Wimbledon-heavy with ATP/WTA tour coverage year-round.' },
+    { url: 'https://tennis365.com/feed', title: 'Tennis365', category: :tennis,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent tennis site — daily player news, tour gossip, match analysis.' },
+
+    # ---- sports podcasts ---------------------------------------
+    # Tagged with the sport's sub-category (not :podcast) so they
+    # surface in the sport's section on /sports. The audio
+    # enclosures still flow through FeedParser → audio_url, so the
+    # global mini-player picks them up the same as tech podcasts.
+
+    # NFL — Eagles
+    { url: 'https://feeds.megaphone.fm/VMP9406149033', title: 'Bleeding Green Nation Podcast', category: :nfl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Multi-show audio network from BGN — beat-writer interviews, post-game reactions, draft analysis.' },
+
+    # NBA — Sixers
+    { url: 'https://feeds.simplecast.com/jxr32ewl', title: 'Sixers Talk', category: :nba,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NBC Sports Philadelphia 76ers podcast — game previews, reactions, roster news.' },
+
+    # MLS — Union
+    { url: 'https://phillysoccerpage.net/category/podcasts/all-three-points/feed/', title: 'All Three Points', category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: "Philly Soccer Page's flagship podcast — Philadelphia Union match recaps and analysis." },
+
+    # Rugby — All Blacks + Black Ferns + Super Rugby
+    { url: 'https://feeds.acast.com/public/shows/aotearoa-rugby-pod', title: 'Aotearoa Rugby Pod', category: :rugby,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: "Ross Karl, James Parsons + Bryn Hall on NZ rugby — All Blacks, Black Ferns, Super Rugby Pacific, NPC." },
+    { url: 'https://feeds.megaphone.fm/GLT9898976502', title: 'The Good, The Bad & The Rugby (Aus/NZ)', category: :rugby,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Australian/NZ-focused rugby chat from the international podcast network.' },
+
+    # Tennis
+    { url: 'https://feeds.acast.com/public/shows/thetennispodcast', title: 'The Tennis Podcast', category: :tennis,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'David Law (BBC) + Catherine Whitaker (Eurosport) covering ATP, WTA, and all four Grand Slams.' }
   ].freeze
 
   module_function
@@ -193,6 +306,30 @@ module FeedCatalog
     grouped = CATALOG.group_by { |e| e[:category] }
     CATEGORIES.keys.each_with_object({}) do |cat, h|
       h[cat] = grouped[cat] || []
+    end
+  end
+
+  # Resolve an entry's top-level topic from its sub-category. The
+  # catalog stores `:category` per row; `:topic` is derived from
+  # CATEGORY_TO_TOPIC so we don't have to keep both fields in sync
+  # by hand on every entry.
+  def topic_for(entry_or_category)
+    cat = entry_or_category.is_a?(Hash) ? entry_or_category[:category] : entry_or_category
+    CATEGORY_TO_TOPIC[cat] || :general
+  end
+
+  # { :technology => { :aggregator => [...], ... }, :sports => {...} }
+  # — two-level nest used by the catalog browse view to surface a
+  # "Technology" / "Sports" outer split with sub-categories inside.
+  def by_topic
+    grouped = CATALOG.group_by { |e| topic_for(e) }
+    TOPICS.keys.each_with_object({}) do |topic, h|
+      entries = grouped[topic] || []
+      sub = entries.group_by { |e| e[:category] }
+      h[topic] = CATEGORIES.keys.each_with_object({}) do |cat, hh|
+        rows = sub[cat] || []
+        hh[cat] = rows unless rows.empty?
+      end
     end
   end
 

@@ -76,13 +76,14 @@ module ArticlesStore
   # max_duration_seconds, when set, bounds the query to articles whose
   # audio_duration_seconds is non-NULL and ≤ the given threshold —
   # used by /bus ("what's short enough for my commute?").
-  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil)
-    sql = state_query(filter: state, kind: kind, max_duration_seconds: max_duration_seconds)
-    db.execute(sql, [limit, offset])
+  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil, topic: nil)
+    sql, args = state_query(filter: state, kind: kind, max_duration_seconds: max_duration_seconds, topic: topic)
+    db.execute(sql, args + [limit, offset])
   end
 
   def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    db.execute(state_query(scope: 'a.feed_id = ?', filter: state), [feed_id, limit, offset])
+    sql, args = state_query(scope: 'a.feed_id = ?', filter: state)
+    db.execute(sql, [feed_id, *args, limit, offset])
   end
 
   # Distinct feeds whose imported articles include at least one audio
@@ -107,12 +108,12 @@ module ArticlesStore
   # optional state filter. Joins article_tags inside the FROM clause
   # (vs. as a sub-select) so SQLite can use the article_tags PK index.
   def for_tag(tag_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    sql = state_query(
+    sql, args = state_query(
       from_extra: 'JOIN article_tags at ON at.article_id = a.id',
       scope:      'at.tag_id = ?',
       filter:     state
     )
-    db.execute(sql, [tag_id, limit, offset])
+    db.execute(sql, [tag_id, *args, limit, offset])
   end
 
   # Articles matching an FTS5 term, with their cached extractive
@@ -257,8 +258,9 @@ module ArticlesStore
     # with optional WHERE-scope (e.g. "a.feed_id = ?"), an optional extra
     # FROM-clause join (used by for_tag), a read-state filter, and an
     # article-kind filter (:podcast → audio_url IS NOT NULL).
-    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all, max_duration_seconds: nil)
+    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all, max_duration_seconds: nil, topic: nil)
       where_clauses = []
+      extra_args    = []
       where_clauses << scope if scope
       case filter
       when :unread     then where_clauses << 'COALESCE(rs.read, 0) = 0'
@@ -279,6 +281,14 @@ module ArticlesStore
         # SQL safe even if a string sneaks in.
         cutoff = Integer(max_duration_seconds)
         where_clauses << "a.audio_duration_seconds IS NOT NULL AND a.audio_duration_seconds <= #{cutoff}"
+      end
+
+      # Sports Phase S1 — filter to a top-level topic (technology /
+      # sports / general). Joins through feeds, parameterised so the
+      # arg array stays SQL-safe.
+      if topic
+        where_clauses << 'EXISTS (SELECT 1 FROM feeds f WHERE f.id = a.feed_id AND f.topic = ?)'
+        extra_args << topic.to_s
       end
 
       # Phase 5 — hide articles that match any mute_rules row. Single
@@ -302,7 +312,7 @@ module ArticlesStore
 
       where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"
 
-      <<~SQL
+      sql = <<~SQL
         SELECT a.*,
                COALESCE(rs.read, 0)       AS read,
                COALESCE(rs.bookmarked, 0) AS bookmarked,
@@ -316,6 +326,7 @@ module ArticlesStore
         ORDER BY a.published_at DESC, a.id DESC
         LIMIT ? OFFSET ?
       SQL
+      [sql, extra_args]
     end
 
     def db

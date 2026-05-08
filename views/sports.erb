@@ -1,0 +1,172 @@
+<div class="page-header">
+  <div>
+    <h2>Sports</h2>
+    <p class="subtitle">
+      <% if @feeds_by_sport.empty? %>
+        No sports feeds subscribed yet.
+      <% else %>
+        <%= @feeds_by_sport.values.map(&:length).sum %> feed<%= 's' unless @feeds_by_sport.values.map(&:length).sum == 1 %> across
+        <%= @feeds_by_sport.keys.length %> sport<%= 's' unless @feeds_by_sport.keys.length == 1 %>
+        &middot;
+        <a href="/articles?topic=sports" title="Linear chronological list of every sports article">All sports articles &rarr;</a>
+      <% end %>
+    </p>
+    <p class="subtitle" style="font-size:0.85rem; margin-top:0.25rem">
+      Live scores, fixtures, and league standings are <em>coming</em> in a follow-up phase
+      (see Sports Phase S3+ in <a href="/feeds">TODO.md</a>). For now this page is the news side: subscribed sources + recent stories per sport.
+    </p>
+  </div>
+</div>
+
+<%# Top-of-page TOC. Two rows of pill buttons:
+    - Row 1 (anchors): jump to sport-section on this page
+    - Row 2 (links): drill into per-team detail at /sports/team/:slug
+    Sticks while scrolling so the user can navigate without
+    scrolling back up. %>
+<% rendered_sports = @sports_sub_categories.select { |s| (@feeds_by_sport[s] || []).any? || (@recent_by_sport[s] || []).any? } %>
+<% if rendered_sports.any? || (@teams_with_subs || []).any? %>
+  <nav class="sports-toc" aria-label="Jump to sport or team">
+    <% if rendered_sports.any? %>
+      <div class="sports-toc-row sports-toc-sports">
+        <span class="sports-toc-label">By sport:</span>
+        <% rendered_sports.each do |sport| %>
+          <% feeds = @feeds_by_sport[sport] || [] %>
+          <a href="#sports-<%= sport %>" class="sports-toc-button"
+             title="Jump to the <%= h(FeedCatalog::CATEGORIES[sport]) %> section">
+            <%= FeedCatalog::CATEGORIES[sport] %>
+            <% if feeds.any? %><span class="muted">(<%= feeds.length %>)</span><% end %>
+          </a>
+        <% end %>
+        <% if (@feeds_by_sport[:other] || []).any? %>
+          <a href="#sports-other" class="sports-toc-button">Other <span class="muted">(<%= @feeds_by_sport[:other].length %>)</span></a>
+        <% end %>
+      </div>
+    <% end %>
+    <% if (@teams_with_subs || []).any? %>
+      <div class="sports-toc-row sports-toc-teams">
+        <span class="sports-toc-label">By team:</span>
+        <% @teams_with_subs.each do |team| %>
+          <a href="/sports/team/<%= team[:slug] %>"
+             class="sports-toc-button sports-toc-team"
+             title="<%= h(team[:blurb]) %>">
+            <% if team[:image_url] && !team[:image_url].to_s.empty? %>
+              <img class="sports-team-logo-sm" src="<%= h(team[:image_url]) %>" alt="" loading="lazy">
+            <% else %>
+              <span class="sports-team-emoji-sm" aria-hidden="true"><%= team[:emoji] %></span>
+            <% end %>
+            <%= h(team[:short_name]) %>
+          </a>
+        <% end %>
+      </div>
+    <% end %>
+  </nav>
+<% end %>
+
+<% if @feeds_by_sport.empty? %>
+  <div class="empty-state">
+    <p>
+      Subscribe to a sports feed from the catalog at <a href="/feeds">/feeds</a> &rarr;
+      "Discover popular feeds". The 14-feed sports starter pack covers
+      Eagles / Sixers / Union / All Blacks + Black Ferns / Tennis (news + podcasts).
+    </p>
+  </div>
+<% else %>
+  <% rendered_sports.each do |sport| %>
+    <% feeds = @feeds_by_sport[sport] || [] %>
+    <% articles = @recent_by_sport[sport] %>
+    <% sport_label = FeedCatalog::CATEGORIES[sport] %>
+
+    <section id="sports-<%= sport %>" class="benchmark-section sports-section sports-<%= sport %>" style="margin-top:2rem">
+      <h3>
+        <%= sport_label %>
+        <% if articles.any? %>
+          <span class="muted" style="font-size:0.85rem; font-weight:normal">
+            (<%= articles.length %> recent article<%= 's' unless articles.length == 1 %>)
+          </span>
+        <% end %>
+      </h3>
+
+      <% if feeds.any? %>
+        <p class="subtitle sports-subscribed-feeds" style="margin-top:0.25rem">
+          <%# Each subscribed feed gets a chip — clicking goes to the
+              feed-filtered /articles list. Per-team navigation
+              effectively lives here, since each subscription IS a
+              team-level source. %>
+          <% feeds.each do |feed| %>
+            <a class="sports-feed-chip" href="/articles?feed_id=<%= feed['id'] %>"
+               title="See every article from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
+          <% end %>
+        </p>
+      <% else %>
+        <p class="subtitle muted" style="margin-top:0.25rem">
+          No <%= sport_label %> feeds subscribed yet. <a href="/feeds">Browse the catalog &rarr;</a>
+        </p>
+      <% end %>
+
+      <% if articles.any? %>
+        <ul class="sports-article-list">
+          <% articles.each do |article| %>
+            <% feed         = (@feeds_by_id || {})[article['feed_id']] %>
+            <% summary_row  = (@summaries_by_article_id || {})[article['id']] %>
+            <% summary_text = skim_summary_for(article, summary_row) %>
+            <li class="sports-article <%= 'read' if article['read'] == 1 %>">
+              <h4 class="sports-article-title">
+                <%# Headline links to the publisher's URL in a new tab —
+                    the user wants to read at the source, not the local
+                    cache. The "Open in app" link below offers the
+                    in-app reading view (with summary, tags, feedback). %>
+                <% if article['url'] && !article['url'].to_s.empty? %>
+                  <% host = (URI.parse(article['url']).host rescue nil) || 'publisher' %>
+                  <a href="<%= h(article['url']) %>" target="_blank" rel="noopener noreferrer"
+                     title="Open at <%= h(host) %> (new tab)">
+                    <%= h(article['title']) %>
+                  </a>
+                <% else %>
+                  <%= h(article['title']) %>
+                <% end %>
+              </h4>
+
+              <% unless summary_text.empty? %>
+                <p class="sports-article-summary"><%= h(summary_text) %></p>
+              <% end %>
+
+              <div class="sports-article-meta">
+                <% if feed %>
+                  <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"
+                     title="Filter to this source"><%= h(feed['title'] || feed['url']) %></a>
+                  <span class="sports-article-meta-sep">&middot;</span>
+                <% end %>
+                <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+                <% if article['author'] && !article['author'].to_s.empty? %>
+                  <span class="sports-article-meta-sep">&middot;</span>
+                  <span class="muted"><%= h(article['author']) %></span>
+                <% end %>
+                <% if article['audio_url'] && !article['audio_url'].to_s.empty? %>
+                  <span class="sports-article-meta-sep">&middot;</span>
+                  <span class="badge podcast-badge" title="Podcast episode">🎧</span>
+                <% end %>
+                <span class="sports-article-meta-sep">&middot;</span>
+                <a class="sports-article-in-app" href="/article/<%= article['uid'] %>"
+                   title="Open the in-app reading view (summary + tags + feedback)">
+                  Open in app &rarr;
+                </a>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if (@feeds_by_sport[:other] || []).any? %>
+    <section id="sports-other" class="benchmark-section sports-section" style="margin-top:2rem">
+      <h3>Other sports feeds <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @feeds_by_sport[:other].length %>)</span></h3>
+      <p class="subtitle">Sports-tagged subscriptions not in the curated catalog.</p>
+      <p class="subtitle">
+        <% @feeds_by_sport[:other].each do |feed| %>
+          <a class="sports-feed-chip" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+        <% end %>
+      </p>
+    </section>
+  <% end %>
+<% end %>

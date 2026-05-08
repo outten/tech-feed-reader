@@ -125,6 +125,7 @@ Passive feedback: the global player tracks % consumed. ≥80% = treat like 👍;
 - [x] `read_state.passive_feedback` column (Phase 4 migration `007_passive_feedback.sql`); explicit-wins guard lives in `ReadStateStore.mark_passive_feedback` so any future caller (cron, batch import) inherits it.
 - [x] Specs: 18 examples in [spec/passive_feedback_spec.rb](spec/passive_feedback_spec.rb) covering store-level explicit-wins (passive can't overwrite explicit; persists when explicit clears), validation, and the full route surface (200 happy path, 200 + applied:false when explicit present, 404 unknown uid, 400 missing/invalid signal, 400 malformed JSON, JSON content-type).
 
+
 ## "Read next" suggestion on /article/:uid
 
 **Status: `merged`** — commit `e0cbb2c`.
@@ -136,3 +137,167 @@ When the user scrolls past the bottom of the article body, a "Read next" card sl
 - [x] Fallback chain: For You ranker first; if `Recommendation::ForYou.next_after` returns nil (cold start — empty positive corpus), use the top FTS5 "Related" hit. If neither has anything, the card simply isn't rendered.
 - [x] Card label flips between "relevance pick" and "related pick" depending on which path produced the suggestion, so the user can see at a glance whether the ranker is in play yet.
 - [x] Specs: 9 examples in [spec/read_next_spec.rb](spec/read_next_spec.rb) covering `next_after` (nil article, empty corpus, top-scoring with non-empty corpus, current-article exclusion) + view-surface (FTS5 fallback path, ranker path, no-card empty case, current-article never linked back, new-tab `target="_blank"`).
+
+# Sports — broadening the product beyond technology
+
+The app started as a tech feed reader, but the user reads across categories — sports being the obvious next pillar. The user's specific interests (recorded so the seed catalog isn't generic):
+
+- **Philadelphia Eagles** (NFL)
+- **Philadelphia 76ers / Sixers** (NBA)
+- **Philadelphia Union** (MLS)
+- **New Zealand All Blacks** (men's rugby)
+- **New Zealand Black Ferns** (women's rugby)
+- **Tennis** — broadly, no team allegiance (ATP, WTA, all four Grand Slams)
+
+Sports is structurally different from articles: it has match results, fixture calendars, league standings, and per-player tracking (especially for individual sports like tennis). The plan below treats news as the "easy" first surface (RSS over the existing pipeline) and structured match/standings data as the foundation that unlocks the score / chart / calendar pages the user asked for.
+
+**Recommended ship order**: S1 + S2 first (immediate value from RSS news through the existing pipeline) → S3 (schema for structured sports data) → S4 (ESPN provider for the leagues it covers — NFL/NBA/MLS) → S5 (`/sports` overview UI) → S6 onward (per-sport detail pages, charts, standings).
+
+## Sports — Phase S1: topic-aware feeds
+
+**Status: `tests`** — outten/TODO-050, awaiting user approval to commit + open PR
+
+Foundation. The current `feeds` table is undifferentiated; every feed flows into the unified `/articles` pipeline. Adding sports needed a top-level grouping so a user can browse "just sports" / "just tech" and so the For You ranker can scope its corpus per topic later.
+
+Naming: the new column is `topic` (not `category`) because the existing `FeedCatalog` already uses `:category` as the sub-category (`:aggregator` / `:engineering` / `:podcast`). Two-level taxonomy = `:topic` (top-level: technology, sports) → `:category` (sub-level inside that topic).
+
+- [x] **Schema**: `feeds.topic TEXT NOT NULL DEFAULT 'general'` + index, migration `011_feeds_topic.sql`. Backfill all existing rows to `topic='technology'`.
+- [x] **Store**: `FeedsStore.add` accepts `topic:` (defaults to `'general'`); `FeedsStore.update` allows it through.
+- [x] **Catalog**: `FeedCatalog::TOPICS` constant + `CATEGORY_TO_TOPIC` map + `topic_for(entry)` helper + `by_topic` two-level nest. Topic derived from the existing `:category` so individual entries don't carry both fields.
+- [x] **Filter**: `/articles?topic=…` filter via `state_query`'s new `topic:` kwarg (parameterised through an EXISTS sub-query against feeds). Composes with state / kind / view / sort / feed_id / tag / page in `filter_url`. Topic chips render in the state-filter row only when the user has feeds in ≥2 topics.
+- [x] **Catalog-add propagates topic**: both `POST /feeds/catalog/add` (form) and the JSON-API equivalent now pass the resolved topic into `FeedsStore.add`. Verified live: subscribing to Bleeding Green Nation via the catalog stores `topic='sports'`.
+- [ ] **For You scope**: deferred to a follow-up. With limited corpus today the cross-topic bleed is small; will land after the user has built up sports corpus through use.
+- [x] **Specs**: 17 examples in [spec/feeds_topic_spec.rb](spec/feeds_topic_spec.rb) covering store defaults / explicit topic / update; catalog `TOPICS` + `CATEGORY_TO_TOPIC` consistency + `topic_for(category|entry)` + 8-sports-entries census + `by_topic` shape; ArticlesStore topic filter (incl. composes with state filter, empty result on no-match); /articles route surface (rendered list filters, invalid value falls through, chip preserves topic via `filter_url`); catalog-add route (sports url → sports topic, tech url → technology topic).
+
+## Sports — Phase S2: seed the user's sports RSS feeds
+
+**Status: `tests`** — outten/TODO-050 (bundled with S1), awaiting user approval to commit + open PR
+
+Eight catalog entries verified live (HTTP 200 + valid RSS/Atom signature) covering all six of the user's stated interests. Feeds aren't auto-seeded — adoption is opt-in via the catalog's "+ Add" buttons, matching how the existing tech-podcast catalog works.
+
+Quick, immediate-value win once S1 lands. Curates the user's specific teams as catalog entries with `:category => :sports`. Articles flow through the existing scheduler / parser / search / feedback pipeline — no new code paths.
+
+- [ ] **Eagles** — [Bleeding Green Nation](https://www.bleedinggreennation.com/) is the SB Nation community blog with active beat-writer coverage; SB Nation sites publish RSS at `/rss/index.xml` (verify on add). [PhillyVoice Sports RSS](https://www.phillyvoice.com/rss-feeds/) also covers Eagles among Philadelphia teams.
+- [ ] **Sixers** — [Liberty Ballers](https://www.libertyballers.com/) (SB Nation, same `/rss/index.xml` convention). PhillyVoice as a second source.
+- [ ] **Union** — [Brotherly Game](http://www.brotherlygame.com/) (SB Nation) + [The Philly Soccer Page](https://phillysoccerpage.net/) (independent, has WordPress RSS).
+- [ ] **All Blacks (men's)** — [Stuff Rugby](https://www.stuff.co.nz/sport/rugby) (NZ's largest news site; RSS at `https://www.stuff.co.nz/rss/sport/rugby/`), [RNZ Sport RSS](https://www.rnz.co.nz/rss/sport.xml), [NZ Herald All Blacks](https://www.nzherald.co.nz/sport/rugby/all-blacks/).
+- [ ] **Black Ferns** — [allblacks.com Black Ferns](https://www.allblacks.com/teams/black-ferns) (official) + [NZ Herald Black Ferns](https://www.nzherald.co.nz/sport/rugby/black-ferns/). RSS coverage thinner than men's; if no RSS, defer to Phase S4 structured fixtures.
+- [ ] **Tennis** — [ATP Tour RSS](https://www.atptour.com/en/media/rss-feed), [ESPN Tennis](https://www.espn.com/tennis/), and Tennis365 (`https://tennis365.com/feed`).
+- [ ] **Specs**: catalog entries surface with the right category; subscribed Eagles articles render under `/articles?category=sports`; one-shot `make seed-sports-feeds` script (analogous to `make seed-feeds`).
+
+## Sports — Phase S3: structured-data schema (matches, teams, players, leagues)
+
+**Status: `not implemented`**
+
+News alone isn't enough — the user asked for "scores of recent games, charts of performance in leagues". That requires structured records, not free-text articles. New tables sit alongside the existing schema; no migration of the article tables.
+
+- [ ] **Schema** (`012_sports_core.sql`):
+  - `sports_leagues (id, slug, name, sport, source_provider, external_id, country, season_year)` — e.g. `(1, 'nfl', 'NFL', 'football', 'espn', 'nfl', 'US', 2026)`.
+  - `sports_teams (id, league_id, slug, name, short_name, location, source_provider, external_id, image_url)` — e.g. Eagles row tied to NFL league.
+  - `sports_matches (id, league_id, home_team_id, away_team_id, scheduled_at, status, home_score, away_score, period, venue, source_provider, external_id, last_synced_at)` — `status ∈ {scheduled, live, final, postponed, cancelled}`. Composite UNIQUE on `(source_provider, external_id)` for idempotent upserts.
+  - `sports_players (id, sport, slug, full_name, country, image_url, source_provider, external_id)` — primarily for tennis follows. NULL `team_id` for individual-sport players.
+  - `sports_follows (kind, value, created_at)` — analogous to `mute_rules`; `kind ∈ {team, player, league}`. The user's "I follow the Eagles + Black Ferns + Iga Świątek" list. Drives every UI surface below.
+- [ ] **Stores**: `SportsLeaguesStore`, `SportsTeamsStore`, `SportsMatchesStore`, `SportsPlayersStore`, `SportsFollowsStore` — same hash-row return shape as the existing stores.
+- [ ] **Specs**: schema round-trip; idempotent upsert by `(source_provider, external_id)`; cascade behaviour when a league is removed; follows CRUD.
+
+## Sports — Phase S4: data providers — ESPN (NFL/NBA/MLS) + TheSportsDB (rugby/tennis)
+
+**Status: `not implemented`**
+
+Two providers because no single free source covers everything the user follows.
+
+- [ ] **`Providers::ESPN`** ([reverse-engineered public endpoints](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b), [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API)). Free, no auth, no documented rate limit. Covers the user's three Philadelphia teams via:
+  - `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/phi` (Eagles)
+  - `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/phi` (Sixers)
+  - `https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/teams/phi` (Union)
+  - Scoreboard endpoint per-league for live + recent: `.../sports/<sport>/<league>/scoreboard`
+  - Caveat: undocumented, ESPN can break it without notice. Wrap calls in `HealthRegistry.measure` and fall back gracefully.
+- [ ] **`Providers::TheSportsDB`** ([thesportsdb.com](https://www.thesportsdb.com/), [free API docs](https://www.thesportsdb.com/free_sports_api)). Free tier, ~30 req/min, JSON. Covers rugby (All Blacks, Black Ferns, Super Rugby) and tennis (ATP, WTA, Grand Slam draws) which ESPN's hidden API doesn't. Crowd-sourced — accept gaps for smaller leagues.
+- [ ] **Cron-style ingestion**: `make sync-sports` (= `scripts/sync_sports.rb`) walks the user's `sports_follows` list, calls the right provider per team/player, upserts into `sports_matches`. Idempotent; safe to run hourly.
+- [ ] **Specs**: HTTP stubbed; verify the upsert is idempotent across two consecutive syncs; verify a deleted match upstream doesn't get re-resurrected (track `last_synced_at`).
+
+Sources for this phase: ESPN endpoint catalogue [(akeaswaran gist)](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b), [Zuplo's ESPN guide](https://zuplo.com/learning-center/espn-hidden-api-guide), [TheSportsDB free API page](https://www.thesportsdb.com/free_sports_api).
+
+## Sports — Phase S5: `/sports` overview page
+
+**Status: `tests` (news-only v1)** — outten/TODO-050 (bundled with S1+S2)
+
+The user asked: "Should we create a top level Sports page that aggregates the sports info?" The answer was yes, but the structured data (live scores, results, upcoming fixtures) won't exist until S3+ ships. So this PR delivers the **news-only** version of S5 — per-sport sections with subscribed feeds + recent articles — and the Live / Results / Upcoming sections will land on the same page once the structured-data schema arrives.
+
+- [x] **News-only layout shipping now**: per-sport sections (NFL / NBA / Soccer / Rugby / Tennis) — each renders subscribed feeds (linked) + the 8 most recent articles in that sport. Sections that have neither subscribed feeds nor articles are suppressed, so a single-sport user doesn't see four empty placeholders. Plus an "Other sports feeds" section for any sports-tagged URLs not in the curated catalog.
+- [x] **Top nav** gains a "Sports" link.
+- [x] **Empty state**: "No sports feeds subscribed yet" + pointer to /feeds catalog.
+- [x] **Sports podcasts surface here too** — they're tagged with the sport's category (`:nfl`/`:nba`/`:soccer`/`:rugby`/`:tennis`), so audio shows alongside news. The 8-feed news catalog grew to 14 (+ 6 podcasts: Bleeding Green Nation Pod, Sixers Talk, All Three Points, Aotearoa Rugby Pod, Good/Bad/Rugby AusNZ, The Tennis Podcast).
+- [x] **Specs**: 7 examples in [spec/sports_route_spec.rb](spec/sports_route_spec.rb) — empty state, per-sport section composition, article-link round-trip, suppressing empty sections, "Other" bucket for uncatalogued URLs, header counts, top-nav highlight.
+- [ ] **Live now / Recent results / Upcoming sections** — defer to the same `/sports` route once Phase S3 (structured-data schema) + Phase S4 (provider sync) land. Same page, just three additional sections at the top.
+
+## Sports — Phase S6: per-team detail page + performance chart
+
+**Status: `tests` (news-only v1)** — outten/TODO-050 (bundled with S1+S2+S5)
+
+The user asked for "buttons in the Executive Summary of the area to filter on sports team … with simple, but nice articles on them". That's the per-team detail page; structured-data parts (matches, charts, standings) wait on Phase S3+.
+
+- [x] **`/sports/team/:slug`** route — renders articles + podcast episodes from every catalog feed_url that belongs to the team AND is subscribed by the user. Uses the same vertical-card layout as `/sports`.
+- [x] **`SportsTeams` data module** ([app/sports_teams.rb](app/sports_teams.rb)) — five teams covering the user's interests (Eagles, Sixers, Union, NZ Rugby/All-Blacks, Tennis). Each team carries slug / name / sport / emoji / blurb / `feed_urls` (intersected with `FeedsStore.find_by_url` to figure out actual subscriptions). Catalog is the single source of truth — every `feed_url` in TEAMS must already exist in `FeedCatalog::CATALOG` (asserted in the spec).
+- [x] **Team button strip** in the `/sports` TOC — second row of pills with team logos/emoji + short name. Only renders teams with ≥1 subscribed feed (no point linking to a team page that's empty). Click → `/sports/team/<slug>`.
+- [x] **Logos**: emoji defaults today (🦅 Eagles / 🏀 Sixers / ⚽ Union / 🏉 All Blacks / 🎾 Tennis). Each team carries an `:image_url` field that's `nil` for now — a follow-up PR can drop in real logo URLs without a schema change.
+- [x] **Empty state** when team is followed in TEAMS but no feeds subscribed: shows the catalog candidates the user could add ("Bleeding Green Nation — Multi-show audio network…", etc).
+- [ ] **Last-N matches table + win/loss chart + league record** — defer to S3+ once structured match data exists. Same route, additional sections.
+- [x] **Specs**: 14 examples in [spec/sports_team_route_spec.rb](spec/sports_team_route_spec.rb) covering the data module (TEAMS shape, all feed_urls catalog-resolvable, `find` happy + nil paths, `subscribed_feeds_for` intersection), the route (header rendering, articles flow, empty state, 404 on unknown slug, multi-feed chronological merge), and the /sports TOC team-row (suppress when no subs, render only teams with ≥1 sub).
+
+## Sports — Phase S7: per-sport landing pages + tennis player follows
+
+**Status: `not implemented`**
+
+`/sports/sport/:slug` (e.g. `/sports/sport/tennis`) — tennis especially is what the user described in detail. Tennis is fundamentally individual-sport, so the page is player-centric, not team-centric.
+
+- [ ] **Tennis landing** (`/sports/sport/tennis`):
+  - "My players" section listing followed players with their last result + next match.
+  - Live scoreboard panel for any active Grand Slam draws (TheSportsDB tournament endpoint).
+  - Follow / unfollow form (search by player name → resolve to `sports_players` row → insert into `sports_follows`).
+- [ ] **Rugby landing** (`/sports/sport/rugby`): Super Rugby / Rugby Championship results + Black Ferns Pacific Four + WXV. Mostly team-centric; reuses Phase S6 components.
+- [ ] **NFL / NBA / MLS landings**: reuse Phase S6's per-team rendering, just listing all the user's followed teams in that sport.
+- [ ] Specs: tennis player follow round-trip, landing-page composition, empty states.
+
+## Sports — Phase S8: league standings tables
+
+**Status: `not implemented`**
+
+`/sports/league/:slug` (e.g. `/sports/league/nfl`) — full league table for a sport the user follows. Useful context for "where do the Eagles sit in the NFC East?"
+
+- [ ] Standings query: pull from the provider that supplied the league (ESPN for NFL/NBA/MLS, TheSportsDB for Super Rugby).
+- [ ] Highlight the row(s) for teams the user follows.
+- [ ] Click a row → that team's `/sports/team/:slug` detail.
+- [ ] Specs: standings render, followed-team highlight, sort order matches the source.
+
+## Sports — Phase S9: calendar / upcoming + iCal export
+
+**Status: `not implemented`**
+
+Aggregate "everything I follow" into a single chronological feed of upcoming fixtures.
+
+- [ ] `/sports/calendar` page: next ~30 days of scheduled matches across all follows, grouped by day.
+- [ ] iCal export: `/sports/calendar.ics` → drop into Apple Calendar / Google Calendar. Each `VEVENT` is a match with venue, opponent, broadcast info if available. Refresh-friendly URL.
+- [ ] Specs: ordering, day-grouping, iCal validation.
+
+## Sports — Phase S10: cross-category personalization
+
+**Status: `not implemented`**
+
+The For You ranker shipped in Phase 6 was scoped globally. With sports + tech in the same DB, the corpus needs scoping (already added in Phase S1) AND the AI triage (`Triage::Claude`) should run per-category by default — "what should I read in tech today" and "what's important in sports today" are different questions.
+
+- [ ] `/articles?sort=relevance&category=sports` ranks within sports only. Same for tech.
+- [ ] `/triage?category=sports` runs a sports-only triage. UI: a category chip in the page header (`all | sports | technology`).
+- [ ] Daily cron — run two triages, one per category, persist both. Browse history at `/triage?category=…`.
+- [ ] Specs: per-category corpus selection, route filter, cron multi-run.
+
+---
+
+## Out of scope for the sports rollout (intentionally)
+
+Recording the things we discussed and decided NOT to do, so the next reader doesn't think they're oversights:
+
+- **Live in-game commentary / play-by-play streams** — too noisy for an aggregator, better served by ESPN / streaming providers directly.
+- **Fantasy / betting integrations** — not the use case.
+- **Paid sports APIs (Sportradar, MySportsFeeds)** — free providers cover the user's interests; cost only justified once the user explicitly outgrows free-tier limits.
+- **Push notifications for live scores** — non-goal per SPEC.md ("real-time push" is a non-goal). User is welcome to subscribe to the iCal for upcoming-match reminders.
