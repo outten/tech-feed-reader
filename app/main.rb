@@ -3,13 +3,10 @@ require 'sinatra/base'
 require 'json'
 require 'time'
 require 'cgi'
-require 'dotenv'
 
-# Load credentials (Anthropic API key for Tier 2 summarization, etc.).
-# `.credentials` is canonical; `.env` is a Dotenv default that we honour
-# but don't write to. Both are git-ignored.
-Dotenv.load(File.expand_path('../../.credentials', __FILE__))
-Dotenv.load(File.expand_path('../../.env', __FILE__))
+# Loads .credentials + .env and aliases CLAUDE_API_KEY → ANTHROPIC_API_KEY
+# so the Anthropic SDK picks it up. See app/credentials.rb.
+require_relative 'credentials'
 
 require_relative 'logger'
 require_relative 'database'
@@ -24,12 +21,23 @@ require_relative 'scheduler'
 require_relative 'summary_store'
 require_relative 'summarizer/extractive'
 require_relative 'summarizer/claude'
+require_relative 'chat'
+require_relative 'digests'
+require_relative 'digest_store'
+require_relative 'background_pool'
+require_relative 'feed_feedback_store'
+require_relative 'mute_rules_store'
 require_relative 'opml'
 require_relative 'recommendation'
+require_relative 'recommendation/for_you'
+require_relative 'triage/claude'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'version'
+require_relative 'tracing'
 require_relative 'metrics'
+require_relative 'request_log_middleware'
+require_relative 'pruner'
 require_relative 'metrics_middleware'
 
 # Sidekiq client config + the worker class. Loading the config only
@@ -76,22 +84,11 @@ class TechFeedReader < Sinatra::Base
   # method / path / status / latency. Errors get a separate event
   # before being re-raised. See app/logger.rb for the format.
 
-  before do
-    @request_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-  end
-
-  after do
-    next if @request_started_at.nil?
-    ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - @request_started_at) * 1000).round
-    AppLogger.info(
-      'http_request',
-      method:     request.request_method,
-      path:       request.path_info,
-      query:      request.query_string.empty? ? nil : request.query_string,
-      status:     response.status,
-      latency_ms: ms
-    )
-  end
+  # Cosmetics 7 — request logging is now done by RequestLogMiddleware
+  # at the Rack layer (see `use` block above), which catches static
+  # assets too. The old Sinatra before/after pair only saw dynamic
+  # routes, which is why "I don't see page loads" looked broken even
+  # though some loads were being logged.
 
   error do
     err = env['sinatra.error']
@@ -115,6 +112,32 @@ class TechFeedReader < Sinatra::Base
     end
 
     # Used in feed-fetch UI; ISO8601 timestamps become "2 minutes ago".
+    # Skim-mode summary line: prefer LLM, fall back to extractive,
+    # else a content_text excerpt. Mirrors the precedence chain used
+    # by Digests.pick_summary so the two views read consistently.
+    SKIM_EXCERPT_FALLBACK_CHARS = 240
+    def skim_summary_for(article, summary_row)
+      llm = summary_row && summary_row['llm'].to_s.strip
+      return llm unless llm.nil? || llm.empty?
+      extractive = summary_row && summary_row['extractive'].to_s.strip
+      return extractive unless extractive.nil? || extractive.empty?
+      excerpt = article['content_text'].to_s.strip
+      return '' if excerpt.empty?
+      excerpt.length > SKIM_EXCERPT_FALLBACK_CHARS ? "#{excerpt[0, SKIM_EXCERPT_FALLBACK_CHARS].rstrip}…" : excerpt
+    end
+
+    # JSON body parser for routes that take application/json. Returns
+    # nil on malformed input so the caller can 400 cleanly without a
+    # raised exception leaking out of the route block.
+    def parse_json_body
+      raw = request.body.read
+      request.body.rewind
+      return nil if raw.to_s.strip.empty?
+      JSON.parse(raw)
+    rescue JSON::ParserError
+      nil
+    end
+
     def relative_time(iso)
       return '—' if iso.nil? || iso.to_s.empty?
       t = iso.is_a?(Time) ? iso : (Time.parse(iso.to_s) rescue nil)
@@ -196,7 +219,8 @@ class TechFeedReader < Sinatra::Base
     # (server-side) and the /api/feeds endpoints (returned as `row_html`)
     # so JS-inserted rows match server-rendered ones.
     def render_feed_row(feed)
-      erb :_feed_row, locals: { feed: feed }, layout: false
+      weight = FeedFeedbackStore.weight_for(feed['id'])
+      erb :_feed_row, locals: { feed: feed, weight: weight }, layout: false
     end
 
     # Format a duration in seconds as "12:34" or "1:23:45". Returns
@@ -226,6 +250,42 @@ class TechFeedReader < Sinatra::Base
       i = units.length - 1 if i >= units.length
       value = bytes.to_f / (1024**i)
       format(i.zero? ? '%d %s' : '%.1f %s', value, units[i])
+    end
+
+    # Build the /articles query string from the current filter state, with
+    # per-call overrides. Captures state / kind / view / sort / feed_id /
+    # tag / page so chip toggles and the pager don't have to hand-stitch
+    # the query string (and silently drop params they forgot about — that
+    # was the bug behind "turning on Skim reverts to page 1," because the
+    # skim toggle's hand-built URL didn't carry `page`).
+    #
+    # Defaults (state=:all, view=:default, sort=:chronological, kind=:all,
+    # page=1) are dropped from the URL — the bare `/articles` route
+    # already lands you in those, so emitting them only adds noise.
+    #
+    # Pass nil in `overrides` to clear an inherited param. Example:
+    #
+    #   filter_url(view: :skim)            # → preserves everything, adds skim
+    #   filter_url(view: nil)              # → preserves everything, removes skim
+    #   filter_url(state: :unread, page: nil) # changing state resets pagination
+    def filter_url(overrides = {})
+      current = {
+        state:   @state_filter == :all          ? nil : @state_filter,
+        kind:    @kind_filter == :podcast       ? :podcast    : nil,
+        view:    @view_filter == :skim          ? :skim       : nil,
+        sort:    @sort_filter == :relevance     ? :relevance  : nil,
+        feed_id: @feed_filter && @feed_filter['id'],
+        tag:     @tag_filter  && @tag_filter['id'],
+        page:    (@page && @page > 1)           ? @page       : nil
+      }
+
+      merged = current.merge(overrides)
+      # Iterate in a fixed canonical order so URLs are stable regardless
+      # of which override the caller passed first.
+      pairs = %i[state kind view sort feed_id tag page]
+                .map { |k| [k, merged[k]] }
+                .reject { |_, v| v.nil? || v.to_s.empty? }
+      pairs.empty? ? '?' : "?#{pairs.map { |k, v| "#{k}=#{v}" }.join('&')}"
     end
   end
 
@@ -314,7 +374,11 @@ class TechFeedReader < Sinatra::Base
     @bookmark_count   = ReadStateStore.bookmarked_count
     @feed_count       = FeedsStore.count
     @degraded         = HealthRegistry.degraded?
-    @daily_counts     = ArticlesStore.daily_counts(days: 30)
+    # Cosmetics 5 — drive the activity chart from the actual retention
+    # window. RETENTION_DAYS=7 means anything older was already swept
+    # by Pruner, so a 30-day chart is mostly empty axes.
+    @activity_window  = Pruner.effective_retention_days
+    @daily_counts     = ArticlesStore.daily_counts(days: @activity_window)
     @top_feeds        = ArticlesStore.counts_by_feed(limit: 10)
     @top_tags_week    = TagsStore.top_in_window(days: 7, limit: 8)
     @topic_clusters   = TopicClusters.recent(days: 14, limit: 8)
@@ -337,17 +401,35 @@ class TechFeedReader < Sinatra::Base
     @state_filter = :all unless ARTICLES_STATE_FILTERS.include?(@state_filter)
 
     @kind_filter = params['kind'].to_s == 'podcast' ? :podcast : :all
+    @view_filter = params['view'].to_s == 'skim' ? :skim : :default
+    @sort_filter = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     @articles = if @tag_filter
                   ArticlesStore.for_tag(tag_id, limit: @per_page, offset: offset, state: @state_filter)
                 elsif @feed_filter
                   ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset, state: @state_filter)
+                elsif @sort_filter == :relevance
+                  # Phase 6 — For You ranker. Forces state=:unread for
+                  # the relevance feed (re-ranking already-read articles
+                  # is rarely what the user wants); the chips above still
+                  # render so they can flip back to chronological with
+                  # any state.
+                  @state_filter = :unread
+                  Recommendation::ForYou.score_window(state: :unread, kind: @kind_filter,
+                                                      limit: @per_page, offset: offset)
                 else
                   ArticlesStore.recent(limit: @per_page, offset: offset, state: @state_filter, kind: @kind_filter)
                 end
 
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @tags_by_article = TagsStore.tags_for_articles(@articles.map { |a| a['id'] })
+    # Skim mode shows a summary line per row — batch-fetch the cached
+    # summaries for the page so the view doesn't N+1 SummaryStore.find.
+    @summaries_by_article_id = if @view_filter == :skim
+                                 SummaryStore.find_for_ids(@articles.map { |a| a['id'] })
+                               else
+                                 {}
+                               end
     erb :articles
   end
 
@@ -356,12 +438,131 @@ class TechFeedReader < Sinatra::Base
   # so the user can spot the freshest show at a glance. Below, the
   # most recent N episodes across all shows render as cards — each
   # card links to /article/:uid where the player lives.
+  # Bus mode — "what's short enough for my commute?" Lists recent
+  # podcast episodes whose runtime is at-or-under the cutoff. Default
+  # 15 minutes; override via ?max_minutes= for a longer commute.
+  BUS_DEFAULT_MAX_MINUTES = 15
+  BUS_MAX_MINUTES_LIMIT   = 90  # absolute ceiling so a malicious URL can't pull the full corpus
+  BUS_LIMIT               = 25
+
+  get '/bus' do
+    @page_title       = 'Bus mode'
+    requested_minutes = params['max_minutes'].to_s
+    @max_minutes      = requested_minutes.match?(/\A\d+\z/) ? requested_minutes.to_i.clamp(1, BUS_MAX_MINUTES_LIMIT) : BUS_DEFAULT_MAX_MINUTES
+    @cutoff_seconds   = @max_minutes * 60
+
+    @episodes    = ArticlesStore.recent(
+      limit:                BUS_LIMIT,
+      kind:                 :podcast,
+      max_duration_seconds: @cutoff_seconds
+    )
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :bus
+  end
+
   get '/podcasts' do
     @page_title       = 'Podcasts'
     @shows            = ArticlesStore.podcast_feeds
     @recent_episodes  = ArticlesStore.recent(limit: 25, kind: :podcast)
     @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     erb :podcasts
+  end
+
+  # Stored digests, newest first. `make digest` (cron) appends to this
+  # list; the detail view renders the saved html_body inline.
+  get '/digests' do
+    @page_title = 'Digests'
+    @digests    = DigestStore.recent(limit: 100)
+    erb :digests
+  end
+
+  get '/digests/:id' do |id|
+    @digest = DigestStore.find(id)
+    halt 404, 'Digest not found' unless @digest
+    @page_title       = @digest['subject']
+    @claude_available = Summarizer::Claude.available?
+    erb :digest
+  end
+
+  # Manual Claude summary of a digest. Cached on the row (one-shot
+  # per digest), so a re-visit of /digests/:id never re-spends tokens.
+  # Returns a notice when the row already has a summary, surfacing
+  # to the user that no API call was made. Inputs come from the
+  # digest's stored text_body, which is composed offline by
+  # `make digest`, so this route is fast and doesn't need Sidekiq.
+  post '/digests/:id/summarize' do |id|
+    digest = DigestStore.find(id)
+    halt 404 unless digest
+
+    if digest['llm_summary'].to_s.strip != ''
+      AppLogger.info('digest_summarize', id: id, status: :cached)
+      redirect to("/digests/#{id}?notice=already-summarized")
+    end
+
+    result = Summarizer::Claude.summarize_digest(
+      subject:   digest['subject'],
+      text_body: digest['text_body']
+    )
+    case result.status
+    when :ok
+      DigestStore.update_llm_summary(id, summary: result.text, model: result.model)
+      AppLogger.info('digest_summarize', id: id, status: :ok, model: result.model)
+      redirect to("/digests/#{id}?notice=llm-summarized&model=#{CGI.escape(result.model.to_s)}")
+    when :unavailable
+      redirect to("/digests/#{id}?error=llm-unavailable")
+    when :empty
+      redirect to("/digests/#{id}?error=empty-content")
+    else
+      redirect to("/digests/#{id}?error=llm-failed&msg=#{CGI.escape(result.error.to_s)}")
+    end
+  end
+
+  # Phase 8 — AI-assisted triage. GET shows the empty state with a
+  # "Generate" button (same UX as manual digests); POST runs the
+  # triage and renders the result inline. No DB persistence v1 —
+  # corpus shifts daily anyway, and re-triggering is cheap. Refresh
+  # after POST does re-trigger (no PRG dance), which is the same
+  # trade-off we accept for /digests' manual button.
+  get '/triage' do
+    @page_title       = 'Triage'
+    @claude_available = Triage::Claude.available?
+    @triage_result    = nil
+    erb :triage
+  end
+
+  post '/triage' do
+    @page_title       = 'Triage'
+    @claude_available = Triage::Claude.available?
+    @triage_result    = Triage::Claude.run
+    AppLogger.info('triage_manual_trigger',
+                   status:        @triage_result.status,
+                   unread_count:  @triage_result.unread_count,
+                   must_read:     @triage_result.must_read.to_a.length,
+                   optional:      @triage_result.optional.to_a.length,
+                   skip:          @triage_result.skip.to_a.length)
+    # Look up titles + feed names so the view can render rows without
+    # a per-uid ArticlesStore.find_by_uid loop.
+    uids = (@triage_result.must_read.to_a + @triage_result.optional.to_a + @triage_result.skip.to_a)
+             .map { |e| e['uid'] }.compact
+    @articles_by_uid = uids.each_with_object({}) do |uid, h|
+      a = ArticlesStore.find_by_uid(uid)
+      h[uid] = a if a
+    end
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :triage
+  end
+
+  # Manual digest trigger — same code path as `make digest` (the cron
+  # script), but kicked off from the /digests page button. Composition
+  # is fast (one SQL pull + render, ~50ms typical) so we run inline
+  # rather than enqueueing to Sidekiq. ?window_hours and ?limit
+  # override the defaults if the user wants a longer or wider digest.
+  post '/digests' do
+    window = (params['window_hours'].to_s.match?(/\A\d+\z/) ? params['window_hours'].to_i : Digests::DEFAULT_WINDOW_HOURS).clamp(1, 720)
+    limit  = (params['limit'].to_s.match?(/\A\d+\z/)        ? params['limit'].to_i        : Digests::DEFAULT_LIMIT).clamp(1, 200)
+    id, result = Digests.generate_and_store!(window_hours: window, limit: limit)
+    AppLogger.info('digest_manual_trigger', id: id, count: result.count, window_hours: window)
+    redirect to("/digests/#{id}?notice=generated&count=#{result.count}")
   end
 
   get '/article/:uid' do |uid|
@@ -375,8 +576,21 @@ class TechFeedReader < Sinatra::Base
     @summary         = SummaryStore.find(@article['id'])
     @claude_available = Summarizer::Claude.available?
     @related         = Recommendation.for_article(@article, limit: 5)
+    # Phase 7 — single-card "Read next" suggestion below the article
+    # body. Tries the personalised For You ranker first; when the
+    # positive corpus is empty (cold start) or it can't pick a row,
+    # falls back to the existing FTS5 "Related" top hit.
+    @read_next       = Recommendation::ForYou.next_after(@article) ||
+                       @related.find { |a| a['id'] != @article['id'] }
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title      = @article['title']
+    # Chat context — give the assistant the article body (capped) so
+    # it can answer questions about what the user is reading. The
+    # widget reads window.PAGE_CONTEXT and posts it to /chat.
+    @chat_context    = {
+      title:   @article['title'].to_s,
+      excerpt: @article['content_text'].to_s
+    }
     erb :article
   end
 
@@ -401,6 +615,49 @@ class TechFeedReader < Sinatra::Base
   # "Summarize with Claude"). Cached forever per article id; never
   # auto-invalidated. The button is hidden in the view when
   # Summarizer::Claude.available? is false (no API key set).
+  # Chat backend for the floating widget. Stateless on the server —
+  # the widget keeps the message thread in localStorage (per page URL)
+  # and replays it on every turn. Body is JSON:
+  #   { message, history: [{role, content}, ...], context: {url, title, excerpt} }
+  # Response shape mirrors Chat::Claude::Result.
+  post '/chat' do
+    content_type :json
+
+    payload = parse_json_body
+    halt 400, { status: 'error', error: 'invalid JSON body' }.to_json unless payload
+
+    result = Chat::Claude.respond(
+      message: payload['message'].to_s,
+      history: payload['history'] || [],
+      context: {
+        url:     payload.dig('context', 'url').to_s,
+        title:   payload.dig('context', 'title').to_s,
+        excerpt: payload.dig('context', 'excerpt').to_s
+      }
+    )
+
+    case result.status
+    when :ok
+      { status: 'ok', reply: result.text, model: result.model, usage: result.usage }.to_json
+    when :unavailable
+      status 503
+      { status: 'unavailable', error: 'Claude not configured (set CLAUDE_API_KEY in .credentials)' }.to_json
+    when :empty
+      status 400
+      { status: 'empty', error: 'message cannot be empty' }.to_json
+    else
+      status 500
+      { status: 'error', error: result.error.to_s }.to_json
+    end
+  end
+
+  # Lightweight probe so the widget's bootstrap JS can hide the button
+  # entirely when Claude isn't configured.
+  get '/chat/health' do
+    content_type :json
+    { available: Chat::Claude.available?, model: Chat::Claude::MODEL }.to_json
+  end
+
   post '/article/:uid/summarize/llm' do |uid|
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
@@ -442,6 +699,140 @@ class TechFeedReader < Sinatra::Base
     value = params['value'] != '0'
     ReadStateStore.mark_archived(article['id'], value: value)
     redirect to(params['return_to'] || "/article/#{uid}")
+  end
+
+  # Phase 3 — per-article 👍/👎 valence. Body param `value` ∈ {1, -1, 0}.
+  # Toggle behaviour lives at the UI layer (the button form posts the
+  # next state — clicking 👍 when already +1 posts 0 to clear).
+  post '/article/:uid/feedback' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    value = case params['value'].to_s
+            when '1', '+1' then 1
+            when '-1'      then -1
+            when '0', ''   then 0
+            else                halt 400, 'feedback value must be -1, 0, or +1'
+            end
+    ReadStateStore.mark_feedback(article['id'], value: value)
+    AppLogger.info('article_feedback', uid: uid, value: value)
+    redirect to(params['return_to'] || "/article/#{uid}")
+  end
+
+  # Phase 4 — passive listened-percent signal posted by the global
+  # player. Accepts JSON `{signal: -1|0|1, listened_pct: 0..1}`. The
+  # listened_pct is logged for telemetry but the persisted signal is
+  # whatever the player resolved to (≥80% ⇒ +1, <10% with >30s
+  # playback ⇒ -1). Explicit feedback (Phase 3) always wins — the
+  # store's mark_passive_feedback no-ops if `feedback != 0`.
+  #
+  # Uses sendBeacon from the player on pagehide, so the response body
+  # is best-effort; we still return JSON for the on-ended path which
+  # uses fetch().
+  post '/api/podcasts/:uid/feedback' do |uid|
+    content_type :json
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'unknown uid') unless article
+
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    signal = body['signal']
+    halt 400, JSON.generate(error: 'signal must be -1, 0, or +1') unless [-1, 0, 1].include?(signal)
+
+    listened_pct = body['listened_pct'].to_f
+    explicit_present = ReadStateStore.get(article['id'])['feedback'].to_i != 0
+    ReadStateStore.mark_passive_feedback(article['id'], value: signal)
+
+    AppLogger.info('podcast_passive_feedback',
+                   uid: uid, signal: signal, listened_pct: listened_pct,
+                   explicit_present: explicit_present)
+
+    JSON.generate(ok: true, applied: !explicit_present, explicit_present: explicit_present)
+  end
+
+  # Phase 3 — per-feed weighting. Body param `direction` ∈ up | down | reset.
+  # Each click bumps by FeedFeedbackStore::STEP (0.25), clamped to
+  # [FLOOR, CEILING]. :reset deletes the row.
+  post '/feeds/:id/feedback' do |id|
+    feed = FeedsStore.find(id.to_i)
+    halt 404 unless feed
+    direction = params['direction'].to_s.to_sym
+    halt 400, 'direction must be up, down, or reset' unless FeedFeedbackStore::DIRECTIONS.include?(direction)
+    weight = FeedFeedbackStore.bump(feed['id'], direction: direction)
+    AppLogger.info('feed_feedback', feed_id: feed['id'], direction: direction, weight: weight)
+    redirect to(params['return_to'] || '/feeds')
+  end
+
+  # Phase 5 — mute filters. Hard-hide rules; matching articles
+  # disappear from /articles and any state_query-backed list, but stay
+  # in the DB and remain reachable via /search.
+  #
+  # POST /mutes        body: kind ∈ {keyword,author,feed}, value (non-empty)
+  # POST /mutes/delete body: kind, value
+  post '/mutes' do
+    kind  = params['kind'].to_s
+    value = params['value'].to_s
+    halt 400, "kind must be one of #{MuteRulesStore::KINDS.join(', ')}" unless MuteRulesStore::KINDS.include?(kind)
+    halt 400, 'value must be non-empty' if value.strip.empty?
+
+    added = MuteRulesStore.add(kind: kind, value: value)
+    AppLogger.info('mute_rule_add', kind: kind, value: value, added: added)
+    redirect to(params['return_to'] || "/feeds?notice=#{added ? 'mute-added' : 'mute-duplicate'}&kind=#{kind}&value=#{CGI.escape(value)}")
+  end
+
+  post '/mutes/delete' do
+    kind  = params['kind'].to_s
+    value = params['value'].to_s
+    halt 400 unless MuteRulesStore::KINDS.include?(kind)
+
+    removed = MuteRulesStore.remove(kind: kind, value: value)
+    AppLogger.info('mute_rule_remove', kind: kind, value: value, removed: removed)
+    redirect to(params['return_to'] || "/feeds?notice=#{removed.positive? ? 'mute-removed' : 'mute-not-found'}")
+  end
+
+  # Apply one read-state action to many articles in a single request,
+  # so the /articles bulk-toolbar can mark / archive / bookmark a
+  # selection in one round-trip instead of N. JSON in, JSON out;
+  # returns a per-uid result list so the UI can flag any uids that
+  # didn't resolve. Cap is 500 uids per call to keep the SQL bounded.
+  BULK_ACTIONS = {
+    'read'       => ->(id) { ReadStateStore.mark_read(id,       read:  true)  },
+    'unread'     => ->(id) { ReadStateStore.mark_read(id,       read:  false) },
+    'bookmark'   => ->(id) { ReadStateStore.mark_bookmarked(id, value: true)  },
+    'unbookmark' => ->(id) { ReadStateStore.mark_bookmarked(id, value: false) },
+    'archive'    => ->(id) { ReadStateStore.mark_archived(id,   value: true)  },
+    'unarchive'  => ->(id) { ReadStateStore.mark_archived(id,   value: false) }
+  }.freeze
+  BULK_UIDS_MAX = 500
+
+  post '/api/articles/bulk' do
+    content_type :json
+    payload = parse_json_body
+    halt 400, { status: 'error', error: 'invalid JSON body' }.to_json unless payload
+
+    action = payload['action'].to_s
+    handler = BULK_ACTIONS[action]
+    unless handler
+      halt 400, { status: 'error', error: "unknown action: #{action}",
+                  allowed: BULK_ACTIONS.keys }.to_json
+    end
+
+    uids = Array(payload['uids']).map(&:to_s).reject(&:empty?).uniq.first(BULK_UIDS_MAX)
+    halt 400, { status: 'error', error: 'uids must be a non-empty array' }.to_json if uids.empty?
+
+    applied = 0
+    results = uids.map do |uid|
+      article = ArticlesStore.find_by_uid(uid)
+      if article
+        handler.call(article['id'])
+        applied += 1
+        { uid: uid, ok: true }
+      else
+        { uid: uid, ok: false, error: 'not_found' }
+      end
+    end
+
+    AppLogger.info('bulk_apply', action: action, applied: applied, total: uids.length)
+    { status: 'ok', action: action, applied: applied, total: uids.length, results: results }.to_json
   end
 
   TOPICS_WINDOW_OPTIONS = { '7' => 7, '14' => 14, '30' => 30 }.freeze
@@ -490,6 +881,12 @@ class TechFeedReader < Sinatra::Base
     @catalog     = FeedCatalog.by_category
     @subscribed  = @feeds.map { |f| f['url'] }.to_set
     @categories  = FeedCatalog::CATEGORIES
+    # Phase 3 — per-feed weights for the show-more / show-less controls
+    # in the feed-row actions column. Default 1.0 for unweighted feeds.
+    @feed_weights = FeedFeedbackStore.weights_by_feed_id(@feeds.map { |f| f['id'] })
+    # Phase 5 — surface the mute rules in the "Muted" subsection.
+    # Hash keyed by kind so the view can render three small lists.
+    @mute_rules = MuteRulesStore.all.group_by { |r| r['kind'] }
     erb :feeds
   end
 
@@ -784,6 +1181,11 @@ class TechFeedReader < Sinatra::Base
     @health_enabled      = HealthRegistry.enabled?
     @health_observations = HealthRegistry.observations.length
 
+    @tracing_enabled = Tracing.enabled?
+    @tracing_otlp    = Tracing.otlp_enabled?
+    @tracing_endpoint = Tracing.endpoint
+    @tracing_spans   = Tracing::Recorder.count
+
     @due_now          = Scheduler.due_feeds(FeedsStore.all).length
     @claude_available = Summarizer::Claude.available?
 
@@ -804,6 +1206,44 @@ class TechFeedReader < Sinatra::Base
     erb :admin_health
   end
 
+  # In-memory trace browser. Reads from the process-local
+  # Tracing::Recorder ring buffer (size TRACING_RECORDER_CAPACITY,
+  # default 200 finished spans). Spans are grouped into traces by
+  # hex_trace_id and sorted newest trace first; within a trace, spans
+  # render in start-time order so the parent-child structure is
+  # readable. ?trace=<hex_trace_id> filters down to one trace.
+  get '/admin/traces' do
+    @page_title    = 'Traces'
+    @enabled       = Tracing.enabled?
+    @otlp_enabled  = Tracing.otlp_enabled?
+    @endpoint      = Tracing.endpoint
+    @service_name  = Tracing.service_name
+    @capacity      = Tracing::Recorder.capacity
+    @count         = Tracing::Recorder.count
+
+    spans = Tracing::Recorder.spans
+    grouped = spans.group_by { |s| s.hex_trace_id }
+    @traces = grouped.map do |trace_id, trace_spans|
+      ordered  = trace_spans.sort_by(&:start_timestamp)
+      start_ns = ordered.first.start_timestamp
+      end_ns   = ordered.map(&:end_timestamp).max
+      {
+        trace_id:    trace_id,
+        spans:       ordered,
+        start_time:  Time.at(start_ns / 1_000_000_000.0).utc,
+        duration_ms: ((end_ns - start_ns) / 1_000_000.0).round(2),
+        root_name:   (ordered.find { |s| s.parent_span_id == OpenTelemetry::Trace::INVALID_SPAN_ID } || ordered.first).name
+      }
+    end.sort_by { |t| -t[:start_time].to_f }
+
+    @focus_trace_id = params['trace'].to_s
+    if !@focus_trace_id.empty?
+      @traces = @traces.select { |t| t[:trace_id] == @focus_trace_id }
+    end
+
+    erb :admin_traces
+  end
+
   get '/admin/cache' do
     @page_title  = 'Cache admin'
     @feeds       = FeedsStore.all
@@ -811,6 +1251,28 @@ class TechFeedReader < Sinatra::Base
       .execute('SELECT feed_id, COUNT(*) AS c FROM articles GROUP BY feed_id')
       .each_with_object({}) { |row, h| h[row['feed_id']] = row['c'] }
     erb :admin_cache
+  end
+
+  # Page-background pool admin: shows the Picsum IDs that
+  # public/page-background.js currently rotates through, with author
+  # attribution + a link to refresh the pool against Picsum's
+  # /v2/list endpoint. Empty pool falls back to a curated default
+  # baked into BackgroundPool::DEFAULT_IDS.
+  get '/admin/backgrounds' do
+    @page_title       = 'Background pool'
+    @entries          = BackgroundPool.entries
+    @default_ids      = BackgroundPool::DEFAULT_IDS
+    @using_default    = @entries.empty?
+    @target_pool_size = BackgroundPool::POOL_TARGET_SIZE
+    erb :admin_backgrounds
+  end
+
+  post '/admin/backgrounds/refresh' do
+    inserted = BackgroundPool.refresh!
+    redirect to("/admin/backgrounds?notice=refreshed&count=#{inserted}")
+  rescue BackgroundPool::RefreshError => e
+    AppLogger.warn('background_pool_refresh_failed', error: e.message)
+    redirect to("/admin/backgrounds?error=refresh-failed&msg=#{CGI.escape(e.message)}")
   end
 
   # Refresh every feed in FeedsStore. Iterates synchronously; for the
@@ -866,6 +1328,7 @@ if __FILE__ == $PROGRAM_NAME
       run Sidekiq::Web
     end
     map '/' do
+      use RequestLogMiddleware::App
       use MetricsMiddleware
       run TechFeedReader.new
     end

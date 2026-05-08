@@ -112,10 +112,18 @@ module FeedCatalog
       interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
       blurb: 'Interactive technical explainers (rare, exceptional posts).' },
 
-    # ---- podcasts (6) -------------------------------------------------
+    # ---- podcasts (15) ------------------------------------------------
     # All ship audio enclosures (parsed by FeedParser into audio_url etc.)
     # so the article view renders the player. Most include itunes:duration
     # so the runtime shows immediately, before <audio> loads metadata.
+    #
+    # The catalog deliberately spans tech, news, culture, and audio drama
+    # — the user's reading interests aren't purely technology, and the
+    # show grouping on /podcasts works just as well across genres. Add
+    # new entries near a thematic neighbour so the catalog reads as a
+    # curated list rather than a dump.
+
+    # tech-side
     { url: 'https://changelog.com/podcast/feed', title: 'The Changelog', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: true,
       blurb: 'Long-running interviews with people building the open source world.' },
@@ -125,15 +133,52 @@ module FeedCatalog
     { url: 'https://api.substack.com/feed/podcast/1517410.rss', title: 'Latent Space', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: true,
       blurb: 'Engineering-focused conversations on the AI / LLM stack.' },
+    { url: 'https://api.substack.com/feed/podcast/69345.rss', title: 'Dwarkesh Podcast', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Deeply researched long-form interviews — AI scaling, supply chains, history of science.' },
     { url: 'https://lexfridman.com/feed/podcast/', title: 'Lex Fridman Podcast', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Long-form interviews with technologists, scientists, and public figures.' },
     { url: 'https://softskills.audio/feed.xml', title: 'Soft Skills Engineering', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Weekly listener-question advice on the non-code side of engineering.' },
-    { url: 'https://acquired.fm/episodes?format=rss', title: 'Acquired', category: :podcast,
+    { url: 'https://publicfeeds.net/f/5901/gadget-lab', title: 'Uncanny Valley (WIRED)', category: :podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Deep, multi-hour business histories of major tech companies and deals.' }
+      blurb: 'WIRED on the people, power, and influence shaping Silicon Valley.' },
+    { url: 'https://feeds.simplecast.com/l2i9YnTd', title: 'Hard Fork', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Casey Newton and Kevin Roose making sense of the rapidly changing tech landscape (NYT).' },
+
+    # business / tech histories
+    { url: 'https://feeds.transistor.fm/acquired', title: 'Acquired', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Deep, multi-hour business histories of major tech companies and deals.' },
+
+    # news + ideas
+    { url: 'https://podcasts.files.bbci.co.uk/p02nq0gn.rss', title: 'BBC Global News Podcast', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC twice-daily roundup of breaking world news and current affairs.' },
+    { url: 'https://feeds.simplecast.com/Sl5CSM3S', title: 'The Daily (NYT)', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Twenty-minute morning briefing on the biggest story of the day, from The New York Times.' },
+    { url: 'https://feeds.simplecast.com/kEKXbjuJ', title: 'The Ezra Klein Show', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NYT long-form conversations on politics, ideas, and the systems that shape them.' },
+
+    # culture + design
+    { url: 'https://feeds.simplecast.com/BqbsxVfO', title: '99% Invisible', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Roman Mars on the unnoticed design and architecture that shapes the world around us.' },
+
+    # film + tv
+    { url: 'https://feeds.acast.com/public/shows/690bb0b92f5fdede3448a770', title: 'What Went Wrong', category: :podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'The behind-the-scenes drama of Hollywood productions — flops, near-misses, and chaos.' },
+
+    # audio drama
+    { url: 'https://starshipexcelsior.com/ExcelsiorRSS.rss', title: 'Starship Excelsior', category: :podcast,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Long-running Star Trek fan audio drama — full-cast adventures aboard the USS Excelsior.' }
   ].freeze
 
   module_function

@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tech Feed Reader<%= @page_title ? " — #{h(@page_title)}" : '' %></title>
   <link rel="stylesheet" href="/style.css?v=<%= asset_mtime('public/style.css') %>">
+  <%# Hotwire Turbo. Intercepts link clicks + form submits, fetches
+      HTML via XHR, swaps <body> in place. Lets the mini-player below
+      keep its <audio> alive across page changes (the
+      data-turbo-permanent attribute on #global-player tells Turbo
+      to leave the element untouched on swap). Without Turbo, every
+      navigation = new document = audio stops + browser blocks
+      autoplay on the new page. %>
+  <script src="https://unpkg.com/@hotwired/turbo@8.0.4/dist/turbo.es2017-umd.js" data-turbo-track="reload"></script>
   <script>
     /* Theme bootstrap — runs before <body> renders so there's no FOUC.
        Reads localStorage if set, otherwise honours the OS-level
@@ -30,11 +38,29 @@
       <a href="/topics"    class="<%= request.path_info == '/topics'   ? 'active' : '' %>">Topics</a>
       <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
       <a href="/podcasts"  class="<%= request.path_info == '/podcasts' ? 'active' : '' %>">Podcasts</a>
+      <a href="/digests"   class="<%= request.path_info.start_with?('/digests') ? 'active' : '' %>">Digests</a>
+      <a href="/triage"    class="<%= request.path_info == '/triage'   ? 'active' : '' %>">Triage</a>
       <a href="/feeds"     class="<%= request.path_info == '/feeds'    ? 'active' : '' %>">Feeds</a>
       <a href="/tags"      class="<%= request.path_info == '/tags'     ? 'active' : '' %>">Tags</a>
       <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
       <a href="/admin"     class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
     </nav>
+    <a href="/bus" class="header-icon-btn <%= 'active' if request.path_info == '/bus' %>"
+       title="Bus mode — recent podcast episodes short enough for the commute"
+       aria-label="Bus mode">
+      <%# Stylised side-view bus: body, two windows, two wheels. 20×16
+          to match the refresh icon's visual weight. %>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 18" width="20" height="16"
+           fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="11" rx="2"/>
+        <line x1="2" y1="7" x2="22" y2="7"/>
+        <line x1="9" y1="2" x2="9" y2="7"/>
+        <line x1="15" y1="2" x2="15" y2="7"/>
+        <circle cx="7" cy="14" r="2"/>
+        <circle cx="17" cy="14" r="2"/>
+      </svg>
+    </a>
     <form method="post" action="/admin/refresh/all" class="header-refresh-form js-header-refresh">
       <button type="submit" id="header-refresh" class="header-icon-btn"
               title="Refresh all feeds now" aria-label="Refresh all feeds">
@@ -53,8 +79,76 @@
     <%= yield %>
   </main>
   <footer>
-    <small>Tech Feed Reader &mdash; Public RSS aggregation for personal use.</small>
+    <small>
+      Tech Feed Reader &mdash; Public RSS aggregation for personal use.
+      &middot;
+      <a href="#" data-bg-shuffle title="Pick a new random nature background">shuffle background</a>
+      <span data-bg-attribution class="bg-attribution"></span>
+    </small>
   </footer>
+
+  <%# Persistent mini-player — pinned bottom of the viewport, holds
+      the only <audio> element in the app. data-turbo-permanent
+      tells Turbo to preserve this DOM node across navigations, so
+      audio doesn't stop when you click a link. Article pages bind
+      a "Play episode" button to window.Player.load(...) instead
+      of rendering their own <audio>. Hidden until something is
+      loaded; close (✕) returns to hidden + clears state. %>
+  <div id="global-player" data-turbo-permanent hidden>
+    <audio id="global-audio" preload="metadata"></audio>
+    <div class="mini-player">
+      <a href="#" class="mini-player-title" id="mini-player-title">—</a>
+      <div class="mini-player-controls">
+        <button type="button" class="mini-player-btn" id="mini-player-skip-back" aria-label="Skip back 15 seconds" title="Skip back 15s">
+          <span class="mini-player-icon">⟲</span><span class="mini-player-icon-label">15</span>
+        </button>
+        <button type="button" class="mini-player-btn mini-player-play" id="mini-player-play" aria-label="Play / pause" title="Play / pause">▶</button>
+        <button type="button" class="mini-player-btn" id="mini-player-skip-fwd" aria-label="Skip forward 30 seconds" title="Skip forward 30s">
+          <span class="mini-player-icon">⟳</span><span class="mini-player-icon-label">30</span>
+        </button>
+        <span class="mini-player-time">
+          <span id="mini-player-current">0:00</span><span class="mini-player-time-sep"> / </span><span id="mini-player-duration">—</span>
+        </span>
+        <input type="range" class="mini-player-scrubber" id="mini-player-scrubber" min="0" max="100" value="0" step="0.1" aria-label="Seek">
+        <select class="mini-player-rate" id="mini-player-rate" aria-label="Playback rate">
+          <option value="1">1×</option>
+          <option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option>
+          <option value="1.75">1.75×</option>
+          <option value="2">2×</option>
+        </select>
+        <button type="button" class="mini-player-btn mini-player-close" id="mini-player-close" aria-label="Close player" title="Close">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <%# Chat widget — floating button bottom-right opens a panel that
+      sends the user's message + the page context to /chat. Hidden by
+      chat-widget.js until /chat/health says the API key is configured.
+      data-turbo-permanent so the panel + open/closed state survive
+      Turbo navigations. %>
+  <div id="chat-widget" data-turbo-permanent hidden>
+    <button id="chat-widget-toggle" type="button" class="chat-toggle" title="Chat about this page" aria-label="Chat about this page" aria-expanded="false">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22"
+           fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+    <div id="chat-widget-panel" class="chat-panel" hidden>
+      <header class="chat-panel-header">
+        <span class="chat-panel-title">Chat <span class="chat-panel-context muted"></span></span>
+        <button type="button" class="chat-panel-clear" title="Clear thread for this page" aria-label="Clear thread">⟲</button>
+        <button type="button" class="chat-panel-close" title="Close" aria-label="Close">✕</button>
+      </header>
+      <div class="chat-panel-messages" role="log" aria-live="polite"></div>
+      <form class="chat-panel-form">
+        <textarea class="chat-panel-input" rows="2" placeholder="Ask about this page…" aria-label="Chat input"></textarea>
+        <button type="submit" class="chat-panel-send">Send</button>
+      </form>
+    </div>
+  </div>
+
   <script>
     /* Theme toggle — wires the header button to flip the class on
        <html>, persists the choice to localStorage, and updates the
@@ -77,6 +171,29 @@
       });
     })();
   </script>
+
+  <%# Page context for the chat widget. Routes can populate
+      @chat_context = { title:, excerpt: } to give the assistant
+      something to ground its answers in. URL is filled in client-side
+      from location.pathname so we don't have to thread it through.
+      .to_json alone JSON-escapes quotes but leaves `</` intact, which
+      lets a `</script>` substring in the title or excerpt break out
+      of this inline <script>. The gsub closes that hole. %>
+  <script>
+    window.PAGE_CONTEXT = {
+      title:   <%= ((@chat_context && @chat_context[:title])   || @page_title || 'Tech Feed Reader').to_json.gsub('</', '<\/') %>,
+      excerpt: <%= ((@chat_context && @chat_context[:excerpt]) || '').to_json.gsub('</', '<\/') %>
+    };
+    <%# Picsum IDs for the page-background rotation. /admin/backgrounds
+        rewrites the underlying table; if it's empty we fall back to
+        BackgroundPool::DEFAULT_IDS, which mirrors the bundled curated
+        set. ERB escapes nothing here since the values are integers,
+        but JSON-encoding is still the safe channel. %>
+    window.PAGE_BACKGROUND_IDS = <%= BackgroundPool.ids.to_json %>;
+  </script>
+  <script src="/page-background.js?v=<%= asset_mtime('public/page-background.js') %>"></script>
+  <script src="/global-player.js?v=<%= asset_mtime('public/global-player.js') %>"></script>
   <script src="/header-refresh.js?v=<%= asset_mtime('public/header-refresh.js') %>"></script>
+  <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>
 </body>
 </html>

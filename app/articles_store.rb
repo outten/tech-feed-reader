@@ -73,8 +73,12 @@ module ArticlesStore
   # filter (:unread | :bookmarked | :archived | :all) lets callers ask
   # for only the rows they want without re-issuing the query. `kind:`
   # narrows to :podcast (audio_url IS NOT NULL) when wanted.
-  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all)
-    db.execute(state_query(filter: state, kind: kind), [limit, offset])
+  # max_duration_seconds, when set, bounds the query to articles whose
+  # audio_duration_seconds is non-NULL and ≤ the given threshold —
+  # used by /bus ("what's short enough for my commute?").
+  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil)
+    sql = state_query(filter: state, kind: kind, max_duration_seconds: max_duration_seconds)
+    db.execute(sql, [limit, offset])
   end
 
   def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
@@ -88,7 +92,7 @@ module ArticlesStore
   # show first" ordering.
   def podcast_feeds
     db.execute(<<~SQL)
-      SELECT f.id, f.title, f.url,
+      SELECT f.id, f.title, f.url, f.image_url,
              COUNT(a.id)         AS episode_count,
              MAX(a.published_at) AS latest_at
       FROM feeds f
@@ -170,8 +174,8 @@ module ArticlesStore
     sql = <<~SQL
       INSERT OR IGNORE INTO articles
         (uid, feed_id, title, url, author, published_at, content_html, content_text,
-         audio_url, audio_mime_type, audio_duration_seconds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         audio_url, audio_mime_type, audio_duration_seconds, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     SQL
 
     rules    = TagsStore.all  # snapshot once per import batch
@@ -189,7 +193,8 @@ module ArticlesStore
           entry[:title].to_s, entry[:url].to_s,
           entry[:author], entry[:published_at],
           entry[:content_html].to_s, entry[:content_text].to_s,
-          entry[:audio_url], entry[:audio_mime_type], entry[:audio_duration_seconds]
+          entry[:audio_url], entry[:audio_mime_type], entry[:audio_duration_seconds],
+          entry[:image_url]
         ])
         next if db.changes.zero?  # uid was a duplicate, skip tag + summary
 
@@ -252,7 +257,7 @@ module ArticlesStore
     # with optional WHERE-scope (e.g. "a.feed_id = ?"), an optional extra
     # FROM-clause join (used by for_tag), a read-state filter, and an
     # article-kind filter (:podcast → audio_url IS NOT NULL).
-    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all)
+    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all, max_duration_seconds: nil)
       where_clauses = []
       where_clauses << scope if scope
       case filter
@@ -267,6 +272,33 @@ module ArticlesStore
       when :all     then # no extra clause
       else raise ArgumentError, "Unknown kind filter: #{kind.inspect}"
       end
+      if max_duration_seconds
+        # Inlined as a number, not a placeholder, so the existing
+        # callers' [limit, offset] / [feed_id, limit, offset] arg
+        # arrays don't have to grow. Coerced to integer to keep the
+        # SQL safe even if a string sneaks in.
+        cutoff = Integer(max_duration_seconds)
+        where_clauses << "a.audio_duration_seconds IS NOT NULL AND a.audio_duration_seconds <= #{cutoff}"
+      end
+
+      # Phase 5 — hide articles that match any mute_rules row. Single
+      # NOT EXISTS sub-query that dispatches on `mr.kind`, so it's a
+      # no-op (sub-query returns no rows ⇒ NOT EXISTS is true) when
+      # mute_rules is empty. The PK index on mute_rules + the kind
+      # index keep this cheap even with hundreds of rules. Keyword
+      # match uses LIKE with leading + trailing wildcards (substring,
+      # case-insensitive on ASCII per SQLite's default LIKE). Caveat:
+      # a literal `%` or `_` in a keyword rule is treated as a LIKE
+      # wildcard — fine for v1, document if it bites a user.
+      where_clauses << <<~SQL.strip
+        NOT EXISTS (
+          SELECT 1 FROM mute_rules mr
+          WHERE
+              (mr.kind = 'keyword' AND (a.title LIKE '%' || mr.value || '%' OR a.content_text LIKE '%' || mr.value || '%'))
+           OR (mr.kind = 'author'  AND a.author = mr.value)
+           OR (mr.kind = 'feed'    AND a.feed_id = CAST(mr.value AS INTEGER))
+        )
+      SQL
 
       where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"
 
@@ -275,6 +307,7 @@ module ArticlesStore
                COALESCE(rs.read, 0)       AS read,
                COALESCE(rs.bookmarked, 0) AS bookmarked,
                COALESCE(rs.archived, 0)   AS archived,
+               COALESCE(rs.feedback, 0)   AS feedback,
                rs.opened_at               AS opened_at
         FROM articles a
         LEFT JOIN read_state rs ON a.id = rs.article_id

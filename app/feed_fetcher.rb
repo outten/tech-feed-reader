@@ -5,6 +5,7 @@ require_relative 'feeds_store'
 require_relative 'health_registry'
 require_relative 'logger'
 require_relative 'metrics'
+require_relative 'tracing'
 
 # Orchestrator: takes a feed row, GETs the URL with conditional-GET
 # headers, parses on 200, records status + ETag + Last-Modified +
@@ -32,7 +33,21 @@ module FeedFetcher
   def fetch_feed(feed)
     AppLogger.info('feed_fetch_start', feed_id: feed['id'], url: feed['url'])
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    result  = HealthRegistry.measure(feed['id']) { fetch_feed_impl(feed) }
+    result  = Tracing.in_span(
+      'feed.fetch',
+      attributes: { 'feed.id' => feed['id'].to_i, 'feed.url' => feed['url'].to_s }
+    ) do |span|
+      r = HealthRegistry.measure(feed['id']) { fetch_feed_impl(feed) }
+      if span.respond_to?(:set_attribute)
+        span.set_attribute('feed.status',  r.status.to_s)
+        span.set_attribute('feed.entries', r.entries.length)
+        if r.error
+          span.set_attribute('feed.error', r.error.to_s)
+          span.status = OpenTelemetry::Trace::Status.error(r.error.to_s)
+        end
+      end
+      r
+    end
     elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
     latency = (elapsed * 1000).round
     AppLogger.info(
@@ -70,7 +85,8 @@ module FeedFetcher
         status:        code.to_s,
         last_etag:     response['ETag'],
         last_modified: response['Last-Modified'],
-        backfill_title: feed['title'].nil? || feed['title'].to_s.empty? ? parsed[:title] : nil
+        backfill_title: feed['title'].nil? || feed['title'].to_s.empty? ? parsed[:title] : nil,
+        backfill_image: feed['image_url'].nil? || feed['image_url'].to_s.empty? ? parsed[:image_url] : nil
       )
       Result.new(
         status:  :ok,
@@ -90,13 +106,14 @@ module FeedFetcher
   class << self
     private
 
-    def record_status(feed, status:, last_etag: nil, last_modified: nil, backfill_title: nil)
+    def record_status(feed, status:, last_etag: nil, last_modified: nil, backfill_title: nil, backfill_image: nil)
       fields = {
         last_fetched_at: Time.now.utc.iso8601,
         last_status:     status
       }
       fields[:last_etag]     = last_etag     if last_etag
       fields[:last_modified] = last_modified if last_modified
+      fields[:image_url]     = backfill_image if backfill_image
       fields[:title]         = backfill_title if backfill_title
 
       FeedsStore.update(feed['id'], **fields)

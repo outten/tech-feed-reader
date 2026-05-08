@@ -1,0 +1,108 @@
+<div class="page-header">
+  <div>
+    <h2>AI-assisted triage</h2>
+    <p class="subtitle">
+      Claude reads your unread queue + a sample of your liked / disliked
+      corpus and groups every unread article into <strong>must read</strong>,
+      <strong>optional</strong>, or <strong>skip</strong> with a one-line
+      rationale. Manual trigger — runs only when you click below.
+    </p>
+  </div>
+</div>
+
+<% unless @claude_available %>
+  <div class="error">
+    Claude isn't configured. Set <code>ANTHROPIC_API_KEY</code> (or <code>CLAUDE_API_KEY</code>)
+    in <code>.credentials</code> and restart, then try again.
+  </div>
+<% end %>
+
+<% if @triage_result.nil? %>
+  <%# GET — empty state with a generate button. %>
+  <div class="portfolio-add">
+    <form method="post" action="/triage" class="portfolio-form">
+      <button type="submit" class="btn-primary" <%= 'disabled' unless @claude_available %>
+              title="Send your unread queue + corpus exemplars to Claude (claude-sonnet-4-6) and classify each article">
+        Generate triage now
+      </button>
+      <p class="subtitle" style="margin-top:0.75rem">
+        One Claude API call. Caps the input to <code><%= Triage::Claude::UNREAD_LIMIT %></code> recent unread
+        articles + up to <code><%= Triage::Claude::CORPUS_EXEMPLAR_LIMIT %></code> corpus exemplars per side.
+        Per-call cost ~$0.02–0.04 on Sonnet 4.6.
+      </p>
+    </form>
+  </div>
+<% elsif @triage_result.status == :unavailable %>
+  <div class="error">Claude isn't configured. Set <code>ANTHROPIC_API_KEY</code> in <code>.credentials</code> and restart.</div>
+<% elsif @triage_result.status == :empty %>
+  <div class="notice">
+    <strong>All caught up.</strong> No unread articles to triage right now.
+  </div>
+<% elsif @triage_result.status == :error %>
+  <div class="error">
+    Claude call failed: <code><%= h(@triage_result.error) %></code>.
+    <form method="post" action="/triage" style="display:inline; margin-left:0.5rem">
+      <button type="submit" class="refresh-btn">Try again</button>
+    </form>
+  </div>
+<% else %>
+  <%# :ok or :parse_error — render the groups regardless. parse_error
+      means we got a response but couldn't parse it; the parser already
+      put every uid into `skip` so the user sees something coherent. %>
+  <% if @triage_result.status == :parse_error %>
+    <div class="error" style="margin-bottom:1rem">
+      Claude responded but the JSON didn't parse. Showing every article
+      as "skip" — try regenerating, the model occasionally drifts.
+    </div>
+  <% end %>
+
+  <p class="subtitle" style="margin-top:0.75rem">
+    <%= @triage_result.unread_count %> unread classified by
+    <code><%= h(@triage_result.model) %></code>
+    <% if @triage_result.latency_ms %>&middot; <%= @triage_result.latency_ms %>ms<% end %>
+    <% if @triage_result.input_tokens %>&middot; <%= @triage_result.input_tokens %> input / <%= @triage_result.output_tokens %> output tokens<% end %>
+    &middot;
+    <form method="post" action="/triage" style="display:inline">
+      <button type="submit" class="refresh-btn" title="Run the triage again with the current corpus + unread state">Regenerate</button>
+    </form>
+  </p>
+
+  <% [
+    [:must_read, 'Must read',  '🔥', 'Strong corpus match — start here.'],
+    [:optional,  'Optional',   '👀', 'Might be interesting; could go either way.'],
+    [:skip,      'Skip',       '🗑️', 'Low relevance — feel free to mark as read in bulk.']
+  ].each do |key, label, emoji, blurb| %>
+    <% rows = @triage_result[key].to_a %>
+    <section class="benchmark-section triage-section triage-<%= key %>" style="margin-top:2rem">
+      <h3><%= emoji %> <%= label %> <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= rows.length %>)</span></h3>
+      <p class="subtitle"><%= blurb %></p>
+      <% if rows.empty? %>
+        <p class="subtitle">(none)</p>
+      <% else %>
+        <ul class="news-list triage-list">
+          <% rows.each do |entry| %>
+            <% article = (@articles_by_uid || {})[entry['uid']] %>
+            <% next unless article %>
+            <% feed = (@feeds_by_id || {})[article['feed_id']] %>
+            <li class="news-item">
+              <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener" title="Open in new tab">
+                <span class="news-headline"><%= h(article['title']) %></span>
+              </a>
+              <% unless entry['rationale'].to_s.empty? %>
+                <p class="triage-rationale" title="Claude's one-line rationale for this classification">
+                  <%= h(entry['rationale']) %>
+                </p>
+              <% end %>
+              <div class="news-meta">
+                <% if feed %>
+                  <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+                <% end %>
+                <span><%= relative_time(article['published_at']) %></span>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+  <% end %>
+<% end %>

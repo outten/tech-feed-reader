@@ -1,5 +1,14 @@
+<%
+  # Hero image: prefer the article's own image_url; fall back to the
+  # feed's cover art (mainly podcast feeds, where every episode shares
+  # the show's artwork).
+  hero_image = @article['image_url'].to_s.empty? ? (@feed && @feed['image_url']) : @article['image_url']
+%>
 <article class="reading-view">
   <header>
+    <% if hero_image && !hero_image.to_s.empty? %>
+      <img class="article-hero" src="<%= h(hero_image) %>" alt="" loading="lazy">
+    <% end %>
     <h2>
       <% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>
         <span class="badge podcast-badge" title="Podcast episode">PODCAST</span>
@@ -8,46 +17,38 @@
     </h2>
     <p class="subtitle">
       <% if @feed %>
-        <a href="/articles?feed_id=<%= @feed['id'] %>"><%= h(@feed['title'] || @feed['url']) %></a>
+        <a href="/articles?feed_id=<%= @feed['id'] %>" title="Show only articles from <%= h(@feed['title'] || @feed['url']) %>"><%= h(@feed['title'] || @feed['url']) %></a>
       <% end %>
       <% if @article['author'] && !@article['author'].to_s.empty? %>
         &middot; by <%= h(@article['author']) %>
       <% end %>
-      &middot; <%= relative_time(@article['published_at']) %>
+      &middot; <span title="Published <%= h(@article['published_at']) %>"><%= relative_time(@article['published_at']) %></span>
       <% if @article['url'] && !@article['url'].empty? %>
-        &middot; <a href="<%= h(@article['url']) %>" rel="noopener noreferrer" target="_blank">Source &rarr;</a>
+        &middot; <a href="<%= h(@article['url']) %>" rel="noopener noreferrer" target="_blank" title="Open the original on the publisher's site (new tab)">Source &rarr;</a>
       <% end %>
     </p>
 
     <% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>
-      <div class="podcast-player" data-duration-seconds="<%= @article['audio_duration_seconds'] %>">
-        <audio
-          preload="metadata"
-          src="<%= h(@article['audio_url']) %>"
-          <% if @article['audio_mime_type'] && !@article['audio_mime_type'].to_s.empty? %>
-            type="<%= h(@article['audio_mime_type']) %>"
-          <% end %>
-        ></audio>
-        <div class="player-row">
-          <button type="button" class="player-btn player-skip-back" aria-label="Skip back 15 seconds" title="Skip back 15s">
-            <span class="player-icon">⟲</span><span class="player-icon-label">15</span>
-          </button>
-          <button type="button" class="player-btn player-play" aria-label="Play / pause" title="Play / pause">▶</button>
-          <button type="button" class="player-btn player-skip-forward" aria-label="Skip forward 30 seconds" title="Skip forward 30s">
-            <span class="player-icon">⟳</span><span class="player-icon-label">30</span>
-          </button>
-          <span class="player-time">
-            <span class="player-current">0:00</span><span class="player-time-sep"> / </span><span class="player-duration">—</span>
-          </span>
-          <input type="range" class="player-scrubber" min="0" max="100" value="0" step="0.1" aria-label="Seek">
-          <select class="player-rate" aria-label="Playback rate">
-            <option value="1">1×</option>
-            <option value="1.25">1.25×</option>
-            <option value="1.5">1.5×</option>
-            <option value="1.75">1.75×</option>
-            <option value="2">2×</option>
-          </select>
-        </div>
+      <%# Single button that loads this episode into the persistent
+          mini-player at the bottom of the screen (see views/layout.erb
+          + public/global-player.js). All controls live in the
+          mini-player so audio survives Turbo navigations. The button
+          label flips to "▶ Resume" / "❚❚ Pause" when the player is
+          on this episode. %>
+      <div class="play-episode-row">
+        <button type="button" class="play-episode btn-primary"
+                title="Load this episode into the bottom mini-player and start playing"
+                data-uid="<%= h(@article['uid']) %>"
+                data-audio-url="<%= h(@article['audio_url']) %>"
+                data-audio-mime="<%= h(@article['audio_mime_type'] || '') %>"
+                data-title="<%= h(@article['title']) %>"
+                data-article-url="/article/<%= h(@article['uid']) %>"
+                data-duration="<%= @article['audio_duration_seconds'] %>">
+          ▶ Play episode
+        </button>
+        <% if @article['audio_duration_seconds'] %>
+          <span class="play-episode-duration muted"><%= fmt_duration(@article['audio_duration_seconds']) %></span>
+        <% end %>
       </div>
     <% end %>
 
@@ -55,22 +56,62 @@
       <% if @state['read'] == 1 %>
         <form method="post" action="/article/<%= @article['uid'] %>/read">
           <input type="hidden" name="read" value="0">
-          <button type="submit">Mark unread</button>
+          <button type="submit" title="Mark this article as unread again">Mark unread</button>
         </form>
       <% else %>
         <form method="post" action="/article/<%= @article['uid'] %>/read">
-          <button type="submit">Mark read</button>
+          <button type="submit" title="Mark this article as read">Mark read</button>
         </form>
       <% end %>
 
       <form method="post" action="/article/<%= @article['uid'] %>/bookmark">
         <input type="hidden" name="value" value="<%= @state['bookmarked'] == 1 ? '0' : '1' %>">
-        <button type="submit"><%= @state['bookmarked'] == 1 ? '★ Unbookmark' : '☆ Bookmark' %></button>
+        <button type="submit" title="<%= @state['bookmarked'] == 1 ? 'Remove bookmark' : 'Save this story for later' %>"><%= @state['bookmarked'] == 1 ? '★ Unbookmark' : '☆ Bookmark' %></button>
       </form>
 
       <form method="post" action="/article/<%= @article['uid'] %>/archive">
         <input type="hidden" name="value" value="<%= @state['archived'] == 1 ? '0' : '1' %>">
-        <button type="submit"><%= @state['archived'] == 1 ? 'Unarchive' : 'Archive' %></button>
+        <button type="submit" title="<%= @state['archived'] == 1 ? 'Restore from archive' : 'Archive (hides from default views)' %>"><%= @state['archived'] == 1 ? 'Unarchive' : 'Archive' %></button>
+      </form>
+
+      <%# Phase 3 — feedback signal. Each form posts the toggle target
+          (clicking 👍 again clears the +1; same for 👎). Display flips
+          to "Boosted" / "Demoted" with a coloured highlight via the
+          .feedback-on-{up,down} modifier classes. %>
+      <form method="post" action="/article/<%= @article['uid'] %>/feedback">
+        <input type="hidden" name="value" value="<%= @state['feedback'].to_i == 1 ? '0' : '1' %>">
+        <button type="submit" class="feedback-btn <%= 'feedback-on-up' if @state['feedback'].to_i == 1 %>"
+                title="<%= @state['feedback'].to_i == 1 ? 'Clear the thumbs-up' : 'Thumbs up — the For-You ranker will boost articles like this one' %>">
+          <%= @state['feedback'].to_i == 1 ? '👍 Boosted' : '👍' %>
+        </button>
+      </form>
+
+      <form method="post" action="/article/<%= @article['uid'] %>/feedback">
+        <input type="hidden" name="value" value="<%= @state['feedback'].to_i == -1 ? '0' : '-1' %>">
+        <button type="submit" class="feedback-btn <%= 'feedback-on-down' if @state['feedback'].to_i == -1 %>"
+                title="<%= @state['feedback'].to_i == -1 ? 'Clear the thumbs-down' : 'Thumbs down — the For-You ranker will demote articles like this one' %>">
+          <%= @state['feedback'].to_i == -1 ? '👎 Demoted' : '👎' %>
+        </button>
+      </form>
+
+      <%# Phase 5 — mute filters. Hard-hide rules; clicking these
+          adds a row to mute_rules so future articles matching
+          author/keyword disappear from listings. Distinct from
+          👎 (which is a soft signal for the ranker). %>
+      <% if @article['author'] && !@article['author'].to_s.empty? %>
+        <form method="post" action="/mutes" style="display:inline">
+          <input type="hidden" name="kind"  value="author">
+          <input type="hidden" name="value" value="<%= h(@article['author']) %>">
+          <input type="hidden" name="return_to" value="/article/<%= @article['uid'] %>?notice=muted-author">
+          <button type="submit" title="Hide every article by &lsquo;<%= h(@article['author']) %>&rsquo; from listings (still searchable)">🚫 Mute author</button>
+        </form>
+      <% end %>
+
+      <form method="post" action="/mutes" class="mute-keyword-form" style="display:inline">
+        <input type="hidden" name="kind" value="keyword">
+        <input type="hidden" name="return_to" value="/article/<%= @article['uid'] %>?notice=muted-keyword">
+        <input type="text" name="value" placeholder="keyword to mute" required title="Substring match against article title + body. Hidden from listings; still searchable.">
+        <button type="submit" title="Hide every article whose title or body contains this keyword">🚫 Mute keyword</button>
       </form>
     </div>
 
@@ -79,17 +120,17 @@
         <% applied_ids = @article_tags.map { |t| t['id'] } %>
         <% @article_tags.each do |tag| %>
           <span class="tag-chip">
-            <a href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+            <a href="/articles?tag=<%= tag['id'] %>" title="Filter all articles by tag &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
             <form method="post" action="/article/<%= @article['uid'] %>/tag/<%= tag['id'] %>" style="display:inline">
               <input type="hidden" name="value" value="remove">
-              <button type="submit" title="Remove tag">&times;</button>
+              <button type="submit" title="Remove this tag from this article">&times;</button>
             </form>
           </span>
         <% end %>
         <% @all_tags.reject { |t| applied_ids.include?(t['id']) }.each do |tag| %>
           <form method="post" action="/article/<%= @article['uid'] %>/tag/<%= tag['id'] %>" style="display:inline">
             <input type="hidden" name="value" value="add">
-            <button type="submit" class="tag-chip-add">+ <%= h(tag['name']) %></button>
+            <button type="submit" class="tag-chip-add" title="Apply tag &lsquo;<%= h(tag['name']) %>&rsquo; to this article">+ <%= h(tag['name']) %></button>
           </form>
         <% end %>
       </div>
@@ -100,6 +141,10 @@
     <div class="notice">Extractive summary regenerated.</div>
   <% elsif params['notice'] == 'llm-summarized' %>
     <div class="notice">Summary generated by <%= h(params['model']) %>.</div>
+  <% elsif params['notice'] == 'muted-author' %>
+    <div class="notice">Author muted. Manage rules in the <a href="/feeds#mutes">Muted</a> section on /feeds.</div>
+  <% elsif params['notice'] == 'muted-keyword' %>
+    <div class="notice">Keyword muted. Manage rules in the <a href="/feeds#mutes">Muted</a> section on /feeds.</div>
   <% elsif params['error'] == 'empty-content' %>
     <div class="error">No content_text to summarise.</div>
   <% elsif params['error'] == 'llm-unavailable' %>
@@ -120,17 +165,26 @@
             &middot; with LLM via <%= h(@summary['llm_model'] || '?') %>
           <% end %>)
         </span>
-        <form method="post" action="/article/<%= @article['uid'] %>/summarize" style="display:inline; margin-left:0.5rem">
-          <button type="submit" class="refresh-btn">Re-summarize (extractive)</button>
+      </h3>
+      <%# Regenerate controls in a vertical button stack — out of the
+          H3 so the heading isn't a jumble of title + muted text + two
+          buttons on one line. %>
+      <div class="summary-actions">
+        <form method="post" action="/article/<%= @article['uid'] %>/summarize">
+          <button type="submit" class="refresh-btn"
+                  title="Regenerate the extractive summary from the article body">
+            Re-summarize (extractive)
+          </button>
         </form>
         <% if @claude_available %>
-          <form method="post" action="/article/<%= @article['uid'] %>/summarize/llm" style="display:inline">
-            <button type="submit" class="refresh-btn">
+          <form method="post" action="/article/<%= @article['uid'] %>/summarize/llm">
+            <button type="submit" class="refresh-btn"
+                    title="Send the article to Claude and replace the LLM summary">
               <%= @summary['llm'].to_s.empty? ? 'Summarize with Claude' : 'Re-summarize with Claude' %>
             </button>
           </form>
         <% end %>
-      </h3>
+      </div>
       <% unless @summary['llm'].to_s.empty? %>
         <p class="excerpt" style="border-left:3px solid #0071e3; padding-left:0.75rem">
           <strong>Claude</strong> &middot;
@@ -171,6 +225,34 @@
     </section>
   <% end %>
 
+  <%# Phase 7 — Read next card. Hidden until the user scrolls past
+      the bottom-of-content sentinel (so it doesn't compete with the
+      Related panel above). Single suggestion, opens in a new tab to
+      match /articles row behaviour. Server-side picked: For You
+      ranker preferred, FTS5 "Related" fallback when corpus is cold. %>
+  <% if @read_next %>
+    <div class="read-next-sentinel" aria-hidden="true"></div>
+    <aside class="read-next-card" hidden data-read-next>
+      <div class="read-next-label">
+        Read next
+        <% if @read_next['_score'] %>
+          <span class="muted" title="Personalised relevance score (recency × per-feed weight × corpus overlap)">&middot; relevance pick</span>
+        <% else %>
+          <span class="muted" title="Content-similarity match via FTS5 — no personalised signal yet">&middot; related pick</span>
+        <% end %>
+      </div>
+      <a class="read-next-headline" href="/article/<%= @read_next['uid'] %>" target="_blank" rel="noopener" title="Open the next suggested article in a new tab">
+        <%= h(@read_next['title']) %>
+      </a>
+      <div class="read-next-meta">
+        <% if (rn_feed = (@feeds_by_id || {})[@read_next['feed_id']]) %>
+          <span class="news-source"><%= h(rn_feed['title'] || rn_feed['url']) %></span>
+        <% end %>
+        <span><%= relative_time(@read_next['published_at']) %></span>
+      </div>
+    </aside>
+  <% end %>
+
   <footer class="article-footer">
     <p class="subtitle">
       Article id: <code><%= @article['uid'] %></code>
@@ -179,8 +261,29 @@
   </footer>
 </article>
 
-<% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>
-  <script src="/podcast-player.js?v=<%= asset_mtime('public/podcast-player.js') %>"></script>
+<% if @read_next %>
+  <script>
+    // Phase 7 — slide the Read-next card in once the user has scrolled
+    // far enough that the article body is mostly behind them. Single
+    // IntersectionObserver on a sentinel element placed right before
+    // the card; once the sentinel is in view, reveal the card with a
+    // CSS slide-in. Script only emitted when the card is rendered.
+    (function () {
+      var sentinel = document.querySelector('.read-next-sentinel');
+      var card     = document.querySelector('.read-next-card');
+      if (!sentinel || !card || !('IntersectionObserver' in window)) return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            card.removeAttribute('hidden');
+            card.classList.add('read-next-card-visible');
+            io.disconnect(); // one-shot — no need to keep observing
+          }
+        });
+      }, { rootMargin: '0px 0px -10% 0px' });
+      io.observe(sentinel);
+    })();
+  </script>
 <% end %>
 
 <script>

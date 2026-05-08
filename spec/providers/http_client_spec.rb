@@ -109,5 +109,58 @@ RSpec.describe Providers::HttpClient do
       out = Providers::HttpClient.get('https://example.com/feed')
       expect(out.code).to eq('404')
     end
+
+    it 'follows 301/302 redirects, dropping conditional-GET headers on hops' do
+      requested_uris    = []
+      captured_requests = []
+
+      redirect_resp = instance_double(Net::HTTPMovedPermanently, code: '301',
+                                                                 body: '')
+      allow(redirect_resp).to receive(:[]).with('Location').and_return('https://elsewhere.example.com/final')
+      final_resp    = instance_double(Net::HTTPSuccess, code: '200', body: '<rss/>')
+
+      allow(Net::HTTP).to receive(:new) do |host, _port|
+        http = instance_double(Net::HTTP)
+        allow(http).to receive(:use_ssl=)
+        allow(http).to receive(:open_timeout=)
+        allow(http).to receive(:read_timeout=)
+        allow(http).to receive(:start) { |&blk| blk.call(http) }
+        allow(http).to receive(:request) do |req|
+          captured_requests << req
+          requested_uris << "#{host}#{req.path}"
+          requested_uris.length == 1 ? redirect_resp : final_resp
+        end
+        http
+      end
+
+      out = Providers::HttpClient.get(
+        'https://example.com/feed',
+        headers: { 'If-None-Match' => 'W/"abc"' }
+      )
+
+      expect(out.code).to eq('200')
+      expect(requested_uris).to eq(['example.com/feed', 'elsewhere.example.com/final'])
+      expect(captured_requests.first['If-None-Match']).to eq('W/"abc"')
+      expect(captured_requests.last['If-None-Match']).to be_nil
+    end
+
+    it 'raises after MAX_REDIRECTS hops' do
+      redirect_resp = instance_double(Net::HTTPMovedPermanently, code: '301', body: '')
+      allow(redirect_resp).to receive(:[]).with('Location').and_return('https://example.com/loop')
+
+      allow(Net::HTTP).to receive(:new) do |_host, _port|
+        http = instance_double(Net::HTTP)
+        allow(http).to receive(:use_ssl=)
+        allow(http).to receive(:open_timeout=)
+        allow(http).to receive(:read_timeout=)
+        allow(http).to receive(:start) { |&blk| blk.call(http) }
+        allow(http).to receive(:request).and_return(redirect_resp)
+        http
+      end
+
+      expect {
+        Providers::HttpClient.get('https://example.com/feed')
+      }.to raise_error(/Too many redirects/)
+    end
   end
 end

@@ -9,16 +9,31 @@
       <em class="muted">(unset)</em>
     <% end %>
   </td>
-  <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"><%= h(feed['url']) %></a></td>
-  <td class="num"><%= feed['fetch_interval_seconds'] %>s</td>
-  <td class="muted"><%= relative_time(feed['last_fetched_at']) %></td>
-  <td class="muted"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
+  <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank" title="Open the raw feed XML in a new tab"><%= h(feed['url']) %></a></td>
+  <td class="num" title="Poll interval — how often the scheduler refreshes this feed"><%= feed['fetch_interval_seconds'] %>s</td>
+  <td class="muted" title="Last fetch time"><%= relative_time(feed['last_fetched_at']) %></td>
+  <td class="muted" title="HTTP status of the most recent fetch"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
   <td>
+    <%# Phase 3 — show-more / show-less weight controls. Default
+        weight 1.0; clicks bump by FeedFeedbackStore::STEP. Tooltip
+        surfaces the current weight + the meaning. %>
+    <% w = (defined?(weight) && weight) ? weight.to_f : 1.0 %>
+    <span class="feed-row-weight <%= 'is-default' if w == 1.0 %>" title="Show-more / show-less weight (Phase 3 ranker input)">
+      <form method="post" action="/feeds/<%= feed['id'] %>/feedback" style="display:inline">
+        <input type="hidden" name="direction" value="down">
+        <button type="submit" class="feed-weight-btn" title="Show me less from this feed (current weight: <%= format('%.2f', w) %>×)" aria-label="Show less">−</button>
+      </form>
+      <span class="feed-weight-display" title="Current weight: <%= format('%.2f', w) %>× — click + or − to adjust"><%= format('%.2f', w) %>×</span>
+      <form method="post" action="/feeds/<%= feed['id'] %>/feedback" style="display:inline">
+        <input type="hidden" name="direction" value="up">
+        <button type="submit" class="feed-weight-btn" title="Show me more from this feed (current weight: <%= format('%.2f', w) %>×)" aria-label="Show more">+</button>
+      </form>
+    </span>
     <form method="post" action="/admin/refresh/<%= feed['id'] %>" class="js-refresh-feed" style="display:inline">
-      <button type="submit" class="refresh-btn">Refresh</button>
+      <button type="submit" class="refresh-btn" title="Fetch this feed now (background job)">Refresh</button>
     </form>
     <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed" style="display:inline">
-      <button type="submit" class="danger">Remove</button>
+      <button type="submit" class="danger" title="Unsubscribe from this feed and delete its imported articles">Remove</button>
     </form>
   </td>
 </tr>

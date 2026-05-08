@@ -7,7 +7,7 @@
   </div>
   <% if @feeds.any? %>
     <form method="post" action="/admin/refresh/all" class="js-refresh-all">
-      <button type="submit" class="refresh-btn">Refresh all</button>
+      <button type="submit" class="refresh-btn" title="Enqueue a fetch for every subscribed feed (background)">Refresh all</button>
     </form>
   <% end %>
 </div>
@@ -51,6 +51,14 @@
   <div class="notice">Added <strong><%= h(params['title']) %></strong> from the catalog.</div>
 <% elsif @notice == 'already-subscribed' %>
   <div class="notice"><strong><%= h(params['title']) %></strong> is already subscribed.</div>
+<% elsif @notice == 'mute-added' %>
+  <div class="notice">Muted <code><%= h(params['kind']) %>:<%= h(params['value']) %></code> &mdash; matching articles will be hidden from listings (still searchable).</div>
+<% elsif @notice == 'mute-duplicate' %>
+  <div class="notice">That mute rule already exists.</div>
+<% elsif @notice == 'mute-removed' %>
+  <div class="notice">Mute rule removed. Matching articles are back in the listings.</div>
+<% elsif @notice == 'mute-not-found' %>
+  <div class="notice">Mute rule was already gone.</div>
 <% elsif @notice %>
   <div class="notice"><%= h(@notice) %></div>
 <% end %>
@@ -86,7 +94,7 @@
       Poll interval (seconds)
       <input type="number" name="fetch_interval_seconds" min="60" value="<%= FeedsStore::PUBLISHER_INTERVAL %>">
     </label>
-    <button type="submit" class="btn-primary">Add</button>
+    <button type="submit" class="btn-primary" title="Subscribe to this feed and queue an initial fetch">Add</button>
   </form>
   <p class="subtitle" style="margin-top:0.75rem">
     Suggested intervals: 900s for high-frequency feeds (HN, Lobsters), 3600s
@@ -100,9 +108,9 @@
   <form method="post" action="/feeds/import" enctype="multipart/form-data" class="portfolio-form">
     <label class="full-width">
       Import from OPML file
-      <input type="file" name="file" accept=".opml,.xml,application/xml,text/x-opml" required>
+      <input type="file" name="file" accept=".opml,.xml,application/xml,text/x-opml" required title="Pick a .opml or .xml file exported from another reader">
     </label>
-    <button type="submit" class="btn-primary">Import</button>
+    <button type="submit" class="btn-primary" title="Add every feed from the OPML file (already-subscribed URLs are skipped)">Import</button>
   </form>
   <p class="subtitle" style="margin-top:0.75rem">
     Re-import is idempotent — feeds whose URL is already subscribed are
@@ -123,7 +131,7 @@
   </thead>
   <tbody>
     <% @feeds.each do |feed| %>
-      <%= erb :_feed_row, locals: { feed: feed }, layout: false %>
+      <%= erb :_feed_row, locals: { feed: feed, weight: (@feed_weights || {})[feed['id']] || 1.0 }, layout: false %>
     <% end %>
   </tbody>
 </table>
@@ -149,16 +157,77 @@
             <span class="muted catalog-url"><%= h(entry[:url]) %></span>
           </div>
           <% if subscribed %>
-            <span class="badge subscribed-badge">✓ Subscribed</span>
+            <span class="badge subscribed-badge" title="This feed is already in your subscriptions">✓ Subscribed</span>
           <% else %>
             <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
               <input type="hidden" name="url" value="<%= h(entry[:url]) %>">
-              <button type="submit" class="btn-primary">+ Add</button>
+              <button type="submit" class="btn-primary" title="Subscribe to &lsquo;<%= h(entry[:title]) %>&rsquo; and queue an initial fetch">+ Add</button>
             </form>
           <% end %>
         </li>
       <% end %>
     </ul>
+  <% end %>
+</section>
+
+<section class="benchmark-section mutes-section" id="mutes" style="margin-top:2.5rem">
+  <h3>Muted <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @mute_rules.values.flatten.length %> rule<%= 's' unless @mute_rules.values.flatten.length == 1 %>)</span></h3>
+  <p class="subtitle">
+    Hard-hide rules. Articles matching any rule below disappear from
+    <a href="/articles">/articles</a> and the dashboard, but stay in the database
+    and remain reachable via <a href="/search">/search</a>.
+  </p>
+
+  <form method="post" action="/mutes" class="portfolio-form mutes-add">
+    <label>
+      Kind
+      <select name="kind" required title="Keyword = substring match against title + body. Author = exact match. Feed = match by feed id.">
+        <option value="keyword">keyword</option>
+        <option value="author">author</option>
+        <option value="feed">feed</option>
+      </select>
+    </label>
+    <label>
+      Value
+      <input type="text" name="value" required placeholder="e.g. crypto, John Smith, or feed_id 42">
+    </label>
+    <button type="submit" class="btn-primary" title="Add this mute rule and hide matching articles from listings">Add mute</button>
+  </form>
+
+  <% MuteRulesStore::KINDS.each do |kind| %>
+    <% rows = @mute_rules[kind] || [] %>
+    <% next if rows.empty? %>
+    <h4 class="catalog-category"><%= kind.capitalize %> <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= rows.length %>)</span></h4>
+    <ul class="mute-list">
+      <% rows.each do |rule| %>
+        <li class="mute-row">
+          <% if kind == 'feed' %>
+            <% feed = FeedsStore.find(rule['value'].to_i) %>
+            <span class="mute-value">
+              <% if feed %>
+                <%= h(feed['title'] || feed['url']) %>
+                <span class="muted">&middot; feed_id <%= rule['value'] %></span>
+              <% else %>
+                <span class="muted">(deleted feed)</span>
+                feed_id <%= rule['value'] %>
+              <% end %>
+            </span>
+          <% else %>
+            <span class="mute-value"><%= h(rule['value']) %></span>
+          <% end %>
+          <span class="muted mute-since" title="Created <%= h(rule['created_at']) %>"><%= relative_time(rule['created_at']) %></span>
+          <form method="post" action="/mutes/delete" style="display:inline">
+            <input type="hidden" name="kind"  value="<%= h(rule['kind']) %>">
+            <input type="hidden" name="value" value="<%= h(rule['value']) %>">
+            <button type="submit" class="danger" title="Remove this mute rule and surface matching articles again">Unmute</button>
+          </form>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <% if @mute_rules.values.flatten.empty? %>
+    <p class="subtitle">No mute rules yet.</p>
   <% end %>
 </section>
 

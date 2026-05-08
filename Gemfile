@@ -62,3 +62,13 @@ gem 'connection_pool', '~> 2.4'
 # no external store needed. Registry is process-local, so the web
 # process and the worker process each expose their own metrics.
 gem 'prometheus-client', '~> 4.2'
+
+# OpenTelemetry — distributed tracing. The SDK only activates when
+# OTEL_EXPORTER_OTLP_ENDPOINT is set, so dev runs without an OTel
+# collector configured pay zero overhead (the API package returns
+# no-op tracers). instrumentation-all auto-instruments Sinatra,
+# Rack, Sidekiq, Net::HTTP, and SQLite3; we add manual spans on
+# top for FeedFetcher + Summarizer::Claude.
+gem 'opentelemetry-sdk',                '~> 1.6'
+gem 'opentelemetry-instrumentation-all', '~> 0.78'
+gem 'opentelemetry-exporter-otlp',       '~> 0.30'

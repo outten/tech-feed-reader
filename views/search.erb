@@ -14,7 +14,7 @@
       Query
       <input type="text" name="q" value="<%= h(@query) %>" placeholder='kubernetes ebpf, "exact phrase", ai NOT crypto' autofocus>
     </label>
-    <button type="submit" class="btn-primary">Search</button>
+    <button type="submit" class="btn-primary" title="Run the FTS5 query and return matching articles">Search</button>
   </form>
 </div>
 
@@ -40,16 +40,16 @@
     <ul class="news-list">
       <% @results.each do |article| %>
         <li class="news-item <%= article['read'] == 1 ? 'read' : '' %>">
-          <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+          <a class="news-headline" href="/article/<%= article['uid'] %>" title="Open article"><%= h(article['title']) %></a>
           <% (@tags_by_article[article['id']] || []).each do |tag| %>
-            <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>"><%= h(tag['name']) %></a>
+            <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>" title="Filter to articles tagged &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
           <% end %>
           <p class="excerpt"><%= article['excerpt'] %></p>
           <div class="news-meta">
             <% if (feed = @feeds_by_id[article['feed_id']]) %>
-              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>" title="Show only articles from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
             <% end %>
-            <span><%= relative_time(article['published_at']) %></span>
+            <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
           </div>
         </li>
       <% end %>

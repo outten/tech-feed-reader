@@ -1,11 +1,33 @@
+/* Default background (no JS yet, or sessionStorage off): solid color
+   from the original design. JS in public/page-background.js sets
+   `--page-bg` to a Picsum URL on first load and persists it for the
+   session, at which point the layered backgrounds below kick in. */
+:root { --page-bg: none; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-  background: #f5f5f7;
+  background-color: #f5f5f7;
+  /* Two-layer background: a translucent "scrim" on top so foreground
+     text stays readable, and the nature image on the bottom. The scrim
+     is matched per theme below. background-attachment: fixed pins the
+     image to the viewport — content scrolls over it instead of with
+     it, which gives the parallax-y feel the user asked for. */
+  background-image: linear-gradient(rgba(245, 245, 247, 0.88), rgba(245, 245, 247, 0.88)), var(--page-bg);
+  background-attachment: fixed, fixed;
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
   color: #1d1d1f;
   margin: 0;
   padding: 0;
+  min-height: 100vh;
 }
-header {
+/* Cosmetics 1+2 — scope the sticky to the LAYOUT's header only.
+   Without `body > `, this rule also pinned the inner <header> inside
+   <article class="reading-view"><header>...</header></article> on
+   /article/:uid, which jammed the title into a small visible
+   sticky-area column and made the rest of the page hard to read. */
+body > header {
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -143,14 +165,126 @@ footer {
   border-top: 1px solid #e0e0e5;
 }
 .footer-freshness { display: block; margin-top: 0.25rem; opacity: 0.7; }
+/* Picsum/Unsplash attribution slot in the footer. Empty by default
+   (no separator either); :not(:empty) adds the bullet only once
+   page-background.js has populated it. */
+.bg-attribution:not(:empty)::before { content: ' · '; }
+.bg-attribution a { color: inherit; }
+.bg-attribution a:hover { color: #0071e3; }
+
+/* /admin/backgrounds — current pool grid with thumbnails. */
+.bg-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.bg-pool-card {
+  margin: 0;
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+html.dark .bg-pool-card { background: #1c1c1e; border-color: #2c2c2e; }
+.bg-pool-card img { display: block; width: 100%; height: auto; }
+.bg-pool-card figcaption {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+/* ---- Article + podcast thumbnails -----------------------------------
+   Three surfaces:
+     1. Hero image at the top of /article/:uid       — .article-hero
+     2. Right-side thumbnail on /articles list rows  — .news-item-thumb
+     3. Cover art on /podcasts show cards             — .podcast-show-cover
+     4. Episode thumbnail on /podcasts recent cards   — .podcast-card-image
+   Width-bounded so a giant CDN image doesn't blow out the layout. */
+.article-hero {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin: 0 0 1rem;
+  background: #f0f0f5;
+}
+html.dark .article-hero { background: #2c2c2e; }
+
+/* Article-row thumbnails: small square on the right of each row. The
+   .news-item is position:relative (from the bulk-actions checkbox
+   work), so we absolute-position the thumbnail over the right gutter
+   without disturbing the existing grid. */
+.news-item-thumb {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.75rem;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f0f0f5;
+}
+html.dark .news-item-thumb { background: #2c2c2e; }
+.news-item.has-thumb .news-row-main,
+.news-item.has-thumb .news-row-badges,
+.news-item.has-thumb .news-meta { padding-right: 76px; }
+@media (max-width: 600px) {
+  .news-item-thumb { width: 48px; height: 48px; top: 0.5rem; }
+  .news-item.has-thumb .news-row-main,
+  .news-item.has-thumb .news-row-badges,
+  .news-item.has-thumb .news-meta { padding-right: 56px; }
+}
+
+/* Podcast show cards (top of /podcasts) — square cover art on top,
+   title + meta below. */
+.podcast-show-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  background: #f0f0f5;
+}
+html.dark .podcast-show-cover { background: #2c2c2e; }
+
+/* Recent-episode cards on /podcasts — image left, body right. .has-image
+   modifier flips the layout to a 2-col grid; cards without an image
+   keep the existing block layout. */
+.podcast-card.has-image {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+.podcast-card-image {
+  display: block;
+  width: 96px;
+  height: 96px;
+}
+.podcast-card-image img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f0f0f5;
+}
+html.dark .podcast-card-image img { background: #2c2c2e; }
+.podcast-card-body { min-width: 0; } /* let text wrap inside the grid track */
 
 /* Dark mode — `html.dark body` wins specificity over the plain `body`
    ruleset above, so the body's background flips when the toggle adds
    `dark` to the html element. */
 html.dark,
 html.dark body {
-  background: #1c1c1e;
+  background-color: #1c1c1e;
   color: #f5f5f7;
+}
+html.dark body {
+  /* Darker scrim so the nature photo doesn't bleach out the dark theme. */
+  background-image: linear-gradient(rgba(28, 28, 30, 0.85), rgba(28, 28, 30, 0.85)), var(--page-bg);
 }
 html.dark header {
   background: rgba(28,28,30,0.9);
@@ -437,20 +571,84 @@ html.dark .tv-readout b,
 html.dark .tv-readout .tv-readout-date { color: #f5f5f7; }
 
 /* News panel (analysis page) */
-.news-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1rem; }
-.news-item { padding-bottom: 1rem; border-bottom: 1px solid #f2f2f7; }
-.news-item:last-child { border-bottom: none; padding-bottom: 0; }
+.news-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid #f0f0f5;
+}
+html.dark .news-list { border-top-color: #2c2c2e; }
+.news-item {
+  position: relative;
+  padding: 0.65rem 0.75rem 0.65rem 2.35rem;
+  border-bottom: 1px solid #f0f0f5;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.news-item-check {
+  position: absolute;
+  left: 0.7rem;
+  top: 0.9rem;
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 0.1s;
+}
+.news-item:hover .news-item-check,
+.news-item-check:checked,
+.news-list.has-selection .news-item-check {
+  opacity: 1;
+}
+html.dark .news-item { border-bottom-color: #2c2c2e; }
+.news-item:hover { background: #f5f5f7; }
+html.dark .news-item:hover { background: #2c2c2e; }
+
+/* The icon + headline are one big anchor — click anywhere on it to
+   open the article in a new tab. Generous padding gives a Fitts'-law
+   click target (HN-style row-link). Display is grid so the icon
+   column stays a fixed width while the headline wraps. */
+.news-row-main {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  text-decoration: none;
+  color: inherit;
+}
+.news-kind-icon {
+  font-size: 1.1rem;
+  line-height: 1.4;
+  text-align: center;
+  user-select: none;
+  flex-shrink: 0;
+}
 .news-headline {
   font-size: 0.96rem;
   font-weight: 600;
   color: #0071e3;
-  text-decoration: none;
   line-height: 1.4;
 }
-.news-headline:hover { text-decoration: underline; }
-.news-meta { display: flex; gap: 0.75rem; margin-top: 0.3rem; font-size: 0.78rem; color: #8e8e93; }
+.news-row-main:hover .news-headline { text-decoration: underline; }
+html.dark .news-headline { color: #0a84ff; }
+
+.news-row-badges {
+  margin: 0.3rem 0 0 2.35rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.news-meta {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.3rem 0 0 2.35rem;
+  font-size: 0.78rem;
+  color: #8e8e93;
+}
 .news-source { font-weight: 500; }
-.news-summary { margin: 0.45rem 0 0; font-size: 0.88rem; line-height: 1.5; color: #3a3a3c; }
+.news-summary { margin: 0.45rem 0 0 2.35rem; font-size: 0.88rem; line-height: 1.5; color: #3a3a3c; }
 
 /* Dark mode extensions */
 html.dark .market-signals-section h3 { color: #f5f5f7; }
@@ -946,6 +1144,18 @@ html.dark .wash-sale-warning            { background: #3a2f00; color: #ffe69c; b
 .benchmark-section { margin-top: 16px; }
 .benchmark-section h3 { margin-bottom: 8px; }
 
+/* Summary regenerate buttons — vertical stack so the heading row stays
+   uncluttered (just title + muted backend marker). align-items at the
+   start so the buttons match their content width. */
+.summary-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.summary-actions form { margin: 0; }
+
 /* ---------- Collapsible positions table ---------- */
 .positions-collapsible {
   margin: 16px 0;
@@ -1106,8 +1316,10 @@ html.dark .error {
 
 /* Reading-list rows — read articles dim, badges sit inline.         */
 .news-item.read .news-headline { color: #6e6e73; font-weight: 500; }
+.news-item.read .news-kind-icon { opacity: 0.4; }
 .news-item.read .news-summary,
 .news-item.read .excerpt        { color: #8e8e93; }
+html.dark .news-item.read .news-headline { color: #8e8e93; }
 
 /* FTS5 snippet excerpt below the headline.                          */
 .excerpt {
@@ -1203,8 +1415,16 @@ html.dark .badge.podcast-badge    { background: #3a1d5e; color: #d6b8ff; }
 .reading-view header { margin-bottom: 1.5rem; }
 .reading-view .actions {
   display: flex;
+  flex-wrap: wrap;       /* Cosmetics 3 — let the row wrap on narrow widths
+                            once Phase 3+5 added 👍/👎/Mute author/Mute keyword */
   gap: 0.5rem;
   margin: 0.75rem 0 0.5rem;
+  align-items: center;
+}
+.reading-view .actions .mute-keyword-form input[type="text"] {
+  /* Bound the keyword-mute input so the inline form doesn't push
+     the surrounding buttons across the wrap. */
+  width: 10rem;
 }
 .reading-view .actions form { margin: 0; }
 .reading-view .actions button {
@@ -1440,7 +1660,7 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
    per-feed result counts in the flash. Match the theme-toggle pill
    shape so the two icon buttons feel like a set. */
 .header-refresh-form { margin: 0; }
-button.header-icon-btn {
+.header-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1453,10 +1673,15 @@ button.header-icon-btn {
   font-size: 0.9rem;
   line-height: 1;
 }
-button.header-icon-btn:hover { background: #e8e8ed; }
-button.header-icon-btn:active svg { transform: rotate(90deg); transition: transform 0.2s; }
-html.dark button.header-icon-btn { border-color: #3a3a3c; color: #f5f5f7; }
-html.dark button.header-icon-btn:hover { background: #2c2c2e; }
+.header-icon-btn:hover { background: #e8e8ed; }
+.header-icon-btn:active svg { transform: rotate(90deg); transition: transform 0.2s; }
+html.dark .header-icon-btn { border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .header-icon-btn:hover { background: #2c2c2e; }
+/* Anchor-shaped header icons (e.g. the bus button) need link styles
+   reset so they don't inherit the generic underline / blue color. */
+a.header-icon-btn { text-decoration: none; }
+a.header-icon-btn.active { background: #e8e8ed; }
+html.dark a.header-icon-btn.active { background: #2c2c2e; }
 
 /* Header refresh toast — anchored to the right of the header so it sits
    adjacent to the icon button. Auto-clears in JS after ~3.5s. */
@@ -1477,115 +1702,6 @@ html.dark button.header-icon-btn:hover { background: #2c2c2e; }
 .header-toast.error { background: #d70015; }
 html.dark .header-toast { background: #f5f5f7; color: #1d1d1f; }
 html.dark .header-toast.error { background: #ff453a; color: #fff; }
-
-/* ----- Podcast player -------------------------------------------------
-   Sticky bar that lives just under the article header. The user can
-   scrub, skip, and change playback rate while scrolling through the
-   show notes below. <audio> stays in the DOM (no CSS hides it) but
-   the native controls are not rendered — we drive the element through
-   .podcast-player JS instead. */
-.podcast-player {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  margin: 1rem 0 1.5rem;
-  padding: 0.6rem 0.85rem;
-  background: #f5f5f7;
-  border: 1px solid #d2d2d7;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-html.dark .podcast-player {
-  background: #1c1c1e;
-  border-color: #3a3a3c;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-.podcast-player audio { display: none; }
-
-.podcast-player .player-row {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-}
-.podcast-player .player-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  height: 2.2rem;
-  padding: 0 0.65rem;
-  border: 1px solid #d2d2d7;
-  background: #fff;
-  color: #1d1d1f;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  line-height: 1;
-}
-.podcast-player .player-btn:hover { background: #e8e8ed; }
-html.dark .podcast-player .player-btn {
-  background: #2c2c2e;
-  border-color: #3a3a3c;
-  color: #f5f5f7;
-}
-html.dark .podcast-player .player-btn:hover { background: #3a3a3c; }
-
-.podcast-player .player-play { font-weight: 600; min-width: 3rem; }
-
-/* Skip buttons stack the curve glyph + the seconds label so the icons
-   read like the standard "⟲ 15" / "⟳ 30" controls every podcast app
-   uses. */
-.podcast-player .player-skip-back,
-.podcast-player .player-skip-forward {
-  flex-direction: column;
-  gap: 0;
-  height: 2.4rem;
-  padding: 0.15rem 0.55rem;
-}
-.podcast-player .player-icon { font-size: 0.95rem; line-height: 0.95; }
-.podcast-player .player-icon-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  margin-top: 0.1rem;
-}
-
-.podcast-player .player-time {
-  font-variant-numeric: tabular-nums;
-  font-size: 0.86rem;
-  color: #1d1d1f;
-  white-space: nowrap;
-}
-.podcast-player .player-time-sep { color: #6e6e73; }
-html.dark .podcast-player .player-time     { color: #f5f5f7; }
-html.dark .podcast-player .player-time-sep { color: #8e8e93; }
-
-.podcast-player .player-scrubber {
-  flex: 1 1 auto;
-  min-width: 8rem;
-  cursor: pointer;
-}
-
-.podcast-player .player-rate {
-  height: 2.2rem;
-  padding: 0 0.55rem;
-  border: 1px solid #d2d2d7;
-  border-radius: 8px;
-  background: #fff;
-  color: #1d1d1f;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-html.dark .podcast-player .player-rate {
-  background: #2c2c2e;
-  border-color: #3a3a3c;
-  color: #f5f5f7;
-}
-
-@media (max-width: 720px) {
-  .podcast-player .player-scrubber { order: 99; flex-basis: 100%; }
-}
 
 /* ----- Podcast browse page (/podcasts) ------------------------------- */
 .podcast-shows {
@@ -1700,3 +1816,624 @@ html.dark .podcast-card-excerpt { color: #aeaeb2; }
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
 }
+
+/* /admin/traces — one card per trace, table of spans inside.
+ *
+ * Layout notes: the attributes column carries arbitrarily long values
+ * (URLs, page titles, user-agent strings). To keep them inside the
+ * card we (a) pin the table to a fixed layout with per-column widths,
+ * (b) drop the per-attr nowrap so long values wrap onto multiple
+ * lines, (c) overflow-wrap: anywhere so URL-like tokens with no
+ * spaces can still break, and (d) overflow-x: auto on the card as a
+ * defence in depth in case a future browser disagrees. */
+.trace-card {
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 8px;
+  padding: 0.75rem 1rem 1rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+html.dark .trace-card { background: #1c1c1e; border-color: #2c2c2e; }
+.trace-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.trace-card-name { font-weight: 600; }
+.trace-card-name a { color: #1d1d1f; text-decoration: none; }
+html.dark .trace-card-name a { color: #f5f5f7; }
+.trace-card-name a:hover { color: #0071e3; }
+.trace-card-meta { font-size: 0.85rem; }
+.trace-spans {
+  width: 100%;
+  table-layout: fixed;
+}
+.trace-spans th:nth-child(1), .trace-spans td:nth-child(1) { width: 28%; }
+.trace-spans th:nth-child(2), .trace-spans td:nth-child(2) { width:  8%; }
+.trace-spans th:nth-child(3), .trace-spans td:nth-child(3) { width: 10%; }
+.trace-spans th:nth-child(4), .trace-spans td:nth-child(4) { width: 12%; }
+.trace-spans th:nth-child(5), .trace-spans td:nth-child(5) { width: 42%; }
+.trace-spans tbody td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+.trace-spans code { font-size: 0.88rem; }
+.trace-attrs {
+  font-size: 0.8rem;
+  color: #6e6e73;
+  line-height: 1.6;
+}
+html.dark .trace-attrs { color: #aeaeb2; }
+.trace-attr {
+  display: inline-block;
+  margin-right: 0.75rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.trace-attr code {
+  background: #f2f2f7;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  color: #1d1d1f;
+}
+html.dark .trace-attr code { background: #2c2c2e; color: #f5f5f7; }
+
+/* ---- Persistent mini-player -------------------------------------------
+   Pinned to the bottom edge of the viewport, full-width on mobile,
+   centered with max-width on desktop. Holds the only <audio> element
+   in the app. data-turbo-permanent on #global-player keeps the DOM
+   alive across Turbo navigations, so audio doesn't stop when you
+   click a link. body.has-mini-player adds bottom padding to <main>
+   so content doesn't get hidden under the bar. */
+#global-player {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  background: #fff;
+  border-top: 1px solid #e5e5ea;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  padding: 0.5rem 1rem;
+}
+html.dark #global-player { background: #1c1c1e; border-top-color: #2c2c2e; box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.35); }
+#global-player[hidden] { display: none !important; }
+body.has-mini-player main { padding-bottom: 5rem; }
+
+.mini-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.mini-player-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #1d1d1f;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html.dark .mini-player-title { color: #f5f5f7; }
+.mini-player-title:hover { color: #0071e3; }
+.mini-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+.mini-player-btn {
+  background: transparent;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  color: #1d1d1f;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+html.dark .mini-player-btn { border-color: #3a3a3c; color: #f5f5f7; }
+.mini-player-btn:hover { background: #f2f2f7; }
+html.dark .mini-player-btn:hover { background: #2c2c2e; }
+.mini-player-play { background: #0071e3; color: #fff; border-color: #0071e3; min-width: 2.4rem; justify-content: center; }
+.mini-player-play:hover { background: #0064c8; }
+html.dark .mini-player-play { background: #0a84ff; border-color: #0a84ff; }
+html.dark .mini-player-play:hover { background: #2a94ff; }
+.mini-player-icon { font-size: 1rem; line-height: 1; }
+.mini-player-icon-label { font-size: 0.7rem; opacity: 0.85; }
+.mini-player-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: #6e6e73;
+  min-width: 7rem;
+  text-align: center;
+}
+html.dark .mini-player-time { color: #aeaeb2; }
+.mini-player-time-sep { opacity: 0.6; margin: 0 0.15rem; }
+.mini-player-scrubber { flex: 1; min-width: 80px; }
+.mini-player-rate {
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  background: #fff;
+  color: #1d1d1f;
+  font-size: 0.85rem;
+}
+html.dark .mini-player-rate { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+.mini-player-close {
+  margin-left: auto;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .mini-player-icon-label { display: none; }
+  .mini-player-time { min-width: 5rem; font-size: 0.78rem; }
+  .mini-player-rate { display: none; }
+}
+
+/* "Play episode" button on the article view — replaces the old inline
+   <audio> + controls. Loads the episode into the global mini-player. */
+.play-episode-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1rem;
+}
+.play-episode-active { background: #34c759 !important; }
+html.dark .play-episode-active { background: #30d158 !important; }
+.play-episode-duration { font-size: 0.88rem; }
+
+/* ---- Chat widget ----------------------------------------------------
+   Floating button bottom-right, opens a 360px-wide panel above it.
+   Hidden by default; chat-widget.js removes [hidden] only after the
+   /chat/health probe says Claude is configured.
+*/
+#chat-widget {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 100;
+  font-size: 0.95rem;
+}
+.chat-toggle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #0071e3;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  transition: background 0.15s, transform 0.15s;
+}
+.chat-toggle:hover { background: #0064c8; transform: translateY(-1px); }
+html.dark .chat-toggle { background: #0a84ff; }
+html.dark .chat-toggle:hover { background: #2a94ff; }
+
+.chat-panel {
+  position: absolute;
+  right: 0;
+  bottom: 64px;
+  width: 380px;
+  max-width: calc(100vw - 2rem);
+  height: 520px;
+  max-height: calc(100vh - 6rem);
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* The bare `hidden` attribute defaults to display:none, but the
+   .chat-panel rule above sets display:flex, which overrides it. We
+   need an explicit !important here so the panel actually starts
+   closed and only opens when the user clicks the toggle button. */
+.chat-panel[hidden] { display: none !important; }
+html.dark .chat-panel { background: #1c1c1e; border-color: #2c2c2e; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); }
+
+.chat-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #f0f0f5;
+  background: #fafafc;
+}
+html.dark .chat-panel-header { background: #2c2c2e; border-bottom-color: #3a3a3c; }
+.chat-panel-title { font-weight: 600; flex: 1; font-size: 0.92rem; color: #1d1d1f; }
+html.dark .chat-panel-title { color: #f5f5f7; }
+.chat-panel-context { font-weight: 400; }
+.chat-panel-clear,
+.chat-panel-close {
+  background: transparent;
+  border: none;
+  color: #6e6e73;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+}
+.chat-panel-clear:hover,
+.chat-panel-close:hover { background: #ececf0; color: #1d1d1f; }
+html.dark .chat-panel-clear:hover,
+html.dark .chat-panel-close:hover { background: #3a3a3c; color: #f5f5f7; }
+
+.chat-panel-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.chat-msg {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  line-height: 1.4;
+  max-width: 90%;
+  word-wrap: break-word;
+}
+.chat-msg-user {
+  align-self: flex-end;
+  background: #0071e3;
+  color: #fff;
+  white-space: pre-wrap;
+}
+.chat-msg-assistant {
+  align-self: flex-start;
+  background: #f2f2f7;
+  color: #1d1d1f;
+}
+html.dark .chat-msg-assistant { background: #2c2c2e; color: #f5f5f7; }
+.chat-msg-assistant code {
+  background: rgba(0, 0, 0, 0.07);
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+html.dark .chat-msg-assistant code { background: rgba(255, 255, 255, 0.12); }
+.chat-msg-assistant ul { margin: 0.25rem 0 0.25rem 1.1rem; padding: 0; }
+.chat-msg-assistant li { margin: 0.1rem 0; }
+.chat-msg-pending { opacity: 0.6; font-style: italic; }
+.chat-msg-error {
+  background: #ffe0de;
+  color: #c0392b;
+  font-style: normal;
+  opacity: 1;
+}
+html.dark .chat-msg-error { background: #4a1a18; color: #ff6961; }
+.chat-msg-hint {
+  align-self: center;
+  font-size: 0.85rem;
+  color: #8e8e93;
+  text-align: center;
+  background: transparent;
+  padding: 0.25rem 0.5rem;
+}
+
+.chat-panel-form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border-top: 1px solid #f0f0f5;
+  background: #fafafc;
+}
+html.dark .chat-panel-form { background: #2c2c2e; border-top-color: #3a3a3c; }
+.chat-panel-input {
+  flex: 1;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.92rem;
+  resize: vertical;
+  min-height: 2.4rem;
+  max-height: 7rem;
+  background: #fff;
+  color: #1d1d1f;
+}
+html.dark .chat-panel-input { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+.chat-panel-input:focus { outline: 2px solid #0071e3; outline-offset: -1px; }
+.chat-panel-send {
+  background: #0071e3;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-panel-send:hover:not(:disabled) { background: #0064c8; }
+.chat-panel-send:disabled { background: #c4c4c9; cursor: not-allowed; }
+html.dark .chat-panel-send { background: #0a84ff; }
+html.dark .chat-panel-send:hover:not(:disabled) { background: #2a94ff; }
+html.dark .chat-panel-send:disabled { background: #3a3a3c; }
+
+/* ---- Digests ----------------------------------------------------------
+   /digests is a list table styled like .data-table; the per-digest
+   detail view drops a Digests.build_html fragment under .digest-items. */
+.digest-meta { margin-bottom: 1rem; font-size: 0.9rem; }
+.digest-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.digest-item {
+  border-top: 1px solid #f0f0f5;
+  padding: 0.85rem 0;
+}
+.digest-item:first-child { border-top: none; }
+html.dark .digest-item { border-top-color: #2c2c2e; }
+.digest-item-title { font-weight: 600; font-size: 1rem; line-height: 1.35; }
+.digest-item-title a { color: #1d1d1f; text-decoration: none; }
+html.dark .digest-item-title a { color: #f5f5f7; }
+.digest-item-title a:hover { color: #0071e3; }
+.digest-item-meta { font-size: 0.85rem; margin: 0.2rem 0 0.4rem; }
+.digest-item-summary { color: #3a3a3c; font-size: 0.92rem; line-height: 1.45; }
+html.dark .digest-item-summary { color: #aeaeb2; }
+
+/* ---- /articles bulk-actions toolbar ----------------------------------
+   Sticky banner that appears once a row checkbox is ticked. The
+   `[hidden] { display: none !important }` rule is required because
+   .bulk-toolbar's `display: flex` would otherwise override the
+   bare hidden attribute (same trick as .chat-panel). */
+.bulk-toolbar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #fff;
+  border: 1px solid #d2d2d7;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+html.dark .bulk-toolbar { background: #1c1c1e; border-color: #3a3a3c; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+.bulk-toolbar[hidden] { display: none !important; }
+.bulk-toolbar-count { font-weight: 600; margin-right: 0.5rem; font-size: 0.92rem; }
+.bulk-toolbar-btn {
+  background: #fff;
+  color: #1d1d1f;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.bulk-toolbar-btn:hover:not(:disabled) { background: #f2f2f7; }
+.bulk-toolbar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.bulk-toolbar-btn.is-pending { opacity: 0.7; }
+html.dark .bulk-toolbar-btn { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
+html.dark .bulk-toolbar-btn:hover:not(:disabled) { background: #3a3a3c; }
+.bulk-toolbar-clear { margin-left: auto; }
+
+/* ---- Phase 3 feedback signal ---------------------------------------
+   Three surfaces share the same colour palette:
+     up   = green (#34c759 / dark #30d158)
+     down = red   (#ff3b30 / dark #ff453a)
+   Idle / cleared state is the existing button colour, so the active
+   state lights up clearly when the user has voted. */
+
+/* /article/:uid action row */
+.feedback-btn.feedback-on-up   { background: #34c759 !important; color: #fff !important; border-color: #34c759 !important; }
+.feedback-btn.feedback-on-down { background: #ff3b30 !important; color: #fff !important; border-color: #ff3b30 !important; }
+html.dark .feedback-btn.feedback-on-up   { background: #30d158 !important; border-color: #30d158 !important; }
+html.dark .feedback-btn.feedback-on-down { background: #ff453a !important; border-color: #ff453a !important; }
+
+/* /articles row inline 👍/👎 — hidden by default, revealed on row
+   hover. When the user has actually voted, .feedback-set keeps the
+   chosen button visible regardless of hover so the vote is always
+   discoverable. */
+.news-row-feedback {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.news-item:hover .news-row-feedback,
+.news-row-feedback.feedback-set { opacity: 1; }
+.news-row-feedback form { display: inline; margin: 0; }
+.feedback-row-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  filter: grayscale(0.4);
+  opacity: 0.75;
+  transition: filter 0.1s, opacity 0.1s, background 0.1s;
+}
+.feedback-row-btn:hover { background: #f0f0f5; filter: none; opacity: 1; }
+html.dark .feedback-row-btn:hover { background: #2c2c2e; }
+.feedback-row-btn.is-on { filter: none; opacity: 1; background: #e0f5e6; }
+.feedback-row-btn.is-on[aria-label="Thumbs down"] { background: #ffe0de; }
+html.dark .feedback-row-btn.is-on { background: #1d3a23; }
+html.dark .feedback-row-btn.is-on[aria-label="Thumbs down"] { background: #3a1a18; }
+/* The badge container had display: flex from the original layout but
+   we made it always-rendered now (so the hover affordances have
+   somewhere to live). When there are no persistent badges, suppress
+   the gap. */
+.news-row-badges.is-empty { gap: 0; }
+
+/* /feeds row weight controls — small +/− pills around the live
+   weight readout. Default state (1.00×) is muted; non-default is
+   highlighted to make it clear which feeds are weighted. */
+.feed-row-weight {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.4rem;
+  font-size: 0.85rem;
+}
+.feed-weight-btn {
+  background: #fff;
+  border: 1px solid #d2d2d7;
+  border-radius: 4px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #1d1d1f;
+}
+.feed-weight-btn:hover { background: #e8e8ed; }
+html.dark .feed-weight-btn { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
+html.dark .feed-weight-btn:hover { background: #3a3a3c; }
+.feed-weight-display {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2rem;
+  text-align: center;
+  color: #1d1d1f;
+  font-weight: 600;
+}
+html.dark .feed-weight-display { color: #f5f5f7; }
+.feed-row-weight.is-default .feed-weight-display { color: #8e8e93; font-weight: 400; }
+
+/* ---- Skim mode (?view=skim on /articles) ----------------------------
+   Drops the meta + badges + tag chips, enlarges the headline, and
+   surfaces a summary line per row so the user can decide
+   read/skip/save without opening anything. Same DOM as the default
+   view; just a `.news-list.skim` modifier. */
+.news-list.skim .news-row-badges,
+.news-list.skim .news-meta { display: none; }
+.news-list.skim .news-headline { font-size: 1.1rem; line-height: 1.35; }
+.news-list.skim .news-item    { padding-top: 0.85rem; padding-bottom: 0.85rem; }
+.news-summary-skim {
+  margin: 0.35rem 0 0 2.35rem;     /* line up under the headline (icon column = 1.75rem + 0.6rem gap) */
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #3a3a3c;
+  /* Clamp to ~3 lines so a single very long article doesn't push the
+     next item off the fold. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.dark .news-summary-skim { color: #c0c0c5; }
+.news-item.read .news-summary-skim { color: #8e8e93; }
+
+/* Cosmetics 4 — skim mode hides the row thumbnail. The 64px image
+   on the right was overlapping the first 1–2 lines of the summary
+   (which only set a margin-left, not padding-right). Skim mode is
+   for fast scan-and-triage, the picture isn't load-bearing here. */
+.news-list.skim .news-item-thumb { display: none; }
+.news-list.skim .news-item.has-thumb .news-row-main,
+.news-list.skim .news-item.has-thumb .news-row-badges,
+.news-list.skim .news-item.has-thumb .news-meta { padding-right: 0; }
+
+/* ---- Phase 5 mute filters --------------------------------------------
+   /feeds Muted subsection — three small lists (keyword/author/feed)
+   plus an add form. /article/:uid keyword form lives inside .actions
+   so it picks up button styling for free; the inline input gets a
+   modest width so it doesn't dominate the row. */
+.mutes-section .mutes-add { gap: 0.75rem; align-items: end; }
+.mute-list { list-style: none; padding: 0; margin: 0.5rem 0 1.25rem 0; }
+.mute-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e5ea;
+}
+.mute-row:last-child { border-bottom: none; }
+.mute-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92rem; }
+.mute-since { font-size: 0.82rem; margin-left: auto; }
+html.dark .mute-row { border-color: #3a3a3c; }
+
+.mute-keyword-form input[type="text"] {
+  width: 12rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-right: 0.25rem;
+}
+html.dark .mute-keyword-form input[type="text"] { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+
+/* ---- Phase 7 Read-next card -----------------------------------------
+   Single-suggestion card revealed by JS once the user scrolls past
+   the sentinel. Slide-in via CSS; the [hidden] attribute keeps it out
+   of layout until the JS removes it. Looks like a slim version of a
+   .news-item to match the rest of the surface. */
+.read-next-card {
+  display: block;
+  margin: 1.5rem 0 1rem 0;
+  padding: 1rem 1.1rem;
+  border-left: 4px solid #0071e3;
+  background: rgba(0, 113, 227, 0.04);
+  border-radius: 6px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.read-next-card-visible { opacity: 1; transform: translateY(0); }
+.read-next-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0071e3;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.read-next-headline {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  text-decoration: none;
+  line-height: 1.35;
+}
+.read-next-headline:hover { text-decoration: underline; }
+.read-next-meta {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: #6e6e73;
+  display: flex;
+  gap: 0.6rem;
+}
+html.dark .read-next-card     { background: rgba(10, 132, 255, 0.08); border-left-color: #0a84ff; }
+html.dark .read-next-headline { color: #f5f5f7; }
+html.dark .read-next-label    { color: #0a84ff; }
+html.dark .read-next-meta     { color: #98989d; }
+
+/* ---- Phase 8 triage page --------------------------------------------
+   Three sections (must_read / optional / skip), each a slimmed-down
+   .news-list. The rationale line under each headline is the value-add
+   over /articles — small, italic, slightly muted so the headline
+   still leads. */
+.triage-section h3 { margin-bottom: 0.25rem; }
+.triage-rationale {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: #6e6e73;
+  line-height: 1.4;
+}
+html.dark .triage-rationale { color: #aeaeb2; }
+.triage-must_read .news-item { border-left: 3px solid #34c759; padding-left: 0.6rem; }
+.triage-skip      .news-item { opacity: 0.7; }
+html.dark .triage-must_read .news-item { border-left-color: #30d158; }

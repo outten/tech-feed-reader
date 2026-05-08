@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x scripts/backfill_audio.rb)",
+      "Bash(curl *)",
+      "Bash(git fetch *)",
+      "Bash(make lint)",
+      "Bash(make test)",
+      "Bash(make audit)"
+    ]
+  }
+}

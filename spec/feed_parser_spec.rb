@@ -16,6 +16,7 @@ RSpec.describe FeedParser do
       e = result[:entries].first
       expect(e.keys).to contain_exactly(
         :uid, :title, :url, :author, :published_at, :content_html, :content_text,
+        :image_url,
         :audio_url, :audio_mime_type, :audio_duration_seconds
       )
     end
@@ -79,6 +80,70 @@ RSpec.describe FeedParser do
       expect {
         FeedParser.parse(mojibake, feed_url: 'https://example.com/feed.rss')
       }.not_to raise_error
+    end
+  end
+
+  describe '.parse image extraction' do
+    let(:podcast_body) { File.read(File.expand_path('fixtures/podcast_rss.xml', __dir__)) }
+    let(:podcast)      { FeedParser.parse(podcast_body, feed_url: 'https://example.com/podcast/feed') }
+
+    it 'extracts the channel-level cover art from <itunes:image>' do
+      expect(podcast[:image_url]).to eq('https://cdn.example.com/show-cover.jpg')
+    end
+
+    it 'extracts per-entry image_url from <itunes:image> on the item' do
+      ep12 = podcast[:entries].find { |e| e[:title].start_with?('Episode 12') }
+      expect(ep12[:image_url]).to eq('https://cdn.example.com/ep-12-art.jpg')
+    end
+
+    it 'leaves image_url nil for entries without an image declaration' do
+      ep11 = podcast[:entries].find { |e| e[:title].start_with?('Episode 11') }
+      expect(ep11[:image_url]).to be_nil
+    end
+
+    it 'falls back to the first <img> in content_html when no feed-level image is declared' do
+      body = <<~XML
+        <?xml version="1.0"?>
+        <rss version="2.0"><channel>
+          <title>Inline Image Blog</title>
+          <link>https://example.com/blog</link>
+          <description>fixture</description>
+          <item>
+            <title>Hello</title>
+            <link>https://example.com/blog/1</link>
+            <guid>1</guid>
+            <pubDate>Mon, 04 May 2026 12:00:00 +0000</pubDate>
+            <description><![CDATA[Body. <img src="https://cdn.example.com/inline.jpg" alt="x"> more.]]></description>
+          </item>
+        </channel></rss>
+      XML
+      result = FeedParser.parse(body, feed_url: 'https://example.com/blog/feed')
+      expect(result[:entries].first[:image_url]).to eq('https://cdn.example.com/inline.jpg')
+    end
+
+    it 'rejects relative <img> URLs (they would 404 outside the publisher origin)' do
+      body = <<~XML
+        <?xml version="1.0"?>
+        <rss version="2.0"><channel>
+          <title>Relative</title>
+          <link>https://example.com/blog</link>
+          <description>fixture</description>
+          <item>
+            <title>Hello</title>
+            <link>https://example.com/blog/1</link>
+            <guid>1</guid>
+            <pubDate>Mon, 04 May 2026 12:00:00 +0000</pubDate>
+            <description><![CDATA[Body. <img src="/relative/path.jpg"> more.]]></description>
+          </item>
+        </channel></rss>
+      XML
+      result = FeedParser.parse(body, feed_url: 'https://example.com/blog/feed')
+      expect(result[:entries].first[:image_url]).to be_nil
+    end
+
+    it 'returns nil channel image_url when neither <itunes:image> nor <image> is present' do
+      result = FeedParser.parse(rss_body, feed_url: 'https://example.com/feed.rss')
+      expect(result[:image_url]).to be_nil
     end
   end
 

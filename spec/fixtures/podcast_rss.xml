@@ -5,6 +5,7 @@
     <link>https://example.com/podcast</link>
     <description>A fixture podcast feed for parser tests.</description>
     <itunes:author>Example Host</itunes:author>
+    <itunes:image href="https://cdn.example.com/show-cover.jpg"/>
 
     <item>
       <title>Episode 12 — On Building Things</title>
@@ -13,6 +14,7 @@
       <pubDate>Sat, 02 May 2026 09:00:00 +0000</pubDate>
       <description>&lt;p&gt;Show notes for episode 12.&lt;/p&gt;</description>
       <enclosure url="https://cdn.example.com/audio/ep-12.mp3" type="audio/mpeg" length="32145678"/>
+      <itunes:image href="https://cdn.example.com/ep-12-art.jpg"/>
       <itunes:duration>1:23:45</itunes:duration>
     </item>
 
