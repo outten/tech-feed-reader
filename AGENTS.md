@@ -29,8 +29,9 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 - [README.md](README.md) page table + status line
 - AGENTS.md (this file) — if there's a new module / store / external integration / convention worth documenting
 - [CONTRIBUTING.md](CONTRIBUTING.md) — only if the process itself changed
+- **[TODO.md](TODO.md) and [STUFF.md](STUFF.md)** — these are the live backlog. Every PR that ships work captured in either file must flip the relevant item's checkbox + status (e.g. `**Status: tests** → **Status: merged** — commit \`abc1234\``) in the same change. Items intentionally not implemented get an explicit "declined" or "deferred" annotation with a one-line reason — never leave a stale `[ ]` for work we've decided not to do. New asks added to STUFF.md by the user during a session should land in their PR with status `not implemented`; the next PR that addresses them flips the status.
 
-Don't leave docs to be reconciled later.
+Don't leave docs to be reconciled later. The "rewrite the file" sweep we did in `outten/TODO-049` is what NOT to repeat — every PR should keep these files honest as it lands.
 
 ## Setup & credentials
 
