@@ -261,14 +261,22 @@ The user asked for "buttons in the Executive Summary of the area to filter on sp
 
 ## Sports — Phase S8: league standings tables
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-053, awaiting user approval to commit + open PR
 
-`/sports/league/:slug` (e.g. `/sports/league/nfl`) — full league table for a sport the user follows. Useful context for "where do the Eagles sit in the NFC East?"
+`/sports/league/:slug` (e.g. `/sports/league/nfl`) — full league table per league the user follows.
 
-- [ ] Standings query: pull from the provider that supplied the league (ESPN for NFL/NBA/MLS, TheSportsDB for Super Rugby).
-- [ ] Highlight the row(s) for teams the user follows.
-- [ ] Click a row → that team's `/sports/team/:slug` detail.
-- [ ] Specs: standings render, followed-team highlight, sort order matches the source.
+- [x] **Schema** (`014_sports_standings.sql`): `sports_standings` table indexed by `(league_id, group_name, position)`, idempotent upsert on `(source_provider, league_id, group_name, team_id)`. Captures position / W-L-T / win_percent / points_for / points_against / point_differential / games_behind / streak / playoff_seed / last_synced_at.
+- [x] **Provider**: `Providers::ESPN.standings(sport_path:)` walks ESPN's nested children/standings tree and flattens to `[StandingsGroup{group_name, entries:[StandingsEntry...]}]`. Defensive — per-leaf rescue, returns `[]` on HTTP/parse/network failures.
+- [x] **Sync**: `make sync-sports` now also pulls standings per league after match data, auto-creates any standings-only team rows that the schedule sync missed. Verified live: 92 standings rows synced (2 NFL conferences × 16 teams + 2 NBA conf × 15 + 2 MLS conf × 15).
+- [x] **Page**: `/sports/league/:slug` renders all groups inside the league as a `data-table`, followed teams highlighted (`.sports-standings-followed`, ★). Each row links to `/sports/team/:slug`. Empty state when no standings synced yet.
+- [x] **TOC entry point on `/sports`**: third pill row "By league:" with one pill per league that has synced standings (no followed-team requirement, so globally-interesting tournaments like FIFA World Cup show even when the user doesn't track a specific team).
+- [x] **Rugby Championship for the All Blacks**: the original Phase S3 seed put All Blacks in `intl-rugby` (rugby/164205), which doesn't expose standings. Replaced with `rugby-championship` (rugby/244293) — the proper 4-team annual table (NZ + AUS + RSA + ARG). All Blacks now has a synced standings row (#2 in the current snapshot, 159 PF / 151 PA). One-time cleanup in the seed script removes the legacy `intl-rugby` league + its cascade-orphaned matches.
+- [x] **FIFA World Cup**: seeded as a league but with no followed team (per the user's "we are not tracking" note). 12 groups × 4 teams synced. Browseable at `/sports/league/fifa-world` and surfaced in the "By league:" pill row. Match sync is follow-gated, so no World Cup matches land in `sports_matches` until the user follows a national team.
+- [x] **Standings sync widened**: previously gated on followed-team-in-league; now syncs every seeded ESPN league. Cheap (one HTTP per league) and required for the World Cup case.
+- [x] **Inline standing line on the team detail page**: `/sports/team/:slug` header now carries a "National Football Conference · 3rd (11–6) · streak L1 · Full standings →" subtitle when standings exist. New `position_suffix` helper for the ordinal (1st/2nd/3rd/…/11th/12th/13th/21st/etc).
+- [ ] **Division-level drill-down** (e.g. NFC East under NFC) — deferred. ESPN's main `standings` endpoint serves at the conference level; division standings need a separate endpoint with a `level=3` query param (probed but not wired). Conference-level is enough for v1.
+- [ ] **Per-tile inline standing line on the score-tiles strip** — deferred to a small follow-up. The team detail page already shows it; adding to tiles is purely a layout question.
+- [x] **Specs**: 23 examples in [spec/sports_standings_spec.rb](spec/sports_standings_spec.rb) — store CRUD + idempotent upsert + lookups, ESPN provider tree-walk + entry normalization + error paths, route happy + 404 + empty-state, team subtitle render + omit-when-empty, `position_suffix` ordinals across the full set including the 11/12/13 special case.
 
 ## Sports — Phase S9: calendar / upcoming + iCal export
 

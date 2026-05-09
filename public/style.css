@@ -2663,6 +2663,39 @@ html.dark .sports-score-tile-vs { color: #98989d; }
 html.dark .sports-score-tile-meta { color: #98989d; }
 html.dark .sports-score-tile-meta-sep { color: #48484a; }
 
+/* ---- Standings (Phase S8) ----------------------------------------
+   Compact table per conference/division. Followed team rows highlight
+   with a tinted background so the user can scan to "where do my
+   teams sit". */
+.sports-standings-heading { margin: 0 0 0.5rem 0; font-size: 1.05rem; }
+.sports-standings-table { font-size: 0.92rem; }
+.sports-standings-table .sports-standings-pos { width: 2.5rem; text-align: center; color: #6e6e73; }
+.sports-standings-team-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #1d1d1f;
+  text-decoration: none;
+  font-weight: 500;
+}
+.sports-standings-team-link:hover { color: #0071e3; text-decoration: underline; }
+html.dark .sports-standings-team-link { color: #f5f5f7; }
+html.dark .sports-standings-team-link:hover { color: #0a84ff; }
+.sports-standings-team-logo {
+  width: 22px; height: 22px; object-fit: contain;
+}
+.sports-standings-followed { background: rgba(0, 113, 227, 0.06); }
+html.dark .sports-standings-followed { background: rgba(10, 132, 255, 0.10); }
+.sports-standings-followed .sports-standings-team-link { font-weight: 600; }
+.sports-standings-follow-mark { color: #ffcc00; margin-left: 0.25rem; }
+
+/* The header subtitle on /sports/team/:slug now carries the
+   league-position line. Slightly tighter than the regular subtitle
+   so the page doesn't grow taller for the same amount of context. */
+.sports-team-standing { margin-top: 0.25rem; font-size: 0.92rem; }
+.sports-team-standing strong { color: #1d1d1f; }
+html.dark .sports-team-standing strong { color: #f5f5f7; }
+
 .sports-toc-button {
   display: inline-flex;
   align-items: center;

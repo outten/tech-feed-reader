@@ -1,0 +1,78 @@
+<div class="page-header">
+  <div>
+    <h2><%= h(@league['name']) %> &mdash; Standings</h2>
+    <p class="subtitle">
+      <a href="/sports">&larr; All sports</a>
+      <% if @standings_groups.any? %>
+        &middot; <%= @standings_groups.values.flatten.length %> teams across
+        <%= @standings_groups.keys.length %> group<%= 's' unless @standings_groups.keys.length == 1 %>
+        <% latest = @standings_groups.values.flatten.map { |r| r['last_synced_at'] }.compact.max %>
+        <% if latest %>&middot; updated <%= relative_time(latest) %><% end %>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @standings_groups.empty? %>
+  <div class="empty-state">
+    <p>No standings synced for this league yet. Run <code>make sync-sports</code> to populate.</p>
+  </div>
+<% else %>
+  <% @standings_groups.each do |group_name, rows| %>
+    <section class="benchmark-section sports-standings-group" style="margin-top:1.5rem">
+      <h3 class="sports-standings-heading"><%= h(group_name) %></h3>
+      <table class="data-table sports-standings-table">
+        <thead>
+          <tr>
+            <th class="sports-standings-pos">#</th>
+            <th>Team</th>
+            <th class="num">W</th>
+            <th class="num">L</th>
+            <% if rows.any? { |r| r['ties'] && r['ties'].to_i > 0 } %>
+              <th class="num">T</th>
+            <% end %>
+            <th class="num">PCT</th>
+            <th class="num">PF</th>
+            <th class="num">PA</th>
+            <th class="num">DIFF</th>
+            <th>Streak</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.each do |row| %>
+            <% team = (@teams_by_id || {})[row['team_id']] %>
+            <% next unless team %>
+            <% followed = @followed_slugs.include?(team['slug']) %>
+            <tr class="<%= 'sports-standings-followed' if followed %>">
+              <td class="sports-standings-pos"><%= row['position'] || '—' %></td>
+              <td>
+                <a class="sports-standings-team-link" href="/sports/team/<%= h(team['slug']) %>"
+                   title="Open the <%= h(team['name']) %> page">
+                  <% if team['image_url'] && !team['image_url'].to_s.empty? %>
+                    <img class="sports-standings-team-logo" src="<%= h(team['image_url']) %>" alt="" loading="lazy">
+                  <% end %>
+                  <span><%= h(team['short_name'] || team['name']) %></span>
+                  <% if followed %><span class="sports-standings-follow-mark" title="You follow this team">★</span><% end %>
+                </a>
+              </td>
+              <td class="num"><%= row['wins']  || '—' %></td>
+              <td class="num"><%= row['losses'] || '—' %></td>
+              <% if rows.any? { |r| r['ties'] && r['ties'].to_i > 0 } %>
+                <td class="num"><%= row['ties'] || 0 %></td>
+              <% end %>
+              <td class="num"><%= row['win_percent'].to_s.empty? ? '—' : row['win_percent'] %></td>
+              <td class="num"><%= row['points_for']     || '—' %></td>
+              <td class="num"><%= row['points_against'] || '—' %></td>
+              <td class="num <%= row['point_differential'].to_i.positive? ? 'positive' : (row['point_differential'].to_i.negative? ? 'negative' : '') %>">
+                <%= row['point_differential'] ? (row['point_differential'].to_i.positive? ? "+#{row['point_differential']}" : row['point_differential']) : '—' %>
+              </td>
+              <td class="<%= row['streak'].to_s.start_with?('W') ? 'positive' : (row['streak'].to_s.start_with?('L') ? 'negative' : '') %>">
+                <%= row['streak'].to_s.empty? ? '—' : row['streak'] %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+  <% end %>
+<% end %>
