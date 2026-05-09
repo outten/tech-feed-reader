@@ -79,6 +79,43 @@
   </p>
 </section>
 
+<%# S7 follow-up #2 — articles mentioning this player. FTS5 phrase
+    cache populated by SportsEntityArticlesStore on page load (TTL 1h). %>
+<section class="benchmark-section sports-entity-articles" style="margin-top:1.5rem">
+  <h3>
+    Articles mentioning <%= h(@player['full_name']) %>
+    <span class="muted" style="font-size:0.85rem; font-weight:normal">
+      (<%= (@related_articles || []).length %>)
+    </span>
+  </h3>
+  <% if (@related_articles || []).empty? %>
+    <p class="muted">No articles mentioning <%= h(@player['full_name']) %> in your feeds yet. New matches surface here as articles are imported.</p>
+  <% else %>
+    <ul class="sports-article-list">
+      <% @related_articles.each do |article| %>
+        <% feed         = (@feeds_by_id || {})[article['feed_id']] %>
+        <% summary_row  = (@summaries_by_article_id || {})[article['id']] %>
+        <% summary_text = skim_summary_for(article, summary_row) %>
+        <li class="sports-article <%= 'read' if article['read'] == 1 %>">
+          <h4 class="sports-article-title">
+            <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+          </h4>
+          <% unless summary_text.empty? %>
+            <p class="sports-article-summary"><%= h(summary_text) %></p>
+          <% end %>
+          <div class="sports-article-meta">
+            <% if feed %>
+              <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+              <span class="sports-article-meta-sep">&middot;</span>
+            <% end %>
+            <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
+
 <section class="benchmark-section" style="margin-top:1.5rem">
   <h3>About</h3>
   <dl class="sports-player-about">

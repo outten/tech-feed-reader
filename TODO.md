@@ -294,7 +294,7 @@ User asked specifically for tennis rankings + drill-down. Shipped that as the fi
 
 ## Sports — Phase S10: cross-category personalization
 
-**Status: `tests`** — outten/TODO-056 (bundled with tennis follow-up), awaiting user approval to commit + open PR
+**Status: `done`** — shipped via #58 on 2026-05-09
 
 The For You ranker shipped in Phase 6 was scoped globally. With sports + tech in the same DB, the corpus needs scoping (already added in Phase S1) AND the AI triage (`Triage::Claude`) should run per-category by default — "what should I read in tech today" and "what's important in sports today" are different questions.
 
@@ -305,7 +305,7 @@ The For You ranker shipped in Phase 6 was scoped globally. With sports + tech in
 
 ## Sports — Phase S7 follow-up: tennis player follows
 
-**Status: `tests`** — outten/TODO-056 (bundled with S10), awaiting user approval to commit + open PR
+**Status: `done`** — shipped via #58 on 2026-05-09
 
 Phase S7 shipped tennis rankings + per-player detail. The follow-up adds first-class follows for individual players (not just teams), so the user can pin Sinner/Alcaraz/Sabalenka and see them surface above the rankings table.
 
@@ -314,6 +314,18 @@ Phase S7 shipped tennis rankings + per-player detail. The follow-up adds first-c
 - [x] **My followed players callout** at the top of `/sports/tennis`, gated on `(@followed_players || []).any?` — sorts by `current_rank` ascending, shows headshot + tour + country.
 - [x] Follow/unfollow toggle on `/sports/player/:slug` detail page with `★ Followed` / `☆ Not followed` heading.
 - [x] **Specs**: 9 examples in [spec/tennis_follows_spec.rb](spec/tennis_follows_spec.rb) — POST happy/idempotent/404/400/return_to, unfollow happy/idempotent, rankings ☆-when-empty + ★-when-followed + sorted callout, detail-page toggle in both states.
+
+## Sports — Phase S7 follow-up #2: articles-mentioning-entity surface
+
+**Status: `tests`** — outten/TODO-057, awaiting user approval to commit + open PR
+
+Following a player or team only pinned them to their topical landing page; nothing in the article stream changed. This follow-up surfaces "articles mentioning Sinner" / "articles mentioning Eagles" on each detail page, populated by an FTS5 phrase MATCH cache.
+
+- [x] Migration `016_sports_entity_articles.sql` — new polymorphic join table `sports_entity_articles (kind, entity_id, article_id, matched_at)` with PK on `(kind, entity_id, article_id)` + ON DELETE CASCADE on article. New `articles_indexed_at` column on `sports_players` + `sports_teams` for cache freshness.
+- [x] `SportsEntityArticlesStore` — `refresh_for(kind:, entity_id:, name:)` runs FTS5 phrase MATCH on the entity's name, upserts hits via `INSERT OR IGNORE`, stamps `articles_indexed_at`. Skips work when within TTL (default 1h, override via `force: true`). `for_entity(kind:, entity_id:, limit:)` reads the cached list ordered by `published_at DESC`.
+- [x] `/sports/player/:slug` — refreshes-if-stale on every visit, renders **Articles mentioning {full_name}** section with empty-state copy.
+- [x] `/sports/team/:slug` — same pattern, but the section only renders when there's at least one cached hit (the page already has a feed-curated list — empty mention block would be visual noise).
+- [x] **Specs**: 8 examples in [spec/sports_entity_articles_spec.rb](spec/sports_entity_articles_spec.rb) — store happy/idempotent/TTL-skip/phrase-strict/unknown-kind, team-name caching, route renders + empty-state copy.
 
 ---
 
