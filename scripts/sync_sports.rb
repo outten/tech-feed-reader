@@ -30,9 +30,19 @@ require_relative '../app/sports_leagues_store'
 require_relative '../app/sports_teams_store'
 require_relative '../app/sports_matches_store'
 require_relative '../app/sports_standings_store'
+require_relative '../app/sports_players_store'
 require_relative '../app/sports_follows_store'
 require_relative '../app/providers/espn'
 require_relative '../app/logger'
+
+# slugify a tennis player display name. "Iga Świątek" → "iga-swiatek".
+# Strips diacritics by best-effort using ASCII transliteration via
+# Unicode decomposition.
+def tennis_player_slug(full_name)
+  s = full_name.to_s.unicode_normalize(:nfd).gsub(/[^\x00-\x7F]/, '')
+  s = s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/(^-|-$)/, '')
+  s.empty? ? nil : s
+end
 
 Database.migrate!
 
@@ -198,5 +208,37 @@ SportsLeaguesStore.all.each do |league|
   puts "  league:#{league['slug'].ljust(12)} groups=#{groups.length} entries=#{groups.sum { |g| g.entries.length }}"
 end
 
+# Phase S7 — tennis rankings (ATP + WTA top 150 each). Cheap (one
+# HTTP per tour). Runs unconditionally; rankings are globally
+# interesting and don't require a follow.
 puts
-puts "Done. matches_upserted=#{upserted} matches_total=#{SportsMatchesStore.count} standings_total=#{SportsStandingsStore.count}"
+puts "Syncing tennis rankings…"
+tennis_count = 0
+%w[atp wta].each do |tour|
+  entries = Providers::ESPN.tennis_rankings(tour: tour)
+  entries.each do |e|
+    slug = tennis_player_slug(e.full_name)
+    next unless slug && e.athlete_external_id && !e.athlete_external_id.empty?
+    SportsPlayersStore.upsert(
+      sport:           'tennis',
+      slug:            slug,
+      full_name:       e.full_name,
+      country:         e.country,
+      image_url:       e.headshot_url,
+      tour:            e.tour,
+      current_rank:    e.current_rank,
+      previous_rank:   e.previous_rank,
+      points:          e.points,
+      trend:           e.trend,
+      headshot_url:    e.headshot_url,
+      flag_url:        e.flag_url,
+      source_provider: 'espn',
+      external_id:     e.athlete_external_id
+    )
+    tennis_count += 1
+  end
+  puts "  tour:#{tour.upcase.ljust(12)} ranked=#{entries.length}"
+end
+
+puts
+puts "Done. matches_upserted=#{upserted} matches_total=#{SportsMatchesStore.count} standings_total=#{SportsStandingsStore.count} players_total=#{SportsPlayersStore.count}"

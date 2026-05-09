@@ -1,0 +1,77 @@
+<div class="page-header">
+  <div>
+    <h2>🎾 Tennis rankings</h2>
+    <p class="subtitle">
+      Top <%= @limit %> on each tour (ATP + WTA), updated daily by <code>make sync-sports</code>.
+      &middot; <a href="/sports">&larr; All sports</a>
+      <% latest = (@atp + @wta).map { |p| p['last_synced_at'] }.compact.max %>
+      <% if latest %>&middot; updated <%= relative_time(latest) %><% end %>
+    </p>
+  </div>
+</div>
+
+<% if @atp.empty? && @wta.empty? %>
+  <div class="empty-state">
+    <p>No tennis rankings synced yet. Run <code>make sync-sports</code> to populate (ESPN ATP + WTA endpoints).</p>
+  </div>
+<% else %>
+  <div class="sports-tennis-grid">
+    <% [
+      ['ATP', "men's tour",   @atp, 'atp'],
+      ['WTA', "women's tour", @wta, 'wta']
+    ].each do |label, gender, rows, tour_slug| %>
+      <section class="benchmark-section sports-tennis-tour">
+        <h3 class="sports-tennis-heading"><%= label %> &mdash; <%= gender %></h3>
+        <% if rows.empty? %>
+          <p class="muted">No <%= label %> rankings synced yet.</p>
+        <% else %>
+          <table class="data-table sports-tennis-table">
+            <thead>
+              <tr>
+                <th class="sports-tennis-rank">#</th>
+                <th></th>
+                <th>Player</th>
+                <th>Country</th>
+                <th class="num">Points</th>
+                <th>Trend</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.each do |p| %>
+                <% diff = (p['previous_rank'].to_i - p['current_rank'].to_i) %>
+                <tr>
+                  <td class="sports-tennis-rank"><%= p['current_rank'] %></td>
+                  <td class="sports-tennis-photo">
+                    <% if p['headshot_url'] && !p['headshot_url'].to_s.empty? %>
+                      <img src="<%= h(p['headshot_url']) %>" alt="" loading="lazy">
+                    <% end %>
+                  </td>
+                  <td>
+                    <a class="sports-tennis-name" href="/sports/player/<%= h(p['slug']) %>"
+                       title="Open <%= h(p['full_name']) %> profile"><%= h(p['full_name']) %></a>
+                  </td>
+                  <td class="sports-tennis-country">
+                    <% if p['flag_url'] && !p['flag_url'].to_s.empty? %>
+                      <img class="sports-tennis-flag" src="<%= h(p['flag_url']) %>" alt="" loading="lazy">
+                    <% end %>
+                    <span class="muted"><%= h(p['country'] || '—') %></span>
+                  </td>
+                  <td class="num"><%= p['points'] ? p['points'].to_i : '—' %></td>
+                  <td class="<%= diff > 0 ? 'positive' : (diff < 0 ? 'negative' : 'muted') %>">
+                    <% if diff > 0 %>
+                      &uarr; <%= diff %>
+                    <% elsif diff < 0 %>
+                      &darr; <%= diff.abs %>
+                    <% else %>
+                      &mdash;
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        <% end %>
+      </section>
+    <% end %>
+  </div>
+<% end %>
