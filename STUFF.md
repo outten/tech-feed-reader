@@ -76,3 +76,14 @@ Genuine miss. `FeedParser` already extracts both `<itunes:image>` and `<image><u
 Two-part fix:
 - `app/logger.rb` flips its default to `debug` when `RACK_ENV` is unset/development; stays `info` for `RACK_ENV=staging` and `production`; stays `fatal` for `test` (so RSpec output stays clean). `LOG_LEVEL` env var still overrides.
 - New Sinatra `before` + `after` hooks emit a single `http_request` JSON line per request with `method`, `path`, `status`, `latency_ms`, `ip`. Logs every request including static assets (per the user's preference for full visibility).
+
+## [ ] 8. Triage page 
+
+The layout of the card elements on the page is off. For example, /triage/1 
+
+- The title of the article is vertical instead of horizontal
+- can you add a summary of the content for each card
+
+## [ ] 9. Sports Scores
+
+On the sports page, at the top, can you add tiles that show the last game score for the teams we are following. Include date, score, logos of teams, where played, and anything else relevant.

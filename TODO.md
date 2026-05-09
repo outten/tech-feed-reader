@@ -187,7 +187,7 @@ Quick, immediate-value win once S1 lands. Curates the user's specific teams as c
 
 ## Sports — Phase S3: structured-data schema (matches, teams, players, leagues)
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-051, awaiting user approval to commit + open PR
 
 News alone isn't enough — the user asked for "scores of recent games, charts of performance in leagues". That requires structured records, not free-text articles. New tables sit alongside the existing schema; no migration of the article tables.
 
@@ -200,23 +200,23 @@ News alone isn't enough — the user asked for "scores of recent games, charts o
 - [ ] **Stores**: `SportsLeaguesStore`, `SportsTeamsStore`, `SportsMatchesStore`, `SportsPlayersStore`, `SportsFollowsStore` — same hash-row return shape as the existing stores.
 - [ ] **Specs**: schema round-trip; idempotent upsert by `(source_provider, external_id)`; cascade behaviour when a league is removed; follows CRUD.
 
-## Sports — Phase S4: data providers — ESPN (NFL/NBA/MLS) + TheSportsDB (rugby/tennis)
+## Sports — Phase S4: data providers — ESPN (NFL/NBA/MLS + intl rugby) + TheSportsDB (deferred)
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-051 (bundled with S3), ESPN-only; TheSportsDB deferred
 
-Two providers because no single free source covers everything the user follows.
+Originally planned as ESPN + TheSportsDB. Shipped as **ESPN-only** in this PR — TheSportsDB's free tier key '3' has been hijacked at the source (every search endpoint returns Arsenal regardless of query, confirmed live). The Patreon-tier $9/mo dedicated key still works, so TheSportsDB integration is a future follow-up gated on either the user opting into the paid tier or another free rugby/tennis provider surfacing.
 
-- [ ] **`Providers::ESPN`** ([reverse-engineered public endpoints](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b), [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API)). Free, no auth, no documented rate limit. Covers the user's three Philadelphia teams via:
-  - `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/phi` (Eagles)
-  - `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/phi` (Sixers)
-  - `https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/teams/phi` (Union)
-  - Scoreboard endpoint per-league for live + recent: `.../sports/<sport>/<league>/scoreboard`
-  - Caveat: undocumented, ESPN can break it without notice. Wrap calls in `HealthRegistry.measure` and fall back gracefully.
-- [ ] **`Providers::TheSportsDB`** ([thesportsdb.com](https://www.thesportsdb.com/), [free API docs](https://www.thesportsdb.com/free_sports_api)). Free tier, ~30 req/min, JSON. Covers rugby (All Blacks, Black Ferns, Super Rugby) and tennis (ATP, WTA, Grand Slam draws) which ESPN's hidden API doesn't. Crowd-sourced — accept gaps for smaller leagues.
-- [ ] **Cron-style ingestion**: `make sync-sports` (= `scripts/sync_sports.rb`) walks the user's `sports_follows` list, calls the right provider per team/player, upserts into `sports_matches`. Idempotent; safe to run hourly.
-- [ ] **Specs**: HTTP stubbed; verify the upsert is idempotent across two consecutive syncs; verify a deleted match upstream doesn't get re-resurrected (track `last_synced_at`).
+- [x] **`Providers::ESPN`** ([reverse-engineered public endpoints](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b)). Free, no auth, no documented rate limit. Two entry points:
+  - `team_schedule(sport_path:, team_external_id:)` for NFL / NBA / MLS — full season schedule per team in one call. Used for Eagles / Sixers / Union.
+  - `league_scoreboard(sport_path:, dates:)` for international rugby — the team-schedule endpoint 500s on rugby; scoreboard works and the sync filters to the followed team. Covers All Blacks (men's intl tests).
+  - Defensive normalization: per-event `rescue StandardError` so one weird row doesn't poison a batch. Status mapping covers ESPN's full vocabulary (scheduled / in-progress / halftime / final / postponed / cancelled / forfeit) collapsed into our 5-status taxonomy.
+  - Score extraction handles both shapes: `score: {value, displayValue}` (current) and bare-string `score: "24"` (legacy).
+- [ ] **`Providers::TheSportsDB`** — **deferred** until either (a) the user opts into the $9/mo Patreon API key or (b) another free provider surfaces for women's intl rugby + tennis tournament draws. Verified at PR-time that the free key '3' is poisoned (every `searchteams.php` call returns Arsenal). Black Ferns + tennis structured data therefore aren't synced yet — but their RSS news already flows through the existing pipeline, so the user-facing miss is small.
+- [x] **Cron-style ingestion**: `make sync-sports` (= [scripts/sync_sports.rb](scripts/sync_sports.rb)) walks `sports_follows` (kind=team), dispatches per league's sport (team_schedule for football/basketball/soccer, league_scoreboard + filter for rugby), upserts into `sports_matches`. Idempotent; auto-creates opponent team rows so match displays have both sides populated even when the user only follows one team in a league.
+- [x] **Seed**: `make seed-sports-data` (= [scripts/seed_sports_data.rb](scripts/seed_sports_data.rb)) populates 4 leagues + 4 teams + 4 follows for the user's interests. Idempotent. Verified live: 42 matches synced across Eagles (17), Sixers (14), Union (11), All Blacks (0 — current intl test window has no NZ fixtures).
+- [x] **Specs**: 17 examples in [spec/sports_espn_spec.rb](spec/sports_espn_spec.rb) — `normalize_event` happy + edge cases (Hash score, flat-string score, missing score, nil event), full STATUS_MAP coverage, `team_schedule` URL building + 200/500/parse-error/raise paths, `league_scoreboard` URL with/without `dates`. HTTP fully stubbed via `http_get:` injection.
 
-Sources for this phase: ESPN endpoint catalogue [(akeaswaran gist)](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b), [Zuplo's ESPN guide](https://zuplo.com/learning-center/espn-hidden-api-guide), [TheSportsDB free API page](https://www.thesportsdb.com/free_sports_api).
+Sources: [ESPN endpoint catalogue](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b), [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API), [Zuplo's ESPN guide](https://zuplo.com/learning-center/espn-hidden-api-guide).
 
 ## Sports — Phase S5: `/sports` overview page
 
