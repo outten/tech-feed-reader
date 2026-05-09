@@ -248,6 +248,86 @@ module Providers
       out
     end
 
+    # Sports Phase S7 — tennis rankings.
+    #
+    # Endpoint:
+    #   /sports/tennis/atp/rankings
+    #   /sports/tennis/wta/rankings
+    #
+    # Shape: { rankings: [ { ranks: [ { current, previous, points,
+    #                                    trend, athlete: { id, displayName,
+    #                                    flag, headshot, citizenshipCountry,
+    #                                    age, ... } } ] } ] }
+    #
+    # Returns array of TennisRankingEntry structs. Empty on
+    # HTTP/parse failure (defensive — same pattern as other ESPN
+    # methods).
+    TennisRankingEntry = Struct.new(
+      :tour, :current_rank, :previous_rank, :points, :trend,
+      :athlete_external_id, :full_name, :first_name, :last_name,
+      :country, :flag_url, :headshot_url, :age, :birth_country,
+      keyword_init: true
+    )
+
+    def tennis_rankings(tour:, http_get: nil)
+      tour = tour.to_s
+      # Validate BEFORE the rescue — an ArgumentError on bad input
+      # is a programmer error and should propagate, not silently
+      # return []. The rescue below covers HTTP / parse / network
+      # only.
+      unless %w[atp wta].include?(tour)
+        raise ArgumentError, "tour must be 'atp' or 'wta' (got #{tour.inspect})"
+      end
+
+      url = "#{BASE}/tennis/#{tour}/rankings"
+      AppLogger.debug('espn_tennis_rankings_start', tour: tour)
+      response = (http_get || method(:default_http_get)).call(url)
+      return [] unless response.code.to_s == '200'
+
+      data = JSON.parse(response.body)
+      ranks = data.dig('rankings', 0, 'ranks') || []
+      out = ranks.flat_map { |r| normalize_tennis_rank(r, tour) }.compact
+      AppLogger.info('espn_tennis_rankings_done', tour: tour, count: out.length)
+      out
+    rescue ArgumentError
+      raise
+    rescue JSON::ParserError => e
+      AppLogger.error('espn_tennis_rankings', tour: tour, status: :parse_error, message: e.message)
+      []
+    rescue StandardError => e
+      AppLogger.error('espn_tennis_rankings', tour: tour, status: :error, class: e.class.name, message: e.message)
+      []
+    end
+
+    def normalize_tennis_rank(rank_row, tour)
+      return [] unless rank_row.is_a?(Hash) && rank_row['athlete'].is_a?(Hash)
+      a = rank_row['athlete']
+      flag_url     = (a['flag'].is_a?(Hash) ? a['flag']['href'] : a['flag']).to_s
+      headshot_url = (a['headshot'].is_a?(Hash) ? a['headshot']['href'] : a['headshot']).to_s
+      [
+        TennisRankingEntry.new(
+          tour:                 tour,
+          current_rank:         cast_int(rank_row['current']),
+          previous_rank:        cast_int(rank_row['previous']),
+          points:               (rank_row['points'].to_f rescue nil),
+          trend:                rank_row['trend'].to_s,
+          athlete_external_id:  a['id'].to_s,
+          full_name:            a['displayName'] || a['fullName'] || "#{a['firstName']} #{a['lastName']}".strip,
+          first_name:           a['firstName'],
+          last_name:            a['lastName'],
+          country:              a['citizenshipCountry'] || a.dig('birthPlace', 'country'),
+          flag_url:             flag_url.empty? ? nil : flag_url,
+          headshot_url:         headshot_url.empty? ? nil : headshot_url,
+          age:                  cast_int(a['age']),
+          birth_country:        a.dig('birthPlace', 'country')
+        )
+      ]
+    rescue StandardError => e
+      AppLogger.warn('espn_tennis_rank_skip', tour: tour, message: e.message,
+                                                athlete_id: rank_row.dig('athlete', 'id'))
+      []
+    end
+
     def normalize_standings_entry(entry)
       return [] unless entry.is_a?(Hash) && entry['team'].is_a?(Hash)
       stats = (entry['stats'] || []).each_with_object({}) { |s, h| h[s['name'].to_s] = s }

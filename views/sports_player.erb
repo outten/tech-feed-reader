@@ -1,0 +1,71 @@
+<div class="page-header sports-player-header">
+  <div>
+    <h2>
+      <% if @player['headshot_url'] && !@player['headshot_url'].to_s.empty? %>
+        <img class="sports-player-headshot" src="<%= h(@player['headshot_url']) %>" alt="" loading="lazy">
+      <% end %>
+      <%= h(@player['full_name']) %>
+    </h2>
+    <p class="subtitle">
+      <% if @player['flag_url'] && !@player['flag_url'].to_s.empty? %>
+        <img class="sports-tennis-flag" src="<%= h(@player['flag_url']) %>" alt="" loading="lazy">
+      <% end %>
+      <%= h(@player['country'] || '—') %>
+      &middot; <strong><%= h(@player['tour'].to_s.upcase) %></strong>
+      &middot; <a href="/sports/tennis">&larr; All rankings</a>
+    </p>
+  </div>
+</div>
+
+<%# Big-stats grid mirrors the dashboard summary-card layout. %>
+<div class="stat-cards sports-player-stats">
+  <div class="summary-card">
+    <span class="summary-label">Current rank</span>
+    <span class="summary-value"><%= @player['current_rank'] || '—' %></span>
+    <% if @player['previous_rank'] && @player['current_rank'] %>
+      <% diff = @player['previous_rank'].to_i - @player['current_rank'].to_i %>
+      <span class="summary-sub <%= diff > 0 ? 'positive' : (diff < 0 ? 'negative' : '') %>">
+        <% if diff > 0 %>
+          &uarr; <%= diff %> from <%= @player['previous_rank'] %>
+        <% elsif diff < 0 %>
+          &darr; <%= diff.abs %> from <%= @player['previous_rank'] %>
+        <% else %>
+          unchanged
+        <% end %>
+      </span>
+    <% end %>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Points</span>
+    <span class="summary-value"><%= @player['points'] ? @player['points'].to_i : '—' %></span>
+    <span class="summary-sub muted">tour ranking points</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Tour</span>
+    <span class="summary-value"><%= h((@player['tour'] || '').upcase) %></span>
+    <span class="summary-sub muted">
+      <%= @player['tour'] == 'atp' ? "men's tour" : "women's tour" %>
+    </span>
+  </div>
+</div>
+
+<section class="benchmark-section" style="margin-top:1.5rem">
+  <h3>External profile</h3>
+  <p class="subtitle">
+    Detailed match results, head-to-heads, and career stats live on ESPN — opens in a new tab.
+  </p>
+  <p>
+    <a class="btn-primary" href="<%= h(@espn_url) %>" target="_blank" rel="noopener noreferrer">
+      Open <%= h(@player['full_name']) %> on ESPN &rarr;
+    </a>
+  </p>
+</section>
+
+<section class="benchmark-section" style="margin-top:1.5rem">
+  <h3>About</h3>
+  <dl class="sports-player-about">
+    <% if @player['country'] %><dt>Country</dt><dd><%= h(@player['country']) %></dd><% end %>
+    <dt>Last synced</dt>
+    <dd><%= @player['last_synced_at'] ? relative_time(@player['last_synced_at']) : '—' %></dd>
+  </dl>
+</section>

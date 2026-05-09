@@ -2790,6 +2790,53 @@ html.dark .sports-calendar-league { color: #98989d; }
 }
 html.dark .sports-calendar-live { background: #ff453a; }
 
+/* ---- Tennis rankings (Phase S7) ----------------------------------
+   Two side-by-side tables (ATP + WTA), each top-N players. Player
+   row links to /sports/player/:slug. Detail page reuses the
+   existing stat-cards grid. */
+.sports-tennis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 1.5rem;
+}
+.sports-tennis-tour { margin: 0; }
+.sports-tennis-heading { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.sports-tennis-table { font-size: 0.9rem; }
+.sports-tennis-rank { width: 2.5rem; text-align: center; color: #6e6e73; font-weight: 600; }
+.sports-tennis-photo { width: 36px; padding: 0.25rem; }
+.sports-tennis-photo img {
+  width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #f0f0f5;
+}
+html.dark .sports-tennis-photo img { background: #2c2c2e; }
+.sports-tennis-name {
+  color: #1d1d1f; text-decoration: none; font-weight: 500;
+}
+.sports-tennis-name:hover { color: #0071e3; text-decoration: underline; }
+html.dark .sports-tennis-name { color: #f5f5f7; }
+html.dark .sports-tennis-name:hover { color: #0a84ff; }
+.sports-tennis-country {
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.sports-tennis-flag {
+  width: 22px; height: 14px; object-fit: contain;
+  border: 1px solid #e5e5ea; border-radius: 2px;
+}
+html.dark .sports-tennis-flag { border-color: #3a3a3c; }
+
+/* Player detail page */
+.sports-player-header h2 {
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.sports-player-headshot {
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: #f0f0f5;
+}
+html.dark .sports-player-headshot { background: #2c2c2e; }
+.sports-player-stats { margin-top: 0.5rem; }
+.sports-player-about { display: grid; grid-template-columns: max-content 1fr; gap: 0.4rem 1rem; margin: 0; }
+.sports-player-about dt { font-weight: 600; color: #515154; }
+.sports-player-about dd { margin: 0; }
+html.dark .sports-player-about dt { color: #aeaeb2; }
+
 .sports-toc-button {
   display: inline-flex;
   align-items: center;

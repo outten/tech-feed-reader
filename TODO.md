@@ -247,17 +247,20 @@ The user asked for "buttons in the Executive Summary of the area to filter on sp
 
 ## Sports — Phase S7: per-sport landing pages + tennis player follows
 
-**Status: `not implemented`**
+**Status: `tests` (tennis-only v1)** — outten/TODO-055, awaiting user approval to commit + open PR
 
-`/sports/sport/:slug` (e.g. `/sports/sport/tennis`) — tennis especially is what the user described in detail. Tennis is fundamentally individual-sport, so the page is player-centric, not team-centric.
+User asked specifically for tennis rankings + drill-down. Shipped that as the first slice of S7 — per-sport landing pages for the team-based sports (rugby / NFL / NBA / MLS) are deferred since their existing `/sports/league/:slug` + `/sports/team/:slug` already cover the team-centric mental model.
 
-- [ ] **Tennis landing** (`/sports/sport/tennis`):
-  - "My players" section listing followed players with their last result + next match.
-  - Live scoreboard panel for any active Grand Slam draws (TheSportsDB tournament endpoint).
-  - Follow / unfollow form (search by player name → resolve to `sports_players` row → insert into `sports_follows`).
-- [ ] **Rugby landing** (`/sports/sport/rugby`): Super Rugby / Rugby Championship results + Black Ferns Pacific Four + WXV. Mostly team-centric; reuses Phase S6 components.
-- [ ] **NFL / NBA / MLS landings**: reuse Phase S6's per-team rendering, just listing all the user's followed teams in that sport.
-- [ ] Specs: tennis player follow round-trip, landing-page composition, empty states.
+- [x] **Tennis rankings landing** (`/sports/tennis`): two side-by-side tables — ATP top N + WTA top N. Each row: rank, headshot (circle), player name (linked), country (with ESPN flag PNG), points, week-over-week trend (↑/↓ with delta, color-coded). `?limit=N` tunable, default 50, clamped 1..150. Empty state when nothing synced.
+- [x] **Player detail page** (`/sports/player/:slug`): player headshot, country flag, current rank + week-over-week movement, points, tour, link out to ESPN player card (career stats, head-to-heads). Slugs are auto-derived from the display name (Unicode-decomposed → ASCII; `tennis_player_slug` helper in `scripts/sync_sports.rb`).
+- [x] **Schema** (`015_sports_players_tennis.sql`): extends the existing `sports_players` skeleton with `tour`, `current_rank`, `previous_rank`, `points`, `trend`, `headshot_url`, `flag_url`, `last_synced_at`. Indexed by `(tour, current_rank)` for the rankings page's single-sorted-scan-per-tour query.
+- [x] **Provider**: `Providers::ESPN.tennis_rankings(tour:)` — wraps `/sports/tennis/<tour>/rankings`. Validates tour ∈ {atp, wta} (raises ArgumentError on bad input — propagates through the rescue). Defensive on JSON shape: handles flag/headshot as either flat string or `{href}` hash.
+- [x] **Sync**: `make sync-sports` now also pulls ATP + WTA rankings (top 150 each). Cheap (one HTTP per tour). Verified live: 300 player rows synced (Sinner #1 ATP, Sabalenka #1 WTA).
+- [x] **Entry point**: `/sports` header subtitle gains a "🎾 Tennis rankings →" link, alongside Calendar + All sports articles.
+- [ ] **Player follows** — deferred. The schema supports `sports_follows` with kind=player; the UI wiring (search-by-name + follow/unfollow form) is the next obvious enhancement once the rankings surface gets real use.
+- [ ] **Per-sport landings for team sports** (rugby / NFL / NBA / MLS) — deferred. The existing `/sports/league/:slug` + `/sports/team/:slug` pages already serve the team-centric mental model; a separate per-sport hub would mostly duplicate them.
+- [ ] **Live scoreboard panel for active Grand Slam draws** — needs TheSportsDB tournament endpoints (gated on a working free key — see Phase S4 deferral note). Defer.
+- [x] **Specs**: 19 examples in [spec/sports_tennis_spec.rb](spec/sports_tennis_spec.rb) — store upsert + idempotence + `top_ranked` (tour scoping, limit, NULL-rank exclusion); ESPN provider happy + flat-shape variants + tour validation + error paths; `/sports/tennis` empty + populated + linking + trend arrows + `?limit=` clamp; `/sports/player/:slug` happy + 404 + movement; `/sports` header tennis link.
 
 ## Sports — Phase S8: league standings tables
 

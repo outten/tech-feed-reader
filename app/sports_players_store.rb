@@ -27,29 +27,53 @@ module SportsPlayersStore
   end
 
   def upsert(sport:, slug:, full_name:, source_provider:, external_id:,
-             country: nil, image_url: nil)
+             country: nil, image_url: nil,
+             tour: nil, current_rank: nil, previous_rank: nil, points: nil,
+             trend: nil, headshot_url: nil, flag_url: nil)
     existing = find_by_external(source_provider, external_id) ||
                find_by_slug(slug)
+    now_iso  = Time.now.utc.iso8601
+
     if existing
       args = [sport, full_name, country, image_url,
+              tour, current_rank, previous_rank, points,
+              trend, headshot_url, flag_url, now_iso,
               source_provider.to_s, external_id.to_s, existing['id']]
       db.execute(<<~SQL, args)
         UPDATE sports_players
         SET sport = ?, full_name = ?, country = ?, image_url = ?,
+            tour = ?, current_rank = ?, previous_rank = ?, points = ?,
+            trend = ?, headshot_url = ?, flag_url = ?, last_synced_at = ?,
             source_provider = ?, external_id = ?
         WHERE id = ?
       SQL
       find(existing['id'])
     else
       args = [sport, slug, full_name, country, image_url,
+              tour, current_rank, previous_rank, points,
+              trend, headshot_url, flag_url, now_iso,
               source_provider.to_s, external_id.to_s]
       db.execute(<<~SQL, args)
         INSERT INTO sports_players(sport, slug, full_name, country, image_url,
+                                    tour, current_rank, previous_rank, points,
+                                    trend, headshot_url, flag_url, last_synced_at,
                                     source_provider, external_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       SQL
       find(db.last_insert_row_id)
     end
+  end
+
+  # Tennis rankings page query. ATP / WTA top-N players, ordered
+  # by current rank. Returns the full row so the view has access
+  # to country, headshot, points, trend, etc.
+  def top_ranked(tour:, limit: 50)
+    db.execute(<<~SQL, [tour.to_s, limit])
+      SELECT * FROM sports_players
+      WHERE tour = ? AND current_rank IS NOT NULL
+      ORDER BY current_rank ASC
+      LIMIT ?
+    SQL
   end
 
   def count

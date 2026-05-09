@@ -39,6 +39,7 @@ require_relative 'sports_leagues_store'
 require_relative 'sports_teams_store'
 require_relative 'sports_matches_store'
 require_relative 'sports_standings_store'
+require_relative 'sports_players_store'
 require_relative 'sports_follows_store'
 require_relative 'version'
 require_relative 'tracing'
@@ -759,6 +760,30 @@ class TechFeedReader < Sinatra::Base
       ).any?
     end
     erb :sports
+  end
+
+  # Sports Phase S7 — tennis rankings landing.
+  #
+  # Two side-by-side tables (ATP top N + WTA top N) so the user
+  # can scan the men's and women's tour states. Click a player's
+  # name → drill into /sports/player/:slug.
+  get '/sports/tennis' do
+    @page_title = 'Tennis rankings'
+    limit_raw   = params['limit'].to_s
+    @limit      = (limit_raw.match?(/\A\d+\z/) ? limit_raw.to_i : 50).clamp(1, 150)
+    @atp        = SportsPlayersStore.top_ranked(tour: 'atp', limit: @limit)
+    @wta        = SportsPlayersStore.top_ranked(tour: 'wta', limit: @limit)
+    erb :sports_tennis
+  end
+
+  # Sports Phase S7 — single-player detail page.
+  get '/sports/player/:slug' do |slug|
+    @player = SportsPlayersStore.find_by_slug(slug)
+    halt 404, erb(:article_not_found) unless @player
+    @page_title  = @player['full_name']
+    # ESPN player-card link reconstructed from external_id + slug.
+    @espn_url    = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}"
+    erb :sports_player
   end
 
   # Phase S9 — upcoming-fixtures calendar across followed teams.
