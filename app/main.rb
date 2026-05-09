@@ -41,6 +41,7 @@ require_relative 'sports_matches_store'
 require_relative 'sports_standings_store'
 require_relative 'sports_players_store'
 require_relative 'sports_follows_store'
+require_relative 'sports_entity_articles_store'
 require_relative 'version'
 require_relative 'tracing'
 require_relative 'metrics'
@@ -799,6 +800,16 @@ class TechFeedReader < Sinatra::Base
     # ESPN player-card link reconstructed from external_id + slug.
     @espn_url      = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}"
     @is_followed   = SportsFollowsStore.follow?('player', slug)
+    # S7 follow-up #2 — articles mentioning the player. Refresh
+    # if the cache is stale (TTL 1h), then read from the join table.
+    SportsEntityArticlesStore.refresh_for(
+      kind: 'player', entity_id: @player['id'], name: @player['full_name']
+    )
+    @related_articles = SportsEntityArticlesStore.for_entity(
+      kind: 'player', entity_id: @player['id'], limit: 30
+    )
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @summaries_by_article_id = SummaryStore.find_for_ids(@related_articles.map { |a| a['id'] })
     erb :sports_player
   end
 
@@ -908,6 +919,18 @@ class TechFeedReader < Sinatra::Base
     @standings = structured_team ? SportsStandingsStore.for_team(structured_team['id']) : nil
     @league    = (@standings && SportsLeaguesStore.find(@standings['league_id'])) ||
                  (structured_team && SportsLeaguesStore.find(structured_team['league_id']))
+    # S7 follow-up #2 — articles mentioning the team. Cache + FTS5
+    # phrase MATCH on the team's display name. Only enabled when
+    # the team has a sports_teams DB row (entity_id is required).
+    @related_articles = []
+    if structured_team
+      SportsEntityArticlesStore.refresh_for(
+        kind: 'team', entity_id: structured_team['id'], name: @team[:name]
+      )
+      @related_articles = SportsEntityArticlesStore.for_entity(
+        kind: 'team', entity_id: structured_team['id'], limit: 30
+      )
+    end
     @page_title  = @team[:name]
     erb :sports_team
   end
