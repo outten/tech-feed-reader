@@ -10,6 +10,29 @@
   </div>
 </div>
 
+<%# Phase S7 follow-up — followed-players callout. Only renders
+    when the user has at least one ★. Click a row → player detail. %>
+<% if (@followed_players || []).any? %>
+  <section class="benchmark-section sports-tennis-followed" style="margin-bottom:1.5rem">
+    <h3>★ My followed players <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @followed_players.length %>)</span></h3>
+    <ul class="sports-tennis-followed-list">
+      <% @followed_players.sort_by { |p| p['current_rank'].to_i.zero? ? 99_999 : p['current_rank'].to_i }.each do |p| %>
+        <li class="sports-tennis-followed-row">
+          <% if p['headshot_url'] && !p['headshot_url'].to_s.empty? %>
+            <img class="sports-tennis-followed-photo" src="<%= h(p['headshot_url']) %>" alt="" loading="lazy">
+          <% end %>
+          <a class="sports-tennis-name" href="/sports/player/<%= h(p['slug']) %>"><%= h(p['full_name']) %></a>
+          <span class="muted">
+            #<%= p['current_rank'] || '—' %>
+            <% if p['tour'] %>· <%= h(p['tour'].upcase) %><% end %>
+            <% if p['country'] %>· <%= h(p['country']) %><% end %>
+          </span>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
 <% if @atp.empty? && @wta.empty? %>
   <div class="empty-state">
     <p>No tennis rankings synced yet. Run <code>make sync-sports</code> to populate (ESPN ATP + WTA endpoints).</p>
@@ -34,6 +57,7 @@
                 <th>Country</th>
                 <th class="num">Points</th>
                 <th>Trend</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -65,6 +89,19 @@
                     <% else %>
                       &mdash;
                     <% end %>
+                  </td>
+                  <td class="sports-tennis-follow-cell">
+                    <% followed = (@followed_player_slugs || []).include?(p['slug']) %>
+                    <form method="post" action="/sports/players/<%= followed ? 'unfollow' : 'follow' %>" style="display:inline">
+                      <input type="hidden" name="slug" value="<%= h(p['slug']) %>">
+                      <input type="hidden" name="return_to" value="/sports/tennis">
+                      <button type="submit"
+                              class="sports-tennis-follow-btn <%= 'is-followed' if followed %>"
+                              title="<%= followed ? "Unfollow #{p['full_name']}" : "Follow #{p['full_name']}" %>"
+                              aria-label="<%= followed ? 'Unfollow' : 'Follow' %> <%= h(p['full_name']) %>">
+                        <%= followed ? '★' : '☆' %>
+                      </button>
+                    </form>
                   </td>
                 </tr>
               <% end %>

@@ -7,6 +7,16 @@
       <strong>optional</strong>, or <strong>skip</strong> with a one-line
       rationale. Manual trigger — runs only when you click below.
     </p>
+    <%# Phase S10 — topic chips so the user can scope the run.
+        Without scoping, a tech 👍 boosts a sports article that
+        happens to share words and vice versa. %>
+    <p class="subtitle state-filter">
+      <a href="/triage" class="<%= 'active' unless @triage_topic %>" title="Triage every unread article (cross-topic)">all topics</a>
+      <% FeedCatalog::TOPICS.each do |key, label| %>
+        <% k = key.to_s %>
+        <a href="/triage?topic=<%= k %>" class="<%= 'active' if @triage_topic == k %>" title="Scope unread + corpus to <%= h(label.downcase) %> only"><%= h(label.downcase) %></a>
+      <% end %>
+    </p>
   </div>
 </div>
 
@@ -21,9 +31,12 @@
   <%# GET — empty state with a generate button. %>
   <div class="portfolio-add">
     <form method="post" action="/triage" class="portfolio-form">
+      <% if @triage_topic %>
+        <input type="hidden" name="topic" value="<%= h(@triage_topic) %>">
+      <% end %>
       <button type="submit" class="btn-primary" <%= 'disabled' unless @claude_available %>
               title="Send your unread queue + corpus exemplars to Claude (claude-sonnet-4-6) and classify each article">
-        Generate triage now
+        Generate triage now<% if @triage_topic %> (<%= h(@triage_topic) %>)<% end %>
       </button>
       <p class="subtitle" style="margin-top:0.75rem">
         One Claude API call. Caps the input to <code><%= Triage::Claude::UNREAD_LIMIT %></code> recent unread

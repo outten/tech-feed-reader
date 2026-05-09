@@ -49,6 +49,24 @@
   </div>
 </div>
 
+<section class="benchmark-section sports-player-follow" style="margin-top:1.5rem">
+  <h3><%= @is_followed ? '★ Followed' : '☆ Not followed' %></h3>
+  <p class="subtitle">
+    <% if @is_followed %>
+      You're following <%= h(@player['full_name']) %> — they appear at the top of <a href="/sports/tennis">/sports/tennis</a>.
+    <% else %>
+      Follow to surface them at the top of the rankings page.
+    <% end %>
+  </p>
+  <form method="post" action="/sports/players/<%= @is_followed ? 'unfollow' : 'follow' %>">
+    <input type="hidden" name="slug" value="<%= h(@player['slug']) %>">
+    <input type="hidden" name="return_to" value="/sports/player/<%= h(@player['slug']) %>">
+    <button type="submit" class="btn-primary">
+      <%= @is_followed ? "★ Unfollow #{@player['full_name']}" : "☆ Follow #{@player['full_name']}" %>
+    </button>
+  </form>
+</section>
+
 <section class="benchmark-section" style="margin-top:1.5rem">
   <h3>External profile</h3>
   <p class="subtitle">

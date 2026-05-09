@@ -48,15 +48,21 @@ module Recommendation
     # Each row gains a `'_score'` key so views can debug-render it later.
     # `state:` and `kind:` mirror ArticlesStore.recent — usually you want
     # state: :unread for a relevance feed.
-    def score_window(state: :unread, kind: :all, limit:, offset:, now: Time.now.utc)
-      pos_terms = corpus_terms(positive: true)
-      neg_terms = corpus_terms(positive: false)
+    #
+    # Phase S10 — `topic:` scopes both corpus selection AND the
+    # candidate window so a 👍 on an Eagles article doesn't boost
+    # tech rankings (and vice versa). nil = unscoped (legacy
+    # behaviour, used when no topic filter is in effect).
+    def score_window(state: :unread, kind: :all, limit:, offset:, topic: nil, now: Time.now.utc)
+      pos_terms = corpus_terms(positive: true,  topic: topic)
+      neg_terms = corpus_terms(positive: false, topic: topic)
 
       candidates = ArticlesStore.recent(
         limit:  CANDIDATE_WINDOW,
         offset: 0,
         state:  state,
-        kind:   kind
+        kind:   kind,
+        topic:  topic
       )
 
       feed_weights = FeedFeedbackStore.weights_by_feed_id(candidates.map { |a| a['feed_id'] })
@@ -93,39 +99,46 @@ module Recommendation
 
     # Top distinctive tokens across the requested corpus. Returns a Set
     # for O(1) intersection in the per-article scorer. Empty when the
-    # corpus has no rows yet (cold start).
-    def corpus_terms(positive:)
-      rows = positive ? positive_corpus : negative_corpus
+    # corpus has no rows yet (cold start). Phase S10: `topic:` scopes
+    # the SQL to articles whose feed.topic matches.
+    def corpus_terms(positive:, topic: nil)
+      rows = positive ? positive_corpus(topic: topic) : negative_corpus(topic: topic)
       return [].to_set if rows.empty?
 
       text = rows.map { |r| "#{r['title']} #{r['content_text']}" }.join(' ')
       Recommendation.top_keywords(text, limit: TOP_TERMS).to_set
     end
 
-    def positive_corpus
-      Database.connection.execute(<<~SQL, [CORPUS_LIMIT])
+    def positive_corpus(topic: nil)
+      sql = <<~SQL
         SELECT a.title, a.content_text
         FROM articles a
         JOIN read_state rs ON rs.article_id = a.id
-        WHERE rs.bookmarked = 1
+        #{'JOIN feeds f ON f.id = a.feed_id' if topic}
+        WHERE (rs.bookmarked = 1
            OR rs.feedback = 1
-           OR rs.passive_feedback = 1
+           OR rs.passive_feedback = 1)
+        #{'AND f.topic = ?' if topic}
         ORDER BY a.id DESC
         LIMIT ?
       SQL
+      Database.connection.execute(sql, topic ? [topic.to_s, CORPUS_LIMIT] : [CORPUS_LIMIT])
     end
 
-    def negative_corpus
-      Database.connection.execute(<<~SQL, [CORPUS_LIMIT])
+    def negative_corpus(topic: nil)
+      sql = <<~SQL
         SELECT a.title, a.content_text
         FROM articles a
         JOIN read_state rs ON rs.article_id = a.id
-        WHERE rs.feedback = -1
+        #{'JOIN feeds f ON f.id = a.feed_id' if topic}
+        WHERE (rs.feedback = -1
            OR rs.passive_feedback = -1
-           OR (rs.archived = 1 AND rs.read = 0)
+           OR (rs.archived = 1 AND rs.read = 0))
+        #{'AND f.topic = ?' if topic}
         ORDER BY a.id DESC
         LIMIT ?
       SQL
+      Database.connection.execute(sql, topic ? [topic.to_s, CORPUS_LIMIT] : [CORPUS_LIMIT])
     end
 
     # Title-only tokens. See module-level comment for the perf rationale.

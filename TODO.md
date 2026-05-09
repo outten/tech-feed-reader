@@ -294,14 +294,26 @@ User asked specifically for tennis rankings + drill-down. Shipped that as the fi
 
 ## Sports — Phase S10: cross-category personalization
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-056 (bundled with tennis follow-up), awaiting user approval to commit + open PR
 
 The For You ranker shipped in Phase 6 was scoped globally. With sports + tech in the same DB, the corpus needs scoping (already added in Phase S1) AND the AI triage (`Triage::Claude`) should run per-category by default — "what should I read in tech today" and "what's important in sports today" are different questions.
 
-- [ ] `/articles?sort=relevance&category=sports` ranks within sports only. Same for tech.
-- [ ] `/triage?category=sports` runs a sports-only triage. UI: a category chip in the page header (`all | sports | technology`).
-- [ ] Daily cron — run two triages, one per category, persist both. Browse history at `/triage?category=…`.
-- [ ] Specs: per-category corpus selection, route filter, cron multi-run.
+- [x] `/articles?sort=relevance&topic=sports` ranks within sports only (and same for tech). `Recommendation::ForYou.score_window` + `corpus_terms` + `positive_corpus` + `negative_corpus` all accept `topic:` and conditional-JOIN onto `feeds` to scope. Helper `sanitize_topic_filter` whitelists `technology|sports|general` to prevent SQL surprises.
+- [x] `/triage?topic=sports` runs a sports-only triage. `Triage::Claude.run(topic:)` scopes both unread fetch + corpus exemplars. UI: topic chips at page header (`all topics | technology | sports`) with active-state highlighting + the Generate form carries the active topic via hidden input.
+- [ ] **Daily cron — per-topic runs**: deferred. Single all-topics run still happens nightly; multi-run is a small follow-up.
+- [x] **Specs**: 11 examples in [spec/topic_scoping_spec.rb](spec/topic_scoping_spec.rb) — `corpus_terms` topic restricts/unscoped legacy union, `score_window` topic, `Triage.run` topic restricts unread + corpus, `/articles?sort=relevance&topic=` route, `/triage` chip rendering + active state + carrying via Generate form.
+
+## Sports — Phase S7 follow-up: tennis player follows
+
+**Status: `tests`** — outten/TODO-056 (bundled with S10), awaiting user approval to commit + open PR
+
+Phase S7 shipped tennis rankings + per-player detail. The follow-up adds first-class follows for individual players (not just teams), so the user can pin Sinner/Alcaraz/Sabalenka and see them surface above the rankings table.
+
+- [x] `POST /sports/players/follow` + `POST /sports/players/unfollow` — idempotent (re-follow / re-unfollow no-op), 404 on unknown slug, 400 on missing slug, honours `return_to`.
+- [x] `★`/`☆` toggle button on every rankings row in `/sports/tennis` — yellow when active, plain hollow star otherwise. Each row's form posts to `follow` or `unfollow` based on current state with `return_to=/sports/tennis`.
+- [x] **My followed players callout** at the top of `/sports/tennis`, gated on `(@followed_players || []).any?` — sorts by `current_rank` ascending, shows headshot + tour + country.
+- [x] Follow/unfollow toggle on `/sports/player/:slug` detail page with `★ Followed` / `☆ Not followed` heading.
+- [x] **Specs**: 9 examples in [spec/tennis_follows_spec.rb](spec/tennis_follows_spec.rb) — POST happy/idempotent/404/400/return_to, unfollow happy/idempotent, rankings ☆-when-empty + ★-when-followed + sorted callout, detail-page toggle in both states.
 
 ---
 
