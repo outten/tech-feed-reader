@@ -350,10 +350,12 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 ## Documentation files
 
 - [SPEC.md](SPEC.md) — project brief (frozen)
-- **[AGENTS.md](AGENTS.md)** — this file (developer/agent reference)
+- **[AGENTS.md](AGENTS.md)** — this file (developer/agent reference). Project-specific *architecture* (what the codebase looks like, conventions, gotchas).
+- **[CLAUDE.md](CLAUDE.md)** — general LLM-coding *behaviour* (think before coding, simplicity first, surgical changes, goal-driven execution). Read this alongside AGENTS.md when picking up work; the two are complementary, not overlapping. CLAUDE.md is what to do; AGENTS.md is what's where.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — PR workflow (branch / commit style / tests / CI / merge)
 - [DEVELOPER.md](DEVELOPER.md) — pointer to AGENTS.md (kept for legacy reference)
 - README.md — user-facing overview (status note + page list, kept current per PR)
 - [TODO.md](TODO.md) — informal scratch list of UI / UX ideas the user wants to discuss before implementing. Not a roadmap (that's still SPEC.md's tier list); read it when the user references items by section heading.
+- [STUFF.md](STUFF.md) — random user-facing asks. Tracks request lifecycle from "captured" → "done" with a short note. The live-updates rule above applies: every PR that ships work captured here flips the relevant item in the same change.
 
 **Workflow rule**: every PR that changes behaviour should update the relevant docs in the same PR — see [CONTRIBUTING.md](CONTRIBUTING.md) and the workflow rule inherited from `t-money`'s memory layer.
