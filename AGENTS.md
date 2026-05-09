@@ -73,6 +73,8 @@ make redis                   # foreground Redis (alternative to brew services)
 make digest                  # generate + persist a digest snapshot (read at /digests; cron-friendly)
 make prune                   # delete articles older than RETENTION_DAYS (default 7); bookmarks always kept
 make backfill-podcast-images # fill feeds.image_url via iTunes Search for podcasts missing <itunes:image>
+make seed-sports-data        # seed sports_leagues + sports_teams + sports_follows for user-followed teams (idempotent)
+make sync-sports             # daily ESPN sync — pulls match schedules + scores for every followed team into sports_matches
 ```
 
 **One-shot dev session orchestration** — pre-canned for tracing-enabled local runs:
@@ -144,6 +146,11 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4) |
 | `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore` |
 | `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`, composite PK on `(kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
+| `sports_leagues` | Sports Phase S3: NFL / NBA / MLS / intl rugby etc., one row per league synced from a provider |
+| `sports_teams` | Sports Phase S3: teams across all leagues, FK to `sports_leagues`. Idempotent upsert by `(source_provider, external_id)` |
+| `sports_matches` | Sports Phase S3: scheduled / live / final games. FK to `sports_teams` (home + away). Status ∈ `{scheduled, live, final, postponed, cancelled}` |
+| `sports_players` | Sports Phase S3: schema only — populated when the player-following UI (S7) ships |
+| `sports_follows` | Sports Phase S3: user's "I follow these" list. kind ∈ `{team, player, league}`, value = entity slug |
 
 **Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (FTS5 BM25, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the FTS5 path when the corpus is cold.
 
@@ -188,6 +195,8 @@ For articles where the feed body is a snippet, not full content, fall through pr
 | Archive.org / Wayback most-recent capture | 3 | `Providers::Archive` (last-resort, when origin returns 4xx/5xx) |
 
 **Other providers**: [`Providers::ITunesLookup`](app/providers/itunes_lookup.rb) — fall-back podcast cover-art lookup against the iTunes Search API (no auth, ~20 req/min). Used by `make backfill-podcast-images` (`scripts/backfill_podcast_images.rb`) to fill `feeds.image_url` for podcast feeds whose RSS doesn't expose `<itunes:image>` or `<image><url>` (Vox-published Ezra Klein, etc).
+
+**Sports data providers** (Phase S4): [`Providers::ESPN`](app/providers/espn.rb) wraps ESPN's reverse-engineered public endpoints (no auth) for structured match data. Two entry points: `team_schedule(sport_path:, team_external_id:)` (NFL / NBA / MLS — per-team season schedule in one call) and `league_scoreboard(sport_path:, dates:)` (rugby — the team_schedule endpoint 500s there). Defensive normalization with per-event rescue so one bad row doesn't poison a batch. Wired by `make sync-sports` (`scripts/sync_sports.rb`) which walks `sports_follows` and upserts into `sports_matches`. Seed via `make seed-sports-data`. **TheSportsDB integration deferred** — the free tier key '3' is poisoned at source (every search returns Arsenal); revisit when a working free provider surfaces or the user opts into TheSportsDB Patreon ($9/mo).
 
 Mirror `t-money`'s `try_providers` pattern: log to `HealthRegistry.measure`, return first non-empty.
 

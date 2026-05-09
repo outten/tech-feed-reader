@@ -144,6 +144,18 @@ prune:
 backfill-podcast-images:
 	bundle exec ruby scripts/backfill_podcast_images.rb
 
+# Sports Phase S3 — seed the leagues / teams / follows the user
+# cares about (Eagles, Sixers, Union, All Blacks). Idempotent;
+# safe to re-run.
+seed-sports-data:
+	bundle exec ruby scripts/seed_sports_data.rb
+
+# Sports Phase S4 cron entry point — pulls match data from ESPN
+# for every followed team. Idempotent; pair with launchd/cron
+# for a daily refresh.
+sync-sports:
+	bundle exec ruby scripts/sync_sports.rb
+
 # AI-assisted triage cron entry point — calls Triage::Claude.run +
 # persists the result via TriageStore. One Claude API call per run
 # (~$0.02–0.04). Browse stored runs at /triage; detail at /triage/:id.
