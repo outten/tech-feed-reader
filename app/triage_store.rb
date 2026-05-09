@@ -26,8 +26,8 @@ module TriageStore
         generated_at, unread_count, model,
         must_read, optional, skip,
         status, error, latency_ms,
-        input_tokens, output_tokens
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        input_tokens, output_tokens, topic
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     SQL
     db.execute(sql, [
       Time.now.utc.iso8601,
@@ -40,20 +40,41 @@ module TriageStore
       result.error,
       result.latency_ms,
       result.input_tokens,
-      result.output_tokens
+      result.output_tokens,
+      result.respond_to?(:topic) ? result.topic : nil
     ])
     db.last_insert_row_id
   end
 
   # Most recent triages, listing fields only (no body parse). Used by
   # the /triage list view at the bottom of the manual-trigger page.
-  def recent(limit: 20)
-    db.execute(<<~SQL, [limit])
-      SELECT id, generated_at, unread_count, status, model
-      FROM triages
-      ORDER BY generated_at DESC, id DESC
-      LIMIT ?
-    SQL
+  # Phase S10 follow-up — when topic: is passed, filters to runs
+  # generated for that scope (NULL topic = cross-topic legacy run).
+  def recent(limit: 20, topic: :any)
+    if topic == :any
+      db.execute(<<~SQL, [limit])
+        SELECT id, generated_at, unread_count, status, model, topic
+        FROM triages
+        ORDER BY generated_at DESC, id DESC
+        LIMIT ?
+      SQL
+    elsif topic.nil?
+      db.execute(<<~SQL, [limit])
+        SELECT id, generated_at, unread_count, status, model, topic
+        FROM triages
+        WHERE topic IS NULL
+        ORDER BY generated_at DESC, id DESC
+        LIMIT ?
+      SQL
+    else
+      db.execute(<<~SQL, [topic.to_s, limit])
+        SELECT id, generated_at, unread_count, status, model, topic
+        FROM triages
+        WHERE topic = ?
+        ORDER BY generated_at DESC, id DESC
+        LIMIT ?
+      SQL
+    end
   end
 
   # Single row by id. JSON-encoded group columns are decoded into

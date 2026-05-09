@@ -98,10 +98,73 @@ Review CLAUDE.md file that contains behavior for Claude. Incorporate this, perha
 
 CLAUDE.md is now tracked + referenced from AGENTS.md's Documentation files section. The two files are complementary, not overlapping: CLAUDE.md is general LLM-coding behaviour (think before coding, simplicity first, surgical changes, goal-driven execution); AGENTS.md is project-specific architecture (what the codebase looks like, conventions, gotchas). Future agents read both.
 
-## [ ] 11. SQLite on S3
+## [x] 11. SQLite on S3
 
-This is just an analysis / research topic. IF we were to deploy the app to AWS. Do we need to use a real RDBMS like PostgreSQL or can we use S3 with locking and SQLite to manage the database.
+> Analysis only — no code change. Question: if we deployed this app to AWS,
+> do we need PostgreSQL, or can we keep SQLite by putting the file on S3?
 
-I run PostgreSQL locally too.
+### TL;DR — recommendation
 
-For a single user app, I'm trying to keep things simple.
+**Keep SQLite. Put the file on a single EBS volume on a single small EC2 instance (or an EFS-backed Fargate task). Use [Litestream](https://litestream.io/) to replicate to S3 for backup + point-in-time recovery. Don't try to run SQLite directly off S3.**
+
+For a single-user reader, that's:
+- One `t4g.nano` / `t4g.micro` ($3–8/mo) running the Sinatra app on EBS
+- Litestream sidecar streaming WAL frames to S3 every ~1s ($0.05/mo storage + pennies in PUTs)
+- Restore = `litestream restore` from S3 on a fresh instance — minutes, not hours
+
+This preserves the things SQLite is great at for our workload (`articles`, `articles_fts` FTS5, transactional writes, sub-millisecond local reads) without paying the operational tax of running PostgreSQL.
+
+### Why not "SQLite directly on S3"
+
+This was the literal question. The two real options people mean:
+
+1. **Mount S3 as a filesystem** (s3fs-fuse, Mountpoint for Amazon S3, goofys). Don't. SQLite uses POSIX-style file locking (`fcntl`) and partial-page writes (a 4 KB page change rewrites just that page, not the whole file). S3 is an object store: every PUT replaces the entire object, there's no atomic compare-and-swap on byte ranges, and S3 didn't even have read-after-write *list* consistency until late 2020. Mountpoint for S3 [explicitly does not support random writes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mountpoint-usage.html#mountpoint-write-mode) — it's append/upload-only. SQLite under any of these will corrupt within minutes of a real write workload.
+
+2. **VFS shims that fetch pages from S3** ([sqlite-s3-query](https://github.com/uktrade/sqlite-s3-query), the various "SQLite over HTTP" experiments). These work for **read-only** databases. The trick: build the SQLite file once, upload to S3, the VFS does HTTP range requests for the pages it needs and uses ETags as a poor-man's cache key. Great for "ship a static dataset to a Lambda." Useless for an app that ingests 50 RSS feeds every 10 minutes.
+
+The real "SQLite + cloud blob storage" answer is **streaming replication of the WAL**, not running SQLite *off* the blob store. Litestream and [LiteFS](https://fly.io/docs/litefs/) both do this well. You write locally, they ship the WAL frames to S3.
+
+### Why not PostgreSQL
+
+PostgreSQL would also work — RDS `db.t4g.micro` is ~$13/mo + ~$2.50/mo for 20 GB gp3, plus a NAT/VPC story if the app runs outside the RDS subnet. None of that is hard, but it adds:
+
+- A separate process / service to manage (or pay AWS to manage)
+- A network hop on every query (vs. SQLite's in-process, ~1µs per query)
+- Schema-migration tooling that handles transactional DDL differently from SQLite's `ALTER TABLE … ADD COLUMN`-only constraint
+- Loss of FTS5 — Postgres has `tsvector` / `pg_trgm` which are fine but require rewriting [app/articles_store.rb](app/articles_store.rb) `search` and `for_topic`
+
+For a multi-user, write-heavy app with replicas, all of that cost is justified. For *this* app — single user, single writer, ~100k row scale, FTS5-heavy — it's pure overhead.
+
+### What we'd actually need to handle
+
+The only real risk with SQLite-on-EBS-with-Litestream is the **single-writer** constraint. Today our writers are:
+
+- Web request handlers (one user, low concurrency)
+- `make sync-feeds` cron (every 10min)
+- `make digest`, `make triage`, `make sync-sports` crons (daily-ish)
+- The dev-server background reload
+
+WAL mode (already set in [app/database.rb:96](app/database.rb#L96)) lets readers run concurrently with one writer, and short writers serialize cleanly. A single-instance deploy keeps all writers in one process tree, which is the only configuration where SQLite is safe. Don't run it behind an autoscaling group with `min_size > 1`.
+
+The Litestream story handles **disaster recovery**: if the EC2 instance dies, you spin a new one, `litestream restore`, and the app is back with at most ~1s of write loss (the replication lag). For backups, Litestream ships continuous snapshots — easier than PostgreSQL's `pg_basebackup` ceremony for this scale.
+
+### Concrete deploy sketch (if we ever ship)
+
+```
+EC2 t4g.nano (or Fargate w/ EFS mount)
+├─ /var/app/tech-feed-reader/  ← code
+├─ /var/lib/db/feed-reader.db  ← EBS-backed SQLite + WAL
+├─ litestream replicate ──→ s3://tfr-litestream-<uniqueid>/
+└─ cron: sync-feeds, digest, triage, sync-sports
+
+Cost: ~$5–8/mo for a single-user instance + $0.10/mo for S3 replication.
+```
+
+If usage ever grows to multi-writer or multi-region, **that's** when PostgreSQL (or LiteFS for SQLite-with-failover) earns its keep. We're nowhere near that point.
+
+### What I considered and rejected
+
+- **Aurora Serverless** — overkill, expensive at idle, network hop per query.
+- **DynamoDB** — kills the relational model; FTS5 has no equivalent.
+- **EFS + SQLite without Litestream** — EFS is NFSv4. SQLite's locking on NFS is officially [discouraged](https://www.sqlite.org/faq.html#q5) and historically buggy. Possible, but Litestream-on-EBS is simpler and cheaper.
+- **DIY rsync to S3** — Litestream solves this exact problem, no point reinventing.

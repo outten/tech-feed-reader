@@ -57,7 +57,7 @@ module Triage
 
     Result = Struct.new(:status, :must_read, :optional, :skip, :raw, :model,
                         :latency_ms, :input_tokens, :output_tokens, :error,
-                        :unread_count, keyword_init: true)
+                        :unread_count, :topic, keyword_init: true)
 
     module_function
 
@@ -72,12 +72,12 @@ module Triage
     # exemplars to a single topic (tech / sports / general). nil
     # means cross-topic, the legacy behaviour.
     def run(topic: nil)
-      return Result.new(status: :unavailable, unread_count: 0) unless available?
+      return Result.new(status: :unavailable, unread_count: 0, topic: topic) unless available?
 
       unread = ArticlesStore.recent(limit: UNREAD_LIMIT, state: :unread, topic: topic)
       if unread.empty?
         AppLogger.info('triage_run', status: :empty, topic: topic)
-        return Result.new(status: :empty, unread_count: 0,
+        return Result.new(status: :empty, unread_count: 0, topic: topic,
                           must_read: [], optional: [], skip: [])
       end
 
@@ -138,15 +138,16 @@ module Triage
         input_tokens:  (response.usage&.input_tokens&.to_i if response.respond_to?(:usage)),
         output_tokens: (response.usage&.output_tokens&.to_i if response.respond_to?(:usage)),
         unread_count:  unread.length,
+        topic:         topic,
         error:         parsed[:error]
       )
     rescue Anthropic::Errors::APIError => e
       AppLogger.error('triage_run', status: :error, class: e.class.name, message: e.message)
-      Result.new(status: :error, error: "#{e.class.name}: #{e.message}", unread_count: 0,
+      Result.new(status: :error, error: "#{e.class.name}: #{e.message}", unread_count: 0, topic: topic,
                  must_read: [], optional: [], skip: [])
     rescue StandardError => e
       AppLogger.error('triage_run', status: :error, class: e.class.name, message: e.message)
-      Result.new(status: :error, error: "#{e.class.name}: #{e.message}", unread_count: 0,
+      Result.new(status: :error, error: "#{e.class.name}: #{e.message}", unread_count: 0, topic: topic,
                  must_read: [], optional: [], skip: [])
     end
 
