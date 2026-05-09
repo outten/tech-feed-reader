@@ -2696,6 +2696,100 @@ html.dark .sports-standings-followed { background: rgba(10, 132, 255, 0.10); }
 .sports-team-standing strong { color: #1d1d1f; }
 html.dark .sports-team-standing strong { color: #f5f5f7; }
 
+/* ---- Calendar (Phase S9) ----------------------------------------
+   Day-grouped list of upcoming fixtures. Each fixture: time on the
+   left, matchup in the middle, league + venue at the bottom. iCal
+   subscribe URL in a callout block at the top. */
+.sports-calendar-subscribe {
+  border-left: 3px solid #0071e3;
+  background: rgba(0, 113, 227, 0.04);
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+}
+html.dark .sports-calendar-subscribe { background: rgba(10, 132, 255, 0.08); border-left-color: #0a84ff; }
+.sports-calendar-ics-url {
+  display: inline-block;
+  padding: 0.25rem 0.55rem;
+  background: #f5f5f7;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  user-select: all;
+}
+html.dark .sports-calendar-ics-url { background: #2c2c2e; }
+
+.sports-calendar-day-heading { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.sports-calendar-list { list-style: none; padding: 0; margin: 0; }
+.sports-calendar-fixture {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e5ea;
+}
+.sports-calendar-fixture:last-child { border-bottom: none; }
+html.dark .sports-calendar-fixture { border-color: #3a3a3c; }
+.sports-calendar-time {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1d1d1f;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+html.dark .sports-calendar-time { color: #f5f5f7; }
+.sports-calendar-matchup {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.sports-calendar-team {
+  color: #1d1d1f;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.sports-calendar-team:hover { color: #0071e3; text-decoration: underline; }
+html.dark .sports-calendar-team { color: #f5f5f7; }
+html.dark .sports-calendar-team:hover { color: #0a84ff; }
+.sports-calendar-vs { font-size: 0.85rem; }
+.sports-calendar-meta {
+  grid-column: 2;
+  font-size: 0.85rem;
+  color: #6e6e73;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+.sports-calendar-meta-sep { color: #c7c7cc; }
+.sports-calendar-league {
+  color: #6e6e73;
+  text-decoration: none;
+  font-weight: 500;
+}
+.sports-calendar-league:hover { color: #0071e3; text-decoration: underline; }
+html.dark .sports-calendar-meta { color: #98989d; }
+html.dark .sports-calendar-meta-sep { color: #48484a; }
+html.dark .sports-calendar-league { color: #98989d; }
+
+.sports-calendar-live {
+  background: #ff3b30;
+  color: #fff;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+html.dark .sports-calendar-live { background: #ff453a; }
+
 .sports-toc-button {
   display: inline-flex;
   align-items: center;

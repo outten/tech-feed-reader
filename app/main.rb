@@ -185,6 +185,104 @@ class TechFeedReader < Sinatra::Base
       )
     end
 
+    # Phase S9 helpers — build lookup tables for a list of match
+    # rows so the calendar view doesn't N+1 across 30+ rows.
+    def build_teams_by_id_for_matches(matches)
+      ids = matches.flat_map { |m| [m['home_team_id'], m['away_team_id']] }.compact.uniq
+      ids.each_with_object({}) { |id, h| h[id] = SportsTeamsStore.find(id) }
+    end
+
+    def build_leagues_by_id_for_matches(matches)
+      ids = matches.map { |m| m['league_id'] }.compact.uniq
+      ids.each_with_object({}) { |id, h| h[id] = SportsLeaguesStore.find(id) }
+    end
+
+    # Group matches by local-day key (YYYY-MM-DD in the user's
+    # locale, which we approximate as Process-local Time.parse →
+    # Time#strftime). Returns an array of [day_key, [matches]]
+    # pairs in chronological order — convenient for the view's
+    # `<% @grouped.each do |day, matches| %>` loop.
+    def group_by_local_day(matches)
+      grouped = matches.group_by do |m|
+        t = (Time.parse(m['scheduled_at'].to_s) rescue nil)
+        t ? t.localtime.strftime('%Y-%m-%d') : 'unknown'
+      end
+      grouped.sort_by { |k, _| k }
+    end
+
+    # Per-sport default match duration in hours. Used as the iCal
+    # DTEND offset since match rows don't carry a duration.
+    SPORT_DURATION_HOURS = {
+      'football'   => 3.5,
+      'basketball' => 2.5,
+      'soccer'     => 2.0,
+      'rugby'      => 2.0
+    }.freeze
+    SPORT_DURATION_DEFAULT = 2.5
+
+    def duration_hours_for(league)
+      SPORT_DURATION_HOURS[(league && league['sport']).to_s] || SPORT_DURATION_DEFAULT
+    end
+
+    # Build the .ics payload for the calendar export. RFC 5545:
+    # CRLF line endings, escaped commas / semicolons / newlines
+    # in TEXT properties, DATE-TIME in UTC with trailing 'Z'.
+    def build_ical(matches, teams_by_id, leagues_by_id, now: Time.now.utc)
+      lines = []
+      lines << 'BEGIN:VCALENDAR'
+      lines << 'VERSION:2.0'
+      lines << 'PRODID:-//tech-feed-reader//sports-calendar//EN'
+      lines << 'CALSCALE:GREGORIAN'
+      lines << 'METHOD:PUBLISH'
+      lines << ical_text('X-WR-CALNAME', 'Tech Feed Reader — Sports')
+      lines << ical_text('X-WR-CALDESC', 'Upcoming fixtures across every followed team.')
+
+      dtstamp = now.strftime('%Y%m%dT%H%M%SZ')
+      matches.each do |m|
+        league = leagues_by_id[m['league_id']]
+        home   = teams_by_id[m['home_team_id']]
+        away   = teams_by_id[m['away_team_id']]
+        start_t = Time.parse(m['scheduled_at'].to_s).utc rescue nil
+        next unless start_t
+        end_t   = start_t + (duration_hours_for(league) * 3600).to_i
+
+        home_label = home ? (home['name'] || home['short_name']) : 'TBD'
+        away_label = away ? (away['name'] || away['short_name']) : 'TBD'
+        league_lbl = league ? league['name'] : 'Sports'
+        summary    = "#{away_label} @ #{home_label}"
+        description_parts = [
+          league_lbl,
+          (m['venue'].to_s.empty? ? nil : "Venue: #{m['venue']}")
+        ].compact
+
+        lines << 'BEGIN:VEVENT'
+        lines << "UID:tfr-sports-match-#{m['id']}@tech-feed-reader"
+        lines << "DTSTAMP:#{dtstamp}"
+        lines << "DTSTART:#{start_t.strftime('%Y%m%dT%H%M%SZ')}"
+        lines << "DTEND:#{end_t.strftime('%Y%m%dT%H%M%SZ')}"
+        lines << ical_text('SUMMARY', summary)
+        lines << ical_text('LOCATION', m['venue'].to_s) unless m['venue'].to_s.empty?
+        lines << ical_text('DESCRIPTION', description_parts.join("\n"))
+        lines << "STATUS:#{m['status'] == 'live' ? 'CONFIRMED' : 'TENTATIVE'}"
+        lines << 'END:VEVENT'
+      end
+
+      lines << 'END:VCALENDAR'
+      lines.join("\r\n") + "\r\n"
+    end
+
+    # RFC 5545 escapes for TEXT-typed properties. Backslash first
+    # so subsequent escapes don't get re-escaped.
+    def ical_text(key, value)
+      escaped = value.to_s
+                     .gsub('\\', '\\\\')
+                     .gsub(',',  '\\,')
+                     .gsub(';',  '\\;')
+                     .gsub("\n", '\\n')
+                     .gsub("\r", '')
+      "#{key}:#{escaped}"
+    end
+
     # Leagues the user implicitly follows because they follow ≥1
     # team in that league. Drives the "By league:" TOC row on
     # /sports and the future calendar/iCal scope (S9).
@@ -661,6 +759,39 @@ class TechFeedReader < Sinatra::Base
       ).any?
     end
     erb :sports
+  end
+
+  # Phase S9 — upcoming-fixtures calendar across followed teams.
+  # Same data source for the HTML view and the iCal export so the
+  # two stay in sync. Default 30-day window; ?days=N tunable.
+  get '/sports/calendar' do
+    @page_title = 'Sports calendar'
+    days_forward = (params['days'].to_s.match?(/\A\d+\z/) ? params['days'].to_i : 30).clamp(1, 365)
+    @days_forward = days_forward
+
+    matches      = SportsMatchesStore.upcoming_for_followed_teams(days_forward: days_forward)
+    @matches     = matches
+    @teams_by_id = build_teams_by_id_for_matches(matches)
+    @leagues_by_id = build_leagues_by_id_for_matches(matches)
+    @grouped     = group_by_local_day(matches)
+    @ical_url    = url('/sports/calendar.ics')
+    erb :sports_calendar
+  end
+
+  # iCal export of the same window. Subscribe in Apple/Google
+  # Calendar to the URL — refreshes pull every couple of hours.
+  # Each VEVENT has UID / DTSTAMP / DTSTART / DTEND / SUMMARY /
+  # LOCATION / DESCRIPTION. DTEND uses a per-sport heuristic
+  # because matches don't carry a duration on the row.
+  get '/sports/calendar.ics' do
+    days_forward = (params['days'].to_s.match?(/\A\d+\z/) ? params['days'].to_i : 30).clamp(1, 365)
+    matches      = SportsMatchesStore.upcoming_for_followed_teams(days_forward: days_forward)
+    teams_by_id  = build_teams_by_id_for_matches(matches)
+    leagues_by_id = build_leagues_by_id_for_matches(matches)
+
+    content_type 'text/calendar; charset=utf-8'
+    headers      'Content-Disposition' => 'inline; filename="tech-feed-reader-sports.ics"'
+    build_ical(matches, teams_by_id, leagues_by_id)
   end
 
   # League standings page (Phase S8). Renders all groups inside the

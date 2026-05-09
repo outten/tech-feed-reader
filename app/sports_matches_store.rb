@@ -55,6 +55,26 @@ module SportsMatchesStore
     db.execute("SELECT * FROM sports_matches WHERE status = 'live' ORDER BY scheduled_at")
   end
 
+  # Phase S9 — upcoming matches across every team the user follows
+  # (sports_follows kind=team), within the next `days_forward` days.
+  # Drives /sports/calendar and the iCal export.
+  def upcoming_for_followed_teams(days_forward: 30, now: Time.now.utc)
+    cutoff = (now + days_forward * 86_400).iso8601
+    db.execute(<<~SQL, [now.iso8601, cutoff])
+      SELECT m.* FROM sports_matches m
+      WHERE m.status IN ('scheduled', 'live')
+        AND m.scheduled_at >= ?
+        AND m.scheduled_at <= ?
+        AND (
+          m.home_team_id IN (SELECT t.id FROM sports_teams t
+                              JOIN sports_follows f ON f.kind = 'team' AND f.value = t.slug)
+          OR m.away_team_id IN (SELECT t.id FROM sports_teams t
+                                 JOIN sports_follows f ON f.kind = 'team' AND f.value = t.slug)
+        )
+      ORDER BY m.scheduled_at ASC
+    SQL
+  end
+
   # Idempotent upsert. Returns the row.
   def upsert(league_id:, source_provider:, external_id:, scheduled_at:, status:,
              home_team_id: nil, away_team_id: nil,

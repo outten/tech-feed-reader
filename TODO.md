@@ -280,13 +280,14 @@ The user asked for "buttons in the Executive Summary of the area to filter on sp
 
 ## Sports — Phase S9: calendar / upcoming + iCal export
 
-**Status: `not implemented`**
+**Status: `tests`** — outten/TODO-054, awaiting user approval to commit + open PR
 
-Aggregate "everything I follow" into a single chronological feed of upcoming fixtures.
-
-- [ ] `/sports/calendar` page: next ~30 days of scheduled matches across all follows, grouped by day.
-- [ ] iCal export: `/sports/calendar.ics` → drop into Apple Calendar / Google Calendar. Each `VEVENT` is a match with venue, opponent, broadcast info if available. Refresh-friendly URL.
-- [ ] Specs: ordering, day-grouping, iCal validation.
+- [x] **`/sports/calendar` page**: next 30 days of scheduled (and live) matches across every followed team, grouped by local day. `?days=N` tunable (clamped 1..365). Each fixture renders time + matchup (logo + name) + league + venue. Followed-team chips link to `/sports/team/:slug`; auto-created opponents render as plain spans (no broken link).
+- [x] **iCal export**: `/sports/calendar.ics` returns `Content-Type: text/calendar` with a proper `Content-Disposition` filename. RFC 5545: CRLF line endings, escaped commas/semicolons/newlines in TEXT properties, UTC `DTSTART`/`DTEND` with `Z` suffix. One `VEVENT` per match with `UID` / `DTSTAMP` / `DTSTART` / `DTEND` / `SUMMARY` / `LOCATION` / `DESCRIPTION` / `STATUS` (CONFIRMED for live, TENTATIVE for scheduled). DTEND duration is per-sport heuristic — football 3.5h, basketball 2.5h, soccer 2h, rugby 2h, default 2.5h.
+- [x] **Subscribe-callout** at the top of `/sports/calendar` with the `.ics` URL and a "Download once" alternative for one-shot snapshots. Apple Calendar / Google Calendar both honour the standard subscription URL flow.
+- [x] **Entry point**: `/sports` header subtitle gains a "Calendar →" link, alongside the existing "All sports articles →". No top-nav addition (the sports area already has its own nav).
+- [x] **Store**: `SportsMatchesStore.upcoming_for_followed_teams(days_forward:, now:)` — single SQL query joining sports_matches → sports_teams → sports_follows, filters by `status IN ('scheduled', 'live')` AND scheduled within `[now, now+days_forward]`.
+- [x] **Specs**: 20 examples in [spec/sports_calendar_spec.rb](spec/sports_calendar_spec.rb) — store window/status/follow filters + chronological ordering, view empty/subscribe/grouped/clamp paths, iCal RFC 5545 structure (CRLF, headers, escapes, status mapping, DTEND duration math), `/sports` header link.
 
 ## Sports — Phase S10: cross-category personalization
 
