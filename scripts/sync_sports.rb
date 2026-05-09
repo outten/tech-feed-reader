@@ -29,6 +29,7 @@ require_relative '../app/database'
 require_relative '../app/sports_leagues_store'
 require_relative '../app/sports_teams_store'
 require_relative '../app/sports_matches_store'
+require_relative '../app/sports_standings_store'
 require_relative '../app/sports_follows_store'
 require_relative '../app/providers/espn'
 require_relative '../app/logger'
@@ -143,5 +144,59 @@ followed_team_slugs.each do |slug|
   puts "  team:#{slug.ljust(12)} matches=#{matches.length}"
 end
 
+# Phase S8 — sync league standings for every seeded ESPN league.
+# Wider than the match sync (which is follow-gated): standings are
+# globally interesting (e.g. World Cup standings even when the
+# user follows no specific national team), and the call is cheap
+# (one HTTP per league). The /sports "By league:" TOC gates
+# visibility to leagues that have synced standings, so this is
+# what determines what's discoverable from the overview page.
 puts
-puts "Done. upserted=#{upserted} skipped=#{skipped} matches_total=#{SportsMatchesStore.count}"
+puts "Syncing standings…"
+standings_count = 0
+
+SportsLeaguesStore.all.each do |league|
+  next unless league['source_provider'] == 'espn'
+
+  groups = Providers::ESPN.standings(sport_path: league['external_id'])
+  groups.each do |group|
+    group.entries.each_with_index do |entry, idx|
+      team_row = SportsTeamsStore.find_by_external(
+        league['source_provider'], entry.team_external_id, league_id: league['id']
+      )
+      # Auto-create the team row if missing (rare — the schedule
+      # sync already creates opponents). image_url backfilled too.
+      team_row ||= SportsTeamsStore.upsert(
+        league_id:       league['id'],
+        slug:            "#{league['slug']}-team-#{entry.team_external_id}",
+        name:            entry.team_name.to_s.empty? ? entry.team_external_id : entry.team_name,
+        source_provider: league['source_provider'],
+        external_id:     entry.team_external_id,
+        image_url:       entry.team_logo
+      )
+
+      SportsStandingsStore.upsert(
+        league_id:           league['id'],
+        team_id:             team_row['id'],
+        group_name:          group.group_name,
+        source_provider:     league['source_provider'],
+        position:            entry.position || (idx + 1),
+        wins:                entry.wins,
+        losses:              entry.losses,
+        ties:                entry.ties,
+        win_percent:         entry.win_percent,
+        points_for:          entry.points_for,
+        points_against:      entry.points_against,
+        point_differential:  entry.point_differential,
+        games_behind:        entry.games_behind,
+        streak:              entry.streak,
+        playoff_seed:        entry.playoff_seed
+      )
+      standings_count += 1
+    end
+  end
+  puts "  league:#{league['slug'].ljust(12)} groups=#{groups.length} entries=#{groups.sum { |g| g.entries.length }}"
+end
+
+puts
+puts "Done. matches_upserted=#{upserted} matches_total=#{SportsMatchesStore.count} standings_total=#{SportsStandingsStore.count}"

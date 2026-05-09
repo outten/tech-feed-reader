@@ -38,6 +38,8 @@ require_relative 'sports_teams'
 require_relative 'sports_leagues_store'
 require_relative 'sports_teams_store'
 require_relative 'sports_matches_store'
+require_relative 'sports_standings_store'
+require_relative 'sports_follows_store'
 require_relative 'version'
 require_relative 'tracing'
 require_relative 'metrics'
@@ -181,6 +183,29 @@ class TechFeedReader < Sinatra::Base
         unread_count:  row['unread_count'].to_i,
         error:         row['error']
       )
+    end
+
+    # Leagues the user implicitly follows because they follow ≥1
+    # team in that league. Drives the "By league:" TOC row on
+    # /sports and the future calendar/iCal scope (S9).
+    def leagues_for_followed_teams
+      slugs = SportsFollowsStore.for_kind('team').map { |f| f['value'] }
+      return [] if slugs.empty?
+      league_ids = slugs.filter_map { |s| (t = SportsTeamsStore.find_by_slug(s)) && t['league_id'] }.uniq
+      league_ids.filter_map { |lid| SportsLeaguesStore.find(lid) }
+    end
+
+    # 1st / 2nd / 3rd / 4th. Used in the league-position subtitle
+    # on the team detail page.
+    def position_suffix(n)
+      return ''  if n.nil? || n <= 0
+      return 'th' if [11, 12, 13].include?(n % 100)
+      case n % 10
+      when 1 then 'st'
+      when 2 then 'nd'
+      when 3 then 'rd'
+      else        'th'
+      end
     end
 
     # STUFF.md #9 — last final per followed team for the score
@@ -625,7 +650,40 @@ class TechFeedReader < Sinatra::Base
     # and surface as score tiles. Empty when no follows or no
     # finals synced yet.
     @last_finals_by_team = build_last_finals(@teams_with_subs)
+    # S8 — leagues the user can navigate to. Anything with synced
+    # standings is fair game: NFL/NBA/MLS (followed-team leagues)
+    # plus globally-interesting tournaments like the FIFA World Cup
+    # (which the user doesn't follow a specific team in but asked
+    # to be able to navigate to).
+    @leagues_with_standings = SportsLeaguesStore.all.select do |lg|
+      Database.connection.execute(
+        'SELECT 1 FROM sports_standings WHERE league_id = ? LIMIT 1', [lg['id']]
+      ).any?
+    end
     erb :sports
+  end
+
+  # League standings page (Phase S8). Renders all groups inside the
+  # league (NFC + AFC for NFL, Eastern + Western for NBA/MLS) with
+  # the user's followed teams highlighted.
+  get '/sports/league/:slug' do |slug|
+    @league = SportsLeaguesStore.find_by_slug(slug)
+    halt 404, erb(:article_not_found) unless @league
+
+    @page_title  = "#{@league['name']} — Standings"
+    rows = SportsStandingsStore.for_league(@league['id'])
+    @standings_groups = rows.group_by { |r| r['group_name'] }
+
+    # Resolve team rows so we can show name + logo + slug. Cheap —
+    # there are only ~30 teams per league.
+    team_ids = rows.map { |r| r['team_id'] }.uniq
+    @teams_by_id = team_ids.each_with_object({}) do |tid, h|
+      h[tid] = SportsTeamsStore.find(tid)
+    end
+
+    # Followed-team highlight: which slug is in sports_follows?
+    @followed_slugs = SportsFollowsStore.for_kind('team').map { |f| f['value'] }.to_set
+    erb :sports_league
   end
 
   # Per-team detail page. Aggregates every article + podcast episode
@@ -652,6 +710,12 @@ class TechFeedReader < Sinatra::Base
     # team's structured-data row by the SportsTeams (Ruby) module
     # slug, then the most recent final from sports_matches.
     @last_final = lookup_last_final_for_team(@team)
+    # S8 — current standings row for the team, drives the league-
+    # position line in the page header.
+    structured_team = SportsTeamsStore.find_by_slug(@team[:slug])
+    @standings = structured_team ? SportsStandingsStore.for_team(structured_team['id']) : nil
+    @league    = (@standings && SportsLeaguesStore.find(@standings['league_id'])) ||
+                 (structured_team && SportsLeaguesStore.find(structured_team['league_id']))
     @page_title  = @team[:name]
     erb :sports_team
   end

@@ -12,6 +12,21 @@
       <%= h(@team[:blurb]) %>
       &middot; <a href="/sports">&larr; All sports</a>
     </p>
+    <% if @standings %>
+      <p class="subtitle sports-team-standing">
+        <strong><%= h(@standings['group_name']) %></strong>
+        &middot; <%= @standings['position'] || '—' %><sup><%= position_suffix(@standings['position'].to_i) %></sup>
+        <% if @standings['wins'] && @standings['losses'] %>
+          (<%= @standings['wins'] %>&ndash;<%= @standings['losses'] %><% if @standings['ties'].to_i > 0 %>&ndash;<%= @standings['ties'] %><% end %>)
+        <% end %>
+        <% if @standings['streak'] && !@standings['streak'].to_s.empty? %>
+          &middot; <span class="<%= @standings['streak'].start_with?('W') ? 'positive' : 'negative' %>">streak <%= h(@standings['streak']) %></span>
+        <% end %>
+        <% if @league %>
+          &middot; <a href="/sports/league/<%= h(@league['slug']) %>">Full standings &rarr;</a>
+        <% end %>
+      </p>
+    <% end %>
   </div>
 </div>
 
