@@ -54,8 +54,8 @@ module Providers
 
     # Normalized match shape — what stores accept upstream.
     Match = Struct.new(:external_id, :scheduled_at, :status,
-                       :home_team_external_id, :home_team_name,
-                       :away_team_external_id, :away_team_name,
+                       :home_team_external_id, :home_team_name, :home_team_logo,
+                       :away_team_external_id, :away_team_name, :away_team_logo,
                        :home_score, :away_score, :period, :venue,
                        keyword_init: true)
 
@@ -134,8 +134,10 @@ module Providers
           status:                STATUS_MAP[status_raw] || 'scheduled',
           home_team_external_id: home.dig('team', 'id').to_s,
           home_team_name:        home.dig('team', 'displayName') || home.dig('team', 'name'),
+          home_team_logo:        extract_logo(home),
           away_team_external_id: away.dig('team', 'id').to_s,
           away_team_name:        away.dig('team', 'displayName') || away.dig('team', 'name'),
+          away_team_logo:        extract_logo(away),
           home_score:            extract_score(home),
           away_score:            extract_score(away),
           period:                ev.dig('status', 'type', 'shortDetail') || nil,
@@ -166,6 +168,19 @@ module Providers
       when nil, '' then nil
       else              cast_int(raw)
       end
+    end
+
+    # ESPN team logos are at competitor.team.logo (often null) or
+    # competitor.team.logos[].href (preferred). Pick the first
+    # logos entry when available — that's the canonical PNG on the
+    # ESPN CDN. Returns nil when nothing usable is on the row.
+    def extract_logo(competitor)
+      team = competitor['team'] || {}
+      flat = team['logo'].to_s
+      return flat unless flat.empty?
+      logos = Array(team['logos'])
+      first = logos.first
+      first.is_a?(Hash) ? first['href'] : nil
     end
 
     class << self

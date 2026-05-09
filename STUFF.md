@@ -77,16 +77,20 @@ Two-part fix:
 - `app/logger.rb` flips its default to `debug` when `RACK_ENV` is unset/development; stays `info` for `RACK_ENV=staging` and `production`; stays `fatal` for `test` (so RSpec output stays clean). `LOG_LEVEL` env var still overrides.
 - New Sinatra `before` + `after` hooks emit a single `http_request` JSON line per request with `method`, `path`, `status`, `latency_ms`, `ip`. Logs every request including static assets (per the user's preference for full visibility).
 
-## [ ] 8. Triage page 
+## [x] 8. Triage page 
 
 The layout of the card elements on the page is off. For example, /triage/1 
 
 - The title of the article is vertical instead of horizontal
 - can you add a summary of the content for each card
 
-## [ ] 9. Sports Scores
+Done on outten/TODO-052. Triage card rows are now full-width vertical cards (reusing the `.sports-article` shape from /sports for visual consistency): h4 title links to the publisher in a new tab, inline article summary via the existing `skim_summary_for` helper (extractive cache → content_text excerpt fallback), italic "Why: …" rationale line, meta row with source / time / author / podcast badge / "Open in app" affordance. Must-read entries keep their green left-edge accent; skip entries stay dimmed. 5 view-surface examples in [spec/triage_card_layout_spec.rb](spec/triage_card_layout_spec.rb).
+
+## [x] 9. Sports Scores
 
 On the sports page, at the top, can you add tiles that show the last game score for the teams we are following. Include date, score, logos of teams, where played, and anything else relevant. Also, add the team's last game on the individual team page.
+
+Done on outten/TODO-052. New `.sports-score-tiles` strip at the top of `/sports`, one tile per followed team that has a synced final from Phase S3+S4. Each tile shows: team logo (or emoji fallback), team short-name, W/L/D pill (color-coded green/red/orange + circle badge), big score line, opponent line ("vs/@ Cowboys" with mini opponent logo), and meta (relative date · venue). Click → that team's `/sports/team/<slug>` page. The same tile renders as a "Last game" section on the per-team page, full-width. ESPN logo capture: `Providers::ESPN.extract_logo` reads `team.logos[0].href`, sync auto-backfills `sports_teams.image_url` for both followed teams + their opponents. Schema fix bundled in: ESPN reuses team IDs across sports (NFL Lions = id 8 = NZ rugby team), so the original `UNIQUE(source_provider, external_id)` was wrong — migration `013_sports_teams_league_unique.sql` rebuilds the table with `UNIQUE(source_provider, league_id, external_id)`. 10 examples in [spec/sports_score_tiles_spec.rb](spec/sports_score_tiles_spec.rb).
 
 ## [x] 10. Claude Behavior
 

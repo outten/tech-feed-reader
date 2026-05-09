@@ -28,11 +28,22 @@ module SportsTeamsStore
     db.execute('SELECT * FROM sports_teams WHERE slug = ?', [slug.to_s]).first
   end
 
-  def find_by_external(source_provider, external_id)
-    db.execute(
-      'SELECT * FROM sports_teams WHERE source_provider = ? AND external_id = ?',
-      [source_provider.to_s, external_id.to_s]
-    ).first
+  # ESPN reuses numeric team IDs across sports (id=8 is Detroit
+  # Lions in NFL AND New Zealand in rugby), so callers MUST scope
+  # by league_id. The legacy 2-arg form is supported for tests
+  # that pre-date the league_id requirement.
+  def find_by_external(source_provider, external_id, league_id: nil)
+    if league_id
+      db.execute(
+        'SELECT * FROM sports_teams WHERE source_provider = ? AND external_id = ? AND league_id = ?',
+        [source_provider.to_s, external_id.to_s, league_id]
+      ).first
+    else
+      db.execute(
+        'SELECT * FROM sports_teams WHERE source_provider = ? AND external_id = ?',
+        [source_provider.to_s, external_id.to_s]
+      ).first
+    end
   end
 
   def for_league(league_id)
@@ -41,7 +52,7 @@ module SportsTeamsStore
 
   def upsert(league_id:, slug:, name:, source_provider:, external_id:,
              short_name: nil, location: nil, image_url: nil)
-    existing = find_by_external(source_provider, external_id) ||
+    existing = find_by_external(source_provider, external_id, league_id: league_id) ||
                find_by_slug(slug)
     if existing
       args = [league_id, name, short_name, location, image_url,

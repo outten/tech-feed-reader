@@ -23,6 +23,59 @@
     - Row 2 (links): drill into per-team detail at /sports/team/:slug
     Sticks while scrolling so the user can navigate without
     scrolling back up. %>
+<%# STUFF.md #9 — score tiles strip. One tile per followed team
+    that has a synced final. Click → that team's detail page.
+    Empty when no follows have synced finals yet (cold start). %>
+<% if @last_finals_by_team && @last_finals_by_team.any? %>
+  <section class="sports-score-tiles" aria-label="Last game per followed team">
+    <h3 class="sports-score-tiles-heading">Last game</h3>
+    <div class="sports-score-tile-row">
+      <% @teams_with_subs.each do |team| %>
+        <% match = @last_finals_by_team[team[:slug]] %>
+        <% next unless match %>
+        <% structured_team = SportsTeamsStore.find_by_slug(team[:slug]) %>
+        <% next unless structured_team %>
+        <% v = score_tile_view(match, structured_team['id']) %>
+        <a class="sports-score-tile sports-score-tile-<%= v[:result].downcase %>"
+           href="/sports/team/<%= team[:slug] %>"
+           title="Open the <%= h(team[:short_name]) %> page">
+          <div class="sports-score-tile-header">
+            <% if team[:image_url] && !team[:image_url].to_s.empty? %>
+              <img class="sports-score-tile-logo" src="<%= h(team[:image_url]) %>" alt="" loading="lazy">
+            <% elsif (v[:focal] || {})['image_url'] && !v[:focal]['image_url'].to_s.empty? %>
+              <img class="sports-score-tile-logo" src="<%= h(v[:focal]['image_url']) %>" alt="" loading="lazy">
+            <% else %>
+              <span class="sports-score-tile-emoji"><%= team[:emoji] %></span>
+            <% end %>
+            <span class="sports-score-tile-name"><%= h(team[:short_name]) %></span>
+            <span class="sports-score-tile-result sports-score-tile-result-<%= v[:result].downcase %>"
+                  title="<%= v[:result] == 'W' ? 'Win' : v[:result] == 'L' ? 'Loss' : 'Draw' %>"><%= v[:result] %></span>
+          </div>
+          <div class="sports-score-tile-score">
+            <span class="sports-score-tile-focal"><%= v[:focal_score] %></span>
+            <span class="sports-score-tile-sep">–</span>
+            <span class="sports-score-tile-opp"><%= v[:opp_score] %></span>
+          </div>
+          <div class="sports-score-tile-opponent">
+            <% if v[:opponent] && v[:opponent]['image_url'] && !v[:opponent]['image_url'].to_s.empty? %>
+              <img class="sports-score-tile-logo-sm" src="<%= h(v[:opponent]['image_url']) %>" alt="" loading="lazy">
+            <% end %>
+            <span class="sports-score-tile-vs"><%= v[:home_away] == 'home' ? 'vs' : '@' %></span>
+            <span><%= h(v[:opponent] ? v[:opponent]['name'] : 'TBD') %></span>
+          </div>
+          <div class="sports-score-tile-meta">
+            <span><%= relative_time(v[:scheduled_at]) %></span>
+            <% if v[:venue] && !v[:venue].to_s.empty? %>
+              <span class="sports-score-tile-meta-sep">&middot;</span>
+              <span class="muted" title="Venue"><%= h(v[:venue]) %></span>
+            <% end %>
+          </div>
+        </a>
+      <% end %>
+    </div>
+  </section>
+<% end %>
+
 <% rendered_sports = @sports_sub_categories.select { |s| (@feeds_by_sport[s] || []).any? || (@recent_by_sport[s] || []).any? } %>
 <% if rendered_sports.any? || (@teams_with_subs || []).any? %>
   <nav class="sports-toc" aria-label="Jump to sport or team">

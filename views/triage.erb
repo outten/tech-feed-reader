@@ -85,25 +85,60 @@
       <% if rows.empty? %>
         <p class="subtitle">(none)</p>
       <% else %>
-        <ul class="news-list triage-list">
+        <%# STUFF.md #8 — vertical article cards (same shape as
+            /sports). Title links to publisher in a new tab; the
+            article summary renders inline (no need to click
+            through just to skim). %>
+        <ul class="sports-article-list triage-list">
           <% rows.each do |entry| %>
             <% article = (@articles_by_uid || {})[entry['uid']] %>
             <% next unless article %>
-            <% feed = (@feeds_by_id || {})[article['feed_id']] %>
-            <li class="news-item">
-              <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener" title="Open in new tab">
-                <span class="news-headline"><%= h(article['title']) %></span>
-              </a>
+            <% feed         = (@feeds_by_id || {})[article['feed_id']] %>
+            <% summary_row  = (@summaries_by_article_id || {})[article['id']] %>
+            <% summary_text = skim_summary_for(article, summary_row) %>
+            <li class="sports-article triage-card <%= 'read' if article['read'] == 1 %>">
+              <h4 class="sports-article-title">
+                <% if article['url'] && !article['url'].to_s.empty? %>
+                  <% host = (URI.parse(article['url']).host rescue nil) || 'publisher' %>
+                  <a href="<%= h(article['url']) %>" target="_blank" rel="noopener noreferrer"
+                     title="Open at <%= h(host) %> (new tab)">
+                    <%= h(article['title']) %>
+                  </a>
+                <% else %>
+                  <%= h(article['title']) %>
+                <% end %>
+              </h4>
+
               <% unless entry['rationale'].to_s.empty? %>
                 <p class="triage-rationale" title="Claude's one-line rationale for this classification">
-                  <%= h(entry['rationale']) %>
+                  <strong>Why:</strong> <%= h(entry['rationale']) %>
                 </p>
               <% end %>
-              <div class="news-meta">
+
+              <% unless summary_text.empty? %>
+                <p class="sports-article-summary"><%= h(summary_text) %></p>
+              <% end %>
+
+              <div class="sports-article-meta">
                 <% if feed %>
-                  <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+                  <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"
+                     title="Filter to this source"><%= h(feed['title'] || feed['url']) %></a>
+                  <span class="sports-article-meta-sep">&middot;</span>
                 <% end %>
-                <span><%= relative_time(article['published_at']) %></span>
+                <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+                <% if article['author'] && !article['author'].to_s.empty? %>
+                  <span class="sports-article-meta-sep">&middot;</span>
+                  <span class="muted"><%= h(article['author']) %></span>
+                <% end %>
+                <% if article['audio_url'] && !article['audio_url'].to_s.empty? %>
+                  <span class="sports-article-meta-sep">&middot;</span>
+                  <span class="badge podcast-badge" title="Podcast episode">🎧</span>
+                <% end %>
+                <span class="sports-article-meta-sep">&middot;</span>
+                <a class="sports-article-in-app" href="/article/<%= article['uid'] %>"
+                   title="Open the in-app reading view (summary + tags + feedback)">
+                  Open in app &rarr;
+                </a>
               </div>
             </li>
           <% end %>
