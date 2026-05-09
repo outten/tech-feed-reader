@@ -1,0 +1,105 @@
+<div class="page-header">
+  <div>
+    <h2>Sports calendar</h2>
+    <p class="subtitle">
+      Next <%= @days_forward %> day<%= 's' unless @days_forward == 1 %> across every followed team
+      &middot; <a href="/sports">&larr; All sports</a>
+      <% if @matches.any? %>
+        &middot; <%= @matches.length %> upcoming fixture<%= 's' unless @matches.length == 1 %>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<%# Subscribe-to-calendar callout. Apple Calendar / Google
+    Calendar refresh on a 1-12h cadence depending on the client,
+    so the user gets fresh fixtures without manual reimport. %>
+<section class="benchmark-section sports-calendar-subscribe" style="margin-bottom:1.5rem">
+  <h3>Subscribe to this calendar</h3>
+  <p class="subtitle">
+    Drop the URL below into Apple Calendar (File → New Calendar Subscription)
+    or Google Calendar (Other calendars → From URL):
+  </p>
+  <p>
+    <code class="sports-calendar-ics-url"><%= h(@ical_url) %></code>
+    &middot;
+    <a href="/sports/calendar.ics" download="tech-feed-reader-sports.ics" title="Download a one-shot snapshot (.ics)">
+      Download once &rarr;
+    </a>
+  </p>
+</section>
+
+<% if @matches.empty? %>
+  <div class="empty-state">
+    <p>
+      No upcoming fixtures in the next <%= @days_forward %> days for any followed team.
+      Either there's nothing scheduled, or the sync hasn't run yet — try
+      <code>make sync-sports</code>.
+    </p>
+  </div>
+<% else %>
+  <% @grouped.each do |day_key, day_matches| %>
+    <% day_label = (Time.parse(day_key) rescue nil)&.strftime('%A, %b %-d, %Y') || day_key %>
+    <section class="benchmark-section sports-calendar-day" style="margin-top:1.25rem">
+      <h3 class="sports-calendar-day-heading"><%= h(day_label) %></h3>
+      <ul class="sports-calendar-list">
+        <% day_matches.each do |m| %>
+          <% league = (@leagues_by_id || {})[m['league_id']] %>
+          <% home   = (@teams_by_id  || {})[m['home_team_id']] %>
+          <% away   = (@teams_by_id  || {})[m['away_team_id']] %>
+          <% start_t = Time.parse(m['scheduled_at'].to_s) rescue nil %>
+          <li class="sports-calendar-fixture">
+            <div class="sports-calendar-time">
+              <% if start_t %>
+                <%= start_t.localtime.strftime('%-I:%M %p') %>
+                <span class="muted"><%= start_t.localtime.strftime('%Z') %></span>
+              <% end %>
+              <% if m['status'] == 'live' %>
+                <span class="badge sports-calendar-live" title="In progress">LIVE</span>
+              <% end %>
+            </div>
+            <div class="sports-calendar-matchup">
+              <%# Team chip — render as a link only when the team has
+                  a SportsTeams (Ruby module) entry, since /sports/team/:slug
+                  404s for structured-only opponents like "nba-team-18". %>
+              <% [['away', away], ['home', home]].each_with_index do |(side, team), i| %>
+                <% unless i.zero? %><span class="sports-calendar-vs muted">@</span><% end %>
+                <% if team %>
+                  <% logo = team['image_url'] %>
+                  <% label = team['name'] || team['short_name'] %>
+                  <% linkable = SportsTeams.find(team['slug']) %>
+                  <% if linkable %>
+                    <a class="sports-calendar-team" href="/sports/team/<%= h(team['slug']) %>">
+                      <% if logo && !logo.to_s.empty? %>
+                        <img class="sports-score-tile-logo-sm" src="<%= h(logo) %>" alt="" loading="lazy">
+                      <% end %>
+                      <%= h(label) %>
+                    </a>
+                  <% else %>
+                    <span class="sports-calendar-team">
+                      <% if logo && !logo.to_s.empty? %>
+                        <img class="sports-score-tile-logo-sm" src="<%= h(logo) %>" alt="" loading="lazy">
+                      <% end %>
+                      <%= h(label) %>
+                    </span>
+                  <% end %>
+                <% else %>
+                  <span>TBD</span>
+                <% end %>
+              <% end %>
+            </div>
+            <div class="sports-calendar-meta">
+              <% if league %>
+                <a class="sports-calendar-league" href="/sports/league/<%= h(league['slug']) %>"><%= h(league['name']) %></a>
+              <% end %>
+              <% if m['venue'] && !m['venue'].to_s.empty? %>
+                <span class="sports-calendar-meta-sep">&middot;</span>
+                <span class="muted"><%= h(m['venue']) %></span>
+              <% end %>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+<% end %>

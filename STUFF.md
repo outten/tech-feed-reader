@@ -97,3 +97,11 @@ Done on outten/TODO-052. New `.sports-score-tiles` strip at the top of `/sports`
 Review CLAUDE.md file that contains behavior for Claude. Incorporate this, perhaps the AGENTS.md file might need updating.
 
 CLAUDE.md is now tracked + referenced from AGENTS.md's Documentation files section. The two files are complementary, not overlapping: CLAUDE.md is general LLM-coding behaviour (think before coding, simplicity first, surgical changes, goal-driven execution); AGENTS.md is project-specific architecture (what the codebase looks like, conventions, gotchas). Future agents read both.
+
+## [ ] 11. SQLite on S3
+
+This is just an analysis / research topic. IF we were to deploy the app to AWS. Do we need to use a real RDBMS like PostgreSQL or can we use S3 with locking and SQLite to manage the database.
+
+I run PostgreSQL locally too.
+
+For a single user app, I'm trying to keep things simple.
