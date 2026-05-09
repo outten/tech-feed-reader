@@ -300,8 +300,8 @@ The For You ranker shipped in Phase 6 was scoped globally. With sports + tech in
 
 - [x] `/articles?sort=relevance&topic=sports` ranks within sports only (and same for tech). `Recommendation::ForYou.score_window` + `corpus_terms` + `positive_corpus` + `negative_corpus` all accept `topic:` and conditional-JOIN onto `feeds` to scope. Helper `sanitize_topic_filter` whitelists `technology|sports|general` to prevent SQL surprises.
 - [x] `/triage?topic=sports` runs a sports-only triage. `Triage::Claude.run(topic:)` scopes both unread fetch + corpus exemplars. UI: topic chips at page header (`all topics | technology | sports`) with active-state highlighting + the Generate form carries the active topic via hidden input.
-- [ ] **Daily cron — per-topic runs**: deferred. Single all-topics run still happens nightly; multi-run is a small follow-up.
-- [x] **Specs**: 11 examples in [spec/topic_scoping_spec.rb](spec/topic_scoping_spec.rb) — `corpus_terms` topic restricts/unscoped legacy union, `score_window` topic, `Triage.run` topic restricts unread + corpus, `/articles?sort=relevance&topic=` route, `/triage` chip rendering + active state + carrying via Generate form.
+- [x] **Daily cron — per-topic runs**: shipped via outten/TODO-058. `scripts/generate_triage.rb` now loops over `TRIAGE_TOPICS = [nil, 'technology', 'sports']` and persists one `triages` row per topic. Migration 017 adds the `topic` column; `TriageStore.recent(topic:)` filters; the Recent runs table on `/triage` shows a Topic column.
+- [x] **Specs**: 11 examples in [spec/topic_scoping_spec.rb](spec/topic_scoping_spec.rb) — `corpus_terms` topic restricts/unscoped legacy union, `score_window` topic, `Triage.run` topic restricts unread + corpus, `/articles?sort=relevance&topic=` route, `/triage` chip rendering + active state + carrying via Generate form. Plus 6 examples in [spec/triage_store_spec.rb](spec/triage_store_spec.rb) (topic round-trip + .recent filtering + Result.topic plumbing) and 2 in [spec/generate_triage_cron_spec.rb](spec/generate_triage_cron_spec.rb).
 
 ## Sports — Phase S7 follow-up: tennis player follows
 

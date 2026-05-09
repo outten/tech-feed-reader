@@ -7,7 +7,7 @@ require_relative '../app/triage_store'
 # Recent-runs list on the /triage manual page.
 
 def triage_result(status: :ok, model: 'claude-sonnet-4-6', unread_count: 3,
-                  must_read: nil, optional: nil, skip: nil)
+                  must_read: nil, optional: nil, skip: nil, topic: nil)
   Triage::Claude::Result.new(
     status: status,
     must_read: must_read || [{ 'uid' => 'a', 'rationale' => 'r1' }],
@@ -19,7 +19,8 @@ def triage_result(status: :ok, model: 'claude-sonnet-4-6', unread_count: 3,
     input_tokens:  1500,
     output_tokens: 800,
     error:         nil,
-    unread_count:  unread_count
+    unread_count:  unread_count,
+    topic:         topic
   )
 end
 
@@ -83,9 +84,70 @@ RSpec.describe TriageStore do
     it 'returns lightweight rows on .recent (no group JSON parse)' do
       TriageStore.create(triage_result)
       row = TriageStore.recent.first
-      expect(row.keys).to include('id', 'generated_at', 'unread_count', 'status', 'model')
+      expect(row.keys).to include('id', 'generated_at', 'unread_count', 'status', 'model', 'topic')
       expect(row.keys).not_to include('must_read', 'optional', 'skip')
     end
+  end
+
+  # Phase S10 follow-up — daily cron writes one row per topic.
+  describe '.create + .recent with topic (Phase S10 follow-up)' do
+    it 'round-trips topic on create + find' do
+      id = TriageStore.create(triage_result(topic: 'sports'))
+      row = TriageStore.find(id)
+      expect(row['topic']).to eq('sports')
+    end
+
+    it 'persists NULL topic for cross-topic legacy runs' do
+      id = TriageStore.create(triage_result(topic: nil))
+      row = TriageStore.find(id)
+      expect(row['topic']).to be_nil
+    end
+
+    it '.recent(topic: ...) filters to that topic only' do
+      TriageStore.create(triage_result(topic: nil))
+      TriageStore.create(triage_result(topic: 'technology'))
+      TriageStore.create(triage_result(topic: 'sports'))
+
+      tech_rows   = TriageStore.recent(topic: 'technology')
+      sports_rows = TriageStore.recent(topic: 'sports')
+      cross_rows  = TriageStore.recent(topic: nil)
+
+      expect(tech_rows.length).to eq(1)
+      expect(tech_rows.first['topic']).to eq('technology')
+      expect(sports_rows.length).to eq(1)
+      expect(sports_rows.first['topic']).to eq('sports')
+      expect(cross_rows.length).to eq(1)
+      expect(cross_rows.first['topic']).to be_nil
+    end
+
+    it '.recent (no topic kwarg) returns rows across every topic' do
+      TriageStore.create(triage_result(topic: nil))
+      TriageStore.create(triage_result(topic: 'technology'))
+      TriageStore.create(triage_result(topic: 'sports'))
+      expect(TriageStore.recent.length).to eq(3)
+    end
+  end
+end
+
+RSpec.describe Triage::Claude, '#run topic plumbing (Phase S10 follow-up)' do
+  before do
+    ENV['ANTHROPIC_API_KEY'] = ''
+  end
+  after do
+    ENV.delete('ANTHROPIC_API_KEY')
+  end
+
+  it 'sets Result.topic on :unavailable so the persisted row carries scope' do
+    result = Triage::Claude.run(topic: 'sports')
+    expect(result.status).to eq(:unavailable)
+    expect(result.topic).to eq('sports')
+  end
+
+  it 'sets Result.topic on :empty so the persisted row carries scope' do
+    ENV['ANTHROPIC_API_KEY'] = 'sk-test-fake-key'
+    result = Triage::Claude.run(topic: 'technology')
+    expect(result.status).to eq(:empty)
+    expect(result.topic).to eq('technology')
   end
 end
 

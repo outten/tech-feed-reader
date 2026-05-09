@@ -169,6 +169,7 @@
       <thead>
         <tr>
           <th>Generated</th>
+          <th>Topic</th>
           <th class="num">Unread</th>
           <th>Status</th>
           <th>Model</th>
@@ -179,6 +180,13 @@
         <% @recent_runs.each do |run| %>
           <tr>
             <td title="<%= h(run['generated_at']) %>"><%= relative_time(run['generated_at']) %></td>
+            <td>
+              <% if run['topic'] %>
+                <%= h(run['topic']) %>
+              <% else %>
+                <span class="muted">all topics</span>
+              <% end %>
+            </td>
             <td class="num"><%= run['unread_count'] %></td>
             <td><%= h(run['status']) %></td>
             <td class="muted"><%= h(run['model'] || '—') %></td>
