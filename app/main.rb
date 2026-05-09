@@ -35,6 +35,9 @@ require_relative 'triage_store'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'sports_teams'
+require_relative 'sports_leagues_store'
+require_relative 'sports_teams_store'
+require_relative 'sports_matches_store'
 require_relative 'version'
 require_relative 'tracing'
 require_relative 'metrics'
@@ -178,6 +181,67 @@ class TechFeedReader < Sinatra::Base
         unread_count:  row['unread_count'].to_i,
         error:         row['error']
       )
+    end
+
+    # STUFF.md #9 — last final per followed team for the score
+    # tiles on /sports. Maps a SportsTeams Ruby module slug to the
+    # corresponding sports_matches row (or nil if no final synced
+    # yet). Skips teams that don't have a structured-data row
+    # (e.g. tennis, where the user follows the sport not a team).
+    def build_last_finals(teams)
+      teams.each_with_object({}) do |team, acc|
+        m = lookup_last_final_for_team(team)
+        acc[team[:slug]] = m if m
+      end
+    end
+
+    # Resolve a SportsTeams Ruby module entry to its
+    # sports_teams.id and pull the most recent final. The Ruby
+    # module's slug is the bridging key; if the structured layer
+    # doesn't have a matching row (catalog mismatch / tennis),
+    # returns nil cleanly.
+    def lookup_last_final_for_team(team)
+      return nil unless team
+      row = SportsTeamsStore.find_by_slug(team[:slug])
+      return nil unless row
+      SportsMatchesStore.recent_finals_for_team(row['id'], limit: 1).first
+    end
+
+    # Helper for the score-tile view: given a match row + the
+    # focal team's id (the team the tile belongs to), returns a
+    # hash with the focal/opponent split + W/L tag. Drives the
+    # one-place-of-truth rendering for /sports tiles + the per-
+    # team detail page's "Last game" section.
+    def score_tile_view(match, focal_team_id)
+      home_id   = match['home_team_id']
+      away_id   = match['away_team_id']
+      home_score = match['home_score'].to_i
+      away_score = match['away_score'].to_i
+      home_team  = home_id ? SportsTeamsStore.find(home_id) : nil
+      away_team  = away_id ? SportsTeamsStore.find(away_id) : nil
+
+      focal_is_home = (home_id == focal_team_id)
+      focal_team    = focal_is_home ? home_team : away_team
+      opponent_team = focal_is_home ? away_team : home_team
+      focal_score   = focal_is_home ? home_score : away_score
+      opp_score     = focal_is_home ? away_score : home_score
+
+      result =
+        if focal_score > opp_score then 'W'
+        elsif focal_score < opp_score then 'L'
+        else 'D'
+        end
+
+      {
+        focal:        focal_team,
+        opponent:     opponent_team,
+        focal_score:  focal_score,
+        opp_score:    opp_score,
+        result:       result,
+        home_away:    focal_is_home ? 'home' : 'away',
+        scheduled_at: match['scheduled_at'],
+        venue:        match['venue']
+      }
     end
 
     def preload_articles_by_uid(result)
@@ -556,6 +620,11 @@ class TechFeedReader < Sinatra::Base
     @teams_with_subs = SportsTeams.all.select do |team|
       SportsTeams.subscribed_feeds_for(team).any?
     end
+    # STUFF.md #9 — score tiles at the top of /sports. Pull last
+    # final per followed team from the structured-data layer (S3+S4)
+    # and surface as score tiles. Empty when no follows or no
+    # finals synced yet.
+    @last_finals_by_team = build_last_finals(@teams_with_subs)
     erb :sports
   end
 
@@ -579,6 +648,10 @@ class TechFeedReader < Sinatra::Base
     end.sort_by { |a| a['published_at'].to_s }.reverse.first(50)
 
     @summaries_by_article_id = SummaryStore.find_for_ids(@articles.map { |a| a['id'] })
+    # STUFF.md #9 — last game on the per-team page. Look up the
+    # team's structured-data row by the SportsTeams (Ruby) module
+    # slug, then the most recent final from sports_matches.
+    @last_final = lookup_last_final_for_team(@team)
     @page_title  = @team[:name]
     erb :sports_team
   end
@@ -653,6 +726,9 @@ class TechFeedReader < Sinatra::Base
     @triage_result    = triage_struct_from_row(row)
     @articles_by_uid  = preload_articles_by_uid(@triage_result)
     @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    # STUFF.md #8 — inline article summaries on the triage cards.
+    article_ids = @articles_by_uid.values.map { |a| a['id'] }
+    @summaries_by_article_id = SummaryStore.find_for_ids(article_ids)
     @triage_id        = row['id']
     erb :triage
   end
@@ -675,6 +751,9 @@ class TechFeedReader < Sinatra::Base
     @recent_runs     = TriageStore.recent(limit: 20)
     @articles_by_uid = preload_articles_by_uid(@triage_result)
     @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    # STUFF.md #8 — inline summaries for the triage cards.
+    article_ids = @articles_by_uid.values.map { |a| a['id'] }
+    @summaries_by_article_id = SummaryStore.find_for_ids(article_ids)
     erb :triage
   end
 

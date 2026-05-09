@@ -86,26 +86,44 @@ followed_team_slugs.each do |slug|
   # and the opponent appears blank in the (forthcoming) UI. Cheap —
   # NFL has 32 teams, NBA has 30, MLS has ~30. SportsTeamsStore
   # upsert is idempotent on (source, external_id).
-  ensure_opponent = ->(m, side_external_id, side_name) do
+  ensure_team = ->(side_external_id, side_name, side_logo) do
     return if side_external_id.nil? || side_external_id.empty?
-    existing_opponent = SportsTeamsStore.find_by_external(league['source_provider'], side_external_id)
-    return existing_opponent if existing_opponent
-    opponent_slug = "#{league['slug']}-team-#{side_external_id}"
-    SportsTeamsStore.upsert(
-      league_id:       league['id'],
-      slug:            opponent_slug,
-      name:            side_name.to_s.empty? ? opponent_slug : side_name,
-      short_name:      nil,
-      source_provider: league['source_provider'],
-      external_id:     side_external_id
-    )
+    existing = SportsTeamsStore.find_by_external(league['source_provider'], side_external_id, league_id: league['id'])
+    if existing
+      # Backfill image_url + name if the existing row is missing them
+      # (newly-followed teams seeded earlier have name but no logo).
+      should_update = (existing['image_url'].to_s.empty? && !side_logo.to_s.empty?) ||
+                      (existing['name'].to_s.empty?      && !side_name.to_s.empty?)
+      return existing unless should_update
+      SportsTeamsStore.upsert(
+        league_id:       existing['league_id'],
+        slug:            existing['slug'],
+        name:            existing['name'].to_s.empty? ? side_name : existing['name'],
+        short_name:      existing['short_name'],
+        location:        existing['location'],
+        source_provider: existing['source_provider'],
+        external_id:     existing['external_id'],
+        image_url:       existing['image_url'].to_s.empty? ? side_logo : existing['image_url']
+      )
+    else
+      opponent_slug = "#{league['slug']}-team-#{side_external_id}"
+      SportsTeamsStore.upsert(
+        league_id:       league['id'],
+        slug:            opponent_slug,
+        name:            side_name.to_s.empty? ? opponent_slug : side_name,
+        short_name:      nil,
+        source_provider: league['source_provider'],
+        external_id:     side_external_id,
+        image_url:       side_logo
+      )
+    end
   end
 
   matches.each do |m|
-    ensure_opponent.call(m, m.home_team_external_id, m.home_team_name)
-    ensure_opponent.call(m, m.away_team_external_id, m.away_team_name)
-    home_team = SportsTeamsStore.find_by_external(league['source_provider'], m.home_team_external_id)
-    away_team = SportsTeamsStore.find_by_external(league['source_provider'], m.away_team_external_id)
+    ensure_team.call(m.home_team_external_id, m.home_team_name, m.home_team_logo)
+    ensure_team.call(m.away_team_external_id, m.away_team_name, m.away_team_logo)
+    home_team = SportsTeamsStore.find_by_external(league['source_provider'], m.home_team_external_id, league_id: league['id'])
+    away_team = SportsTeamsStore.find_by_external(league['source_provider'], m.away_team_external_id, league_id: league['id'])
     SportsMatchesStore.upsert(
       league_id:       league['id'],
       source_provider: league['source_provider'],
