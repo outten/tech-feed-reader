@@ -68,18 +68,21 @@ module Triage
     # Top-level entry point. Returns a Result; never raises. Empty
     # unread queue → Result.status :empty (caller renders an "all
     # caught up" view rather than a triage). No API key → :unavailable.
-    def run
+    # Phase S10 — `topic:` scopes the unread queue + corpus
+    # exemplars to a single topic (tech / sports / general). nil
+    # means cross-topic, the legacy behaviour.
+    def run(topic: nil)
       return Result.new(status: :unavailable, unread_count: 0) unless available?
 
-      unread = ArticlesStore.recent(limit: UNREAD_LIMIT, state: :unread)
+      unread = ArticlesStore.recent(limit: UNREAD_LIMIT, state: :unread, topic: topic)
       if unread.empty?
-        AppLogger.info('triage_run', status: :empty)
+        AppLogger.info('triage_run', status: :empty, topic: topic)
         return Result.new(status: :empty, unread_count: 0,
                           must_read: [], optional: [], skip: [])
       end
 
-      positive = corpus_exemplars(positive: true)
-      negative = corpus_exemplars(positive: false)
+      positive = corpus_exemplars(positive: true,  topic: topic)
+      negative = corpus_exemplars(positive: false, topic: topic)
 
       prompt   = build_user_prompt(unread, positive, negative)
       started  = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -223,31 +226,21 @@ module Triage
     # Pull recent positive / negative exemplars for the prompt — same
     # corpus shape the For You ranker uses, just capped to the
     # exemplar count and sliced to title + content_text.
-    def corpus_exemplars(positive:)
-      sql = if positive
-              <<~SQL
-                SELECT a.title, a.content_text
-                FROM articles a
-                JOIN read_state rs ON rs.article_id = a.id
-                WHERE rs.bookmarked = 1
-                   OR rs.feedback = 1
-                   OR rs.passive_feedback = 1
-                ORDER BY a.id DESC
-                LIMIT ?
-              SQL
-            else
-              <<~SQL
-                SELECT a.title, a.content_text
-                FROM articles a
-                JOIN read_state rs ON rs.article_id = a.id
-                WHERE rs.feedback = -1
-                   OR rs.passive_feedback = -1
-                   OR (rs.archived = 1 AND rs.read = 0)
-                ORDER BY a.id DESC
-                LIMIT ?
-              SQL
-            end
-      Database.connection.execute(sql, [CORPUS_EXEMPLAR_LIMIT])
+    def corpus_exemplars(positive:, topic: nil)
+      where_corpus = positive ?
+        '(rs.bookmarked = 1 OR rs.feedback = 1 OR rs.passive_feedback = 1)' :
+        '(rs.feedback = -1 OR rs.passive_feedback = -1 OR (rs.archived = 1 AND rs.read = 0))'
+      sql = <<~SQL
+        SELECT a.title, a.content_text
+        FROM articles a
+        JOIN read_state rs ON rs.article_id = a.id
+        #{'JOIN feeds f ON f.id = a.feed_id' if topic}
+        WHERE #{where_corpus}
+        #{'AND f.topic = ?' if topic}
+        ORDER BY a.id DESC
+        LIMIT ?
+      SQL
+      Database.connection.execute(sql, topic ? [topic.to_s, CORPUS_EXEMPLAR_LIMIT] : [CORPUS_EXEMPLAR_LIMIT])
     end
 
     class << self

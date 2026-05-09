@@ -167,6 +167,15 @@ class TechFeedReader < Sinatra::Base
       (@feeds_by_id ||= {})[article['feed_id']]
     end
 
+    # Phase S10 — single source of truth for the top-level topic
+    # filter validator. Accepts any FeedCatalog::TOPICS key plus
+    # 'general' (for arbitrary URL-added feeds); nil for unrecognised
+    # values so callers can default cleanly.
+    def sanitize_topic_filter(raw)
+      valid = FeedCatalog::TOPICS.keys.map(&:to_s) + %w[general]
+      valid.include?(raw.to_s) ? raw.to_s : nil
+    end
+
     # Triage helpers — used by the /triage routes to share rendering
     # paths between live POST results and historical GET /triage/:id
     # rows. The struct shape matches Triage::Claude::Result so the
@@ -621,11 +630,9 @@ class TechFeedReader < Sinatra::Base
 
     @kind_filter = params['kind'].to_s == 'podcast' ? :podcast : :all
     @view_filter = params['view'].to_s == 'skim' ? :skim : :default
-    # Sports Phase S1 — top-level topic filter. Accepts any value
-    # in FeedCatalog::TOPICS plus 'general' for arbitrary URL-form
-    # adds; nil = no filter (default behaviour).
-    valid_topics = FeedCatalog::TOPICS.keys.map(&:to_s) + %w[general]
-    @topic_filter = valid_topics.include?(params['topic'].to_s) ? params['topic'].to_s : nil
+    # Sports Phase S1 — top-level topic filter. nil = unfiltered.
+    # See sanitize_topic_filter helper for the validator.
+    @topic_filter = sanitize_topic_filter(params['topic'])
     @sort_filter = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     @articles = if @tag_filter
@@ -640,6 +647,7 @@ class TechFeedReader < Sinatra::Base
                   # any state.
                   @state_filter = :unread
                   Recommendation::ForYou.score_window(state: :unread, kind: @kind_filter,
+                                                      topic: @topic_filter,
                                                       limit: @per_page, offset: offset)
                 else
                   ArticlesStore.recent(
@@ -773,6 +781,13 @@ class TechFeedReader < Sinatra::Base
     @limit      = (limit_raw.match?(/\A\d+\z/) ? limit_raw.to_i : 50).clamp(1, 150)
     @atp        = SportsPlayersStore.top_ranked(tour: 'atp', limit: @limit)
     @wta        = SportsPlayersStore.top_ranked(tour: 'wta', limit: @limit)
+    # Phase S7 follow-up — followed-player slugs (so view can mark
+    # the ★ chip on each row + render the "My followed players"
+    # callout above the rankings).
+    @followed_player_slugs = SportsFollowsStore.for_kind('player').map { |f| f['value'] }.to_set
+    @followed_players = @followed_player_slugs.filter_map do |slug|
+      SportsPlayersStore.find_by_slug(slug)
+    end
     erb :sports_tennis
   end
 
@@ -780,10 +795,31 @@ class TechFeedReader < Sinatra::Base
   get '/sports/player/:slug' do |slug|
     @player = SportsPlayersStore.find_by_slug(slug)
     halt 404, erb(:article_not_found) unless @player
-    @page_title  = @player['full_name']
+    @page_title    = @player['full_name']
     # ESPN player-card link reconstructed from external_id + slug.
-    @espn_url    = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}"
+    @espn_url      = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}"
+    @is_followed   = SportsFollowsStore.follow?('player', slug)
     erb :sports_player
+  end
+
+  # Sports Phase S7 follow-up — tennis player follows. Both
+  # endpoints are idempotent (re-follow / re-unfollow no-ops) so a
+  # mis-clicked button doesn't 500.
+  post '/sports/players/follow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    halt 404 unless SportsPlayersStore.find_by_slug(slug)
+    SportsFollowsStore.add(kind: 'player', value: slug)
+    AppLogger.info('player_follow', slug: slug)
+    redirect to(params['return_to'] || "/sports/player/#{slug}")
+  end
+
+  post '/sports/players/unfollow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    SportsFollowsStore.remove(kind: 'player', value: slug)
+    AppLogger.info('player_unfollow', slug: slug)
+    redirect to(params['return_to'] || "/sports/player/#{slug}")
   end
 
   # Phase S9 — upcoming-fixtures calendar across followed teams.
@@ -934,6 +970,7 @@ class TechFeedReader < Sinatra::Base
     @claude_available = Triage::Claude.available?
     @recent_runs      = TriageStore.recent(limit: 20)
     @triage_result    = nil
+    @triage_topic     = sanitize_topic_filter(params['topic'])
     erb :triage
   end
 
@@ -956,9 +993,11 @@ class TechFeedReader < Sinatra::Base
   post '/triage' do
     @page_title       = 'Triage'
     @claude_available = Triage::Claude.available?
-    @triage_result    = Triage::Claude.run
+    @triage_topic     = sanitize_topic_filter(params['topic'])
+    @triage_result    = Triage::Claude.run(topic: @triage_topic)
     AppLogger.info('triage_manual_trigger',
                    status:        @triage_result.status,
+                   topic:         @triage_topic,
                    unread_count:  @triage_result.unread_count,
                    must_read:     @triage_result.must_read.to_a.length,
                    optional:      @triage_result.optional.to_a.length,
