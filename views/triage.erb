@@ -197,3 +197,8 @@
     </table>
   </section>
 <% end %>
+
+<%# Triage::Claude.run is a synchronous 10–30s Claude API call. Disable
+    the submit button + swap its label on submit so the user knows the
+    request is in flight (the form still submits normally — no fetch). %>
+<script src="/triage-form.js?v=<%= asset_mtime('public/triage-form.js') %>"></script>
