@@ -1,0 +1,120 @@
+<%# Public about page. Longer-form companion to home.erb. %>
+
+<div class="page-header">
+  <div>
+    <h2>About Tech Feed Reader</h2>
+    <p class="subtitle">
+      A self-hosted RSS reader that ranks, summarizes, and triages your
+      feed for you — built single-user-first.
+    </p>
+  </div>
+</div>
+
+<section class="about-section">
+  <h3>Why this exists</h3>
+  <p>
+    Most people who read news online spend an hour a day swivel-chairing —
+    Hacker News, then The Verge, then Lobsters, then five team-specific
+    blogs, then a podcast app, then back to the top because "did I check
+    that one yet?". The platforms call this <em>engagement</em>. It's just
+    lost time.
+  </p>
+  <p>
+    Algorithmic feeds (Twitter/X, Reddit, TikTok) solve part of the
+    swivel-chair problem by aggregating, but they swap one cost for
+    another: <em>they</em> decide what you see, optimised for the
+    platform's engagement metrics, not yours. Your data leaves your
+    machine. Your attention is sold.
+  </p>
+  <p>
+    Tech Feed Reader is the third option: aggregate everything <em>you</em>
+    chose to follow, in <em>your</em> order, on <em>your</em> machine. Use
+    AI to do the boring work — summarising, ranking, triaging — but never
+    to decide what's important. That stays with you.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>The anti-swivel-chair argument</h3>
+  <p>
+    The default RSS-reader UX (Feedly, NewsBlur) shows you every unread
+    item in chronological order. With 50 feeds, that's a 200-item list at
+    8am every day. You either:
+  </p>
+  <ul>
+    <li>Mark it all as read (the firehose problem)</li>
+    <li>Skim every title and click into 10–15% (the time problem)</li>
+    <li>Just stop using it (most people)</li>
+  </ul>
+  <p>
+    This app's answer:
+  </p>
+  <ol>
+    <li>
+      <strong>Personal ranking.</strong> The For You sort scores every
+      article against your bookmarks, thumbs-ups, and active reading time.
+      Sort by relevance, not chronology.
+    </li>
+    <li>
+      <strong>AI triage.</strong> Once a night Claude reads your unread
+      queue plus a sample of your positive + negative corpus and emits
+      three groups: must-read, optional, skip. With rationales.
+    </li>
+    <li>
+      <strong>Summaries inline.</strong> Every article gets an extractive
+      summary at import time. One click adds a Claude summary cached on
+      the row. Skim mode hides the noise.
+    </li>
+    <li>
+      <strong>Skip the swipe.</strong> Bulk-action checkboxes; mute rules
+      for keywords / authors / feeds; archive what you'll never get to.
+    </li>
+  </ol>
+</section>
+
+<section class="about-section">
+  <h3>How it works</h3>
+  <ul>
+    <li><strong>Ingest:</strong> a 10-minute cron pulls every subscribed feed via Ruby's <code>FeedParser</code>; HN/Lobsters teasers fall back to a readability fetch.</li>
+    <li><strong>Storage:</strong> SQLite with FTS5 for full-text search, WAL mode for concurrent reads. One file at <code>data/app.db</code>. No external services required.</li>
+    <li><strong>Ranking:</strong> a simple cosine-overlap score against your positive/negative corpus, plus a recency factor and per-feed weight that adapts from your engagement.</li>
+    <li><strong>Summaries:</strong> extractive (TextRank) at import, optional Claude (Sonnet 4.6) on demand. Cached so re-visits don't re-spend tokens.</li>
+    <li><strong>Triage:</strong> Claude reads up to 30 unread + 20 corpus exemplars per topic. Three runs nightly (cross-topic, technology-only, sports-only). Browse history at <a href="/triage">/triage</a>.</li>
+    <li><strong>Sports:</strong> ESPN's unofficial API supplies scores, standings, fixtures, tennis rankings. Calendar exports as <code>.ics</code> for Apple/Google Calendar subscription.</li>
+    <li><strong>Audio:</strong> a Hotwire Turbo + <code>data-turbo-permanent</code> mini-player at the bottom of every page survives navigation; podcast episodes share the same article queue with a 🎧 badge.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>What's different</h3>
+  <ul>
+    <li><strong>Single-user-first.</strong> No signup, no accounts, no auth boundary. The whole app trusts whoever opens it. (Multi-user is on the roadmap, but the simplicity comes first.)</li>
+    <li><strong>No analytics, no tracking, no third-party JS.</strong> The only outbound calls are the feeds you subscribed to + Claude's API for the summaries you opt into.</li>
+    <li><strong>Your data on your disk.</strong> Bookmark a backup of <code>data/app.db</code> and you're portable. <a href="/admin/backgrounds">Even the rotating background images</a> are yours to swap.</li>
+    <li><strong>AI as a tool, not the master.</strong> Claude summarises and triages. It doesn't decide what you read, what's "for you," or what gets boosted.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>Tech stack</h3>
+  <ul>
+    <li>Ruby 3.4.1 / Sinatra / ERB / RSpec</li>
+    <li>SQLite (FTS5, WAL mode)</li>
+    <li>Anthropic Claude Sonnet 4.6 for triage + summaries; Opus 4.7 for chat widget</li>
+    <li>Hotwired Turbo for SPA-style navigation; Chart.js for the Activity chart</li>
+    <li>Cron-driven background jobs via Make targets (<code>make refresh-feeds</code>, <code>make triage</code>, <code>make digest</code>, <code>make sync-sports</code>)</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>Get started</h3>
+  <p>
+    Already running? Open the <a href="/dashboard">dashboard</a> or browse
+    feeds at <a href="/feeds">/feeds</a>. New here? The README in the
+    repository covers <code>make install</code> and the seed-feed flow.
+  </p>
+  <div class="home-cta" style="margin-top:1rem">
+    <a class="btn-primary" href="/dashboard">Open dashboard &rarr;</a>
+    <a class="home-cta-secondary" href="/">Back to home &rarr;</a>
+  </div>
+</section>

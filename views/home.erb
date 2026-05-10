@@ -1,0 +1,143 @@
+<%# Public home / landing page. STUFF.md #13.
+    GET / shows this view to first-time visitors and sets a tfr_seen
+    cookie so subsequent visits jump straight to /dashboard. The link
+    to /dashboard below works for everyone — owners can bookmark it. %>
+
+<section class="home-hero">
+  <div class="home-hero-text">
+    <h1>Stop swivel-chairing between 50 sites.</h1>
+    <p class="home-tagline">
+      An RSS reader that <strong>ranks</strong>, <strong>summarizes</strong>,
+      and <strong>triages</strong> your feed for you. Self-hosted,
+      single-user, no analytics, no algorithmic agenda.
+    </p>
+    <div class="home-cta">
+      <a class="btn-primary" href="/dashboard">Open dashboard &rarr;</a>
+      <a class="home-cta-secondary" href="/about">What this is &rarr;</a>
+    </div>
+    <p class="home-hero-meta">
+      Free &middot; Open source &middot; Your data lives on your disk
+    </p>
+  </div>
+  <div class="home-hero-image">
+    <img src="/img/home/dashboard.png" alt="Dashboard view: article counts, activity chart, top feeds and tags." loading="lazy">
+  </div>
+</section>
+
+<section class="home-features">
+  <article class="home-feature">
+    <div class="home-feature-body">
+      <h2>🌐 One inbox for everything you read</h2>
+      <p>
+        Add a curated set of 25+ feeds in one click, or bulk-import OPML.
+        Tech, sports, and podcasts share a single ranked queue.
+        Stop opening twelve tabs every morning.
+      </p>
+    </div>
+  </article>
+
+  <article class="home-feature home-feature-with-image">
+    <div class="home-feature-body">
+      <h2>🎯 Ranked for you</h2>
+      <p>
+        Every article gets a personal score based on what you've bookmarked,
+        thumbs-upped, or skipped. The ranker honours your topic preferences —
+        sports feedback won't pollute your tech queue, and vice versa.
+        Sort: <code>?sort=relevance</code>.
+      </p>
+    </div>
+    <div class="home-feature-image">
+      <img src="/img/home/for-you.png" alt="Articles list sorted by personal relevance." loading="lazy">
+    </div>
+  </article>
+
+  <article class="home-feature home-feature-with-image">
+    <div class="home-feature-body">
+      <h2>🧠 AI-assisted triage</h2>
+      <p>
+        One Claude call (Sonnet 4.6) classifies every unread article into
+        <strong>Must read</strong>, <strong>Optional</strong>, or <strong>Skip</strong>,
+        with a one-sentence rationale that cites <em>your</em> past behaviour:
+        "matches your bookmarked Ruby work," "topic you've previously demoted."
+        Three runs nightly via cron — one per topic.
+      </p>
+    </div>
+    <div class="home-feature-image">
+      <img src="/img/home/triage.png" alt="AI triage page showing Must read / Optional / Skip groups with rationale." loading="lazy">
+    </div>
+  </article>
+
+  <article class="home-feature home-feature-with-image">
+    <div class="home-feature-body">
+      <h2>✍️ Summaries you can skim</h2>
+      <p>
+        Every article gets an extractive summary inline. One click adds a full
+        Claude summary cached on the row, so revisits don't re-spend tokens.
+        Skim mode hides the noise so you can clear 100 unread in minutes.
+      </p>
+    </div>
+    <div class="home-feature-image">
+      <img src="/img/home/digest.png" alt="Daily digest page with cached Claude summary at the top." loading="lazy">
+    </div>
+  </article>
+
+  <article class="home-feature home-feature-with-image">
+    <div class="home-feature-body">
+      <h2>🎧 Podcasts that follow you</h2>
+      <p>
+        A persistent mini-player at the bottom of every page keeps audio
+        playing as you navigate. Episodes appear in the same queue as
+        articles, with listened-percent + speed-control + skip-15s.
+      </p>
+    </div>
+    <div class="home-feature-image">
+      <img src="/img/home/podcasts.png" alt="Podcasts page with subscribed shows and recent episodes." loading="lazy">
+    </div>
+  </article>
+
+  <article class="home-feature home-feature-with-image">
+    <div class="home-feature-body">
+      <h2>🏈 Sports — same engine, different domain</h2>
+      <p>
+        Scores, league standings, calendar export (iCal subscribe), and follows
+        for teams + individual tennis players. Articles mentioning your followed
+        entities surface on their detail page automatically.
+      </p>
+    </div>
+    <div class="home-feature-image">
+      <img src="/img/home/sports.png" alt="Sports landing page with score tiles and league sections." loading="lazy">
+    </div>
+  </article>
+</section>
+
+<section class="home-narrative">
+  <h2>Information comes to you, not the other way around.</h2>
+  <p>
+    Most of us spend an hour a day swivel-chairing — Hacker News, then The Verge,
+    then Lobsters, then five team-specific blogs, then a podcast app, then back
+    to the top because "did I check that one yet?". The platforms call this
+    <em>engagement</em>. It's just lost time.
+  </p>
+  <p>
+    Tech Feed Reader inverts that. You declare what you care about. The server
+    pulls every feed every ten minutes. Claude triages overnight. The ranker
+    learns from your clicks. By the time you open the dashboard, the work is
+    done — you read, you skim, you skip.
+  </p>
+  <p>
+    The algorithm works for <strong>you</strong>, not against you. Nothing is
+    optimised for retention. Nothing is monetised. There's no feed of someone
+    else's choosing.
+  </p>
+</section>
+
+<section class="home-final-cta">
+  <h2>Open it up.</h2>
+  <p>
+    The dashboard is one click away. Or read about the philosophy first.
+  </p>
+  <div class="home-cta">
+    <a class="btn-primary" href="/dashboard">Open dashboard &rarr;</a>
+    <a class="home-cta-secondary" href="/about">About this project &rarr;</a>
+  </div>
+</section>
