@@ -18,7 +18,8 @@ module FeedCatalog
   # /articles?topic= filters and the catalog UI's section split.
   TOPICS = {
     technology: 'Technology',
-    sports:     'Sports'
+    sports:     'Sports',
+    nature:     'Nature & Documentary'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -37,7 +38,9 @@ module FeedCatalog
     nba:         'NBA',
     soccer:      'Soccer (MLS / international)',
     rugby:       'Rugby',
-    tennis:      'Tennis'
+    tennis:      'Tennis',
+    # STUFF.md #16 — nature / documentary YouTube channels
+    youtube_nature: 'Nature & wildlife (YouTube)'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -56,7 +59,8 @@ module FeedCatalog
     nba:         :sports,
     soccer:      :sports,
     rugby:       :sports,
-    tennis:      :sports
+    tennis:      :sports,
+    youtube_nature: :nature
   }.freeze
 
   CATALOG = [
@@ -291,7 +295,36 @@ module FeedCatalog
     # Tennis
     { url: 'https://feeds.acast.com/public/shows/thetennispodcast', title: 'The Tennis Podcast', category: :tennis,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'David Law (BBC) + Catherine Whitaker (Eurosport) covering ATP, WTA, and all four Grand Slams.' }
+      blurb: 'David Law (BBC) + Catherine Whitaker (Eurosport) covering ATP, WTA, and all four Grand Slams.' },
+
+    # ---- Nature & Documentary (YouTube) -------------------------------
+    # STUFF.md #16. YouTube exposes a standard Atom feed per channel at
+    # /feeds/videos.xml?channel_id=UC... — FeedParser handles this with
+    # no special-casing. Channel IDs verified via curl 2026-05-10.
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCwmZiChSryoWQCZMIQezgTg',
+      title: 'BBC Earth (YouTube)', category: :youtube_nature,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC Earth — Planet Earth / Frozen Planet / Blue Planet / Life clips and full segments.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCdsOTr6SmDrxuWE7sJFrkhQ',
+      title: 'BBC Earth Science (YouTube)', category: :youtube_nature,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC Earth Science — geology, weather, and the planet itself.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCpVm7bg6pXKo1Pr6k5kxG9A',
+      title: 'National Geographic (YouTube)', category: :youtube_nature,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Nat Geo — wildlife, exploration, science, and culture from the magazine + TV network.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCkzTTu69cSxxab41OHrBfvQ',
+      title: 'Nature on PBS (YouTube)', category: :youtube_nature,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'PBS Nature — long-form wildlife documentaries, full episodes, and behind-the-scenes.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCG5_BraUMNcluZPZ__oOeKg',
+      title: 'Natural World Facts (YouTube)', category: :youtube_nature,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Natural World Facts — short, well-narrated wildlife / biology essays.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCQtW2oz8ec8pHjjxawujNjg',
+      title: 'Free Documentary - Nature (YouTube)', category: :youtube_nature,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Free Documentary (Nature channel) — full-length nature documentaries reposted with permission.' }
   ].freeze
 
   module_function

@@ -619,6 +619,44 @@ class TechFeedReader < Sinatra::Base
     erb :about
   end
 
+  # STUFF.md #17 — "What's On Today". Top-level surface that pulls
+  # from data we already track and filters to *today*, personalized
+  # by the user's follows + For You ranker. Four sections:
+  #   • Sports — fixtures for followed teams in the next 24h
+  #   • To read — articles published today, ranked by For You,
+  #     excluding podcasts + nature/YouTube videos
+  #   • To listen — podcast episodes published today
+  #   • To watch — YouTube videos (feed.topic = 'nature') today
+  # Section is hidden when its bucket is empty so the page doesn't
+  # render N empty cards for a slow news day.
+  get '/whats-on' do
+    @page_title = "What's On Today"
+    today       = Date.today
+    start_of_day = Time.new(today.year, today.month, today.day, 0, 0, 0).utc
+
+    @today_matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 1)
+
+    scored = Recommendation::ForYou.score_window(state: :all, limit: 200, offset: 0)
+    todays = scored.select { |a| a['published_at'].to_s >= start_of_day.iso8601 }
+
+    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+
+    @today_listening = todays.select { |a| a['audio_url'].to_s.size.positive? }.first(10)
+    nature_today, non_nature = todays.reject { |a| a['audio_url'].to_s.size.positive? }
+                                     .partition { |a| (@feeds_by_id[a['feed_id']] || {})['topic'] == 'nature' }
+    @today_watching = nature_today.first(10)
+    @today_reading  = non_nature.first(10)
+
+    @summaries_by_article_id = SummaryStore.find_for_ids(
+      (@today_reading + @today_listening + @today_watching).map { |a| a['id'] }
+    )
+    @teams_by_id   = build_teams_by_id_for_matches(@today_matches)
+    @leagues_by_id = build_leagues_by_id_for_matches(@today_matches)
+    @nothing_today = @today_matches.empty? && @today_reading.empty? &&
+                     @today_listening.empty? && @today_watching.empty?
+    erb :whats_on
+  end
+
   get '/dashboard' do
     @page_title       = 'Dashboard'
     @articles         = ArticlesStore.recent(limit: 20, state: :unread)

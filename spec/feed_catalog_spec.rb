@@ -3,8 +3,8 @@ require_relative '../app/feed_catalog'
 
 RSpec.describe FeedCatalog do
   describe '.all' do
-    it 'returns 54 curated entries (25 tech RSS + 15 tech podcasts + 8 sports news + 6 sports podcasts)' do
-      expect(FeedCatalog.all.length).to eq(54)
+    it 'returns 60 curated entries (25 tech RSS + 15 tech podcasts + 8 sports news + 6 sports podcasts + 6 nature/YouTube)' do
+      expect(FeedCatalog.all.length).to eq(60)
     end
 
     it 'every entry has the required keys' do
