@@ -195,14 +195,33 @@ In the header, the TITLE card link should link to the link / with a refresh.
 
 **Shipped.** The header "Tech Feed Reader" title is now a link to `/` with `data-turbo="false"` so the click does a full document refresh (rather than a Turbo SPA swap). The `/` route stays at the same URL but branches its hero based on `ReadStateStore.any_activity?` — first-time visitors see the original "Stop swivel-chairing" pitch; returning users (anyone with a row in `read_state`) see a "Welcome back" hero with their unread / bookmarked / article counts, last-triage timestamp, top-3 unread picks, and CTAs into `/articles?sort=relevance` + `/dashboard`. The six feature cards stay below either hero so the vision pillars are always visible. No cookie used — the DB probe is the source of truth, and once auth ships in Phase A1 it becomes "is signed-in user."
 
-## [ ] 15; The Links Header
+## [x] 15; The Links Header
 
 Can you links how to links in the header can be better for UI/UX. There are too many.
 
-## [ ] YouTube
+**Shipped.** Nav consolidated from 11 flat links to **6 visible + 2 dropdowns + a search icon**: `Dashboard | What's On | Articles | Podcasts | Sports | AI ▾ | Manage ▾ | 🔍 | Admin`. **AI ▾** holds Topics / Triage / Digests; **Manage ▾** holds Feeds / Tags. Dropdowns are pure CSS via `:hover` and `:focus-within` (no JS needed; keyboard-accessible). Active highlighting propagates: visiting `/triage` lights up the AI parent; visiting `/feeds` lights up the Manage parent.
+
+## [x] 16. YouTube
 
 I love YouTube and have a subscription. And about how to use subdcribitions? I love natture hows by BBC Activity (last 7 days). Dadiv Abbenborough.
 
-## [ ] What's on the World Today
+**Shipped.** YouTube exposes a standard Atom feed per channel at `https://www.youtube.com/feeds/videos.xml?channel_id=UC...`, which our existing `FeedParser` handles with no special-casing. New `:nature` topic and `:youtube_nature` category in `FeedCatalog`, seeded with six verified channels: **BBC Earth**, **BBC Earth Science**, **National Geographic**, **Nature on PBS**, **Natural World Facts**, and **Free Documentary - Nature**. Channel IDs verified live via `curl` against each `.../videos.xml` URL on 2026-05-10. You can browse all six on `/feeds` under the new "Nature & Documentary" topic and add more channel URLs the same way. Once subscribed, videos flow into `/articles` like any other feed and surface in the new "To watch today" section on `/whats-on` (item #17).
+
+## [x] 17. What's on the World Today
 
 As we are expanding to at world wide audience of Sports Fans. Can we add a top level section, "whats on" that listens sports, legends, etc. that are personalized to the user.
+
+**Shipped (v1, sans "legends").** New top-level `/whats-on` page pulls from data we already track and filters to *today*, personalized by the user's follows + the For You ranker. Four sections, each only rendered when it has rows: 🏟 Sports today (fixtures for followed teams in the next 24h), 📰 To read today (articles ranked by For You), 🎧 To listen today (podcast episodes published today), 📺 To watch today (articles from `topic = 'nature'` feeds — i.e. the YouTube channels from item #16). Empty-state copy when nothing's happening. Top-level nav link added between **Dashboard** and **Articles** in the consolidated header (item #15). "Sports legends" deferred — once we have a clear data source (anniversaries via Wikipedia? a hand-built list?) we'll layer it in.
+
+## 18 [ ] 18. Development areas
+
+Can we add areas / topics for:
+
+- Cyber: Cyber security
+- development: software development
+- mythos: Claudus Mythos model
+
+### [ ] Links on the Architeves Page
+
+For some pages, they are relative. Check and make relaive to the realiative spot.
+

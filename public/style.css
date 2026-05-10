@@ -58,6 +58,103 @@ nav a {
 }
 nav a:hover { background: #e8e8ed; }
 nav a.active { color: #0071e3; font-weight: 600; }
+
+/* STUFF.md #15 — pure-CSS dropdowns (AI ▾ / Manage ▾). Open on
+   hover OR keyboard focus-within so the menu is reachable without
+   JS and accessible to keyboard users. */
+.nav-dropdown { position: relative; display: inline-block; }
+.nav-dropdown-trigger {
+  background: transparent;
+  border: none;
+  color: #515154;
+  font-size: 0.92rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: background 0.15s;
+}
+.nav-dropdown-trigger:hover { background: #e8e8ed; }
+.nav-dropdown.active > .nav-dropdown-trigger { color: #0071e3; font-weight: 600; }
+.nav-dropdown-caret { font-size: 0.7rem; opacity: 0.7; }
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 8rem;
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 0.35rem;
+  display: none;
+  z-index: 200;
+}
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu { display: block; }
+.nav-dropdown-menu a {
+  display: block;
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  color: #1d1d1f;
+  white-space: nowrap;
+}
+.nav-dropdown-menu a:hover { background: #f2f2f7; }
+html.dark .nav-dropdown-trigger { color: #c7c7cc; }
+html.dark .nav-dropdown-trigger:hover { background: #2c2c2e; }
+html.dark .nav-dropdown-menu { background: #1c1c1e; border-color: #2c2c2e; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+html.dark .nav-dropdown-menu a { color: #f5f5f7; }
+html.dark .nav-dropdown-menu a:hover { background: #2c2c2e; }
+html.dark .nav-dropdown.active > .nav-dropdown-trigger { color: #0a84ff; }
+
+/* Search icon button — same visual size as the bus icon. */
+nav a.nav-search-icon {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  color: #515154;
+}
+nav a.nav-search-icon:hover { background: #e8e8ed; color: #0071e3; }
+nav a.nav-search-icon.active { color: #0071e3; }
+html.dark nav a.nav-search-icon { color: #c7c7cc; }
+html.dark nav a.nav-search-icon:hover { background: #2c2c2e; color: #0a84ff; }
+html.dark nav a.nav-search-icon.active { color: #0a84ff; }
+
+/* STUFF.md #17 — /whats-on page. Sections stack; section count chips
+   reuse the muted small style from elsewhere; matches list is a
+   compact time/teams/league row. */
+.whats-on-section { margin: 1.5rem 0; }
+.whats-on-count { font-size: 0.85rem; font-weight: normal; }
+.whats-on-foot { margin-top: 1rem; font-size: 0.88rem; }
+.whats-on-matches { list-style: none; padding: 0; margin: 0; }
+.whats-on-match {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid #e5e5ea;
+}
+html.dark .whats-on-match { border-bottom-color: #2c2c2e; }
+.whats-on-match:last-child { border-bottom: none; }
+.whats-on-time { min-width: 5rem; font-weight: 600; color: #1d1d1f; }
+html.dark .whats-on-time { color: #f5f5f7; }
+.whats-on-matchup a { color: inherit; text-decoration: none; font-weight: 500; }
+.whats-on-matchup a:hover { color: #0071e3; }
+html.dark .whats-on-matchup a:hover { color: #0a84ff; }
+.whats-on-league { font-size: 0.85rem; }
+.live-badge {
+  background: #ff3b30;
+  color: #fff;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
 button#theme-toggle {
   padding: 0.35rem 0.9rem;
   border: 1px solid #d2d2d7;

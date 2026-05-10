@@ -36,6 +36,17 @@
         so the click does a full document refresh (Turbo would otherwise
         do an SPA-style swap that doesn't always feel like "go home"). %>
     <a class="logo" href="/" data-turbo="false" title="Home">Tech Feed Reader</a>
+    <%# STUFF.md #15 — nav consolidated from 11 flat links to 6 visible
+        + 2 dropdowns + a search icon. AI ▾ holds Topics/Triage/Digests
+        (the AI-driven reading surfaces); Manage ▾ holds Feeds/Tags
+        (library admin). Dropdowns are pure-CSS via :focus-within /
+        :hover so they work without JS. %>
+    <%
+      ai_paths      = %w[/topics /triage /digests]
+      manage_paths  = %w[/feeds /tags]
+      ai_active     = ai_paths.any?     { |p| request.path_info == p || request.path_info.start_with?(p + '/') }
+      manage_active = manage_paths.any? { |p| request.path_info == p }
+    %>
     <nav>
       <%# data-turbo="false" — /dashboard initialises a Chart.js canvas
           via an inline script. Turbo's body-replacement breaks the
@@ -43,16 +54,39 @@
           turbo:load fallback wasn't enough). Same opt-out we use on
           the /triage forms; full reload is the right cost here. %>
       <a href="/dashboard" data-turbo="false" class="<%= %w[/ /dashboard].include?(request.path_info) ? 'active' : '' %>">Dashboard</a>
-      <a href="/topics"    class="<%= request.path_info == '/topics'   ? 'active' : '' %>">Topics</a>
+      <%# STUFF.md #17 — top-level "What's On" surface. %>
+      <a href="/whats-on"  class="<%= request.path_info == '/whats-on' ? 'active' : '' %>">What's On</a>
       <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
       <a href="/podcasts"  class="<%= request.path_info == '/podcasts' ? 'active' : '' %>">Podcasts</a>
       <a href="/sports"    class="<%= request.path_info == '/sports'   ? 'active' : '' %>">Sports</a>
-      <a href="/digests"   class="<%= request.path_info.start_with?('/digests') ? 'active' : '' %>">Digests</a>
-      <a href="/triage"    class="<%= request.path_info == '/triage'   ? 'active' : '' %>">Triage</a>
-      <a href="/feeds"     class="<%= request.path_info == '/feeds'    ? 'active' : '' %>">Feeds</a>
-      <a href="/tags"      class="<%= request.path_info == '/tags'     ? 'active' : '' %>">Tags</a>
-      <a href="/search"    class="<%= request.path_info == '/search'   ? 'active' : '' %>">Search</a>
-      <a href="/admin"     class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
+
+      <div class="nav-dropdown <%= 'active' if ai_active %>">
+        <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">AI <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>
+        <div class="nav-dropdown-menu" role="menu">
+          <a href="/topics"  class="<%= 'active' if request.path_info == '/topics' || request.path_info.start_with?('/topics/') %>" role="menuitem">Topics</a>
+          <a href="/triage"  class="<%= 'active' if request.path_info == '/triage' || request.path_info.start_with?('/triage/') %>" role="menuitem">Triage</a>
+          <a href="/digests" class="<%= 'active' if request.path_info.start_with?('/digests') %>" role="menuitem">Digests</a>
+        </div>
+      </div>
+
+      <div class="nav-dropdown <%= 'active' if manage_active %>">
+        <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">Manage <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>
+        <div class="nav-dropdown-menu" role="menu">
+          <a href="/feeds" class="<%= 'active' if request.path_info == '/feeds' %>" role="menuitem">Feeds</a>
+          <a href="/tags"  class="<%= 'active' if request.path_info == '/tags'  %>" role="menuitem">Tags</a>
+        </div>
+      </div>
+
+      <a href="/search" class="nav-search-icon <%= 'active' if request.path_info == '/search' %>"
+         title="Search" aria-label="Search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </a>
+      <a href="/admin" class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
     </nav>
     <a href="/bus" class="header-icon-btn <%= 'active' if request.path_info == '/bus' %>"
        title="Bus mode — recent podcast episodes short enough for the commute"
