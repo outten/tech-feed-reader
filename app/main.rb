@@ -590,21 +590,14 @@ class TechFeedReader < Sinatra::Base
     Prometheus::Client::Formats::Text.marshal(Metrics::REGISTRY)
   end
 
-  # STUFF.md #13 — public home page for first-time visitors. The
-  # tfr_seen cookie flips the redirect to /dashboard for everyone
-  # who's been here before, so the existing single-user owner keeps
-  # their muscle memory ("type / → dashboard") after the first
-  # landing. When real auth ships, the cookie becomes "is logged in"
-  # and the same redirect logic stands.
+  # STUFF.md #13 — public home page. Always render the marketing
+  # surface for newbies; existing users navigate to /dashboard via
+  # the nav link or a bookmark. (Earlier cookie-redirect dropped —
+  # honour first-time visitors over returning-user muscle memory.)
   get '/' do
-    if request.cookies['tfr_seen']
-      redirect '/dashboard'
-    else
-      response.set_cookie('tfr_seen', value: '1', path: '/', max_age: 60 * 60 * 24 * 365 * 2, httponly: true, same_site: :lax)
-      @page_title = 'Tech Feed Reader'
-      @public_page = true
-      erb :home
-    end
+    @page_title  = 'Tech Feed Reader'
+    @public_page = true
+    erb :home
   end
 
   get '/about' do
