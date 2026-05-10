@@ -222,6 +222,13 @@ RSpec.describe '/triage routes' do
     ensure
       ENV.delete('ANTHROPIC_API_KEY')
     end
+
+    # Loading state: disable button + swap text on submit so the user
+    # sees feedback during the 10-30s Claude call.
+    it 'wires the triage-form.js loading-state script' do
+      get '/triage'
+      expect(last_response.body).to match(%r{<script src="/triage-form\.js})
+    end
   end
 
   describe 'POST /triage' do
