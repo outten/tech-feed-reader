@@ -108,6 +108,22 @@ RSpec.describe 'dashboard charts' do
       expect(last_response.body).to include('Most active feeds')
     end
 
+    # Regression: the Activity chart was blank on Turbo Drive navigation
+    # and only painted after a hard refresh. The fix listens for
+    # turbo:load + destroys any prior Chart bound to the canvas before
+    # re-creating, mirroring public/chat-widget.js's pattern.
+    it 'wires turbo:load + destroy-prior-Chart so the chart re-paints on Turbo navigation' do
+      feed = FeedsStore.add(url: 'https://example.com/feed.rss')
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'a' * 12, title: 'x', url: 'https://example.com/a', author: nil,
+        published_at: Date.today.to_s + 'T12:00:00Z',
+        content_html: '<p>x</p>', content_text: 'x'
+      }])
+      get '/dashboard'
+      expect(last_response.body).to include("addEventListener('turbo:load'")
+      expect(last_response.body).to include('Chart.getChart')
+    end
+
     it 'omits the chart entirely when there are no articles' do
       get '/dashboard'
       expect(last_response.body).not_to include('id="dailyChart"')

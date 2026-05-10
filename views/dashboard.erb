@@ -140,38 +140,74 @@
   <script>
     (function () {
       const data = <%= @daily_counts.to_json %>;
-      const ctx  = document.getElementById('dailyChart');
-      if (!ctx || !window.Chart) return;
-      const isDark = document.documentElement.dataset.theme === 'dark';
-      const stroke = isDark ? '#0a84ff' : '#0071e3';
-      const grid   = isDark ? '#3a3a3c' : '#e5e5ea';
-      const muted  = isDark ? '#aeaeb2' : '#8e8e93';
 
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: data.map(d => d.day.slice(5)),  // MM-DD
-          datasets: [{
-            label: 'Articles',
-            data:  data.map(d => d.count),
-            borderColor: stroke,
-            backgroundColor: stroke + '22',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 0,
-            pointHoverRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
-            y: { grid: { color: grid }, ticks: { color: muted, precision: 0 }, beginAtZero: true }
+      // Turbo Drive replaces the document on same-app navigation but
+      // does not always re-run inline body scripts cleanly — and any
+      // existing Chart instance bound to the canvas survives in JS
+      // memory. Without this, navigating into /dashboard from another
+      // page leaves the canvas blank until a hard refresh forces a
+      // full document load. Pattern mirrors public/chat-widget.js.
+      function initDashboardChart() {
+        const ctx = document.getElementById('dailyChart');
+        if (!ctx || !window.Chart) return;
+        // Destroy any prior Chart bound to this canvas — guards
+        // against duplicate-instance errors on Turbo re-render.
+        const prior = Chart.getChart(ctx);
+        if (prior) prior.destroy();
+
+        const isDark = document.documentElement.dataset.theme === 'dark';
+        const stroke = isDark ? '#0a84ff' : '#0071e3';
+        const grid   = isDark ? '#3a3a3c' : '#e5e5ea';
+        const muted  = isDark ? '#aeaeb2' : '#8e8e93';
+
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: data.map(d => d.day.slice(5)),  // MM-DD
+            datasets: [{
+              label: 'Articles',
+              data:  data.map(d => d.count),
+              borderColor: stroke,
+              backgroundColor: stroke + '22',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              pointHoverRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+              y: { grid: { color: grid }, ticks: { color: muted, precision: 0 }, beginAtZero: true }
+            }
           }
-        }
-      });
+        });
+      }
+
+      // Expose the freshly-closured init on window so a single
+      // persistent turbo:load listener can always call the latest
+      // version (each Turbo nav re-runs this IIFE with new data).
+      window.__initDashboardChart = initDashboardChart;
+
+      // First load: run immediately so the chart paints without a
+      // flash. Subsequent Turbo navs: the persistent listener below
+      // re-runs the (then-current) init on every turbo:load.
+      initDashboardChart();
+
+      // Register the turbo:load listener once. Turbo replaces <body>
+      // on every navigation, so this IIFE re-runs each time we land
+      // on /dashboard — without the guard, listeners would accumulate.
+      if (!window.__dashboardChartListener) {
+        window.__dashboardChartListener = true;
+        document.addEventListener('turbo:load', function () {
+          if (typeof window.__initDashboardChart === 'function') {
+            window.__initDashboardChart();
+          }
+        });
+      }
     })();
   </script>
 <% end %>
