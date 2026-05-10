@@ -26,8 +26,8 @@ module TriageStore
         generated_at, unread_count, model,
         must_read, optional, skip,
         status, error, latency_ms,
-        input_tokens, output_tokens, topic
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        input_tokens, output_tokens, topic, raw
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     SQL
     db.execute(sql, [
       Time.now.utc.iso8601,
@@ -41,7 +41,8 @@ module TriageStore
       result.latency_ms,
       result.input_tokens,
       result.output_tokens,
-      result.respond_to?(:topic) ? result.topic : nil
+      result.respond_to?(:topic) ? result.topic : nil,
+      result.respond_to?(:raw) ? result.raw : nil
     ])
     db.last_insert_row_id
   end
