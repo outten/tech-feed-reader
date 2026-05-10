@@ -329,6 +329,99 @@ Following a player or team only pinned them to their topical landing page; nothi
 
 ---
 
+## Multi-user — Phase A1: Auth wall (Microsoft Entra ID SSO)
+
+**Status: `proposed`** — awaiting Azure app registration before any code
+
+The app is single-user today. Goal: open it to the rest of the company. Phase A1 ships the auth wall — Entra ID single-sign-on, a `users` table, sessions, login/logout — but **does not yet split per-user data**. All existing data stays shared; the first person to sign in becomes user 1 and inherits Todd's bookmarks/state. This lets us land auth as one focused PR and start Phase A2 (per-user data split) only after the auth wall has been kicked in real use.
+
+### What ships in the Phase A1 PR
+
+- Migration `019_users.sql` — `users (id, azure_oid UNIQUE, email, display_name, created_at, last_seen_at)` + index on `azure_oid`.
+- `app/users_store.rb` — `find_or_create_by_azure(oid:, email:, name:)`, `find(id)`.
+- `app/auth.rb` — OmniAuth setup, helpers (`current_user`, `signed_in?`, `require_signed_in!`).
+- `views/sign_in.erb` — "Sign in with Microsoft" page.
+- Layout header: "Signed in as {name} ▾" with logout link.
+
+**Routes**
+- `GET /auth/entra-id` — OmniAuth handles internally; kicks off OAuth.
+- `GET /auth/entra-id/callback` — receives Azure response, finds-or-creates user, sets `session[:user_id]`, redirects to original requested path.
+- `GET /auth/failure` — error display.
+- `POST /sign-out` — clears session.
+- `GET /sign-in` — landing if a protected page bounces here.
+
+**Auth wall (before-filter)**
+- Public allowlist: `/`, `/about`, `/health`, `/metrics`, `/auth/*`, `/sign-in`, `/sign-out`, static assets.
+- Everything else: redirect to `/sign-in?return_to=<original>` if not signed in.
+
+**Optional gating**
+- `ALLOWED_EMAIL_DOMAINS` env var (e.g. `yourcompany.com`): if set, reject sign-ins outside that allowlist with a friendly "not allowed" page.
+
+### Library + tooling
+
+| Concern | Choice | Why |
+|---|---|---|
+| OAuth/OIDC client | [`omniauth-entra-id`](https://github.com/RIPAGlobal/omniauth-entra-id) | Maintained successor to `omniauth-azure-activedirectory-v2`; standard Ruby OmniAuth integration. |
+| Session storage | `Rack::Session::Cookie` (signed, encrypted) | Already used by `Sidekiq::Web` in the codebase; no new infra. |
+| Secrets in dev | `dotenv` gem + the existing `.env` (already gitignored) | Loads only in `RACK_ENV=development|test`; prod reads from real env vars. |
+| CSRF | `rack-protection` (already pulled in by Sinatra) | Confirm the auth callback exempts CSRF for the OAuth handshake. |
+
+`.env` during dev:
+
+```
+AZURE_TENANT_ID=...
+AZURE_CLIENT_ID=...
+AZURE_CLIENT_SECRET=...
+SESSION_SECRET=<64-byte hex>
+ALLOWED_EMAIL_DOMAINS=yourcompany.com   # optional allow-list
+```
+
+`.credentials` (existing) keeps `ANTHROPIC_API_KEY` — no migration needed.
+
+### Decisions (locked 2026-05-10)
+
+| Question | Choice |
+|---|---|
+| Tenant scope | **Single-tenant** — only employees in the company's Entra directory |
+| Email-domain allow-list | **Yes** — `ALLOWED_EMAIL_DOMAINS` enforced as belt-and-suspenders |
+| First-time-user behaviour | **Auto-create user row + sign in** — first user (Todd) becomes user_id=1 and inherits existing single-user data |
+
+### Azure-side prerequisites (user to set up)
+
+1. App registration in Entra admin center
+   - Name: "Tech Feed Reader"
+   - Supported accounts: "Accounts in this organizational directory only" (single tenant)
+   - Redirect URI: `http://localhost:4567/auth/entra-id/callback` (add prod URL later)
+2. Permissions: `User.Read` (delegated, default) — gets the user's email + display name.
+3. Generate a client secret, copy it (only shown once).
+4. Capture: **Tenant ID**, **Application (client) ID**, **Client secret**, **allow-list domain**.
+
+Drop into `.env` (a `.env.example` template ships in the PR).
+
+### What Phase A1 does NOT do (intentional deferral)
+
+- **No per-user data scoping** — every existing route still sees the shared "owner" bookmarks/feeds/tags. This is the auth-wall model: gated, but everyone signed-in shares one account state.
+- **No admin pages, no user management UI, no roles** — flat permissions; everyone signed in is "a user."
+- **No multi-tenant isolation** — single Entra tenant, single app registration.
+
+---
+
+## Multi-user — Phase A2: per-user data split
+
+**Status: `not started`** — depends on Phase A1 shipping first
+
+Per-user data split, ordered by user impact. Each is its own PR.
+
+1. **`read_state` + `feedback`** → `user_id` column, scope every read in `ReadStateStore` / `FeedbackStore`. Backfill existing rows to `user_id = 1`.
+2. **`bookmarks`, `tags`, `mute_rules`** → same pattern.
+3. **`sports_follows`, `chat_history`, `triages`** → same.
+4. **For You corpus + Triage** → already filters by feedback signals; once #1 lands, these inherit per-user automatically.
+5. **`feeds`** → trickier. Either: (a) shared catalog + new `user_feed_subscriptions` table, or (b) duplicate per user. (a) is the right answer but a bigger refactor.
+
+None of these should land before Phase A1 is in.
+
+---
+
 ## Out of scope for the sports rollout (intentionally)
 
 Recording the things we discussed and decided NOT to do, so the next reader doesn't think they're oversights:
