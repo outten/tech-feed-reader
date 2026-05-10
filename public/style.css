@@ -44,7 +44,10 @@ body > header {
   font-weight: 600;
   color: #1d1d1f;
   margin-right: auto;
+  text-decoration: none;
 }
+.logo:hover { color: #0071e3; }
+html.dark .logo:hover { color: #0a84ff; }
 nav a {
   text-decoration: none;
   color: #515154;
@@ -3047,6 +3050,25 @@ html.dark .home-hero-meta { color: #aeaeb2; }
   border: 1px solid #e5e5ea;
 }
 html.dark .home-hero-image img { border-color: #2c2c2e; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+
+/* STUFF.md #14 — top-picks list under the personalized hero. */
+.home-hero-picks {
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 0 0;
+  border-top: 1px solid #e5e5ea;
+  padding-top: 1rem;
+}
+html.dark .home-hero-picks { border-top-color: #2c2c2e; }
+.home-hero-picks li { margin: 0.4rem 0; line-height: 1.4; }
+.home-hero-picks a {
+  color: #1d1d1f;
+  text-decoration: none;
+  font-weight: 500;
+}
+html.dark .home-hero-picks a { color: #f5f5f7; }
+.home-hero-picks a:hover { color: #0071e3; }
+html.dark .home-hero-picks a:hover { color: #0a84ff; }
 
 /* Feature grid — alternating image/text layout. The first card has
    no image (just text) so it renders full-width as an intro. */

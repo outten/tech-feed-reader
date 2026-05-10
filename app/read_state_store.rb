@@ -85,6 +85,14 @@ module ReadStateStore
     db.execute('SELECT COUNT(*) AS c FROM read_state WHERE bookmarked = 1').first['c']
   end
 
+  # STUFF.md #14 — fast probe for "has the user actually used this app
+  # at all?". Any read_state row means at least one article was opened,
+  # bookmarked, archived, or thumbed. Used by GET / to switch the home
+  # page from the marketing pitch to a personalized "Welcome back" hero.
+  def any_activity?
+    !db.execute('SELECT 1 FROM read_state LIMIT 1').first.nil?
+  end
+
   class << self
     private
 
