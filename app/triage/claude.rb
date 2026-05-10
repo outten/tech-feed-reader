@@ -53,6 +53,9 @@ module Triage
       - Rationale is one short sentence, max 15 words, citing the corpus
         signal that drove the classification ("matches your bookmarked
         Ruby work" / "topic you've previously demoted" / etc.).
+      - Output exactly one JSON object. Do not retry, restart, or write
+        a "let me redo this" follow-up — finalize the JSON and stop. Do
+        not include any text before or after the JSON object.
     PROMPT
 
     Result = Struct.new(:status, :must_read, :optional, :skip, :raw, :model,
@@ -166,41 +169,35 @@ module Triage
       lines.join("\n")
     end
 
-    # Defensive parser. Tries strict JSON first, then strips markdown
-    # fences (```json ... ```), then salvages by finding the first {
-    # and last }. Returns a hash with :must_read/:optional/:skip arrays
-    # and a :fallback flag set true when we couldn't parse and had to
-    # synthesize a default.
+    # Defensive parser. Tries, in order:
+    #   1. Strict JSON.parse on the whole string (happy path).
+    #   2. Strip leading/trailing ```json fences and try again.
+    #   3. Extract every brace-balanced top-level {...} block via
+    #      extract_json_candidates and try each from LAST to FIRST.
+    #      Last-first matters: when Sonnet 4.6 second-guesses itself
+    #      mid-response ("Wait, I made errors. Let me redo:" + a
+    #      second JSON block), the corrected output is the last block.
+    #   4. Fall through to a "skip-all" Result with status :parse_error.
+    #
+    # Returns a hash with :must_read/:optional/:skip arrays and a
+    # :fallback flag set true when we couldn't parse.
     def parse_response(raw, unread)
       cleaned = raw.dup
       cleaned.sub!(/\A```(?:json)?\s*/, '')
       cleaned.sub!(/\s*```\s*\z/, '')
-      data = JSON.parse(cleaned)
-      groups = %w[must_read optional skip].each_with_object({}) do |key, h|
-        h[key.to_sym] = Array(data[key]).map do |entry|
-          next unless entry.is_a?(Hash)
-          uid = entry['uid'].to_s
-          { 'uid' => uid, 'rationale' => entry['rationale'].to_s }
-        end.compact
-      end
-      groups[:fallback] = false
-      groups[:error]    = nil
-      groups
+      groups_from_hash(JSON.parse(cleaned))
     rescue JSON::ParserError, TypeError => e
-      # Salvage: try to find the first {...} block and parse that.
-      first = raw.index('{')
-      last  = raw.rindex('}')
-      if first && last && last > first
-        retry_str = raw[first..last]
+      # Salvage: try every brace-balanced JSON object from last to first.
+      extract_json_candidates(raw).reverse.each do |candidate|
         begin
-          data = JSON.parse(retry_str)
-          if data.is_a?(Hash)
-            return parse_response(retry_str, unread)
-          end
+          data = JSON.parse(candidate)
+          next unless data.is_a?(Hash) && schema_match?(data)
+          return groups_from_hash(data)
         rescue JSON::ParserError
-          # fall through
+          next
         end
       end
+
       AppLogger.warn('triage_parse', status: :fallback, message: e.message,
                                       raw_head: raw.to_s[0, 200])
       {
@@ -210,6 +207,68 @@ module Triage
         fallback:  true,
         error:     "parse failure: #{e.class.name}: #{e.message}"
       }
+    end
+
+    def groups_from_hash(data)
+      raise TypeError, 'expected Hash' unless data.is_a?(Hash)
+      groups = %w[must_read optional skip].each_with_object({}) do |key, h|
+        h[key.to_sym] = Array(data[key]).map do |entry|
+          next unless entry.is_a?(Hash)
+          { 'uid' => entry['uid'].to_s, 'rationale' => entry['rationale'].to_s }
+        end.compact
+      end
+      groups[:fallback] = false
+      groups[:error]    = nil
+      groups
+    end
+
+    # A response shape is "good enough" if it has at least one of
+    # the three group keys — guards against returning a parsed-but-
+    # unrelated JSON blob if the model embeds one (e.g. a quoted
+    # rationale that happens to be a tiny JSON object).
+    def schema_match?(hash)
+      %w[must_read optional skip].any? { |k| hash.key?(k) }
+    end
+
+    # Walk the raw text and emit every top-level brace-balanced
+    # {...} substring. Tracks string-literal context so braces
+    # inside JSON strings (e.g. a rationale like "'{example}'")
+    # don't break the depth counter. Returns substrings in source
+    # order — callers that want the latest object should reverse.
+    def extract_json_candidates(text)
+      objects = []
+      depth = 0
+      start = nil
+      in_string = false
+      escape = false
+      text.each_char.with_index do |c, i|
+        if in_string
+          if escape
+            escape = false
+          elsif c == '\\'
+            escape = true
+          elsif c == '"'
+            in_string = false
+          end
+          next
+        end
+        case c
+        when '"'
+          in_string = true
+        when '{'
+          start = i if depth.zero?
+          depth += 1
+        when '}'
+          if depth.positive?
+            depth -= 1
+            if depth.zero? && start
+              objects << text[start..i]
+              start = nil
+            end
+          end
+        end
+      end
+      objects
     end
 
     def format_exemplar(row)

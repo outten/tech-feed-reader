@@ -4,6 +4,7 @@ require_relative '../app/feeds_store'
 require_relative '../app/articles_store'
 require_relative '../app/read_state_store'
 require_relative '../app/triage/claude'
+require_relative '../app/triage_store'
 
 # Phase 8 — AI-assisted triage. Specs cover three layers:
 #   1. Triage::Claude.available?      (env-key gating)
@@ -129,6 +130,51 @@ RSpec.describe Triage::Claude, '.run' do
     expect(result.skip.length).to eq(1)
     expect(result.skip.first['uid']).to eq('triagefail001')
     expect(result.error).to include('parse failure')
+  end
+
+  # Regression for production parse failures on 2026-05-10: Sonnet 4.6
+  # second-guessed itself mid-response, emitting a first JSON block,
+  # then "Wait, I made errors. Let me redo this cleanly with..." plus
+  # a second corrected JSON block. The old salvage took raw[first..last]
+  # which spans BOTH blocks + the prose between, so it never parsed.
+  it 'recovers when Claude emits a second "let me redo" JSON block after a wrong first attempt' do
+    art = make_triage_article(uid: 'triageredo001', title: 'Redo me')
+    first_attempt  = JSON.generate(must_read: [{ uid: 'wrong-uid', rationale: 'first attempt' }],
+                                   optional: [], skip: [])
+    second_attempt = JSON.generate(must_read: [{ uid: art['uid'], rationale: 'corrected' }],
+                                   optional: [], skip: [])
+    stub_response("```json\n#{first_attempt}\n```\n\nWait, I made errors with duplicates. Let me redo this cleanly with the right uids:\n\n```json\n#{second_attempt}\n```")
+    result = Triage::Claude.run
+    expect(result.status).to eq(:ok)
+    expect(result.must_read.first['uid']).to eq('triageredo001')
+    expect(result.must_read.first['rationale']).to eq('corrected')
+  end
+
+  it 'recovers when two JSON blocks are separated by prose without code fences' do
+    art = make_triage_article(uid: 'triageredo002', title: 'No fences redo')
+    first_attempt  = JSON.generate(must_read: [], optional: [], skip: [{ uid: 'unused', rationale: 'first' }])
+    second_attempt = JSON.generate(must_read: [{ uid: art['uid'], rationale: 'final' }],
+                                   optional: [], skip: [])
+    stub_response("#{first_attempt}\n\nLet me redo this cleanly:\n\n#{second_attempt}")
+    result = Triage::Claude.run
+    expect(result.status).to eq(:ok)
+    expect(result.must_read.first['uid']).to eq('triageredo002')
+  end
+
+  it 'extract_json_candidates ignores braces inside JSON string literals' do
+    raw = '{"must_read": [{"uid": "a", "rationale": "matches \"{example}\""}], "optional": [], "skip": []}'
+    candidates = Triage::Claude.extract_json_candidates(raw)
+    expect(candidates.length).to eq(1)
+    expect(candidates.first).to eq(raw)
+  end
+
+  it 'persists the raw model output on every triage row' do
+    art = make_triage_article(uid: 'triageraw0001', title: 'Saved raw')
+    stub_response(JSON.generate(must_read: [{ uid: art['uid'], rationale: 'r' }], optional: [], skip: []))
+    result = Triage::Claude.run
+    id = TriageStore.create(result)
+    row = Database.connection.execute('SELECT raw FROM triages WHERE id = ?', [id]).first
+    expect(row['raw']).to include(art['uid'])
   end
 
   it 'includes the positive corpus excerpts in the user prompt' do
