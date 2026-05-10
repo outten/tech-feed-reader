@@ -30,7 +30,12 @@
 <% if @triage_result.nil? %>
   <%# GET — empty state with a generate button. %>
   <div class="portfolio-add">
-    <form method="post" action="/triage" class="portfolio-form">
+    <%# data-turbo="false" — the POST takes 10–30s for the Claude call.
+        Turbo intercepts the submit and does a background fetch with no
+        visible progress, which feels like the button is unclickable.
+        Classic full-page navigation lets the browser show its native
+        loading state + the public/triage-form.js label swap. %>
+    <form method="post" action="/triage" class="portfolio-form" data-turbo="false">
       <% if @triage_topic %>
         <input type="hidden" name="topic" value="<%= h(@triage_topic) %>">
       <% end %>
@@ -54,7 +59,7 @@
 <% elsif @triage_result.status == :error %>
   <div class="error">
     Claude call failed: <code><%= h(@triage_result.error) %></code>.
-    <form method="post" action="/triage" style="display:inline; margin-left:0.5rem">
+    <form method="post" action="/triage" style="display:inline; margin-left:0.5rem" data-turbo="false">
       <button type="submit" class="refresh-btn">Try again</button>
     </form>
   </div>
@@ -75,7 +80,7 @@
     <% if @triage_result.latency_ms %>&middot; <%= @triage_result.latency_ms %>ms<% end %>
     <% if @triage_result.input_tokens %>&middot; <%= @triage_result.input_tokens %> input / <%= @triage_result.output_tokens %> output tokens<% end %>
     &middot;
-    <form method="post" action="/triage" style="display:inline">
+    <form method="post" action="/triage" style="display:inline" data-turbo="false">
       <button type="submit" class="refresh-btn" title="Run the triage again with the current corpus + unread state">Regenerate</button>
     </form>
   </p>

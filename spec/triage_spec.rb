@@ -275,6 +275,15 @@ RSpec.describe '/triage routes' do
       get '/triage'
       expect(last_response.body).to match(%r{<script src="/triage-form\.js})
     end
+
+    # Turbo intercepts form submits and runs a background fetch. For a
+    # 30s Claude call that means no visible progress — clicks look dead.
+    # Forms posting to /triage opt out via data-turbo="false" so the
+    # browser does classic full-page navigation.
+    it 'opts the Generate form out of Turbo' do
+      get '/triage'
+      expect(last_response.body).to match(%r{<form[^>]*action="/triage"[^>]*data-turbo="false"})
+    end
   end
 
   describe 'POST /triage' do
