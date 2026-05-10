@@ -41,7 +41,12 @@
   </section>
 <% elsif @claude_available %>
   <div class="portfolio-add" style="margin-bottom:1.5rem">
-    <form method="post" action="/digests/<%= @digest['id'] %>/summarize" class="portfolio-form">
+    <%# data-turbo="false" — the POST takes 5-15s for the Claude call;
+        Turbo would intercept and run a silent background fetch. The
+        js-digest-summarize hook lets public/digest-summarize-form.js
+        swap the button label to "Summarizing… (5-15s)" on submit. %>
+    <form method="post" action="/digests/<%= @digest['id'] %>/summarize"
+          class="portfolio-form js-digest-summarize" data-turbo="false">
       <button type="submit" class="btn-primary"
               title="Send the digest text to Claude and cache the resulting summary on this row (one-shot — re-visits won't re-spend tokens)">
         Summarize with Claude
@@ -52,6 +57,8 @@
     </form>
   </div>
 <% end %>
+
+<script src="/digest-summarize-form.js?v=<%= asset_mtime('public/digest-summarize-form.js') %>"></script>
 
 <%# The stored html_body is a self-contained fragment built by
     Digests.build_html. CGI-escaped at composition time, so safe to
