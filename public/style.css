@@ -2985,3 +2985,185 @@ html.dark .sports-article-source { color: #98989d; }
 }
 .sports-article-in-app:hover { text-decoration: underline; }
 html.dark .sports-article-in-app { color: #0a84ff; }
+
+/* ---- Public home + about pages (STUFF.md #13) ----
+   Marketing-style landing surfaces for new visitors. Hero on the left,
+   screenshot on the right; below that a feature grid with alternating
+   card layouts. Stays inside the existing typographic system so the
+   page feels of-a-piece with the app rather than a separate brand. */
+.home-hero {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+  padding: 2rem 0 2.5rem 0;
+  margin-bottom: 1rem;
+}
+.home-hero-text h1 {
+  font-size: 2.6rem;
+  line-height: 1.15;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.02em;
+}
+.home-tagline {
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: #424245;
+  margin: 0 0 1.5rem 0;
+}
+html.dark .home-tagline { color: #c7c7cc; }
+.home-tagline strong { color: #1d1d1f; font-weight: 600; }
+html.dark .home-tagline strong { color: #f5f5f7; }
+.home-cta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.home-cta .btn-primary {
+  font-size: 1rem;
+  padding: 0.7rem 1.4rem;
+}
+.home-cta-secondary {
+  color: #0071e3;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+.home-cta-secondary:hover { text-decoration: underline; }
+html.dark .home-cta-secondary { color: #0a84ff; }
+.home-hero-meta {
+  font-size: 0.82rem;
+  color: #6e6e73;
+  margin: 0;
+}
+html.dark .home-hero-meta { color: #aeaeb2; }
+.home-hero-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  border: 1px solid #e5e5ea;
+}
+html.dark .home-hero-image img { border-color: #2c2c2e; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+
+/* Feature grid — alternating image/text layout. The first card has
+   no image (just text) so it renders full-width as an intro. */
+.home-features {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin: 2.5rem 0;
+}
+.home-feature {
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: center;
+}
+html.dark .home-feature { background: #1c1c1e; border-color: #2c2c2e; }
+.home-feature-with-image {
+  grid-template-columns: 1.1fr 1fr;
+}
+.home-feature-with-image:nth-child(odd) {
+  grid-template-columns: 1fr 1.1fr;
+}
+.home-feature-with-image:nth-child(odd) .home-feature-image {
+  order: -1;
+}
+.home-feature h2 {
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+.home-feature p {
+  margin: 0;
+  line-height: 1.55;
+  color: #424245;
+}
+html.dark .home-feature p { color: #c7c7cc; }
+.home-feature p code {
+  font-size: 0.85em;
+  background: #f2f2f7;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+html.dark .home-feature p code { background: #2c2c2e; }
+.home-feature-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e5ea;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  display: block;
+}
+html.dark .home-feature-image img { border-color: #2c2c2e; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+
+/* Middle "why" section — reduced visual weight so the screenshots
+   above and the CTA below carry the page. */
+.home-narrative {
+  max-width: 680px;
+  margin: 3rem auto;
+  text-align: center;
+}
+.home-narrative h2 {
+  font-size: 1.7rem;
+  letter-spacing: -0.01em;
+  margin-bottom: 1.25rem;
+}
+.home-narrative p {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #424245;
+  margin: 0 0 1rem 0;
+}
+html.dark .home-narrative p { color: #c7c7cc; }
+
+.home-final-cta {
+  text-align: center;
+  padding: 2.5rem 0;
+  border-top: 1px solid #e5e5ea;
+  margin-top: 1rem;
+}
+html.dark .home-final-cta { border-top-color: #2c2c2e; }
+.home-final-cta h2 {
+  font-size: 1.6rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+.home-final-cta p { color: #6e6e73; margin: 0 0 1.25rem 0; }
+html.dark .home-final-cta p { color: #aeaeb2; }
+.home-final-cta .home-cta { justify-content: center; }
+
+/* About page — left-aligned narrative sections. */
+.about-section {
+  margin: 2rem 0;
+  max-width: 760px;
+}
+.about-section h3 {
+  font-size: 1.3rem;
+  margin: 0 0 0.75rem 0;
+  letter-spacing: -0.01em;
+}
+.about-section p, .about-section ul, .about-section ol {
+  line-height: 1.6;
+  color: #424245;
+}
+html.dark .about-section p, html.dark .about-section ul, html.dark .about-section ol { color: #c7c7cc; }
+.about-section ul, .about-section ol { padding-left: 1.4rem; }
+.about-section li { margin: 0.4rem 0; }
+
+/* Mobile: stack hero + feature cards. */
+@media (max-width: 800px) {
+  .home-hero { grid-template-columns: 1fr; gap: 1.5rem; }
+  .home-hero-text h1 { font-size: 2rem; }
+  .home-feature, .home-feature-with-image, .home-feature-with-image:nth-child(odd) {
+    grid-template-columns: 1fr;
+  }
+  .home-feature-with-image:nth-child(odd) .home-feature-image { order: 0; }
+}

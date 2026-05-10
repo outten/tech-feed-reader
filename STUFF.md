@@ -174,3 +174,15 @@ If usage ever grows to multi-writer or multi-region, **that's** when PostgreSQL 
 The podcast element on pages is great. However, I think it is rendering over the information and attribution of the background page image that I like a lot. I want to make sure the artists get attribution as they are very much a part of the UI/UX of the application. Can you make sure the artists are take care of. And can you up the count or random images to say 50 -- they are so inspirational.
 
 **Fix.** The fixed `#global-player` (`position:fixed; bottom:0`) was overlapping the `<footer>` that holds the `data-bg-attribution` slot, hiding the artist credit whenever a podcast was loaded. The existing `body.has-mini-player main { padding-bottom: 5rem }` only padded `<main>` — but the footer lives OUTSIDE main, so it slid under the player. Moved that rule to `body.has-mini-player { padding-bottom: 5rem }` so the entire body (main + footer) clears the player bar. Also bumped `BackgroundPool::POOL_TARGET_SIZE` from 12 to 50, giving the next "Refresh pool" click a much larger rotation set.
+
+## [x] 13: Home Page
+
+This application is very useful. Thank you. Let's prepare to open this to other users.
+
+Before we restructure the database, etc. I'd like to focus on the home page.
+
+The hone page should be very friendly to new users. It should express the vision of this project: to aggregate information on topics that the user cares about; the change user behavior from swivel chairing between site -- i.e. we bring relevant and personalized inform to YOU verus you hunting for information; we prioritize information, based on your behavior and preferences, for you; we summarize information based on AI; we allow you to efficiently skim data; and your podcast listening plays consistently across pages while you are reading articles.
+
+In addition to the home page, this should be expressed fully in an About page for the application.
+
+**Shipped.** New `/` shows a marketing home for first-time visitors (hero + 6 feature cards mapping to the vision pillars + a "why" narrative + a final CTA), and a `tfr_seen` cookie redirects subsequent visits to `/dashboard` so the existing single-user owner keeps their muscle memory. Six screenshots captured via Chrome headless ([public/img/home/](public/img/home/)). New `/about` page covers the philosophy, anti-swivel-chair argument, how-it-works, what's-different, tech stack, and get-started. Footer "About" link renders on every page. Multi-user / auth / DB restructure stays bracketed for later — the cookie's `tfr_seen=1` guard becomes the natural place to plug "is logged in" when that arrives.
