@@ -2,6 +2,15 @@ require_relative 'spec_helper'
 require_relative '../app/background_pool'
 
 RSpec.describe BackgroundPool do
+  describe 'POOL_TARGET_SIZE' do
+    # STUFF.md #12 — bumped from 12 to 50 so each "Refresh pool"
+    # gives a much wider rotation set. Picsum's /v2/list returns
+    # up to 100 per page, so 50 still fits in one fetch.
+    it 'is 50 (matches the documented "many more random images" target)' do
+      expect(BackgroundPool::POOL_TARGET_SIZE).to eq(50)
+    end
+  end
+
   describe '.ids' do
     it 'returns the bundled DEFAULT_IDS when the pool table is empty' do
       expect(BackgroundPool.count).to eq(0)
@@ -139,6 +148,25 @@ RSpec.describe '/admin/backgrounds routes' do
       BackgroundPool::DEFAULT_IDS.first(3).each do |id|
         expect(last_response.body).to include(id.to_s)
       end
+    end
+
+    # STUFF.md #12 — target_pool_size is surfaced in the page copy
+    # ("batch of N random images …"). Confirm the bumped value flows
+    # through, not the legacy 12.
+    it 'surfaces the bumped POOL_TARGET_SIZE in the page copy' do
+      get '/admin/backgrounds'
+      expect(last_response.body).to include('batch of 50')
+    end
+
+    # STUFF.md #12 — fixed #global-player was overlapping the footer
+    # that holds the data-bg-attribution slot. The padding-bottom must
+    # apply to BODY (not just main) so the artist credit sits above
+    # the player bar. Locking this so a future refactor doesn't
+    # silently move the rule back to `main`.
+    it 'pads the body (not just main) when the mini-player is visible' do
+      css = File.read(File.expand_path('../public/style.css', __dir__))
+      expect(css).to match(/body\.has-mini-player\s*\{\s*padding-bottom/)
+      expect(css).not_to match(/body\.has-mini-player\s+main\s*\{\s*padding-bottom/)
     end
 
     it 'renders the populated pool with thumbnails + author' do

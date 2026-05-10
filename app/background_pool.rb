@@ -15,7 +15,7 @@ module BackgroundPool
   # Curated nature-themed Picsum IDs used when the table is empty.
   # Keep in sync with public/page-background.js's IDS array.
   DEFAULT_IDS = [10, 15, 28, 29, 1015, 1018, 1019, 1037, 1043, 1044, 1059].freeze
-  POOL_TARGET_SIZE = 12
+  POOL_TARGET_SIZE = 50
   PICSUM_LIST_URL = 'https://picsum.photos/v2/list?page=1&limit=100'.freeze
 
   RefreshError = Class.new(StandardError)

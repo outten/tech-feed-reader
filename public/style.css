@@ -1905,7 +1905,11 @@ html.dark .trace-attr code { background: #2c2c2e; color: #f5f5f7; }
 }
 html.dark #global-player { background: #1c1c1e; border-top-color: #2c2c2e; box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.35); }
 #global-player[hidden] { display: none !important; }
-body.has-mini-player main { padding-bottom: 5rem; }
+/* Push the entire body (main + footer with bg-attribution) up when
+   the fixed mini-player is visible. The footer is OUTSIDE <main>,
+   so padding the body — not just main — keeps the artist attribution
+   line visible above the player bar. */
+body.has-mini-player { padding-bottom: 5rem; }
 
 .mini-player {
   display: flex;
