@@ -8,19 +8,11 @@ RSpec.describe 'TechFeedReader smoke' do
     TechFeedReader
   end
 
-  # STUFF.md #13 — / shows the public home page on first visit and
-  # redirects to /dashboard once the tfr_seen cookie is set.
-  it 'first visit to / renders the public home page (no cookie set yet)' do
+  # STUFF.md #13 — / always renders the public home page.
+  it '/ renders the public home page for everyone' do
     get '/'
     expect(last_response.status).to eq(200)
     expect(last_response.body).to include('Stop swivel-chairing')
-  end
-
-  it 'returning visit to / (tfr_seen=1) redirects to /dashboard' do
-    set_cookie 'tfr_seen=1'
-    get '/'
-    expect(last_response.status).to eq(302)
-    expect(last_response.headers['Location']).to include('/dashboard')
   end
 
   it 'renders /dashboard' do
