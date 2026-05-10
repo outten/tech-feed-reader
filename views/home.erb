@@ -1,28 +1,67 @@
-<%# Public home / landing page. STUFF.md #13.
-    GET / shows this view to first-time visitors and sets a tfr_seen
-    cookie so subsequent visits jump straight to /dashboard. The link
-    to /dashboard below works for everyone — owners can bookmark it. %>
+<%# Public home / landing page. STUFF.md #13 + #14.
+    GET / always renders this view; the hero branches on @returning_user
+    (true when ReadStateStore has any activity in the DB) — first-time
+    visitors get the marketing pitch; returning users get a "Welcome
+    back" hero with stats + top picks. Feature cards stay below either
+    hero. /dashboard links carry data-turbo="false" so Chart.js inits
+    cleanly on a full document load. %>
 
-<section class="home-hero">
-  <div class="home-hero-text">
-    <h1>Stop swivel-chairing between 50 sites.</h1>
-    <p class="home-tagline">
-      An RSS reader that <strong>ranks</strong>, <strong>summarizes</strong>,
-      and <strong>triages</strong> your feed for you. Self-hosted,
-      single-user, no analytics, no algorithmic agenda.
-    </p>
-    <div class="home-cta">
-      <a class="btn-primary" href="/dashboard">Open dashboard &rarr;</a>
-      <a class="home-cta-secondary" href="/about">What this is &rarr;</a>
+<% if @returning_user %>
+  <%# STUFF.md #14 — personalized hero for returning users. No cookie:
+      we infer "returning" from the presence of any read_state activity
+      in the DB (any opened/bookmarked/feedback'd article). The pillars
+      below remain visible so the vision is still on the page. %>
+  <section class="home-hero home-hero-returning">
+    <div class="home-hero-text">
+      <h1>Welcome back.</h1>
+      <p class="home-tagline">
+        You have <strong><%= @stats[:unread] %></strong> unread,
+        <strong><%= @stats[:bookmarks] %></strong> bookmarked
+        across <strong><%= @stats[:articles] %></strong> articles.
+        <% if @latest_triage && @latest_triage['generated_at'] %>
+          Last triage <%= relative_time(@latest_triage['generated_at']) %>.
+        <% end %>
+      </p>
+      <div class="home-cta">
+        <a class="btn-primary" href="/articles?sort=relevance&amp;state=unread">Read your top picks &rarr;</a>
+        <a class="home-cta-secondary" href="/dashboard" data-turbo="false">Open dashboard &rarr;</a>
+      </div>
+      <% if (@top_unread || []).any? %>
+        <ul class="home-hero-picks">
+          <% @top_unread.first(3).each do |article| %>
+            <li>
+              <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
     </div>
-    <p class="home-hero-meta">
-      Free &middot; Open source &middot; Your data lives on your disk
-    </p>
-  </div>
-  <div class="home-hero-image">
-    <img src="/img/home/dashboard.png" alt="Dashboard view: article counts, activity chart, top feeds and tags." loading="lazy">
-  </div>
-</section>
+    <div class="home-hero-image">
+      <img src="/img/home/dashboard.png" alt="Dashboard view: article counts, activity chart, top feeds and tags." loading="lazy">
+    </div>
+  </section>
+<% else %>
+  <section class="home-hero">
+    <div class="home-hero-text">
+      <h1>Stop swivel-chairing between 50 sites.</h1>
+      <p class="home-tagline">
+        An RSS reader that <strong>ranks</strong>, <strong>summarizes</strong>,
+        and <strong>triages</strong> your feed for you. Self-hosted,
+        single-user, no analytics, no algorithmic agenda.
+      </p>
+      <div class="home-cta">
+        <a class="btn-primary" href="/dashboard" data-turbo="false">Open dashboard &rarr;</a>
+        <a class="home-cta-secondary" href="/about">What this is &rarr;</a>
+      </div>
+      <p class="home-hero-meta">
+        Free &middot; Open source &middot; Your data lives on your disk
+      </p>
+    </div>
+    <div class="home-hero-image">
+      <img src="/img/home/dashboard.png" alt="Dashboard view: article counts, activity chart, top feeds and tags." loading="lazy">
+    </div>
+  </section>
+<% end %>
 
 <section class="home-features">
   <article class="home-feature">
@@ -137,7 +176,7 @@
     The dashboard is one click away. Or read about the philosophy first.
   </p>
   <div class="home-cta">
-    <a class="btn-primary" href="/dashboard">Open dashboard &rarr;</a>
+    <a class="btn-primary" href="/dashboard" data-turbo="false">Open dashboard &rarr;</a>
     <a class="home-cta-secondary" href="/about">About this project &rarr;</a>
   </div>
 </section>

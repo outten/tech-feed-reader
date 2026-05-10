@@ -186,3 +186,23 @@ The hone page should be very friendly to new users. It should express the vision
 In addition to the home page, this should be expressed fully in an About page for the application.
 
 **Shipped.** New `/` shows a marketing home for first-time visitors (hero + 6 feature cards mapping to the vision pillars + a "why" narrative + a final CTA), and a `tfr_seen` cookie redirects subsequent visits to `/dashboard` so the existing single-user owner keeps their muscle memory. Six screenshots captured via Chrome headless ([public/img/home/](public/img/home/)). New `/about` page covers the philosophy, anti-swivel-chair argument, how-it-works, what's-different, tech stack, and get-started. Footer "About" link renders on every page. Multi-user / auth / DB restructure stays bracketed for later — the cookie's `tfr_seen=1` guard becomes the natural place to plug "is logged in" when that arrives.
+
+## [x] 14: The Tech Link
+
+In the header, the TITLE card link should link to the link / with a refresh.
+
+/ should he usuablize to the user's preferences. Generalize in the first time, then personalized.
+
+**Shipped.** The header "Tech Feed Reader" title is now a link to `/` with `data-turbo="false"` so the click does a full document refresh (rather than a Turbo SPA swap). The `/` route stays at the same URL but branches its hero based on `ReadStateStore.any_activity?` — first-time visitors see the original "Stop swivel-chairing" pitch; returning users (anyone with a row in `read_state`) see a "Welcome back" hero with their unread / bookmarked / article counts, last-triage timestamp, top-3 unread picks, and CTAs into `/articles?sort=relevance` + `/dashboard`. The six feature cards stay below either hero so the vision pillars are always visible. No cookie used — the DB probe is the source of truth, and once auth ships in Phase A1 it becomes "is signed-in user."
+
+## [ ] 15; The Links Header
+
+Can you links how to links in the header can be better for UI/UX. There are too many.
+
+## [ ] YouTube
+
+I love YouTube and have a subscription. And about how to use subdcribitions? I love natture hows by BBC Activity (last 7 days). Dadiv Abbenborough.
+
+## [ ] What's on the World Today
+
+As we are expanding to at world wide audience of Sports Fans. Can we add a top level section, "whats on" that listens sports, legends, etc. that are personalized to the user.

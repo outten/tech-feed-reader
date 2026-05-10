@@ -590,13 +590,26 @@ class TechFeedReader < Sinatra::Base
     Prometheus::Client::Formats::Text.marshal(Metrics::REGISTRY)
   end
 
-  # STUFF.md #13 — public home page. Always render the marketing
-  # surface for newbies; existing users navigate to /dashboard via
-  # the nav link or a bookmark. (Earlier cookie-redirect dropped —
-  # honour first-time visitors over returning-user muscle memory.)
+  # STUFF.md #13 — public home page. The URL stays at /; first-time
+  # visitors get the marketing pitch, returning users get a "Welcome
+  # back" hero with their stats + top picks above the same feature
+  # cards. STUFF.md #14 — "Generalize in the first time, then
+  # personalized." No cookie / no redirect; a single DB probe
+  # (ReadStateStore.any_activity?) decides the path. Once auth ships
+  # in Phase A1, that probe becomes "is the current user signed in?".
   get '/' do
     @page_title  = 'Tech Feed Reader'
     @public_page = true
+    @returning_user = ArticlesStore.count.positive? && ReadStateStore.any_activity?
+    if @returning_user
+      @stats = {
+        unread:     ReadStateStore.unread_count,
+        bookmarks:  ReadStateStore.bookmarked_count,
+        articles:   ArticlesStore.count
+      }
+      @top_unread    = Recommendation::ForYou.score_window(state: :unread, limit: 5, offset: 0)
+      @latest_triage = TriageStore.latest
+    end
     erb :home
   end
 
