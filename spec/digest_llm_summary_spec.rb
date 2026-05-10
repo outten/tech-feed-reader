@@ -218,6 +218,20 @@ RSpec.describe '/digests/:id summarize routes' do
       ENV.delete('ANTHROPIC_API_KEY')
     end
 
+    # Loading state + Turbo opt-out for the 5-15s Claude call. Without
+    # data-turbo="false", Turbo intercepts the POST and runs a silent
+    # background fetch — the button looks dead. Without the JS the
+    # click sits unchanged for the entire round-trip.
+    it 'opts the Summarize form out of Turbo + loads the loading-state JS' do
+      ENV['ANTHROPIC_API_KEY'] = 'sk-test-fake-key'
+      digest = make_digest
+      get "/digests/#{digest['id']}"
+      expect(last_response.body).to match(%r{<form[^>]*action="/digests/#{digest['id']}/summarize"[^>]*data-turbo="false"})
+      expect(last_response.body).to match(%r{<script src="/digest-summarize-form\.js})
+    ensure
+      ENV.delete('ANTHROPIC_API_KEY')
+    end
+
     it 'hides the Summarize button + renders the cached summary when present' do
       digest = make_digest
       DigestStore.update_llm_summary(digest['id'], summary: 'My cached digest summary.', model: 'claude-opus-4-7')
