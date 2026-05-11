@@ -272,7 +272,11 @@
 
     // ---- UI events ----
     playBtn.addEventListener('click', function () {
-      if (audio.paused) audio.play(); else audio.pause();
+      // STUFF.md #19 — rewind to 0 if the track previously played
+      // through, otherwise play() does nothing and the button feels
+      // broken. Pause path is unchanged.
+      if (audio.paused) { rewindIfAtEnd(); audio.play(); }
+      else { audio.pause(); }
     });
     skipBackBtn.addEventListener('click', function () {
       audio.currentTime = Math.max(0, audio.currentTime - SKIP_BACK_S);
@@ -316,6 +320,22 @@
     function hide() { root.setAttribute('hidden', ''); document.body.classList.remove('has-mini-player'); }
     function pause() { if (!audio.paused) audio.pause(); }
 
+    // STUFF.md #19 — when an audio element has played through (ended)
+    // its currentTime sits at duration. A subsequent play() call has
+    // nothing to play and fires `ended` again immediately — the user
+    // sees nothing happen. Rewind to 0 before play() in that case so
+    // "Play episode" on a finished show restarts it. Returns true
+    // when a rewind was needed (caller can short-circuit a resume
+    // seek if it just reset us). Tolerance of 0.5s covers float drift.
+    function rewindIfAtEnd() {
+      if (!isFinite(audio.duration) || audio.duration <= 0) return false;
+      if (audio.ended || audio.currentTime >= audio.duration - 0.5) {
+        audio.currentTime = 0;
+        return true;
+      }
+      return false;
+    }
+
     function loadEpisode(ep, opts) {
       opts = opts || {};
       var sameEpisode = state && state.uid === ep.uid;
@@ -346,6 +366,10 @@
           };
           audio.addEventListener('loadedmetadata', seekOnce);
         }
+      } else {
+        // Same episode re-loaded by user click. If it already played
+        // through, rewind so play() actually starts playback.
+        rewindIfAtEnd();
       }
 
       if (opts.autoplay !== false) {
@@ -370,8 +394,11 @@
     window.Player = {
       load:    loadEpisode,
       pause:   pause,
-      resume:  function () { var p = audio.play(); if (p && p.catch) p.catch(function () {}); },
-      toggle:  function () { if (audio.paused) audio.play(); else audio.pause(); },
+      resume:  function () { rewindIfAtEnd(); var p = audio.play(); if (p && p.catch) p.catch(function () {}); },
+      toggle:  function () {
+        if (audio.paused) { rewindIfAtEnd(); audio.play(); }
+        else { audio.pause(); }
+      },
       close:   function () { closeBtn.click(); },
       state:   snapshot,
       isActive:   function () { return !!state; },
