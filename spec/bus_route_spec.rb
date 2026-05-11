@@ -92,7 +92,7 @@ RSpec.describe 'GET /bus' do
 
   describe 'header surface' do
     it 'renders the bus icon link in the header on every layout-rendered page' do
-      get '/dashboard'
+      get '/admin/dashboard'
       expect(last_response.body).to include('href="/bus"')
       expect(last_response.body).to include('Bus mode')
     end

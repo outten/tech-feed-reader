@@ -48,7 +48,7 @@ RSpec.describe 'GET /dashboard activity chart' do
 
   it 'labels the chart with the actual retention window (default 7 days)' do
     seed_one_article
-    get '/dashboard'
+    get '/admin/dashboard'
     expect(last_response.body).to include('Activity (last 7 days)')
     expect(last_response.body).not_to include('Activity (last 30 days)')
   end
@@ -56,7 +56,7 @@ RSpec.describe 'GET /dashboard activity chart' do
   it 'reflects RETENTION_DAYS env override in the heading' do
     ENV['RETENTION_DAYS'] = '14'
     seed_one_article
-    get '/dashboard'
+    get '/admin/dashboard'
     expect(last_response.body).to include('Activity (last 14 days)')
   ensure
     ENV.delete('RETENTION_DAYS')

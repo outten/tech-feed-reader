@@ -201,6 +201,39 @@ class TechFeedReader < Sinatra::Base
       (@feeds_by_id ||= {})[article['feed_id']]
     end
 
+    # STUFF.md #17 / #14 follow-up — gathers the four What's On Today
+    # buckets (matches / reads / listens / watch) used by both the
+    # returning-user branch of GET / and any legacy callers. Mutates
+    # the route-scoped instance variables in place so the view template
+    # can read them directly. Keeps the data source single-sourced
+    # rather than copy-pasted between the / and (formerly) /whats-on
+    # routes.
+    def load_whats_on_today!
+      today        = Date.today
+      start_of_day = Time.new(today.year, today.month, today.day, 0, 0, 0).utc
+
+      @today_matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 1)
+
+      scored = Recommendation::ForYou.score_window(state: :all, limit: 200, offset: 0)
+      todays = scored.select { |a| a['published_at'].to_s >= start_of_day.iso8601 }
+
+      @feeds_by_id ||= FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+
+      @today_listening = todays.select { |a| a['audio_url'].to_s.size.positive? }.first(10)
+      nature_today, non_nature = todays.reject { |a| a['audio_url'].to_s.size.positive? }
+                                       .partition { |a| (@feeds_by_id[a['feed_id']] || {})['topic'] == 'nature' }
+      @today_watching = nature_today.first(10)
+      @today_reading  = non_nature.first(10)
+
+      @summaries_by_article_id = SummaryStore.find_for_ids(
+        (@today_reading + @today_listening + @today_watching).map { |a| a['id'] }
+      )
+      @teams_by_id   = build_teams_by_id_for_matches(@today_matches)
+      @leagues_by_id = build_leagues_by_id_for_matches(@today_matches)
+      @nothing_today = @today_matches.empty? && @today_reading.empty? &&
+                       @today_listening.empty? && @today_watching.empty?
+    end
+
     # Phase S10 — single source of truth for the top-level topic
     # filter validator. Accepts any FeedCatalog::TOPICS key plus
     # 'general' (for arbitrary URL-added feeds); nil for unrecognised
@@ -623,24 +656,26 @@ class TechFeedReader < Sinatra::Base
     Prometheus::Client::Formats::Text.marshal(Metrics::REGISTRY)
   end
 
-  # STUFF.md #13 — public home page. The URL stays at /; first-time
-  # visitors get the marketing pitch, returning users get a "Welcome
-  # back" hero with their stats + top picks above the same feature
-  # cards. STUFF.md #14 — "Generalize in the first time, then
-  # personalized." No cookie / no redirect; a single DB probe
-  # (ReadStateStore.any_activity?) decides the path. Once auth ships
-  # in Phase A1, that probe becomes "is the current user signed in?".
+  # STUFF.md #13 / #14 / #17 — / is the canonical home.
+  # Two modes, branched on ReadStateStore.any_activity?:
+  #   • Anonymous (no read_state rows) → marketing pitch + feature cards.
+  #   • Returning user → What's On Today (matches / reads / listens /
+  #     watch) personalized by follows + For You ranker. The Dashboard
+  #     (operational stats + Activity chart) moved to /admin/dashboard
+  #     since it's an ops view, not a daily-use surface.
+  # Single DB probe decides the path; no cookie. Once auth ships in
+  # Phase A1, the probe becomes "is the current user signed in?".
   get '/' do
     @page_title  = 'Tech Feed Reader'
     @public_page = true
     @returning_user = ArticlesStore.count.positive? && ReadStateStore.any_activity?
     if @returning_user
+      load_whats_on_today!
       @stats = {
         unread:     ReadStateStore.unread_count,
         bookmarks:  ReadStateStore.bookmarked_count,
         articles:   ArticlesStore.count
       }
-      @top_unread    = Recommendation::ForYou.score_window(state: :unread, limit: 5, offset: 0)
       @latest_triage = TriageStore.latest
     end
     erb :home
@@ -652,45 +687,22 @@ class TechFeedReader < Sinatra::Base
     erb :about
   end
 
-  # STUFF.md #17 — "What's On Today". Top-level surface that pulls
-  # from data we already track and filters to *today*, personalized
-  # by the user's follows + For You ranker. Four sections:
-  #   • Sports — fixtures for followed teams in the next 24h
-  #   • To read — articles published today, ranked by For You,
-  #     excluding podcasts + nature/YouTube videos
-  #   • To listen — podcast episodes published today
-  #   • To watch — YouTube videos (feed.topic = 'nature') today
-  # Section is hidden when its bucket is empty so the page doesn't
-  # render N empty cards for a slow news day.
+  # /whats-on → / 301-redirect for backwards compatibility with old
+  # bookmarks / nav links. The "What's On Today" experience lives at
+  # / now (for returning users; anonymous still gets marketing).
   get '/whats-on' do
-    @page_title = "What's On Today"
-    today       = Date.today
-    start_of_day = Time.new(today.year, today.month, today.day, 0, 0, 0).utc
-
-    @today_matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 1)
-
-    scored = Recommendation::ForYou.score_window(state: :all, limit: 200, offset: 0)
-    todays = scored.select { |a| a['published_at'].to_s >= start_of_day.iso8601 }
-
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-
-    @today_listening = todays.select { |a| a['audio_url'].to_s.size.positive? }.first(10)
-    nature_today, non_nature = todays.reject { |a| a['audio_url'].to_s.size.positive? }
-                                     .partition { |a| (@feeds_by_id[a['feed_id']] || {})['topic'] == 'nature' }
-    @today_watching = nature_today.first(10)
-    @today_reading  = non_nature.first(10)
-
-    @summaries_by_article_id = SummaryStore.find_for_ids(
-      (@today_reading + @today_listening + @today_watching).map { |a| a['id'] }
-    )
-    @teams_by_id   = build_teams_by_id_for_matches(@today_matches)
-    @leagues_by_id = build_leagues_by_id_for_matches(@today_matches)
-    @nothing_today = @today_matches.empty? && @today_reading.empty? &&
-                     @today_listening.empty? && @today_watching.empty?
-    erb :whats_on
+    redirect to('/'), 301
   end
 
+  # /dashboard → /admin/dashboard. The operational stats / Activity
+  # chart moved under /admin so / can host the more user-facing
+  # What's On Today surface. Permanent 301 so any existing bookmark
+  # gets cached correctly by the browser.
   get '/dashboard' do
+    redirect to('/admin/dashboard'), 301
+  end
+
+  get '/admin/dashboard' do
     @page_title       = 'Dashboard'
     @articles         = ArticlesStore.recent(limit: 20, state: :unread)
     @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }

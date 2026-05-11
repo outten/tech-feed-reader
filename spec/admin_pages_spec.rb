@@ -99,7 +99,7 @@ RSpec.describe 'admin pages' do
 
   describe 'dashboard degraded banner' do
     it 'is hidden when HealthRegistry.degraded? is false' do
-      get '/dashboard'
+      get '/admin/dashboard'
       expect(last_response.body).not_to include('Feeds are systematically failing')
     end
 
@@ -109,7 +109,7 @@ RSpec.describe 'admin pages' do
         HealthRegistry.record(feed_id: 1, status: :error, latency_ms: 0)
       end
 
-      get '/dashboard'
+      get '/admin/dashboard'
       expect(last_response.body).to include('Feeds are systematically failing')
     ensure
       ENV.delete('HEALTH_REGISTRY')

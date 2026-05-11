@@ -101,7 +101,7 @@ RSpec.describe 'dashboard charts' do
         content_html: '<p>x</p>', content_text: 'something to summarize'
       }])
 
-      get '/dashboard'
+      get '/admin/dashboard'
       expect(last_response.status).to eq(200)
       expect(last_response.body).to include('id="dailyChart"')
       expect(last_response.body).to include('chart.umd.min.js')
@@ -119,13 +119,13 @@ RSpec.describe 'dashboard charts' do
         published_at: Date.today.to_s + 'T12:00:00Z',
         content_html: '<p>x</p>', content_text: 'x'
       }])
-      get '/dashboard'
+      get '/admin/dashboard'
       expect(last_response.body).to include("addEventListener('turbo:load'")
       expect(last_response.body).to include('Chart.getChart')
     end
 
     it 'omits the chart entirely when there are no articles' do
-      get '/dashboard'
+      get '/admin/dashboard'
       expect(last_response.body).not_to include('id="dailyChart"')
       expect(last_response.body).not_to include('chart.umd.min.js')
     end

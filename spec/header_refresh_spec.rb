@@ -10,7 +10,7 @@ RSpec.describe 'header refresh button' do
   end
 
   it 'renders the refresh form on every page' do
-    %w[/dashboard /topics /articles /feeds /tags /search /admin/cache /admin/health].each do |path|
+    %w[/admin/dashboard /topics /articles /feeds /tags /search /admin/cache /admin/health].each do |path|
       get path
       expect(last_response.body).to include('id="header-refresh"'), "missing on #{path}"
       expect(last_response.body).to include('action="/admin/refresh/all"')

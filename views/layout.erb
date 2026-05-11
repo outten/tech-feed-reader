@@ -48,14 +48,10 @@
       manage_active = manage_paths.any? { |p| request.path_info == p }
     %>
     <nav>
-      <%# data-turbo="false" — /dashboard initialises a Chart.js canvas
-          via an inline script. Turbo's body-replacement breaks the
-          canvas re-bind in some browser/state combos (PR #65's
-          turbo:load fallback wasn't enough). Same opt-out we use on
-          the /triage forms; full reload is the right cost here. %>
-      <a href="/dashboard" data-turbo="false" class="<%= %w[/ /dashboard].include?(request.path_info) ? 'active' : '' %>">Dashboard</a>
-      <%# STUFF.md #17 — top-level "What's On" surface. %>
-      <a href="/whats-on"  class="<%= request.path_info == '/whats-on' ? 'active' : '' %>">What's On</a>
+      <%# STUFF.md follow-up: Dashboard moved under /admin/dashboard;
+          What's On now lives at / (returning users) so the dedicated
+          /whats-on link is redundant. Title-click reaches both for
+          returning users. /dashboard is one click further into Admin. %>
       <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
       <a href="/podcasts"  class="<%= request.path_info == '/podcasts' ? 'active' : '' %>">Podcasts</a>
       <a href="/sports"    class="<%= request.path_info == '/sports'   ? 'active' : '' %>">Sports</a>
