@@ -70,6 +70,24 @@
         <% end %>
       </p>
     <% end %>
+
+    <%# STUFF.md follow-up — context strip. Shows current-page count
+        in the user's chosen filter + "freshest source today" hint.
+        Skipped when filtered to a specific feed/tag — the rest of
+        the header already carries the context. %>
+    <% unless @feed_filter || @tag_filter %>
+      <p class="subtitle articles-context">
+        <% if @articles.any? %>
+          <strong><%= @articles.length %></strong> <%= @articles.length == 1 ? 'article' : 'articles' %>
+          on this page<% if @page > 1 %> (page <%= @page %>)<% end %>
+          &middot; <%= @articles_total %> in your corpus
+          <% if @most_active_24h_feed %>
+            &middot; freshest: <strong><a href="/articles?feed_id=<%= @most_active_24h_feed['id'] %>"><%= h(@most_active_24h_feed['title'] || @most_active_24h_feed['url']) %></a></strong>
+            (<%= @most_active_24h_feed['c'] %> in last 24h)
+          <% end %>
+        <% end %>
+      </p>
+    <% end %>
   </div>
 </div>
 
@@ -94,34 +112,86 @@
     <button type="button" class="bulk-toolbar-btn bulk-toolbar-clear"          title="Deselect all">Clear</button>
   </div>
 
+  <%# STUFF.md follow-up — precompute source-cluster runs so we can
+      emit a "From <feed>" ribbon above any run of 3+ consecutive
+      articles from the same feed. Skip when the page is already
+      filtered to a specific feed (the cluster IS the page). %>
+  <%
+    cluster_starts = {}  # index → { feed: row, length: n }
+    unless @feed_filter
+      i = 0
+      while i < @articles.length
+        fid = @articles[i]['feed_id']
+        j = i
+        j += 1 while j < @articles.length && @articles[j]['feed_id'] == fid
+        run_len = j - i
+        if run_len >= 3 && (feed_row = (@feeds_by_id || {})[fid])
+          cluster_starts[i] = { feed: feed_row, length: run_len }
+        end
+        i = j
+      end
+    end
+    prev_day_group = nil
+  %>
   <ul class="news-list <%= 'skim' if @view_filter == :skim %>">
-    <% @articles.each do |article| %>
+    <% @articles.each_with_index do |article, idx| %>
       <%
         is_podcast = article['audio_url'] && !article['audio_url'].to_s.empty?
         kind_icon  = is_podcast ? '🎧' : '📄'
         kind_label = is_podcast ? 'Podcast episode' : 'Article'
         feed_row   = (@feeds_by_id || {})[article['feed_id']]
-        # Per-article image first; for podcasts fall back to the show's
-        # cover art so episodes without their own thumbnail still show
-        # the show artwork.
-        thumb_url  = article['image_url'].to_s.empty? ? (is_podcast && feed_row && feed_row['image_url']) : article['image_url']
+        # STUFF.md follow-up — thumbnail fallback chain. Per-article
+        # image > YouTube hqdefault (for video feeds) > feed cover art.
+        # Always trying to render something so the list has visual
+        # rhythm instead of mixed thumb / no-thumb rows.
+        thumb_url = article['image_url'].to_s.empty? ? nil : article['image_url']
+        thumb_url ||= youtube_thumbnail_url(article)
+        thumb_url ||= feed_row && feed_row['image_url']
+
+        # STUFF.md follow-up — day-group dividers. Only render in
+        # chronological mode; relevance sort already imposes its own
+        # ordering so a day-grouping would be misleading.
+        day_group = (@sort_filter == :relevance ? nil : day_group_label_for(article['published_at']))
       %>
+
+      <% if day_group && day_group != prev_day_group %>
+        <%# Day-group divider — rendered as a non-list <li role="separator">
+            so screen readers don't try to read it as an article. %>
+        <li class="news-day-divider" role="separator" aria-label="<%= h(day_group) %>">
+          <span class="news-day-label"><%= h(day_group) %></span>
+        </li>
+        <% prev_day_group = day_group %>
+      <% end %>
+
+      <% if (cluster = cluster_starts[idx]) %>
+        <%# Source-cluster ribbon — appears above the first row of a
+            run of 3+ articles from the same feed. Filter to the feed
+            with one click. %>
+        <li class="news-source-ribbon" role="separator"
+            aria-label="<%= cluster[:length] %> consecutive articles from <%= h(cluster[:feed]['title'] || cluster[:feed]['url']) %>">
+          <a href="/articles?feed_id=<%= cluster[:feed]['id'] %>" title="Filter to articles from this feed">
+            <span class="news-source-ribbon-label">From</span>
+            <strong><%= h(cluster[:feed]['title'] || cluster[:feed]['url']) %></strong>
+            <span class="muted"> · <%= cluster[:length] %> in a row</span>
+          </a>
+        </li>
+      <% end %>
+
       <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= is_podcast ? 'news-item-podcast' : 'news-item-article' %> <%= 'has-thumb' if thumb_url && !thumb_url.to_s.empty? %>">
         <input type="checkbox" class="news-item-check" data-uid="<%= h(article['uid']) %>" aria-label="Select article" title="Select for bulk action">
-        <%# STUFF.md #19 — the article title is an INTERNAL link to
-            /article/:uid. The rest of the app (/whats-on, /sports/*,
-            /digests, /triage) opens internal article links in the
-            same tab; /articles used to be the lone outlier with
-            target="_blank". Now consistent: same tab for in-app
-            navigation, new tab reserved for off-site publisher URLs
-            (those still use target="_blank" + rel="noopener noreferrer"). %>
+        <%# STUFF.md follow-up — thumbnail moved to the LEFT of the
+            title row and grown to ~80px. Always renders when we can
+            construct a URL (per-article > YouTube > feed image). %>
+        <% if thumb_url && !thumb_url.to_s.empty? %>
+          <a class="news-item-thumb-link" href="/article/<%= article['uid'] %>" title="Open article" aria-hidden="true" tabindex="-1">
+            <img class="news-item-thumb" src="<%= h(thumb_url) %>" alt="" loading="lazy">
+          </a>
+        <% end %>
+        <%# STUFF.md #19 — internal link, same-tab navigation. %>
         <a class="news-row-main" href="/article/<%= article['uid'] %>" title="Open article">
           <span class="news-kind-icon" title="<%= kind_label %>" aria-label="<%= kind_label %>"><%= kind_icon %></span>
           <span class="news-headline"><%= h(article['title']) %></span>
         </a>
-        <% if thumb_url && !thumb_url.to_s.empty? %>
-          <img class="news-item-thumb" src="<%= h(thumb_url) %>" alt="" loading="lazy">
-        <% end %>
         <% if @view_filter == :skim %>
           <%
             summary_row = @summaries_by_article_id[article['id']]

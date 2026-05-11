@@ -375,29 +375,106 @@ html.dark .bg-pool-card { background: #1c1c1e; border-color: #2c2c2e; }
 }
 html.dark .article-hero { background: #2c2c2e; }
 
-/* Article-row thumbnails: small square on the right of each row. The
-   .news-item is position:relative (from the bulk-actions checkbox
-   work), so we absolute-position the thumbnail over the right gutter
-   without disturbing the existing grid. */
-.news-item-thumb {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.75rem;
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
+/* STUFF.md follow-up — article-row thumbnails moved to the LEFT
+   and enlarged from 64px → 96px so the list has visual rhythm.
+   When a thumb is present we switch the row to a two-column grid
+   so the thumb + content sit side-by-side rather than the title
+   wrapping under a right-anchored square. */
+.news-item-thumb-link {
+  grid-area: thumb;
+  display: block;
+  width: 96px;
+  height: 72px;
   border-radius: 6px;
+  overflow: hidden;
   background: #f0f0f5;
+  text-decoration: none;
 }
-html.dark .news-item-thumb { background: #2c2c2e; }
-.news-item.has-thumb .news-row-main,
-.news-item.has-thumb .news-row-badges,
-.news-item.has-thumb .news-meta { padding-right: 76px; }
+.news-item-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s;
+}
+.news-item-thumb-link:hover .news-item-thumb { transform: scale(1.04); }
+html.dark .news-item-thumb-link { background: #2c2c2e; }
+.news-item.has-thumb {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  grid-template-areas:
+    "thumb main"
+    "thumb badges"
+    "thumb meta";
+  column-gap: 0.85rem;
+  align-items: start;
+}
+.news-item.has-thumb .news-row-main    { grid-area: main; }
+.news-item.has-thumb .news-row-badges  { grid-area: badges; }
+.news-item.has-thumb .news-meta        { grid-area: meta; }
+.news-item.has-thumb.news-item-podcast .news-item-thumb-link { aspect-ratio: 1 / 1; height: auto; }
+
 @media (max-width: 600px) {
-  .news-item-thumb { width: 48px; height: 48px; top: 0.5rem; }
-  .news-item.has-thumb .news-row-main,
-  .news-item.has-thumb .news-row-badges,
-  .news-item.has-thumb .news-meta { padding-right: 56px; }
+  .news-item-thumb-link { width: 72px; height: 54px; }
+  .news-item.has-thumb  { grid-template-columns: 72px 1fr; column-gap: 0.6rem; }
+}
+
+/* STUFF.md follow-up — day-group dividers ("Today" / "Yesterday" /
+   "Earlier this week" / "Earlier this month" / "Older"). Thin row,
+   small caps, subtle bar — visually distinct from articles but not
+   competing for attention. */
+.news-day-divider {
+  list-style: none;
+  padding: 1rem 0 0.4rem 2.35rem;
+  border-bottom: 1px solid transparent !important;
+}
+.news-day-divider:first-child { padding-top: 0.4rem; }
+.news-day-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6e6e73;
+  border-bottom: 1px solid #e5e5ea;
+  padding-bottom: 0.35rem;
+  display: block;
+}
+html.dark .news-day-label { color: #aeaeb2; border-bottom-color: #2c2c2e; }
+
+/* STUFF.md follow-up — source-cluster ribbons. Appear above a run
+   of 3+ consecutive rows sharing a feed_id. The whole ribbon is a
+   filter link to that feed. */
+.news-source-ribbon {
+  list-style: none;
+  padding: 0.5rem 0.75rem 0.5rem 2.35rem;
+  background: linear-gradient(90deg, rgba(0, 113, 227, 0.07), transparent 60%);
+  border-radius: 6px;
+  margin: 0.35rem 0 0.1rem 0;
+}
+.news-source-ribbon a {
+  color: #1d1d1f;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.news-source-ribbon a:hover { color: #0071e3; }
+html.dark .news-source-ribbon { background: linear-gradient(90deg, rgba(10, 132, 255, 0.12), transparent 60%); }
+html.dark .news-source-ribbon a { color: #f5f5f7; }
+html.dark .news-source-ribbon a:hover { color: #0a84ff; }
+.news-source-ribbon-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6e6e73;
+  margin-right: 0.25rem;
+}
+html.dark .news-source-ribbon-label { color: #aeaeb2; }
+
+/* STUFF.md follow-up — context line right under the /articles
+   header. Slightly tighter type than .subtitle since it carries
+   denser meta info (count + freshest source). */
+.articles-context {
+  font-size: 0.88rem;
+  margin-top: 0.5rem;
 }
 
 /* Podcast show cards (top of /podcasts) — square cover art on top,
