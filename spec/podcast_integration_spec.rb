@@ -103,10 +103,13 @@ RSpec.describe 'podcast end-to-end' do
       expect(last_response.body).to include('aria-label="Article"')
     end
 
-    it 'opens article links in a new tab so Cmd-W returns to the list' do
+    # STUFF.md #19 — reversed. Internal article links now stay in the
+    # same tab so /articles is consistent with /whats-on, /sports,
+    # /digests, /triage. Locking the new convention.
+    it 'opens article links in the same tab (no target="_blank") so /articles matches the rest of the app' do
       feed = FeedsStore.add(url: 'https://example.com/feed', title: 'Feed')
       ArticlesStore.import(feed_id: feed['id'], entries: [{
-        uid: 'newtabarticle', title: 'A',
+        uid: 'sametabarticle', title: 'A',
         url: 'https://example.com/a', author: nil,
         published_at: '2026-05-04T12:00:00Z',
         content_html: '<p>Body</p>', content_text: 'Body',
@@ -114,9 +117,11 @@ RSpec.describe 'podcast end-to-end' do
       }])
 
       get '/articles'
-      # The headline anchor (the row-main link to /article/UID) carries
-      # target="_blank" + rel="noopener".
-      expect(last_response.body).to match(%r{<a class="news-row-main" href="/article/newtabarticle"[^>]*target="_blank"[^>]*rel="noopener"})
+      expect(last_response.body).to match(%r{<a class="news-row-main" href="/article/sametabarticle"[^>]*>})
+      # No target="_blank" / rel="noopener" on internal links.
+      news_row = last_response.body[%r{<a class="news-row-main" href="/article/sametabarticle"[^>]*>}]
+      expect(news_row).not_to include('target="_blank"')
+      expect(news_row).not_to include('rel="noopener"')
     end
   end
 end

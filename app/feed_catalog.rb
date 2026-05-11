@@ -30,7 +30,11 @@ module FeedCatalog
     publisher:   'Tech publishers',
     engineering: 'Engineering blogs',
     ai:          'AI / ML',
-    security:    'Security',
+    # STUFF.md #18 — :security renamed → :cyber for broader cyber-
+    # security coverage. The DB stores feeds.topic, not the category
+    # symbol, so this is a code-only rename.
+    cyber:       'Cyber security',
+    development: 'Software development',
     personal:    'Personal blogs',
     podcast:     'Podcasts',
     # Sports (Phase S2)
@@ -40,7 +44,9 @@ module FeedCatalog
     rugby:       'Rugby',
     tennis:      'Tennis',
     # STUFF.md #16 — nature / documentary YouTube channels
-    youtube_nature: 'Nature & wildlife (YouTube)'
+    youtube_nature: 'Nature & wildlife (YouTube)',
+    # STUFF.md #18 — mythology / classical history (Greek / Roman / Norse).
+    mythos:      'Mythology & classical history'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -52,7 +58,8 @@ module FeedCatalog
     publisher:   :technology,
     engineering: :technology,
     ai:          :technology,
-    security:    :technology,
+    cyber:       :technology,
+    development: :technology,
     personal:    :technology,
     podcast:     :technology,
     nfl:         :sports,
@@ -60,7 +67,8 @@ module FeedCatalog
     soccer:      :sports,
     rugby:       :sports,
     tennis:      :sports,
-    youtube_nature: :nature
+    youtube_nature: :nature,
+    mythos:      :technology
   }.freeze
 
   CATALOG = [
@@ -126,16 +134,68 @@ module FeedCatalog
       interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
       blurb: 'Practical ML / LLM essays from a researcher-educator.' },
 
-    # ---- security (3) -------------------------------------------------
-    { url: 'https://krebsonsecurity.com/feed/', title: 'Krebs on Security', category: :security,
+    # ---- cyber security (6) -------------------------------------------
+    # STUFF.md #18 — :security renamed → :cyber. Existing three feeds
+    # moved under the new category; three new feeds added for more
+    # operational/news cyber coverage.
+    { url: 'https://krebsonsecurity.com/feed/', title: 'Krebs on Security', category: :cyber,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Investigative reporting on cybercrime and breaches.' },
-    { url: 'https://www.schneier.com/feed/atom/', title: 'Schneier on Security', category: :security,
+    { url: 'https://www.schneier.com/feed/atom/', title: 'Schneier on Security', category: :cyber,
       interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
       blurb: 'Bruce Schneier on security, privacy, and policy.' },
-    { url: 'https://www.bleepingcomputer.com/feed/', title: 'Bleeping Computer', category: :security,
+    { url: 'https://www.bleepingcomputer.com/feed/', title: 'Bleeping Computer', category: :cyber,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Daily breach disclosures and malware analysis.' },
+    { url: 'https://www.darkreading.com/rss.xml', title: 'Dark Reading', category: :cyber,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Enterprise infosec news — threats, vulnerabilities, defense.' },
+    { url: 'https://thehackernews.com/feeds/posts/default', title: 'The Hacker News', category: :cyber,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Fast-moving daily coverage of vulnerabilities, exploits, and breaches.' },
+    { url: 'https://www.csoonline.com/feed/', title: 'CSO Online', category: :cyber,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'CISO-perspective coverage — strategy, governance, risk, IR.' },
+
+    # ---- software development (5) -------------------------------------
+    # STUFF.md #18. Distinct from :engineering (which is company eng-
+    # blog content) — this is the "thinking about how to write code"
+    # genre: Fowler patterns, Spolsky business-of-software, A List
+    # Apart on the craft, CSS-Tricks for frontend, Atwood for the
+    # culture. All verified live on 2026-05-11.
+    { url: 'https://martinfowler.com/feed.atom', title: 'Martin Fowler', category: :development,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Patterns, refactoring, architecture — Fowler\'s long-running thinking blog.' },
+    { url: 'https://www.joelonsoftware.com/feed/', title: 'Joel on Software', category: :development,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Joel Spolsky on the business + craft of building software.' },
+    { url: 'https://alistapart.com/main/feed/', title: 'A List Apart', category: :development,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Long-form essays on web design, accessibility, and frontend craft.' },
+    { url: 'https://css-tricks.com/feed/', title: 'CSS-Tricks', category: :development,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Frontend, CSS, and the wider web platform — practical how-tos.' },
+    { url: 'https://blog.codinghorror.com/rss/', title: 'Coding Horror', category: :development,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Jeff Atwood (Stack Overflow co-founder) on programming and developer culture.' },
+
+    # ---- mythology & classical history (4) ---------------------------
+    # STUFF.md #18 — mythos. Greek / Roman / Norse mythology and the
+    # adjacent classical-history / philosophy corner. Mix of essay
+    # publishers and podcasts. Verified live 2026-05-11.
+    { url: 'https://aeon.co/feed.rss', title: 'Aeon', category: :mythos,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Long-form essays on philosophy, classics, and mythology among other areas.' },
+    { url: 'https://dailystoic.com/feed/', title: 'Daily Stoic', category: :mythos,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Ryan Holiday — daily reflections drawn from Roman / Greek Stoic philosophy.' },
+    { url: 'https://feeds.feedburner.com/mythsandlegends', title: 'Myths and Legends', category: :mythos,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Jason Weiser\'s podcast retelling classical Greek, Norse, and global myths.' },
+    { url: 'https://omny.fm/shows/stuff-you-missed-in-history-class/playlists/podcast.rss',
+      title: 'Stuff You Missed in History Class', category: :mythos,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'iHeart Media\'s long-running history podcast — mythology, ancient world, and lesser-known stories.' },
 
     # ---- personal blogs (4) -------------------------------------------
     { url: 'https://simonwillison.net/atom/everything/', title: 'Simon Willison', category: :personal,

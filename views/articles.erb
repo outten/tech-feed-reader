@@ -108,9 +108,14 @@
       %>
       <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= is_podcast ? 'news-item-podcast' : 'news-item-article' %> <%= 'has-thumb' if thumb_url && !thumb_url.to_s.empty? %>">
         <input type="checkbox" class="news-item-check" data-uid="<%= h(article['uid']) %>" aria-label="Select article" title="Select for bulk action">
-        <%# Whole left+title block is one click target, opens in a new
-            tab so Cmd-W returns the user to the list. %>
-        <a class="news-row-main" href="/article/<%= article['uid'] %>" target="_blank" rel="noopener" title="Open in new tab">
+        <%# STUFF.md #19 — the article title is an INTERNAL link to
+            /article/:uid. The rest of the app (/whats-on, /sports/*,
+            /digests, /triage) opens internal article links in the
+            same tab; /articles used to be the lone outlier with
+            target="_blank". Now consistent: same tab for in-app
+            navigation, new tab reserved for off-site publisher URLs
+            (those still use target="_blank" + rel="noopener noreferrer"). %>
+        <a class="news-row-main" href="/article/<%= article['uid'] %>" title="Open article">
           <span class="news-kind-icon" title="<%= kind_label %>" aria-label="<%= kind_label %>"><%= kind_icon %></span>
           <span class="news-headline"><%= h(article['title']) %></span>
         </a>
