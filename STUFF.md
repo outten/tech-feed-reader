@@ -213,6 +213,8 @@ As we are expanding to at world wide audience of Sports Fans. Can we add a top l
 
 **Shipped (v1, sans "legends").** New top-level `/whats-on` page pulls from data we already track and filters to *today*, personalized by the user's follows + the For You ranker. Four sections, each only rendered when it has rows: 🏟 Sports today (fixtures for followed teams in the next 24h), 📰 To read today (articles ranked by For You), 🎧 To listen today (podcast episodes published today), 📺 To watch today (articles from `topic = 'nature'` feeds — i.e. the YouTube channels from item #16). Empty-state copy when nothing's happening. Top-level nav link added between **Dashboard** and **Articles** in the consolidated header (item #15). "Sports legends" deferred — once we have a clear data source (anniversaries via Wikipedia? a hand-built list?) we'll layer it in.
 
+**Update.** What's On Today is now the home page itself: GET `/` shows the marketing pitch for anonymous visitors (no `read_state` activity), and the four What's On sections for returning users. The dedicated `/whats-on` URL is a 301 redirect to `/`. The Dashboard (operational stats + Activity chart) moved to `/admin/dashboard` since it's an ops view, not a daily-use surface; `/dashboard` 301-redirects there. Both `Dashboard` and `What's On` links removed from the main nav (the title click lands you on the home, and `/admin/dashboard` is linked from the admin index).
+
 ## [x] 18. Development areas
 
 Can we add areas / topics for:

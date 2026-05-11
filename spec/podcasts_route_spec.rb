@@ -55,7 +55,7 @@ RSpec.describe 'GET /podcasts' do
   end
 
   it 'exposes Podcasts in the main nav' do
-    get '/dashboard'
+    get '/admin/dashboard'
     expect(last_response.body).to include('href="/podcasts"')
   end
 end

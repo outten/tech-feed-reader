@@ -15,10 +15,22 @@ RSpec.describe 'TechFeedReader smoke' do
     expect(last_response.body).to include('Stop swivel-chairing')
   end
 
-  it 'renders /dashboard' do
+  it 'redirects /dashboard → /admin/dashboard (moved to Admin)' do
     get '/dashboard'
+    expect(last_response.status).to eq(301)
+    expect(last_response.headers['Location']).to end_with('/admin/dashboard')
+  end
+
+  it 'renders /admin/dashboard' do
+    get '/admin/dashboard'
     expect(last_response.status).to eq(200)
     expect(last_response.body).to include('Dashboard')
+  end
+
+  it 'redirects /whats-on → / (folded into the home for returning users)' do
+    get '/whats-on'
+    expect(last_response.status).to eq(301)
+    expect(last_response.headers['Location']).to end_with('/')
   end
 
   %w[/articles /topics /feeds /tags /search /admin/health /admin/cache].each do |path|

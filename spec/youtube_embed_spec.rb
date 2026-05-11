@@ -110,11 +110,14 @@ RSpec.describe '/article/:uid YouTube embed' do
   end
 end
 
-RSpec.describe '/whats-on To watch today thumbnails' do
+RSpec.describe 'GET / To watch today thumbnails' do
   include Rack::Test::Methods
   def app; TechFeedReader; end
 
   it 'renders a YouTube thumbnail + play overlay on each watch card' do
+    # Seed read_state activity so / hits the returning-user path
+    # (anonymous home is the marketing pitch).
+    require_relative '../app/read_state_store'
     feed = FeedsStore.add(url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCwhatson',
                           title: 'WO Nature', topic: 'nature')
     ArticlesStore.import(feed_id: feed['id'], entries: [{
@@ -124,7 +127,9 @@ RSpec.describe '/whats-on To watch today thumbnails' do
       content_html: '<p>x</p>', content_text: 'x',
       audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
     }])
-    get '/whats-on'
+    ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('whatsonwatch1')['id'], value: true)
+
+    get '/'
     expect(last_response.body).to include('To watch today')
     expect(last_response.body).to include('https://i.ytimg.com/vi/zzzzzzzzzzz/hqdefault.jpg')
     expect(last_response.body).to include('whats-on-watch-play')

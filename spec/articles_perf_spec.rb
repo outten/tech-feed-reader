@@ -39,7 +39,7 @@ RSpec.describe 'cache-only render contract' do
 
   it '/dashboard does not call FeedFetcher.fetch_feed' do
     expect(FeedFetcher).not_to receive(:fetch_feed)
-    get '/dashboard'
+    get '/admin/dashboard'
     expect(last_response.status).to eq(200)
     expect(last_response.body).to include('Article 1')
   end

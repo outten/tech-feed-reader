@@ -63,7 +63,7 @@ RSpec.describe 'GET /topics' do
   end
 
   it 'exposes Topics in the main nav' do
-    get '/dashboard'
+    get '/admin/dashboard'
     expect(last_response.body).to include('href="/topics"')
   end
 end
