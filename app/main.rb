@@ -34,6 +34,7 @@ require_relative 'triage/claude'
 require_relative 'triage_store'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
+require_relative 'providers/itunes_lookup'
 require_relative 'sports_teams'
 require_relative 'sports_leagues_store'
 require_relative 'sports_teams_store'
@@ -1509,9 +1510,30 @@ class TechFeedReader < Sinatra::Base
     interval = params['fetch_interval_seconds'].to_i
     interval = FeedsStore::PUBLISHER_INTERVAL if interval <= 0
 
+    # Apple Podcasts URLs (podcasts.apple.com/.../id<digits>) are HTML
+    # landing pages, not RSS — the feed parser would silently import
+    # zero entries. Resolve to the real feedUrl via iTunes Lookup
+    # before insert. On failure (deleted show, network error) we keep
+    # the original URL + redirect with a hint so the user knows why
+    # it didn't auto-resolve.
+    notice = 'added'
+    if (apple_id = Providers::ITunesLookup.apple_podcast_id_from_url(url))
+      result = Providers::ITunesLookup.lookup_by_id(apple_id)
+      case result.status
+      when :ok
+        url     = result.feed_url
+        title ||= result.collection_name
+        notice  = 'apple-resolved'
+      when :not_found
+        redirect to('/feeds?error=apple-not-found')
+      when :error
+        redirect to('/feeds?error=apple-lookup-failed')
+      end
+    end
+
     begin
       FeedsStore.add(url: url, title: title, fetch_interval_seconds: interval)
-      redirect to('/feeds?notice=added')
+      redirect to("/feeds?notice=#{notice}")
     rescue SQLite3::ConstraintException
       redirect to('/feeds?error=duplicate-url')
     end
