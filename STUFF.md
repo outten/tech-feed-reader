@@ -213,7 +213,7 @@ As we are expanding to at world wide audience of Sports Fans. Can we add a top l
 
 **Shipped (v1, sans "legends").** New top-level `/whats-on` page pulls from data we already track and filters to *today*, personalized by the user's follows + the For You ranker. Four sections, each only rendered when it has rows: 🏟 Sports today (fixtures for followed teams in the next 24h), 📰 To read today (articles ranked by For You), 🎧 To listen today (podcast episodes published today), 📺 To watch today (articles from `topic = 'nature'` feeds — i.e. the YouTube channels from item #16). Empty-state copy when nothing's happening. Top-level nav link added between **Dashboard** and **Articles** in the consolidated header (item #15). "Sports legends" deferred — once we have a clear data source (anniversaries via Wikipedia? a hand-built list?) we'll layer it in.
 
-## 18 [ ] 18. Development areas
+## [x] 18. Development areas
 
 Can we add areas / topics for:
 
@@ -221,7 +221,11 @@ Can we add areas / topics for:
 - development: software development
 - mythos: Claudus Mythos model
 
-### [ ] Links on the Architeves Page
+**Shipped.** Three new categories under `:technology`: `:cyber` (renamed from `:security`, now broader — kept the existing Krebs / Schneier / Bleeping Computer and added **Dark Reading**, **The Hacker News**, **CSO Online**), `:development` (Martin Fowler, Joel on Software, A List Apart, CSS-Tricks, Coding Horror), and `:mythos` (classical / Greek / Norse mythology — Aeon, Daily Stoic, Myths and Legends podcast, Stuff You Missed in History Class). All 12 new feed URLs verified live via curl on 2026-05-11. Catalog total: 60 → 72.
+
+### [x] Links on the Articles Page (#19)
 
 For some pages, they are relative. Check and make relaive to the realiative spot.
+
+**Shipped.** `/articles` was the lone outlier: its article-title links carried `target="_blank"` while every other listing surface (`/whats-on`, `/sports/*`, `/digests`, `/triage`) opens internal `/article/:uid` links in the same tab. Fixed `/articles` AND the **Read-next** card on `/article/:uid` (which had the same bug). External publisher URLs (`@article['url']`, `@espn_url`, etc.) still carry `target="_blank"` + `rel="noopener noreferrer"`. New regression spec [spec/internal_link_target_spec.rb](spec/internal_link_target_spec.rb) locks the convention so a refactor can't quietly reintroduce the inconsistency.
 

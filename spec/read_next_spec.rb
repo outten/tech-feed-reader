@@ -116,10 +116,15 @@ RSpec.describe 'GET /article/:uid Read-next card (Phase 7)' do
     expect(last_response.body).not_to include('href="/article/rnviewself02" target="_blank"')
   end
 
-  it 'opens the suggested article in a new tab' do
+  # STUFF.md #19 — reversed. Internal /article/:uid links open in the
+  # same tab so the Read-next surface is consistent with the article
+  # list (/articles, /whats-on, /sports, /digests, /triage).
+  it 'opens the suggested article in the same tab (no target="_blank")' do
     make_read_next_article(uid: 'rnviewtab01', title: 'A',  content_text: 'shared body terms here')
     make_read_next_article(uid: 'rnviewtab02', title: 'B',  content_text: 'shared body terms here')
     get '/article/rnviewtab01'
-    expect(last_response.body).to match(%r{<a class="read-next-headline" href="/article/rnviewtab02"[^>]*target="_blank"})
+    rn = last_response.body[%r{<a class="read-next-headline" href="/article/rnviewtab02"[^>]*>}]
+    expect(rn).not_to be_nil
+    expect(rn).not_to include('target="_blank"')
   end
 end

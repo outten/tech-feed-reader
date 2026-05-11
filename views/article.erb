@@ -261,7 +261,10 @@
           <span class="muted" title="Content-similarity match via FTS5 — no personalised signal yet">&middot; related pick</span>
         <% end %>
       </div>
-      <a class="read-next-headline" href="/article/<%= @read_next['uid'] %>" target="_blank" rel="noopener" title="Open the next suggested article in a new tab">
+      <%# STUFF.md #19 — internal article links stay in the same tab,
+          consistent with /whats-on, /sports/*, /digests, /triage,
+          /articles. External publisher links use target="_blank". %>
+      <a class="read-next-headline" href="/article/<%= @read_next['uid'] %>" title="Open the next suggested article">
         <%= h(@read_next['title']) %>
       </a>
       <div class="read-next-meta">
