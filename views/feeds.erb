@@ -51,6 +51,8 @@
   <div class="notice">Added <strong><%= h(params['title']) %></strong> from the catalog.</div>
 <% elsif @notice == 'already-subscribed' %>
   <div class="notice"><strong><%= h(params['title']) %></strong> is already subscribed.</div>
+<% elsif @notice == 'apple-resolved' %>
+  <div class="notice">Resolved that Apple Podcasts URL to its underlying RSS feed and added it.</div>
 <% elsif @notice == 'mute-added' %>
   <div class="notice">Muted <code><%= h(params['kind']) %>:<%= h(params['value']) %></code> &mdash; matching articles will be hidden from listings (still searchable).</div>
 <% elsif @notice == 'mute-duplicate' %>
@@ -67,6 +69,10 @@
   <div class="error">That doesn't look like a valid http(s) URL.</div>
 <% elsif @error == 'duplicate-url' %>
   <div class="error">That feed is already subscribed.</div>
+<% elsif @error == 'apple-not-found' %>
+  <div class="error">Apple Podcasts couldn't find that show (deleted? wrong region?). Try pasting the show's actual RSS URL instead.</div>
+<% elsif @error == 'apple-lookup-failed' %>
+  <div class="error">Couldn't reach Apple's lookup service. Try again, or paste the show's RSS URL directly.</div>
 <% elsif @error == 'not-found' %>
   <div class="error">No feed with that id.</div>
 <% elsif @error == 'missing-file' %>
