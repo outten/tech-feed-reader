@@ -234,6 +234,46 @@ class TechFeedReader < Sinatra::Base
                        @today_listening.empty? && @today_watching.empty?
     end
 
+    # STUFF.md follow-up — feed with the most articles published in
+    # the last 24h, returned as a row from `feeds` (or nil if no
+    # articles published in that window). Powers the "freshest source
+    # today" line on /articles. Single small query — bounded by an
+    # index on articles.published_at.
+    def articles_most_active_feed_24h
+      since = (Time.now.utc - 24 * 60 * 60).iso8601
+      row = Database.connection.execute(<<~SQL, [since]).first
+        SELECT f.id, f.title, f.url, COUNT(*) AS c, MAX(a.published_at) AS latest_at
+        FROM articles a
+        JOIN feeds f ON f.id = a.feed_id
+        WHERE a.published_at >= ?
+        GROUP BY f.id
+        ORDER BY c DESC, latest_at DESC
+        LIMIT 1
+      SQL
+      row && row['c'].to_i.positive? ? row : nil
+    end
+
+    # STUFF.md follow-up — day-group label for the article-list
+    # dividers. Buckets relative to "today" in the server's local
+    # timezone since most users will be in the same TZ as the server.
+    # Returns one of: 'Today', 'Yesterday', 'Earlier this week',
+    # 'Earlier this month', 'Older'.
+    def day_group_label_for(published_at)
+      return 'Undated' if published_at.to_s.empty?
+      published = (Time.parse(published_at.to_s).getlocal.to_date rescue nil)
+      return 'Undated' unless published
+
+      today = Date.today
+      days  = (today - published).to_i
+      case days
+      when 0    then 'Today'
+      when 1    then 'Yesterday'
+      when 2..6 then 'Earlier this week'
+      when 7..30 then 'Earlier this month'
+      else 'Older'
+      end
+    end
+
     # Phase S10 — single source of truth for the top-level topic
     # filter validator. Accepts any FeedCatalog::TOPICS key plus
     # 'general' (for arbitrary URL-added feeds); nil for unrecognised
@@ -775,6 +815,14 @@ class TechFeedReader < Sinatra::Base
                                else
                                  {}
                                end
+    # STUFF.md follow-up — context strip under the page header. Cheap
+    # one-shot queries: which feed is most active in the last 24h
+    # (used by view) and the absolute count of articles in the user's
+    # corpus (used in the "of <N> total" line). Total-for-current-
+    # filter is harder to compute without a parallel COUNT query;
+    # leaving that as a follow-up.
+    @articles_total       = ArticlesStore.count
+    @most_active_24h_feed = articles_most_active_feed_24h
     erb :articles
   end
 
