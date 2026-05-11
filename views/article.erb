@@ -1,12 +1,16 @@
 <%
   # Hero image: prefer the article's own image_url; fall back to the
   # feed's cover art (mainly podcast feeds, where every episode shares
-  # the show's artwork).
+  # the show's artwork). STUFF.md #16 follow-up — for YouTube articles
+  # we suppress the hero image and render the iframe player below the
+  # header instead; the channel logo isn't useful when you can play
+  # the actual video in-app.
+  yt_embed   = youtube_embed_url(@article)
   hero_image = @article['image_url'].to_s.empty? ? (@feed && @feed['image_url']) : @article['image_url']
 %>
 <article class="reading-view">
   <header>
-    <% if hero_image && !hero_image.to_s.empty? %>
+    <% if hero_image && !hero_image.to_s.empty? && !yt_embed %>
       <img class="article-hero" src="<%= h(hero_image) %>" alt="" loading="lazy">
     <% end %>
     <h2>
@@ -195,6 +199,22 @@
         <strong class="muted" style="font-size:0.78rem">Extractive</strong> &middot;
         <%= h(@summary['extractive']) %>
       </p>
+    </section>
+  <% end %>
+
+  <%# STUFF.md #16 follow-up — embedded YouTube player for articles
+      from YouTube channel feeds. Iframe is sandboxed by default;
+      allow flags match YouTube's official embed snippet so picture-
+      in-picture + fullscreen + autoplay-on-click work. Lazy-loaded so
+      the network request doesn't fire until the user scrolls here. %>
+  <% if yt_embed %>
+    <section class="article-youtube-player">
+      <iframe src="<%= h(yt_embed) %>"
+              title="<%= h(@article['title']) %>"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              loading="lazy"
+              allowfullscreen></iframe>
     </section>
   <% end %>
 

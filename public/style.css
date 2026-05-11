@@ -155,6 +155,69 @@ html.dark .whats-on-matchup a:hover { color: #0a84ff; }
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+
+/* STUFF.md #16 follow-up — embedded YouTube player on /article/:uid.
+   Aspect-ratio 16:9 wrapper so the iframe scales to whatever width
+   the article column gets. background:#000 so the lazy-load doesn't
+   flash white. */
+.article-youtube-player {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 1.5rem 0;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.article-youtube-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* /whats-on "To watch today" cards — thumbnail + body side-by-side
+   on desktop, stack on mobile. The play overlay is a CSS-only
+   semi-transparent circle with a triangle. */
+.whats-on-watch .whats-on-watch-card {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+.whats-on-watch-thumb {
+  position: relative;
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  text-decoration: none;
+}
+.whats-on-watch-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s;
+}
+.whats-on-watch-thumb:hover img { transform: scale(1.04); }
+.whats-on-watch-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(transparent 60%, rgba(0,0,0,0.4));
+  pointer-events: none;
+}
+@media (max-width: 600px) {
+  .whats-on-watch .whats-on-watch-card { grid-template-columns: 1fr; }
+}
 button#theme-toggle {
   padding: 0.35rem 0.9rem;
   border: 1px solid #d2d2d7;

@@ -126,24 +126,34 @@
 <% if (@today_watching || []).any? %>
   <section class="benchmark-section whats-on-section">
     <h3>📺 To watch today <span class="muted whats-on-count">(<%= @today_watching.length %>)</span></h3>
-    <ul class="sports-article-list">
+    <ul class="sports-article-list whats-on-watch">
       <% @today_watching.each do |article| %>
         <% feed         = (@feeds_by_id || {})[article['feed_id']] %>
         <% summary_row  = (@summaries_by_article_id || {})[article['id']] %>
         <% summary_text = skim_summary_for(article, summary_row) %>
-        <li class="sports-article <%= 'read' if article['read'] == 1 %>">
-          <h4 class="sports-article-title">
-            <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
-          </h4>
-          <% unless summary_text.empty? %>
-            <p class="sports-article-summary"><%= h(summary_text) %></p>
+        <% thumb        = youtube_thumbnail_url(article) %>
+        <li class="sports-article whats-on-watch-card <%= 'read' if article['read'] == 1 %>">
+          <% if thumb %>
+            <a class="whats-on-watch-thumb" href="/article/<%= article['uid'] %>"
+               title="Play <%= h(article['title']) %> in app">
+              <img src="<%= h(thumb) %>" alt="" loading="lazy">
+              <span class="whats-on-watch-play" aria-hidden="true">▶</span>
+            </a>
           <% end %>
-          <div class="sports-article-meta">
-            <% if feed %>
-              <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
-              <span class="sports-article-meta-sep">&middot;</span>
+          <div class="whats-on-watch-body">
+            <h4 class="sports-article-title">
+              <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+            </h4>
+            <% unless summary_text.empty? %>
+              <p class="sports-article-summary"><%= h(summary_text) %></p>
             <% end %>
-            <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+            <div class="sports-article-meta">
+              <% if feed %>
+                <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+                <span class="sports-article-meta-sep">&middot;</span>
+              <% end %>
+              <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+            </div>
           </div>
         </li>
       <% end %>

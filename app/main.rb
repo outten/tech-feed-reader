@@ -120,6 +120,38 @@ class TechFeedReader < Sinatra::Base
       File.exist?(full) ? File.mtime(full).to_i : Time.now.to_i
     end
 
+    # STUFF.md #16 follow-up — extract the 11-char YouTube video ID
+    # from an article's URL. Handles the canonical /watch?v=, /embed/,
+    # /v/, /shorts/, and youtu.be/ patterns. Returns nil for anything
+    # that doesn't look like YouTube. Strict on length (11 chars) so
+    # we don't false-positive on YouTube URLs that don't carry a video.
+    def youtube_video_id(article)
+      url = article['url'].to_s
+      return nil unless url.include?('youtube.com') || url.include?('youtu.be')
+      match =
+        url.match(%r{[?&]v=([\w-]{11})}) ||
+        url.match(%r{youtube\.com/(?:embed|v|shorts)/([\w-]{11})}) ||
+        url.match(%r{youtu\.be/([\w-]{11})})
+      match && match[1]
+    end
+
+    # https://www.youtube.com/embed/<id> — the iframe-friendly URL.
+    # No-cookie variant would be youtube-nocookie.com/embed/<id>; we
+    # use the standard host since YouTube's privacy-enhanced mode
+    # disables some features for autoplay/PiP.
+    def youtube_embed_url(article)
+      vid = youtube_video_id(article)
+      vid && "https://www.youtube.com/embed/#{vid}"
+    end
+
+    # Standard YouTube CDN thumbnail URL. hqdefault is 480x360, served
+    # for every public video, no API key needed. Used on /whats-on
+    # "To watch today" cards so the section is visual.
+    def youtube_thumbnail_url(article)
+      vid = youtube_video_id(article)
+      vid && "https://i.ytimg.com/vi/#{vid}/hqdefault.jpg"
+    end
+
     # Used in feed-fetch UI; ISO8601 timestamps become "2 minutes ago".
     # Skim-mode summary line: prefer LLM, fall back to extractive,
     # else a content_text excerpt. Mirrors the precedence chain used
