@@ -208,14 +208,23 @@
       in-picture + fullscreen + autoplay-on-click work. Lazy-loaded so
       the network request doesn't fire until the user scrolls here. %>
   <% if yt_embed %>
+    <%# Phase 1 (May 2026 follow-up) — enablejsapi=1 lets
+        public/youtube-watch.js hook this iframe via the YouTube IFrame
+        API to (a) save+resume watch position in localStorage and (b)
+        post a passive_feedback signal to /api/podcasts/:uid/feedback
+        once watch ≥80% (same path podcasts use, feeds the For You
+        ranker). data-uid is the article UID — used for localStorage
+        keying + the POST URL. %>
     <section class="article-youtube-player">
-      <iframe src="<%= h(yt_embed) %>"
+      <iframe class="article-youtube-iframe"
+              data-uid="<%= h(@article['uid']) %>"
+              src="<%= h(yt_embed) %>?enablejsapi=1"
               title="<%= h(@article['title']) %>"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerpolicy="strict-origin-when-cross-origin"
-              loading="lazy"
               allowfullscreen></iframe>
     </section>
+    <script src="/youtube-watch.js?v=<%= asset_mtime('public/youtube-watch.js') %>"></script>
   <% end %>
 
   <section class="article-body">

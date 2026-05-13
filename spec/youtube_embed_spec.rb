@@ -72,11 +72,34 @@ RSpec.describe '/article/:uid YouTube embed' do
     get '/article/yt000000001'
     expect(last_response.status).to eq(200)
     expect(last_response.body).to match(
-      %r{<iframe[^>]*src="https://www\.youtube\.com/embed/dQw4w9WgXcQ"}
+      %r{<iframe[^>]*src="https://www\.youtube\.com/embed/dQw4w9WgXcQ\?enablejsapi=1"}
     )
     # Allow flags so picture-in-picture + fullscreen + autoplay-on-click work.
     expect(last_response.body).to include('allowfullscreen')
     expect(last_response.body).to include('picture-in-picture')
+  end
+
+  # Phase 1 (May 2026) — watch tracker. Iframe carries data-uid so
+  # public/youtube-watch.js can hook it; ?enablejsapi=1 enables the
+  # YouTube IFrame API; the script tag is included alongside.
+  it 'wires the youtube-watch.js tracker (data-uid + enablejsapi + script tag)' do
+    make_youtube_article(uid: 'yt000000003', video_id: 'dQw4w9WgXcQ')
+    get '/article/yt000000003'
+    expect(last_response.body).to match(%r{<iframe[^>]*class="article-youtube-iframe"[^>]*data-uid="yt000000003"})
+    expect(last_response.body).to include('enablejsapi=1')
+    expect(last_response.body).to match(%r{<script src="/youtube-watch\.js})
+  end
+
+  it 'does NOT load youtube-watch.js on a non-YouTube article' do
+    feed = FeedsStore.add(url: 'https://example.com/plain-feed', title: 'Plain')
+    ArticlesStore.import(feed_id: feed['id'], entries: [{
+      uid: 'plainnoyt001', title: 'Plain', url: 'https://example.com/p',
+      author: nil, published_at: '2026-05-10T12:00:00Z',
+      content_html: '<p>x</p>', content_text: 'x',
+      audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
+    }])
+    get '/article/plainnoyt001'
+    expect(last_response.body).not_to include('youtube-watch.js')
   end
 
   it 'suppresses the hero image when a YouTube embed is present' do
