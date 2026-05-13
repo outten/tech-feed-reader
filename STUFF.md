@@ -231,3 +231,8 @@ For some pages, they are relative. Check and make relaive to the realiative spot
 
 **Shipped.** `/articles` was the lone outlier: its article-title links carried `target="_blank"` while every other listing surface (`/whats-on`, `/sports/*`, `/digests`, `/triage`) opens internal `/article/:uid` links in the same tab. Fixed `/articles` AND the **Read-next** card on `/article/:uid` (which had the same bug). External publisher URLs (`@article['url']`, `@espn_url`, etc.) still carry `target="_blank"` + `rel="noopener noreferrer"`. New regression spec [spec/internal_link_target_spec.rb](spec/internal_link_target_spec.rb) locks the convention so a refactor can't quietly reintroduce the inconsistency.
 
+## [x] 19. Can't play
+
+On the play article play can't play if played before.
+
+**Shipped.** Root cause: after an audio element fires `ended`, its `currentTime` is parked at `duration`. The "Play episode" button (and the mini-player ▶ button, and `window.Player.toggle/resume`) all called `audio.play()` with no rewind — so on a finished episode `play()` had nothing to play and fired `ended` again immediately. The button looked broken. Added a `rewindIfAtEnd()` helper in [public/global-player.js](public/global-player.js) that resets `currentTime = 0` whenever the audio is at-end (`audio.ended` OR within 0.5s of duration), and wired it into every code path that initiates playback: the article-page Play button → `loadEpisode` (same-uid branch), the mini-player ▶ click, `window.Player.toggle`, and `window.Player.resume`. Pause paths unchanged. Suite: 948/0 (JS-only — no Ruby regressions).
