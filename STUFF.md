@@ -236,3 +236,16 @@ For some pages, they are relative. Check and make relaive to the realiative spot
 On the play article play can't play if played before.
 
 **Shipped.** Root cause: after an audio element fires `ended`, its `currentTime` is parked at `duration`. The "Play episode" button (and the mini-player ▶ button, and `window.Player.toggle/resume`) all called `audio.play()` with no rewind — so on a finished episode `play()` had nothing to play and fired `ended` again immediately. The button looked broken. Added a `rewindIfAtEnd()` helper in [public/global-player.js](public/global-player.js) that resets `currentTime = 0` whenever the audio is at-end (`audio.ended` OR within 0.5s of duration), and wired it into every code path that initiates playback: the article-page Play button → `loadEpisode` (same-uid branch), the mini-player ▶ click, `window.Player.toggle`, and `window.Player.resume`. Pause paths unchanged. Suite: 948/0 (JS-only — no Ruby regressions).
+
+## [x] 20. Documentation Skill
+
+Can you write a skill to always update our documentation with new features, bug fixes, etc. When we merge, our docs should always be up to date.
+
+**Shipped.** New project-local skill at [.claude/skills/update-docs/SKILL.md](.claude/skills/update-docs/SKILL.md) — invoke with `/update-docs`. Scans `git log` for recent merges, classifies each as feature / bugfix / refactor / docs / infra, and emits precise `Edit` calls against README.md, AGENTS.md, TODO.md, STUFF.md (and SPEC.md when a non-goal changes). Read-only on code; doc-only edits. The AGENTS.md "Documentation rule" block now points at the skill as the catch-up tool when drift sneaks in between sessions. The standing rule remains: every PR keeps its own docs honest as it lands — `/update-docs` is for sweeping up missed updates, not as a substitute.
+
+## [x] 21. Unsplash
+
+Can you double the number of unsplash random background inpirational, pictures. I like them a lot, partciularly nature and technology.
+
+**Shipped.** `BackgroundPool::POOL_TARGET_SIZE` bumped 50 → 100. That's the page-size ceiling Picsum's `/v2/list` endpoint returns in a single hit, so we're maxing out the per-fetch variety. Click "Refresh pool" on `/admin/backgrounds` to populate. Note: Picsum is unfiltered random — Unsplash's themed endpoints (nature / technology specifically) would require an API key + a different provider integration; happy to do that as a follow-up if 100 random images isn't enough variety on the themes you like.
+

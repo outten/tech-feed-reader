@@ -33,6 +33,8 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 
 Don't leave docs to be reconciled later. The "rewrite the file" sweep we did in `outten/TODO-049` is what NOT to repeat — every PR should keep these files honest as it lands.
 
+**Catch-up skill** — if drift does happen (e.g. someone merged in another session without touching docs), invoke `/update-docs` (the skill at [.claude/skills/update-docs/SKILL.md](.claude/skills/update-docs/SKILL.md)). It scans recent merges and proposes precise edits to README / AGENTS / TODO / STUFF. Read-only on code; edits docs only.
+
 ## Setup & credentials
 
 Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [`app/credentials.rb`](app/credentials.rb), which is required at the top of `app/main.rb` and `app/sidekiq_boot.rb` so both processes get the same env. `.credentials` wins — `.env` is honoured but secondary.
