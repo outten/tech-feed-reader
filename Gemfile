@@ -19,6 +19,11 @@ end
 gem 'dotenv'
 gem 'ostruct'
 
+# Auth — WebAuthn server library (passkey-only sign-in, per Phase A1).
+# Handles registration + authentication ceremonies, attestation
+# verification, sign-count rollback detection. Used by Mastodon + GitLab.
+gem 'webauthn'
+
 # Feed parsing — feedjira normalises RSS 2.0 / RSS 1.0 / Atom into a single
 # shape so we don't ship three parsers. Pulls in nokogiri as a dependency.
 gem 'feedjira'

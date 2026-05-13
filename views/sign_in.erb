@@ -1,0 +1,53 @@
+<%# Phase A1 (consumer auth). Sign-in page shell. The browser does
+    the WebAuthn ceremony via public/auth.js. The recovery-code
+    fallback is a second form on the same page, gated by a toggle. %>
+
+<div class="page-header">
+  <div>
+    <h2>Sign in</h2>
+    <p class="subtitle">
+      Enter your username, then approve the passkey prompt on your device.
+    </p>
+  </div>
+</div>
+
+<section class="benchmark-section auth-card">
+  <form id="auth-login-form" class="auth-form">
+    <label class="full-width">
+      Username
+      <input type="text" id="auth-username" name="username"
+             placeholder="your username"
+             autocomplete="username webauthn"
+             pattern="[a-z0-9_-]{3,32}"
+             required autofocus>
+    </label>
+    <button type="submit" id="auth-login-submit" class="btn-primary">Sign in with passkey</button>
+    <p class="auth-error error" id="auth-login-error" hidden></p>
+  </form>
+</section>
+
+<%# Recovery-code fallback. Hidden by default to keep the primary
+    flow focused; revealed by the toggle below the form. %>
+<details class="auth-recovery-fallback">
+  <summary>Lost your passkey? Use a recovery code.</summary>
+  <section class="benchmark-section auth-card auth-card-recovery">
+    <form id="auth-recovery-form" class="auth-form">
+      <label class="full-width">
+        Recovery code
+        <input type="text" id="auth-recovery-input" name="code"
+               placeholder="XK4P-9MWZ-AB23-..."
+               autocomplete="one-time-code"
+               required>
+        <span class="auth-hint muted">One-time use. Each code unlocks once.</span>
+      </label>
+      <button type="submit" class="btn-primary">Sign in with code</button>
+      <p class="auth-error error" id="auth-recovery-error" hidden></p>
+    </form>
+  </section>
+</details>
+
+<p class="subtitle auth-footer-link">
+  New here? <a href="/sign-up">Create an account &rarr;</a>
+</p>
+
+<script src="/auth.js?v=<%= asset_mtime('public/auth.js') %>"></script>

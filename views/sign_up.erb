@@ -1,0 +1,61 @@
+<%# Phase A1 (consumer auth). Sign-up page shell. The WebAuthn
+    ceremony + recovery-code rendering happen client-side in
+    public/auth.js — this template just paints the form + the
+    target containers the script fills in. %>
+
+<div class="page-header">
+  <div>
+    <h2>Sign up</h2>
+    <p class="subtitle">
+      Pick a username and register a passkey — your fingerprint, Face ID,
+      or hardware key. No password, no email, no phone.
+    </p>
+  </div>
+</div>
+
+<section class="benchmark-section auth-card">
+  <form id="auth-signup-form" class="auth-form">
+    <label class="full-width">
+      Username
+      <input type="text" id="auth-username" name="username"
+             placeholder="e.g. todd"
+             autocomplete="username webauthn"
+             pattern="[a-z0-9_-]{3,32}"
+             required autofocus>
+      <span class="auth-hint muted">3–32 chars · lowercase letters, digits, underscore, hyphen</span>
+    </label>
+    <label class="full-width">
+      Display name <span class="muted">(optional)</span>
+      <input type="text" id="auth-display-name" name="display_name" placeholder="leave blank to use your username">
+    </label>
+    <button type="submit" id="auth-signup-submit" class="btn-primary">Register passkey</button>
+    <p class="auth-error error" id="auth-signup-error" hidden></p>
+  </form>
+</section>
+
+<%# Recovery-codes drawer — hidden until the ceremony succeeds. The
+    JS unhides this, fills in the codes, and gates the dashboard
+    redirect on the "I've saved these" confirm. %>
+<section class="benchmark-section auth-recovery-card" id="auth-recovery-card" hidden>
+  <h3>Save your recovery codes</h3>
+  <p class="subtitle">
+    These ten codes are your only way back in if you lose every device
+    where this passkey lives. Each works once. We won't show them again.
+  </p>
+  <pre class="auth-recovery-codes" id="auth-recovery-codes"></pre>
+  <div class="auth-recovery-actions">
+    <button type="button" class="btn-primary" id="auth-recovery-download">Download as text</button>
+    <a href="/" class="auth-recovery-continue" id="auth-recovery-continue" hidden>I've saved them — continue &rarr;</a>
+  </div>
+  <p class="subtitle auth-hint">
+    The continue link unlocks after you click <strong>Download</strong>.
+    Re-registering a passkey or using a recovery code mints a fresh batch
+    only when we ship the "manage passkeys" screen in a follow-up.
+  </p>
+</section>
+
+<p class="subtitle auth-footer-link">
+  Already have an account? <a href="/sign-in">Sign in &rarr;</a>
+</p>
+
+<script src="/auth.js?v=<%= asset_mtime('public/auth.js') %>"></script>

@@ -15,6 +15,15 @@ migrate:
 seed-feeds:
 	bundle exec ruby scripts/seed_feeds.rb
 
+# Phase A1 (consumer auth) — insert a user row by username. No passkey
+# is registered; useful for dev when you've blown away the DB and want
+# a known user_id=1 to inherit the existing single-user data. Use:
+#   make seed-user USER=todd
+# Pass DISPLAY="Full Name" for a custom display name. Falls back to
+# username if omitted.
+seed-user:
+	bundle exec ruby scripts/seed_user.rb $(USER) "$(DISPLAY)"
+
 # Auto-reloading dev server. `rerun` reads .rerun in the project root for
 # watch dirs, file patterns, and ignore globs. NOTE: .rerun does NOT support
 # `#` comments — its contents are shell-split verbatim, so any `#` becomes a

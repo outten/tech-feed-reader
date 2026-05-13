@@ -3,6 +3,15 @@ require 'rack/test'
 
 ENV['RACK_ENV'] = 'test'
 
+# Phase A1 (consumer auth). Set the env vars the app boot needs
+# BEFORE any app file requires them. Tests don't read .env (the
+# dotenv branch in main.rb skips loading in test env), so we must
+# inject deterministic values here.
+ENV['SESSION_SECRET']    ||= '0' * 128
+ENV['WEBAUTHN_RP_NAME']  ||= 'Tech Feed Reader (test)'
+ENV['WEBAUTHN_RP_ID']    ||= 'localhost'
+ENV['WEBAUTHN_ORIGIN']   ||= 'http://localhost:4567'
+
 require_relative '../app/database'
 require_relative '../app/health_registry'
 
