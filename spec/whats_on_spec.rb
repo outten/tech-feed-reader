@@ -25,11 +25,11 @@ def seed_returning!
 end
 
 def make_today_article(uid:, title:, audio_url: nil, topic: 'technology',
-                       feed_url: 'https://x.com/whatson')
+                       feed_url: 'https://x.com/whatson', url: nil)
   feed = FeedsStore.find_by_url(feed_url) ||
          FeedsStore.add(url: feed_url, title: 'Whats On Spec', topic: topic)
   ArticlesStore.import(feed_id: feed['id'], entries: [{
-    uid: uid, title: title, url: "https://x.com/#{uid}", author: nil,
+    uid: uid, title: title, url: url || "https://x.com/#{uid}", author: nil,
     published_at: Time.now.utc.iso8601,
     content_html: "<p>#{title}</p>", content_text: title,
     audio_url: audio_url, audio_mime_type: nil, audio_duration_seconds: nil
@@ -69,13 +69,30 @@ RSpec.describe "GET / What's On Today (returning user)" do
     expect(read_section).to be_nil
   end
 
-  it 'puts nature-topic articles in the To watch section' do
+  it 'puts ANY article with a YouTube URL in the To watch section (Phase 2 — was: topic=nature only)' do
     seed_returning!
+    # Nature YouTube — like before.
     make_today_article(uid: 'whatson_vid001', title: 'BBC nature today',
-                       topic: 'nature', feed_url: 'https://x.com/whatson-nature')
+                       topic: 'nature', feed_url: 'https://x.com/whatson-nature',
+                       url: 'https://www.youtube.com/watch?v=naturevid_0')
+    # Sports YouTube — would have been read in pre-Phase-2; now lands in watch.
+    make_today_article(uid: 'whatson_vid002', title: 'NFL highlight today',
+                       topic: 'sports', feed_url: 'https://x.com/whatson-nfl',
+                       url: 'https://www.youtube.com/watch?v=sportsvid_1')
     get '/'
     expect(last_response.body).to include('To watch today')
     expect(last_response.body).to include('BBC nature today')
+    expect(last_response.body).to include('NFL highlight today')
+  end
+
+  it 'puts non-YouTube articles in the To read section regardless of topic' do
+    seed_returning!
+    make_today_article(uid: 'whatson_natread1', title: 'Nature article (no video)',
+                       topic: 'nature', feed_url: 'https://x.com/whatson-nat-rss',
+                       url: 'https://example.com/article')
+    get '/'
+    expect(last_response.body).to include('To read today')
+    expect(last_response.body).to include('Nature article (no video)')
   end
 end
 

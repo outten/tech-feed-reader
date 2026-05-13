@@ -45,6 +45,10 @@ module FeedCatalog
     tennis:      'Tennis',
     # STUFF.md #16 — nature / documentary YouTube channels
     youtube_nature: 'Nature & wildlife (YouTube)',
+    # Phase 2 follow-up (2026-05-12) — sports YouTube channels so
+    # game highlights / league channels surface in /whats-on's "To
+    # watch today" alongside nature.
+    youtube_sports: 'Sports (YouTube)',
     # STUFF.md #18 — mythology / classical history (Greek / Roman / Norse).
     mythos:      'Mythology & classical history'
   }.freeze
@@ -68,6 +72,7 @@ module FeedCatalog
     rugby:       :sports,
     tennis:      :sports,
     youtube_nature: :nature,
+    youtube_sports: :sports,
     mythos:      :technology
   }.freeze
 
@@ -384,7 +389,41 @@ module FeedCatalog
     { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCQtW2oz8ec8pHjjxawujNjg',
       title: 'Free Documentary - Nature (YouTube)', category: :youtube_nature,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Free Documentary (Nature channel) — full-length nature documentaries reposted with permission.' }
+      blurb: 'Free Documentary (Nature channel) — full-length nature documentaries reposted with permission.' },
+
+    # ---- Sports (YouTube, 7) ------------------------------------------
+    # Phase 2 follow-up (2026-05-12). Game highlights + league channels
+    # so the "To watch today" section on / surfaces sports clips, not
+    # just nature docs. All channel IDs verified live via curl on
+    # 2026-05-12 (and the channel-feed URL returns HTTP 200).
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCDVYQ4Zhbm3S2dlz7P1GBDg',
+      title: 'NFL (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official NFL channel — game recaps, highlights, top plays.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCWJ2lWNubArHWmf3FIHbfcQ',
+      title: 'NBA (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official NBA channel — game highlights, top plays, dunks.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCiWLfSweyRNmLpgEHekhoAg',
+      title: 'ESPN (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'ESPN — multi-sport highlights, analysis, breaking news clips.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCG5qGWdu8nIRZqJ_GgDwQ-w',
+      title: 'Premier League (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official English Premier League — match highlights, behind-the-scenes.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCSZbXT5TLLW_i-5W8FZpFsg',
+      title: 'Major League Soccer (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official MLS channel — Union, every club, match highlights.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCr2QLMGN6BJ96f_k3Q8f5zQ',
+      title: 'UEFA (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'UEFA — international football, Champions League, Europa, EURO.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCLcSuj4B8YyUVJdVDeozFQg',
+      title: 'UEFA Champions League (YouTube)', category: :youtube_sports,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Champions League official channel — matchday highlights + classics.' }
   ].freeze
 
   module_function

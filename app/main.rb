@@ -219,11 +219,16 @@ class TechFeedReader < Sinatra::Base
 
       @feeds_by_id ||= FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
 
+      # Phase 2 follow-up (2026-05-12) — "To watch today" partitions
+      # by whether the article has a YouTube video URL, NOT by feed
+      # topic. So a Premier League highlight clip from the new
+      # :youtube_sports channels shows up alongside BBC Earth, and a
+      # tech YouTube channel would too if you ever subscribed to one.
       @today_listening = todays.select { |a| a['audio_url'].to_s.size.positive? }.first(10)
-      nature_today, non_nature = todays.reject { |a| a['audio_url'].to_s.size.positive? }
-                                       .partition { |a| (@feeds_by_id[a['feed_id']] || {})['topic'] == 'nature' }
-      @today_watching = nature_today.first(10)
-      @today_reading  = non_nature.first(10)
+      videos_today, non_video = todays.reject { |a| a['audio_url'].to_s.size.positive? }
+                                      .partition { |a| youtube_video_id(a) }
+      @today_watching = videos_today.first(10)
+      @today_reading  = non_video.first(10)
 
       @summaries_by_article_id = SummaryStore.find_for_ids(
         (@today_reading + @today_listening + @today_watching).map { |a| a['id'] }
