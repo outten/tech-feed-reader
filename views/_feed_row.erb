@@ -2,14 +2,17 @@
     feeds.erb's loop and emitted as JSON `row_html` from /api/feeds
     so JS-inserted rows match server-rendered ones byte-for-byte. %>
 <tr data-feed-id="<%= feed['id'] %>">
+  <%# Title is also a link to the raw feed XML — saves the URL column
+      while keeping the "open the raw feed" affordance one click away. %>
   <td>
     <% if feed['title'] && !feed['title'].to_s.empty? %>
-      <%= h(feed['title']) %>
+      <a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"
+         title="Open the raw feed XML in a new tab — <%= h(feed['url']) %>"><%= h(feed['title']) %></a>
     <% else %>
-      <em class="muted">(unset)</em>
+      <a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank"
+         title="Open the raw feed XML in a new tab"><em class="muted">(unset)</em></a>
     <% end %>
   </td>
-  <td><a href="<%= h(feed['url']) %>" rel="noopener noreferrer" target="_blank" title="Open the raw feed XML in a new tab"><%= h(feed['url']) %></a></td>
   <td class="num" title="Poll interval — how often the scheduler refreshes this feed"><%= feed['fetch_interval_seconds'] %>s</td>
   <td class="muted" title="Last fetch time"><%= relative_time(feed['last_fetched_at']) %></td>
   <td class="muted" title="HTTP status of the most recent fetch"><%= feed['last_status'] ? h(feed['last_status']) : '—' %></td>
