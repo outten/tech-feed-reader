@@ -61,4 +61,26 @@ RSpec.describe '/search' do
     expect(last_response.body).not_to include('<script>alert(1)</script>')
     expect(last_response.body).to include('&lt;script&gt;')
   end
+
+  # Phase 3 polish (2026-05-12) — pre-search "Try a query" panel +
+  # card-style results matching the /articles list.
+  it 'shows the "Try a query" suggestion chips when there is no query' do
+    get '/search'
+    expect(last_response.body).to include('Try a query')
+    expect(last_response.body).to include('search-suggestion-chip')
+    # Spot-check one of the chips is linked to /search with the term.
+    expect(last_response.body).to match(%r{<a class="search-suggestion-chip" href="/search\?q=ai"})
+  end
+
+  it 'omits the "Try a query" panel once a query is present' do
+    get '/search?q=ruby'
+    expect(last_response.body).not_to include('Try a query')
+  end
+
+  it 'renders result rows as cards with title + excerpt + meta + kind icon' do
+    get '/search?q=framework'
+    expect(last_response.body).to include('news-row-main')
+    expect(last_response.body).to include('search-excerpt')
+    expect(last_response.body).to include('news-kind-icon')
+  end
 end

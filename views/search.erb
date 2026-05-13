@@ -3,13 +3,14 @@
     <h2>Search</h2>
     <p class="subtitle">
       Full-text search across article titles + extracted body text.
-      FTS5 syntax — quoted phrases, AND/OR/NOT, prefix-with-* — works.
+      FTS5 syntax — quoted phrases, <code>AND</code>/<code>OR</code>/<code>NOT</code>,
+      prefix-with-<code>*</code> — all work.
     </p>
   </div>
 </div>
 
 <div class="portfolio-add">
-  <form action="/search" method="get" class="portfolio-form">
+  <form action="/search" method="get" class="portfolio-form search-form">
     <label class="full-width">
       Query
       <input type="text" name="q" value="<%= h(@query) %>" placeholder='kubernetes ebpf, "exact phrase", ai NOT crypto' autofocus>
@@ -25,31 +26,85 @@
   </div>
 <% end %>
 
-<% if !@query.empty? && !@error %>
+<% if @query.empty? %>
+  <%# Pre-search state — give first-time visitors something to click. %>
+  <section class="benchmark-section search-empty">
+    <h3>Try a query</h3>
+    <p class="subtitle">
+      Click any of these to try, or paste a quoted phrase / FTS5 expression in the box above.
+    </p>
+    <p class="search-suggestions">
+      <% %w[ai kubernetes "machine learning" rust tennis "premier league" claude eagles].each do |term| %>
+        <a class="search-suggestion-chip" href="/search?q=<%= CGI.escape(term) %>"><%= h(term) %></a>
+      <% end %>
+    </p>
+    <p class="subtitle search-hint">
+      <strong>Tips.</strong>
+      <code>"large language models"</code> matches the exact phrase.
+      <code>rust NOT crypto</code> excludes terms.
+      <code>kub*</code> prefix-matches.
+      <code>title:kubernetes</code> restricts to titles.
+    </p>
+  </section>
+<% elsif !@error %>
   <% if @results.empty? %>
     <div class="empty-state">
-      No results for <code><%= h(@query) %></code>.
-      Try <a href="/search?q=<%= CGI.escape(@query) %>%2A">prefix-match with <code>*</code></a>
-      if it's an unusual word.
+      <p>No results for <code><%= h(@query) %></code>.</p>
+      <p class="muted">
+        Try
+        <a href="/search?q=<%= CGI.escape(@query) %>%2A">prefix-match (<code>*</code>)</a>
+        if it's an unusual word, or
+        <a href="/search?q=<%= CGI.escape(@query.split(/\s+/).first.to_s) %>">just the first term</a>
+        on its own to broaden.
+      </p>
     </div>
   <% else %>
-    <p class="subtitle" style="margin-top:1.25rem">
+    <p class="subtitle search-results-summary">
       Results for <code><%= h(@query) %></code>
-      <span class="muted">(page <%= @page %>, showing <%= @results.length %>)</span>
+      <span class="muted">(<%= @results.length %><% if @results.length == @per_page %>+<% end %> on page <%= @page %>)</span>
     </p>
-    <ul class="news-list">
+
+    <ul class="news-list search-results-list">
       <% @results.each do |article| %>
-        <li class="news-item <%= article['read'] == 1 ? 'read' : '' %>">
-          <a class="news-headline" href="/article/<%= article['uid'] %>" title="Open article"><%= h(article['title']) %></a>
-          <% (@tags_by_article[article['id']] || []).each do |tag| %>
-            <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>" title="Filter to articles tagged &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
+        <%
+          is_podcast = article['audio_url'] && !article['audio_url'].to_s.empty?
+          kind_icon  = is_podcast ? '🎧' : (youtube_video_id(article) ? '📺' : '📄')
+          kind_label = is_podcast ? 'Podcast episode' : (youtube_video_id(article) ? 'Video' : 'Article')
+          feed_row   = @feeds_by_id[article['feed_id']]
+          thumb_url  = article['image_url'].to_s.empty? ? nil : article['image_url']
+          thumb_url ||= youtube_thumbnail_url(article)
+          thumb_url ||= feed_row && feed_row['image_url']
+          mins       = reading_time_minutes(article)
+        %>
+        <li class="news-item <%= article['read'] == 1 ? 'read' : '' %> <%= 'has-thumb' if thumb_url && !thumb_url.to_s.empty? %>">
+          <% if thumb_url && !thumb_url.to_s.empty? %>
+            <a class="news-item-thumb-link" href="/article/<%= article['uid'] %>" title="Open article" aria-hidden="true" tabindex="-1">
+              <img class="news-item-thumb" src="<%= h(thumb_url) %>" alt="" loading="lazy">
+            </a>
           <% end %>
-          <p class="excerpt"><%= article['excerpt'] %></p>
+          <a class="news-row-main" href="/article/<%= article['uid'] %>" title="Open article">
+            <span class="news-kind-icon" title="<%= kind_label %>" aria-label="<%= kind_label %>"><%= kind_icon %></span>
+            <span class="news-headline"><%= h(article['title']) %></span>
+          </a>
+          <%# Excerpt rides under the title — FTS5's snippet() wraps
+              matches in <mark>…</mark>, safe to render unescaped per
+              the ArticlesStore.search contract. %>
+          <p class="search-excerpt"><%= article['excerpt'] %></p>
+          <% if (tags = @tags_by_article[article['id']] || []).any? %>
+            <div class="news-row-badges">
+              <% tags.each do |tag| %>
+                <a class="tag-chip" href="/articles?tag=<%= tag['id'] %>" title="Filter to articles tagged &lsquo;<%= h(tag['name']) %>&rsquo;"><%= h(tag['name']) %></a>
+              <% end %>
+            </div>
+          <% end %>
           <div class="news-meta">
-            <% if (feed = @feeds_by_id[article['feed_id']]) %>
-              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>" title="Show only articles from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
+            <% if feed_row %>
+              <a class="news-source" href="/articles?feed_id=<%= feed_row['id'] %>" title="Show only articles from <%= h(feed_row['title'] || feed_row['url']) %>"><%= h(feed_row['title'] || feed_row['url']) %></a>
             <% end %>
             <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+            <% if mins %>
+              <span class="news-reading-time" title="Estimated reading time at ~200 wpm">📖 <%= mins %> min</span>
+            <% end %>
           </div>
         </li>
       <% end %>
