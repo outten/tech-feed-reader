@@ -1480,6 +1480,37 @@ class TechFeedReader < Sinatra::Base
   }.freeze
   BULK_UIDS_MAX = 500
 
+  # Phase 2 polish (2026-05-12) — light JSON lookup for the home-page
+  # "Continue listening / watching" tile. The tile is rendered
+  # client-side (the watch position lives in localStorage, which the
+  # server can't see), so the JS posts the list of uids it found and
+  # this returns just enough metadata to render a row: title, feed,
+  # the media URLs, and the duration so the tile can show
+  # "Resume at M:SS / X:XX". Unknown uids are silently dropped.
+  ARTICLE_LOOKUP_MAX_UIDS = 20
+  get '/api/articles/lookup' do
+    content_type :json
+    uids = params['uids'].to_s.split(',').map(&:strip).reject(&:empty?).first(ARTICLE_LOOKUP_MAX_UIDS)
+    halt 200, JSON.generate(articles: []) if uids.empty?
+
+    feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    rows = uids.filter_map do |uid|
+      article = ArticlesStore.find_by_uid(uid)
+      next unless article
+      feed = feeds_by_id[article['feed_id']]
+      {
+        uid:                     article['uid'],
+        title:                   article['title'],
+        url:                     article['url'],
+        audio_url:               article['audio_url'],
+        audio_duration_seconds:  article['audio_duration_seconds'],
+        feed_title:              feed && (feed['title'] || feed['url']),
+        feed_image_url:          feed && feed['image_url']
+      }
+    end
+    JSON.generate(articles: rows)
+  end
+
   post '/api/articles/bulk' do
     content_type :json
     payload = parse_json_body

@@ -29,6 +29,13 @@
     </div>
   </div>
 
+  <%# Phase 2 polish (2026-05-12) — "Pick up where you left off" tile.
+      Position state for in-progress podcasts + YouTube videos lives in
+      localStorage (server can't see it), so this slot starts hidden
+      and continue-progress.js scans + fetches + renders client-side.
+      Empty visitors → slot stays hidden, no flash. %>
+  <section id="continue-progress" class="benchmark-section continue-progress" hidden></section>
+
   <% if @nothing_today %>
     <div class="empty-state">
       <p><strong>Quiet day.</strong> Nothing new from your followed teams or feeds yet.</p>
@@ -188,6 +195,8 @@
       </p>
     </section>
   <% end %>
+
+  <script src="/continue-progress.js?v=<%= asset_mtime('public/continue-progress.js') %>"></script>
 
 <% else %>
   <%# Anonymous — full marketing surface: hero + feature cards +
