@@ -109,7 +109,16 @@
 
   <% if (@today_listening || []).any? %>
     <section class="benchmark-section whats-on-section">
-      <h3>🎧 To listen today <span class="muted whats-on-count">(<%= @today_listening.length %>)</span></h3>
+      <h3>
+        🎧 To listen today <span class="muted whats-on-count">(<%= @today_listening.length %>)</span>
+        <%# Phase 3 follow-up (2026-05-12) — exposes bus mode in the
+            home page rather than only behind the header 🚌 icon. %>
+        <% if (@bus_count_today || 0).positive? %>
+          <a class="whats-on-bus-chip" href="/bus" title="Open Bus mode — every podcast ≤15 minutes from your subscriptions">
+            🚌 <%= @bus_count_today %> short for the bus
+          </a>
+        <% end %>
+      </h3>
       <ul class="sports-article-list">
         <% @today_listening.each do |article| %>
           <% feed         = (@feeds_by_id || {})[article['feed_id']] %>
