@@ -234,6 +234,9 @@
             <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>" title="Show only articles from <%= h(feed['title'] || feed['url']) %>"><%= h(feed['title'] || feed['url']) %></a>
           <% end %>
           <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+          <% if (mins = reading_time_minutes(article)) %>
+            <span class="news-reading-time" title="Estimated reading time at ~200 wpm">📖 <%= mins %> min</span>
+          <% end %>
           <% if article['author'] && !article['author'].to_s.empty? %>
             <span><%= h(article['author']) %></span>
           <% end %>

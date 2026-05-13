@@ -27,6 +27,9 @@
         &middot; by <%= h(@article['author']) %>
       <% end %>
       &middot; <span title="Published <%= h(@article['published_at']) %>"><%= relative_time(@article['published_at']) %></span>
+      <% if (mins = reading_time_minutes(@article)) %>
+        &middot; <span title="Estimated reading time at ~200 wpm">📖 <%= mins %> min read</span>
+      <% end %>
       <% if @article['url'] && !@article['url'].empty? %>
         &middot; <a href="<%= h(@article['url']) %>" rel="noopener noreferrer" target="_blank" title="Open the original on the publisher's site (new tab)">Source &rarr;</a>
       <% end %>

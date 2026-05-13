@@ -183,6 +183,11 @@ html.dark .whats-on-bus-chip {
 }
 html.dark .whats-on-bus-chip:hover { background: #4a3a14; }
 
+/* Reading-time pill on /articles meta + /article/:uid subtitle. */
+.news-reading-time {
+  font-variant-numeric: tabular-nums;
+}
+
 /* STUFF.md #16 follow-up — embedded YouTube player on /article/:uid.
    Aspect-ratio 16:9 wrapper so the iframe scales to whatever width
    the article column gets. background:#000 so the lazy-load doesn't
