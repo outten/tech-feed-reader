@@ -35,6 +35,20 @@ require_relative 'triage_store'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'providers/itunes_lookup'
+require_relative 'auth'
+
+# Phase A1 (consumer auth) — load .env in dev/test for SESSION_SECRET
+# + WEBAUTHN_* config. Production reads from real env vars (host's
+# launchd/systemd unit), no .env loaded.
+if %w[development test].include?(ENV['RACK_ENV'].to_s) || ENV['RACK_ENV'].to_s.empty?
+  begin
+    require 'dotenv'
+    Dotenv.load(File.expand_path('../../.env', __FILE__))
+  rescue LoadError
+    # dotenv isn't strictly required in test runs; the spec helper
+    # sets the needed env vars directly.
+  end
+end
 require_relative 'sports_teams'
 require_relative 'sports_leagues_store'
 require_relative 'sports_teams_store'
@@ -80,6 +94,48 @@ class TechFeedReader < Sinatra::Base
   set :port, 4567
   set :bind, '0.0.0.0' if ENV['RACK_ENV'] == 'production'
 
+  # Phase A1 (consumer auth). Sinatra session cookie holds only the
+  # signed-in user id (Integer) + a WebAuthn challenge (String,
+  # transient). secure: only in prod since dev runs on plain HTTP;
+  # SameSite=Lax is sufficient since the WebAuthn API blocks cross-
+  # origin invocation anyway. SESSION_SECRET must be a long random
+  # hex (`bundle exec ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'`).
+  enable :sessions
+  set :session_secret, ENV.fetch('SESSION_SECRET') {
+    if ENV['RACK_ENV'].to_s == 'test'
+      'test-session-secret-' + ('0' * 96)
+    else
+      raise 'SESSION_SECRET not set. Generate one with `ruby -rsecurerandom -e \'puts SecureRandom.hex(64)\'` and add to .env.'
+    end
+  }
+  set :sessions, key: 'tfr.session',
+                 httponly: true,
+                 secure: ENV['RACK_ENV'] == 'production',
+                 same_site: :lax
+
+  # Sinatra auto-enables Rack::Protection::HostAuthorization in
+  # non-dev modes, rejecting requests whose Host header isn't in a
+  # known list. Rack::Test defaults Host to "example.org", and
+  # WEBAUTHN_ORIGIN's host needs an explicit allow. Configure via
+  # :host_authorization (its own Sinatra setting, separate from
+  # :protection — `set :protection, permitted_hosts:` is a no-op).
+  permitted_hosts = ['localhost', '127.0.0.1', 'example.org']
+  if (origin = ENV['WEBAUTHN_ORIGIN'])
+    begin
+      uri = URI(origin)
+      permitted_hosts << uri.host if uri.host && !permitted_hosts.include?(uri.host)
+    rescue URI::InvalidURIError
+      # leave permitted_hosts as-is; fail-closed
+    end
+  end
+  set :host_authorization, { permitted_hosts: permitted_hosts }
+
+  # JSON CSRF isn't needed: SameSite cookie + custom Content-Type
+  # combo means cross-origin forms can't post JSON with our session.
+  set :protection, except: [:json_csrf]
+
+  Auth.configure!
+
   # Surface the real exception in test runs so a 500 in rack-test prints
   # the underlying error class + backtrace instead of the bare "Internal
   # Server Error" page. Has no effect outside test env.
@@ -111,6 +167,32 @@ class TechFeedReader < Sinatra::Base
       backtrace:  Array(err.backtrace).first(5)
     )
     raise err if settings.raise_errors?
+  end
+
+  # Phase A1 (consumer auth). Mix the Auth::Helpers methods into
+  # Sinatra's request scope so `current_user` / `signed_in?` /
+  # `require_signed_in!` / `sign_in!` / `sign_out!` are usable in
+  # routes + views.
+  helpers Auth::Helpers
+
+  # Auth wall — every request that isn't public + isn't already
+  # signed in bounces to /sign-in with a return_to. Runs after
+  # Sinatra has matched a route but before the route block, so we
+  # don't 404 on protected URLs while signed out (a 404 would leak
+  # the URL exists).
+  #
+  # In RACK_ENV=test the wall is OFF by default — every existing
+  # spec would otherwise need to sign-in before hitting any
+  # protected route. Tests that explicitly want to exercise the wall
+  # (spec/auth_spec.rb) flip `TechFeedReader.enforce_auth_wall = true`
+  # in a before/after pair.
+  set :enforce_auth_wall, ENV['RACK_ENV'] != 'test'
+  before do
+    next unless settings.enforce_auth_wall
+    next if Auth.public_path?(request.path_info)
+    next if signed_in?
+    session[:return_to] = request.fullpath if request.get?
+    redirect to('/sign-in')
   end
 
   helpers do
@@ -758,6 +840,198 @@ class TechFeedReader < Sinatra::Base
     @page_title  = 'About'
     @public_page = true
     erb :about
+  end
+
+  # ===================================================================
+  # Phase A1 (consumer auth). Passkey-only sign-up + sign-in + recovery.
+  # Two HTML page shells (/sign-up, /sign-in), one logout POST, plus
+  # five JSON endpoints that drive the WebAuthn ceremonies from
+  # public/auth.js.
+  # ===================================================================
+
+  get '/sign-up' do
+    @page_title  = 'Sign up'
+    @public_page = true
+    redirect to('/') if signed_in?  # bounce signed-in users home
+    erb :sign_up
+  end
+
+  get '/sign-in' do
+    @page_title  = 'Sign in'
+    @public_page = true
+    redirect to('/') if signed_in?
+    erb :sign_in
+  end
+
+  post '/sign-out' do
+    sign_out!
+    redirect to('/')
+  end
+
+  # Step 1 of registration ceremony. Validate the requested username,
+  # short-circuit if it's taken, otherwise emit a fresh
+  # PublicKeyCredentialCreationOptions object. The challenge + intended
+  # username are stashed in the session so step 2 can verify them.
+  post '/api/auth/register/options' do
+    content_type :json
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+
+    username = UsersStore.normalize_username(body['username'].to_s)
+    unless UsersStore.valid_username?(username)
+      halt 400, JSON.generate(error: UsersStore::USERNAME_RULE)
+    end
+    if UsersStore.find_by_username(username)
+      halt 409, JSON.generate(error: 'That username is already taken.')
+    end
+
+    options = WebAuthn::Credential.options_for_create(
+      user: {
+        id:           WebAuthn.generate_user_id,
+        name:         username,
+        display_name: body['display_name'].to_s.strip.empty? ? username : body['display_name'].to_s.strip
+      },
+      authenticator_selection: { user_verification: 'preferred' },
+      exclude: WebauthnCredentialsStore.find_by_credential_id(nil).is_a?(Hash) ? [] : []  # no excludes for a brand-new user
+    )
+
+    session[:webauthn_register] = {
+      challenge:    options.challenge,
+      username:     username,
+      display_name: body['display_name'].to_s.strip
+    }
+    JSON.generate(publicKey: options.as_json)
+  end
+
+  # Step 2 of registration ceremony. Verify the attestation,
+  # persist user + credential rows, mint recovery codes, and return
+  # them in the response body so the client can render the
+  # "save these" screen. Codes are surfaced ONCE — there's no
+  # "show me my codes again" endpoint by design.
+  post '/api/auth/register/verify' do
+    content_type :json
+    stash = session.delete(:webauthn_register)
+    halt 400, JSON.generate(error: 'No registration in progress — start over.') unless stash
+
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+
+    credential = WebAuthn::Credential.from_create(body)
+    begin
+      credential.verify(stash[:challenge])
+    rescue WebAuthn::Error => e
+      AppLogger.warn('webauthn_register_failed', error: e.class.name, message: e.message)
+      halt 400, JSON.generate(error: 'Passkey verification failed. Try again.')
+    end
+
+    # Idempotency last-mile: another request could have grabbed the
+    # username while the ceremony was in flight. Re-check before insert.
+    if UsersStore.find_by_username(stash[:username])
+      halt 409, JSON.generate(error: 'That username was taken while you were signing up. Try a different one.')
+    end
+
+    user = UsersStore.create(username: stash[:username], display_name: stash[:display_name])
+    WebauthnCredentialsStore.register!(
+      user_id:       user['id'],
+      credential_id: credential.id,
+      public_key:    credential.public_key,
+      sign_count:    credential.sign_count,
+      transports:    body.dig('response', 'transports')
+    )
+    codes = RecoveryCodesStore.mint_for!(user_id: user['id'])
+    sign_in!(user)
+
+    JSON.generate(ok: true, recovery_codes: codes, username: user['username'])
+  end
+
+  # Step 1 of authentication ceremony. For a given username, emit
+  # PublicKeyCredentialRequestOptions naming that user's registered
+  # credentials. We don't 404 unknown users — saying "no such user"
+  # would let an attacker enumerate. Same response shape either way;
+  # an unknown user yields an empty allow-list and the ceremony fails
+  # client-side with a generic message.
+  post '/api/auth/login/options' do
+    content_type :json
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+
+    username = UsersStore.normalize_username(body['username'].to_s)
+    user     = UsersStore.find_by_username(username)
+    creds    = user ? WebauthnCredentialsStore.for_user(user['id']) : []
+
+    options = WebAuthn::Credential.options_for_get(
+      allow: creds.map { |c| c['credential_id'] },
+      user_verification: 'preferred'
+    )
+
+    session[:webauthn_login] = {
+      challenge: options.challenge,
+      user_id:   user && user['id']
+    }
+    JSON.generate(publicKey: options.as_json)
+  end
+
+  # Step 2 of authentication ceremony.
+  post '/api/auth/login/verify' do
+    content_type :json
+    stash = session.delete(:webauthn_login)
+    halt 400, JSON.generate(error: 'No sign-in in progress — start over.') unless stash
+
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+
+    credential = WebAuthn::Credential.from_get(body)
+    cred_row   = WebauthnCredentialsStore.find_by_credential_id(credential.id)
+    halt 401, JSON.generate(error: 'No such passkey.') unless cred_row
+
+    # The stashed user_id (from the GET-options request) must match
+    # the credential's actual owner. Defends against a swap where the
+    # client claims username A but then signs with B's credential.
+    if stash[:user_id] && stash[:user_id].to_i != cred_row['user_id'].to_i
+      halt 401, JSON.generate(error: 'Passkey does not belong to that account.')
+    end
+
+    begin
+      credential.verify(
+        stash[:challenge],
+        public_key: cred_row['public_key'],
+        sign_count: cred_row['sign_count']
+      )
+    # OpenSSL::PKey::PKeyError isn't a WebAuthn::Error subclass — when
+    # the signature is tampered the underlying OpenSSL.verify call
+    # raises directly. Catch both so a malformed assertion 401s
+    # instead of 500ing.
+    rescue WebAuthn::Error, OpenSSL::PKey::PKeyError => e
+      AppLogger.warn('webauthn_login_failed', error: e.class.name, message: e.message)
+      halt 401, JSON.generate(error: 'Passkey verification failed.')
+    end
+
+    WebauthnCredentialsStore.bump_sign_count!(credential.id, credential.sign_count)
+    user = UsersStore.find(cred_row['user_id'])
+    sign_in!(user)
+
+    return_to = session.delete(:return_to) || '/'
+    JSON.generate(ok: true, return_to: return_to)
+  end
+
+  # Recovery — consume a one-time code, sign the user in. The code
+  # IS the credential; we don't ask for a username because the code
+  # is unique across users and reveals the user_id on hash match.
+  post '/api/auth/recovery' do
+    content_type :json
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+
+    user_id = RecoveryCodesStore.consume!(body['code'])
+    halt 401, JSON.generate(error: 'That code is invalid or already used.') unless user_id
+
+    user = UsersStore.find(user_id)
+    halt 401, JSON.generate(error: 'That code is invalid or already used.') unless user
+    sign_in!(user)
+
+    return_to = session.delete(:return_to) || '/'
+    remaining = RecoveryCodesStore.unconsumed_count_for(user_id)
+    JSON.generate(ok: true, return_to: return_to, recovery_codes_remaining: remaining)
   end
 
   # /whats-on → / 301-redirect for backwards compatibility with old
