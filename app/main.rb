@@ -250,6 +250,23 @@ class TechFeedReader < Sinatra::Base
                        @today_listening.empty? && @today_watching.empty?
     end
 
+    # Estimated reading time for an article in whole minutes, based
+    # on the cleaned content_text word count at ~200 words/min. Returns
+    # nil for articles whose primary mode is audio (podcasts) or video
+    # (YouTube) since "reading time" is meaningless there — the row
+    # already shows duration / a play affordance. Caps at 60 min and
+    # returns nil under 1 min (sub-minute pills add noise, not value).
+    def reading_time_minutes(article)
+      return nil if article['audio_url'].to_s.size.positive?
+      return nil if youtube_video_id(article)
+      text = article['content_text'].to_s
+      return nil if text.empty?
+      words = text.split(/\s+/).length
+      return nil if words < 100
+      minutes = (words / 200.0).ceil
+      [minutes, 60].min
+    end
+
     # STUFF.md follow-up — feed with the most articles published in
     # the last 24h, returned as a row from `feeds` (or nil if no
     # articles published in that window). Powers the "freshest source
