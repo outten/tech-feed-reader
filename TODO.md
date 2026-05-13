@@ -329,80 +329,102 @@ Following a player or team only pinned them to their topical landing page; nothi
 
 ---
 
-## Multi-user — Phase A1: Auth wall (Microsoft Entra ID SSO)
+## Multi-user — Phase A1: Auth wall (passkey-only, consumer-facing)
 
-**Status: `proposed`** — awaiting Azure app registration before any code
+**Status: `proposed`** — awaiting user go-ahead on the locked decisions below; no Azure / Entra dependency anymore
 
-The app is single-user today. Goal: open it to the rest of the company. Phase A1 ships the auth wall — Entra ID single-sign-on, a `users` table, sessions, login/logout — but **does not yet split per-user data**. All existing data stays shared; the first person to sign in becomes user 1 and inherits Todd's bookmarks/state. This lets us land auth as one focused PR and start Phase A2 (per-user data split) only after the auth wall has been kicked in real use.
+**Pivot 2026-05-13:** the original A1 plan targeted an enterprise rollout against Microsoft Entra ID for a single company tenant. STUFF.md #22 changed the direction — this is a **consumer-facing app now**, anyone on the internet can sign up. Auth provider, recovery story, and cost profile all change. Phase A2 (per-user data split) is unaffected — that work is provider-agnostic.
+
+The app is single-user today. Phase A1 ships the auth wall — passkey sign-up + sign-in, a `users` table, sessions, recovery codes — but **does not yet split per-user data**. All existing data stays shared; the first person to sign up becomes user 1 and inherits Todd's bookmarks/state. This lets us land auth as one focused PR and start A2 (per-user data split) only after the auth wall has been kicked in real use.
+
+### Why passkey-only (no email, no SMS, no password)
+
+| | Email/Password | SMS (Text) | **Passkey (WebAuthn)** ✓ |
+|---|---|---|---|
+| Phishing resistance | Low (reused passwords, AITM) | Low (SIM swap) | **Very high** — origin-bound, no shared secret |
+| UX after first login | Type credentials | Wait for SMS, type 6-digit | Tap fingerprint / Face ID (~1s) |
+| Cost / login | Free (but need email infra for recovery) | $0.01–0.05 per SMS, scales linearly | **Free**, no per-login cost |
+| Privacy | Email collected | Phone number collected | **Nothing collected** beyond a username |
+| Recovery | Email reset link | "Lost my phone" is brutal | Platform sync (iCloud/Google/Bitwarden) + one-time recovery codes |
+| Implementation | Moderate | High (Twilio + per-country deliverability) | Moderate (`webauthn` gem) |
+
+User explicitly nixed email (any flavour) and SMS, so **passkey-only with recovery codes** is the path. No external services. No per-message cost. Cleanest privacy story of the three.
 
 ### What ships in the Phase A1 PR
 
-- Migration `019_users.sql` — `users (id, azure_oid UNIQUE, email, display_name, created_at, last_seen_at)` + index on `azure_oid`.
-- `app/users_store.rb` — `find_or_create_by_azure(oid:, email:, name:)`, `find(id)`.
-- `app/auth.rb` — OmniAuth setup, helpers (`current_user`, `signed_in?`, `require_signed_in!`).
-- `views/sign_in.erb` — "Sign in with Microsoft" page.
-- Layout header: "Signed in as {name} ▾" with logout link.
+**Migrations**
+- `019_users.sql` — `users (id, username TEXT UNIQUE NOT NULL, display_name TEXT, created_at, last_seen_at)` + index on `username`.
+- `020_webauthn_credentials.sql` — `webauthn_credentials (id, user_id REFERENCES users(id) ON DELETE CASCADE, credential_id TEXT UNIQUE NOT NULL, public_key BLOB NOT NULL, sign_count INTEGER NOT NULL DEFAULT 0, transports TEXT, label TEXT, created_at, last_used_at)`. Multiple credentials per user (so the user can register a passkey on phone + laptop).
+- `021_recovery_codes.sql` — `recovery_codes (id, user_id REFERENCES users(id) ON DELETE CASCADE, code_hash TEXT UNIQUE NOT NULL, consumed_at TIMESTAMP)`. 10 codes generated at signup, each usable once.
 
-**Routes**
-- `GET /auth/entra-id` — OmniAuth handles internally; kicks off OAuth.
-- `GET /auth/entra-id/callback` — receives Azure response, finds-or-creates user, sets `session[:user_id]`, redirects to original requested path.
-- `GET /auth/failure` — error display.
+**Stores**
+- `app/users_store.rb` — `find_by_username`, `create(username:, display_name:)`, `touch_last_seen!(id)`.
+- `app/webauthn_credentials_store.rb` — `for_user(user_id)`, `register!(user_id:, ...)`, `bump_sign_count!(credential_id, n)`.
+- `app/recovery_codes_store.rb` — `mint_for!(user_id, n:)` (returns plaintext codes once), `consume!(user_id, plaintext_code)`.
+
+**Helpers + middleware**
+- `app/auth.rb` — `current_user`, `signed_in?`, `require_signed_in!`; loads `dotenv` in dev/test.
+- Before-filter on every route: public allowlist (`/`, `/about`, `/health`, `/metrics`, `/auth/*`, `/sign-up`, `/sign-in`, static assets) — everything else 302 → `/sign-in?return_to=<path>`.
+
+**Views**
+- `views/sign_up.erb` — "Pick a username, register a passkey." On success, full-screen modal lists 10 recovery codes with a "Download as text" button and a "I've saved these" confirm.
+- `views/sign_in.erb` — username field + "Sign in with passkey" button + a "Use a recovery code" link.
+- Layout header: "Signed in as {display_name or username} ▾" with logout link.
+
+**Routes** (all JSON for the WebAuthn ceremonies; HTML for the page shells)
+- `GET /sign-up` / `GET /sign-in` — page shells.
+- `POST /api/auth/register/options` — server emits `PublicKeyCredentialCreationOptions`; stores the challenge in the session.
+- `POST /api/auth/register/verify` — verifies the attestation, creates `users` + `webauthn_credentials` row, mints 10 recovery codes, returns them in the response body once.
+- `POST /api/auth/login/options` — for a given username, emits `PublicKeyCredentialRequestOptions` listing that user's registered credentials.
+- `POST /api/auth/login/verify` — verifies the assertion, bumps `sign_count`, sets `session[:user_id]`.
+- `POST /api/auth/recovery` — username + one recovery code → consume + sign in.
 - `POST /sign-out` — clears session.
-- `GET /sign-in` — landing if a protected page bounces here.
-
-**Auth wall (before-filter)**
-- Public allowlist: `/`, `/about`, `/health`, `/metrics`, `/auth/*`, `/sign-in`, `/sign-out`, static assets.
-- Everything else: redirect to `/sign-in?return_to=<original>` if not signed in.
-
-**Optional gating**
-- `ALLOWED_EMAIL_DOMAINS` env var (e.g. `yourcompany.com`): if set, reject sign-ins outside that allowlist with a friendly "not allowed" page.
 
 ### Library + tooling
 
 | Concern | Choice | Why |
 |---|---|---|
-| OAuth/OIDC client | [`omniauth-entra-id`](https://github.com/RIPAGlobal/omniauth-entra-id) | Maintained successor to `omniauth-azure-activedirectory-v2`; standard Ruby OmniAuth integration. |
-| Session storage | `Rack::Session::Cookie` (signed, encrypted) | Already used by `Sidekiq::Web` in the codebase; no new infra. |
+| WebAuthn server library | [`webauthn`](https://github.com/cedarcode/webauthn-ruby) | Maintained, used by Mastodon + GitLab. Handles registration + authentication ceremonies, attestation verification, sign-count check. |
+| Browser-side ceremony | Native `navigator.credentials.create()` / `.get()` — no library | First-party browser API; available on 95%+ of active browsers. Tiny shim in `public/auth.js` (~80 LoC) to base64url-encode/decode + post JSON. |
+| Recovery code hashing | `OpenSSL::HMAC.hexdigest('SHA256', SESSION_SECRET, code)` | No reason to use bcrypt — codes are high-entropy, single-use, and the perf cost of bcrypt-each-check matters when a user has 10 of them. |
+| Session storage | `Rack::Session::Cookie` (signed, encrypted) | Already used by `Sidekiq::Web`; no new infra. |
 | Secrets in dev | `dotenv` gem + the existing `.env` (already gitignored) | Loads only in `RACK_ENV=development|test`; prod reads from real env vars. |
-| CSRF | `rack-protection` (already pulled in by Sinatra) | Confirm the auth callback exempts CSRF for the OAuth handshake. |
+| CSRF | `rack-protection` (already pulled in) | The `/api/auth/*` JSON endpoints need an exemption (CSRF tokens vs WebAuthn challenges are belt-and-suspenders); auth POSTs from the same origin are still bounded by the SameSite cookie. |
 
-`.env` during dev:
-
+`.env` during dev (no third-party secrets needed):
 ```
-AZURE_TENANT_ID=...
-AZURE_CLIENT_ID=...
-AZURE_CLIENT_SECRET=...
 SESSION_SECRET=<64-byte hex>
-ALLOWED_EMAIL_DOMAINS=yourcompany.com   # optional allow-list
+WEBAUTHN_RP_NAME=Tech Feed Reader
+WEBAUTHN_RP_ID=localhost           # in prod: your bare domain (e.g. tfr.example.com)
+WEBAUTHN_ORIGIN=http://localhost:4567   # in prod: https://tfr.example.com
 ```
 
 `.credentials` (existing) keeps `ANTHROPIC_API_KEY` — no migration needed.
 
-### Decisions (locked 2026-05-10)
+### Decisions (locked 2026-05-13)
 
 | Question | Choice |
 |---|---|
-| Tenant scope | **Single-tenant** — only employees in the company's Entra directory |
-| Email-domain allow-list | **Yes** — `ALLOWED_EMAIL_DOMAINS` enforced as belt-and-suspenders |
-| First-time-user behaviour | **Auto-create user row + sign in** — first user (Todd) becomes user_id=1 and inherits existing single-user data |
-
-### Azure-side prerequisites (user to set up)
-
-1. App registration in Entra admin center
-   - Name: "Tech Feed Reader"
-   - Supported accounts: "Accounts in this organizational directory only" (single tenant)
-   - Redirect URI: `http://localhost:4567/auth/entra-id/callback` (add prod URL later)
-2. Permissions: `User.Read` (delegated, default) — gets the user's email + display name.
-3. Generate a client secret, copy it (only shown once).
-4. Capture: **Tenant ID**, **Application (client) ID**, **Client secret**, **allow-list domain**.
-
-Drop into `.env` (a `.env.example` template ships in the PR).
+| Auth method | **Passkey-only** (WebAuthn). No password, no email, no SMS. |
+| Identity field | **Username** (unique, user-chosen at signup). No email stored. |
+| Recovery | **10 one-time recovery codes** generated at signup, shown once, hashed at rest. Account is locked if user loses all passkeys + all codes — documented explicitly on the signup screen. |
+| First-time-user behaviour | **Auto-create user + sign in** — first user (Todd) becomes user_id=1 and inherits the existing single-user data. |
+| Sign-up open / closed | **Open for now**. Once we hit a real cost ceiling we can add a per-day signup rate-limit or invite codes. |
+| Recovery-code algorithm | 10 codes, each 5 groups of 4 base32 chars (e.g. `XK4P-9MWZ-...`). HMAC-SHA256 with `SESSION_SECRET` as the storage hash. |
+| Account deletion | Out of scope for A1. POST `/account` route in a follow-up; until then it's a manual DB delete. |
 
 ### What Phase A1 does NOT do (intentional deferral)
 
-- **No per-user data scoping** — every existing route still sees the shared "owner" bookmarks/feeds/tags. This is the auth-wall model: gated, but everyone signed-in shares one account state.
+- **No per-user data scoping** — every signed-in user sees the shared "owner" bookmarks/feeds/tags. This is the auth-wall model: gated, but everyone shares state. A2 handles the split.
 - **No admin pages, no user management UI, no roles** — flat permissions; everyone signed in is "a user."
-- **No multi-tenant isolation** — single Entra tenant, single app registration.
+- **No email anywhere** — explicit user direction. Recovery story is "save the codes, register passkeys on multiple devices, use platform sync (iCloud Keychain / Google Password Manager / 1Password / Bitwarden)."
+- **No social login / no SSO providers** — explicit pivot away from this.
+- **No multi-passkey UI v1** — registration only adds the first passkey at signup. Add-another-passkey-on-this-device-too can come in a follow-up; the schema already supports it.
+
+### Open questions (before opening the Phase A1 PR)
+
+- **`WEBAUTHN_RP_ID` for prod**: needs to be the bare domain we'll deploy on. Until we have it, dev uses `localhost`.
+- **Backup strategy for `webauthn_credentials` + `recovery_codes`**: tied to the larger "deploy this somewhere" decision. SQLite-on-S3 with Litestream replication (per STUFF.md #11) covers it.
 
 ---
 
