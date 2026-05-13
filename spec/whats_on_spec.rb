@@ -69,6 +69,44 @@ RSpec.describe "GET / What's On Today (returning user)" do
     expect(read_section).to be_nil
   end
 
+  # Phase 3 (2026-05-12) — bus mode discovery chip.
+  it 'renders a "short for the bus" chip when today has any ≤15-min podcast episodes' do
+    seed_returning!
+    feed = FeedsStore.find_by_url('https://x.com/buspod') ||
+           FeedsStore.add(url: 'https://x.com/buspod', title: 'Bus Pod')
+    ArticlesStore.import(feed_id: feed['id'], entries: [{
+      uid: 'buspod0001', title: 'Short ep',
+      url: 'https://x.com/buspod-ep', author: nil,
+      published_at: Time.now.utc.iso8601,
+      content_html: '<p>x</p>', content_text: 'x',
+      audio_url: 'https://x.com/bus.mp3',
+      audio_mime_type: 'audio/mpeg',
+      audio_duration_seconds: 600  # 10 minutes — under the 15m cap
+    }])
+    get '/'
+    expect(last_response.body).to include('whats-on-bus-chip')
+    expect(last_response.body).to include('short for the bus')
+    expect(last_response.body).to match(%r{href="/bus"})
+  end
+
+  it 'does NOT render the bus chip when nothing today is ≤15 min' do
+    seed_returning!
+    feed = FeedsStore.find_by_url('https://x.com/longpod') ||
+           FeedsStore.add(url: 'https://x.com/longpod', title: 'Long Pod')
+    ArticlesStore.import(feed_id: feed['id'], entries: [{
+      uid: 'longpod0001', title: 'Long ep',
+      url: 'https://x.com/longpod-ep', author: nil,
+      published_at: Time.now.utc.iso8601,
+      content_html: '<p>x</p>', content_text: 'x',
+      audio_url: 'https://x.com/long.mp3',
+      audio_mime_type: 'audio/mpeg',
+      audio_duration_seconds: 5400  # 90 minutes — over the bus cap
+    }])
+    get '/'
+    expect(last_response.body).to include('To listen today')
+    expect(last_response.body).not_to include('whats-on-bus-chip')
+  end
+
   it 'puts ANY article with a YouTube URL in the To watch section (Phase 2 — was: topic=nature only)' do
     seed_returning!
     # Nature YouTube — like before.

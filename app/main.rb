@@ -224,11 +224,22 @@ class TechFeedReader < Sinatra::Base
       # topic. So a Premier League highlight clip from the new
       # :youtube_sports channels shows up alongside BBC Earth, and a
       # tech YouTube channel would too if you ever subscribed to one.
-      @today_listening = todays.select { |a| a['audio_url'].to_s.size.positive? }.first(10)
+      all_listens = todays.select { |a| a['audio_url'].to_s.size.positive? }
+      @today_listening = all_listens.first(10)
       videos_today, non_video = todays.reject { |a| a['audio_url'].to_s.size.positive? }
                                       .partition { |a| youtube_video_id(a) }
       @today_watching = videos_today.first(10)
       @today_reading  = non_video.first(10)
+
+      # Phase 3 follow-up (2026-05-12) — surface bus mode on the home.
+      # Bus mode (header 🚌 icon) lists podcast episodes ≤15 minutes
+      # so the user can pick something for the commute. The icon is
+      # easy to miss; this exposes the count alongside today's listens.
+      bus_cutoff_seconds = BUS_DEFAULT_MAX_MINUTES * 60
+      @bus_count_today = all_listens.count do |a|
+        dur = a['audio_duration_seconds'].to_i
+        dur.positive? && dur <= bus_cutoff_seconds
+      end
 
       @summaries_by_article_id = SummaryStore.find_for_ids(
         (@today_reading + @today_listening + @today_watching).map { |a| a['id'] }
