@@ -249,3 +249,15 @@ Can you double the number of unsplash random background inpirational, pictures. 
 
 **Shipped.** `BackgroundPool::POOL_TARGET_SIZE` bumped 50 → 100. That's the page-size ceiling Picsum's `/v2/list` endpoint returns in a single hit, so we're maxing out the per-fetch variety. Click "Refresh pool" on `/admin/backgrounds` to populate. Note: Picsum is unfiltered random — Unsplash's themed endpoints (nature / technology specifically) would require an API key + a different provider integration; happy to do that as a follow-up if 100 random images isn't enough variety on the themes you like.
 
+## [x] 22. Consumer Facing and Multi-Users
+
+I've decided to change this from a Enterprise / Company app and make this for consumers.
+
+So, update the TODO / Microsoft Entra area to reflect this. Also, recommend which type of login we should use:
+
+- email / password
+- text message
+- passkey
+
+**Analyzed + locked.** Phase A1 in [TODO.md](TODO.md#multi-user--phase-a1-auth-wall-passkey-only-consumer-facing) rewritten end-to-end. Decision: **passkey-only with one-time recovery codes**. No email anywhere (explicit user direction); no SMS (per-message cost + privacy + SIM swap); no password (adds breach surface for zero gain when the recovery story is non-email). User identity is a chosen username; 10 recovery codes generated at signup hashed with HMAC-SHA256 + `SESSION_SECRET`, shown once. Library: `webauthn` Ruby gem (Mastodon + GitLab use it). No external services, no per-login cost. Three new tables (`users`, `webauthn_credentials`, `recovery_codes`). Phase A2 (per-user data split) is unchanged — provider-agnostic.
+
