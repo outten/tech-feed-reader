@@ -251,6 +251,8 @@ The singleton player API lives in [`public/global-player.js`](public/global-play
 
 **Turbo migration notes** — body-level `<script>` tags re-execute on every Turbo body swap. Scripts that should bind once need a guard (see `window.__playerInited` in `global-player.js` and the `dataset.inited` check in `chat-widget.js`). Scripts that should rebind every nav (e.g. the article-page hookup of the play-episode button) can run unconditionally.
 
+**Turbo opt-out for heavy-JS pages** — for pages that initialize a complex JS component (Chart.js on `/admin/dashboard`, the YouTube IFrame API on `/article/:uid` for video articles) OR that submit a form to a long-running endpoint (the `/triage` Generate button calls Claude for ~30s), Turbo's silent background fetch is the wrong default. Either the click looks dead, the canvas is stuck stale, or the body-replace races the script's first run. Mark the *link* or *form* with `data-turbo="false"` for those targets. PR #62 / #65 / #69 cover the three real-world incidents that taught us this — when in doubt, opt out.
+
 ## Project structure
 
 ```
