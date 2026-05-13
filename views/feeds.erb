@@ -142,12 +142,46 @@
   </tbody>
 </table>
 
+<%# Phase 4 follow-up (2026-05-12) — "Recommended for you" callout
+    above the full catalog browse. Scores unsubscribed entries against
+    the user's existing subscriptions (category × 2 + topic). Empty on
+    cold-start (no catalog overlap) so the section auto-hides. %>
+<% if (@recommended || []).any? %>
+  <section class="benchmark-section feeds-recommended" style="margin-top:2.5rem">
+    <h3>✨ Recommended for you <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @recommended.length %>)</span></h3>
+    <p class="subtitle">
+      Based on the <%= @subscribed.length %> feed<%= 's' unless @subscribed.length == 1 %> you already subscribe to.
+      Adjacent categories + topics; skip what you don't want and the rest of the
+      full catalog is below.
+    </p>
+    <ul class="catalog-list">
+      <% @recommended.each do |entry| %>
+        <li class="catalog-row" data-catalog-url="<%= h(entry[:url]) %>">
+          <div class="catalog-meta">
+            <span class="catalog-title"><%= h(entry[:title]) %></span>
+            <span class="catalog-blurb"><%= h(entry[:blurb]) %></span>
+            <span class="muted catalog-url">
+              <%= h(@categories[entry[:category]]) %>
+              &middot; <%= h(entry[:url]) %>
+            </span>
+          </div>
+          <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
+            <input type="hidden" name="url" value="<%= h(entry[:url]) %>">
+            <button type="submit" class="btn-primary" title="Subscribe to &lsquo;<%= h(entry[:title]) %>&rsquo; and queue an initial fetch">+ Add</button>
+          </form>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
 <section class="benchmark-section" style="margin-top:2.5rem">
   <h3>Discover popular feeds</h3>
   <p class="subtitle">
-    25 hand-picked tech feeds. Click <strong>Add</strong> on anything that looks
-    interesting — the URL goes straight into the subscriptions list. Already-
-    subscribed entries are marked.
+    Hand-picked catalog of <%= FeedCatalog.all.length %> feeds across tech, sports, podcasts,
+    nature, and more. Click <strong>Add</strong> on anything that looks interesting —
+    the URL goes straight into the subscriptions list. Already-subscribed entries are
+    marked.
   </p>
   <% @categories.each do |key, label| %>
     <% entries = @catalog[key] %>
