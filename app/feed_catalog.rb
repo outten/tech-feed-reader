@@ -474,4 +474,37 @@ module FeedCatalog
   def find_by_url(url)
     CATALOG.find { |e| e[:url] == url }
   end
+
+  # Phase 4 (2026-05-12). Score unsubscribed catalog entries by their
+  # similarity to what the user has already subscribed to, return the
+  # top N. Algorithm:
+  #
+  #   • For every subscribed feed that's in the catalog, accumulate
+  #     weights: +2 for its category, +1 for its topic.
+  #   • Score each unsubscribed catalog entry by summing the weights
+  #     of its (category, topic).
+  #   • Return entries with score > 0, descending — discards entries
+  #     whose category isn't represented by any subscription.
+  #
+  # Returns [] cold-start (no overlap with the catalog at all). Used
+  # by the /feeds view to put a "Recommended for you" callout above
+  # the full catalog browse, which got intimidating at 79 entries.
+  def recommend_for(subscribed_urls:, limit: 6)
+    subscribed = Array(subscribed_urls).to_set
+    cat_weight, topic_weight = Hash.new(0), Hash.new(0)
+    subscribed.each do |url|
+      entry = find_by_url(url)
+      next unless entry
+      cat_weight[entry[:category]] += 1
+      topic_weight[topic_for(entry)] += 1
+    end
+    return [] if cat_weight.empty?
+
+    CATALOG.reject { |e| subscribed.include?(e[:url]) }
+           .map { |e| [e, cat_weight[e[:category]] * 2 + topic_weight[topic_for(e)]] }
+           .select { |(_, s)| s.positive? }
+           .sort_by { |(_, s)| -s }
+           .first(limit)
+           .map(&:first)
+  end
 end

@@ -26,8 +26,15 @@ RSpec.describe '/feeds catalog routes' do
 
       get '/feeds'
       expect(last_response.body).to include('✓ Subscribed')
-      # The HN row should not have an Add button (it's subscribed).
-      hn_row = last_response.body[/Hacker News.*?(?=<\/li>)/m]
+      # Capture the HN catalog row precisely. We anchor on the
+      # `subscribed` class modifier — only the catalog row for an
+      # already-subscribed entry carries it, so this isolates the
+      # row we want without being fooled by mentions of "Hacker
+      # News" elsewhere on the page (e.g. the user's subscribed-
+      # feeds table or the Phase 4 "Recommended for you" section).
+      hn_row = last_response.body[/<li class="catalog-row subscribed"[^>]*ycombinator[^>]*>[\s\S]*?<\/li>/]
+      expect(hn_row).not_to be_nil
+      expect(hn_row).to include('Hacker News')
       expect(hn_row).to include('Subscribed')
       expect(hn_row).not_to include('+ Add')
     end

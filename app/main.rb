@@ -1546,6 +1546,11 @@ class TechFeedReader < Sinatra::Base
     # Phase 5 — surface the mute rules in the "Muted" subsection.
     # Hash keyed by kind so the view can render three small lists.
     @mute_rules = MuteRulesStore.all.group_by { |r| r['kind'] }
+    # Phase 4 follow-up (2026-05-12) — "Recommended for you" callout.
+    # Scores unsubscribed catalog entries against the user's current
+    # subscriptions (cat × 2 + topic). Empty cold-start; otherwise
+    # 6 strongest matches surface above the full browse list.
+    @recommended = FeedCatalog.recommend_for(subscribed_urls: @subscribed, limit: 6)
     erb :feeds
   end
 
