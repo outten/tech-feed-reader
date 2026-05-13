@@ -155,7 +155,7 @@ Sports is structurally different from articles: it has match results, fixture ca
 
 ## Sports — Phase S1: topic-aware feeds
 
-**Status: `tests`** — outten/TODO-050, awaiting user approval to commit + open PR
+**Status: `done`** — shipped in commit `a2344e9` (bundled with S2 + S5/S6 news-only v1)
 
 Foundation. The current `feeds` table is undifferentiated; every feed flows into the unified `/articles` pipeline. Adding sports needed a top-level grouping so a user can browse "just sports" / "just tech" and so the For You ranker can scope its corpus per topic later.
 
@@ -171,7 +171,7 @@ Naming: the new column is `topic` (not `category`) because the existing `FeedCat
 
 ## Sports — Phase S2: seed the user's sports RSS feeds
 
-**Status: `tests`** — outten/TODO-050 (bundled with S1), awaiting user approval to commit + open PR
+**Status: `done`** — shipped in commit `a2344e9` (bundled with S1)
 
 Eight catalog entries verified live (HTTP 200 + valid RSS/Atom signature) covering all six of the user's stated interests. Feeds aren't auto-seeded — adoption is opt-in via the catalog's "+ Add" buttons, matching how the existing tech-podcast catalog works.
 
@@ -187,7 +187,7 @@ Quick, immediate-value win once S1 lands. Curates the user's specific teams as c
 
 ## Sports — Phase S3: structured-data schema (matches, teams, players, leagues)
 
-**Status: `tests`** — outten/TODO-051, awaiting user approval to commit + open PR
+**Status: `done`** — shipped in commit `c059411` (bundled with S4, ESPN-only)
 
 News alone isn't enough — the user asked for "scores of recent games, charts of performance in leagues". That requires structured records, not free-text articles. New tables sit alongside the existing schema; no migration of the article tables.
 
@@ -202,7 +202,7 @@ News alone isn't enough — the user asked for "scores of recent games, charts o
 
 ## Sports — Phase S4: data providers — ESPN (NFL/NBA/MLS + intl rugby) + TheSportsDB (deferred)
 
-**Status: `tests`** — outten/TODO-051 (bundled with S3), ESPN-only; TheSportsDB deferred
+**Status: `done`** — shipped in commit `c059411` (bundled with S3), ESPN-only; TheSportsDB still deferred (free-key poisoned, Patreon required)
 
 Originally planned as ESPN + TheSportsDB. Shipped as **ESPN-only** in this PR — TheSportsDB's free tier key '3' has been hijacked at the source (every search endpoint returns Arsenal regardless of query, confirmed live). The Patreon-tier $9/mo dedicated key still works, so TheSportsDB integration is a future follow-up gated on either the user opting into the paid tier or another free rugby/tennis provider surfacing.
 
@@ -220,7 +220,7 @@ Sources: [ESPN endpoint catalogue](https://gist.github.com/akeaswaran/b48b02f1c9
 
 ## Sports — Phase S5: `/sports` overview page
 
-**Status: `tests` (news-only v1)** — outten/TODO-050 (bundled with S1+S2)
+**Status: `done` (news-only v1)** — shipped in commit `a2344e9` (bundled with S1+S2)
 
 The user asked: "Should we create a top level Sports page that aggregates the sports info?" The answer was yes, but the structured data (live scores, results, upcoming fixtures) won't exist until S3+ ships. So this PR delivers the **news-only** version of S5 — per-sport sections with subscribed feeds + recent articles — and the Live / Results / Upcoming sections will land on the same page once the structured-data schema arrives.
 
@@ -233,7 +233,7 @@ The user asked: "Should we create a top level Sports page that aggregates the sp
 
 ## Sports — Phase S6: per-team detail page + performance chart
 
-**Status: `tests` (news-only v1)** — outten/TODO-050 (bundled with S1+S2+S5)
+**Status: `done` (news-only v1)** — shipped in commit `a2344e9` (bundled with S1+S2+S5)
 
 The user asked for "buttons in the Executive Summary of the area to filter on sports team … with simple, but nice articles on them". That's the per-team detail page; structured-data parts (matches, charts, standings) wait on Phase S3+.
 
@@ -247,7 +247,7 @@ The user asked for "buttons in the Executive Summary of the area to filter on sp
 
 ## Sports — Phase S7: per-sport landing pages + tennis player follows
 
-**Status: `tests` (tennis-only v1)** — outten/TODO-055, awaiting user approval to commit + open PR
+**Status: `done` (tennis-only v1)** — shipped in commit `48e73e6`
 
 User asked specifically for tennis rankings + drill-down. Shipped that as the first slice of S7 — per-sport landing pages for the team-based sports (rugby / NFL / NBA / MLS) are deferred since their existing `/sports/league/:slug` + `/sports/team/:slug` already cover the team-centric mental model.
 
@@ -264,7 +264,7 @@ User asked specifically for tennis rankings + drill-down. Shipped that as the fi
 
 ## Sports — Phase S8: league standings tables
 
-**Status: `tests`** — outten/TODO-053, awaiting user approval to commit + open PR
+**Status: `done`** — shipped in commit `bad8911`
 
 `/sports/league/:slug` (e.g. `/sports/league/nfl`) — full league table per league the user follows.
 
@@ -283,7 +283,7 @@ User asked specifically for tennis rankings + drill-down. Shipped that as the fi
 
 ## Sports — Phase S9: calendar / upcoming + iCal export
 
-**Status: `tests`** — outten/TODO-054, awaiting user approval to commit + open PR
+**Status: `done`** — shipped in commit `7ccb118`
 
 - [x] **`/sports/calendar` page**: next 30 days of scheduled (and live) matches across every followed team, grouped by local day. `?days=N` tunable (clamped 1..365). Each fixture renders time + matchup (logo + name) + league + venue. Followed-team chips link to `/sports/team/:slug`; auto-created opponents render as plain spans (no broken link).
 - [x] **iCal export**: `/sports/calendar.ics` returns `Content-Type: text/calendar` with a proper `Content-Disposition` filename. RFC 5545: CRLF line endings, escaped commas/semicolons/newlines in TEXT properties, UTC `DTSTART`/`DTEND` with `Z` suffix. One `VEVENT` per match with `UID` / `DTSTAMP` / `DTSTART` / `DTEND` / `SUMMARY` / `LOCATION` / `DESCRIPTION` / `STATUS` (CONFIRMED for live, TENTATIVE for scheduled). DTEND duration is per-sport heuristic — football 3.5h, basketball 2.5h, soccer 2h, rugby 2h, default 2.5h.
@@ -317,7 +317,7 @@ Phase S7 shipped tennis rankings + per-player detail. The follow-up adds first-c
 
 ## Sports — Phase S7 follow-up #2: articles-mentioning-entity surface
 
-**Status: `tests`** — outten/TODO-057, awaiting user approval to commit + open PR
+**Status: `done`** — shipped via PR #59
 
 Following a player or team only pinned them to their topical landing page; nothing in the article stream changed. This follow-up surfaces "articles mentioning Sinner" / "articles mentioning Eagles" on each detail page, populated by an FTS5 phrase MATCH cache.
 
