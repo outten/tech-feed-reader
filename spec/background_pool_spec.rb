@@ -3,11 +3,12 @@ require_relative '../app/background_pool'
 
 RSpec.describe BackgroundPool do
   describe 'POOL_TARGET_SIZE' do
-    # STUFF.md #12 — bumped from 12 to 50 so each "Refresh pool"
-    # gives a much wider rotation set. Picsum's /v2/list returns
-    # up to 100 per page, so 50 still fits in one fetch.
-    it 'is 50 (matches the documented "many more random images" target)' do
-      expect(BackgroundPool::POOL_TARGET_SIZE).to eq(50)
+    # STUFF.md #21 — doubled from 50 → 100 per user request for more
+    # rotation variety. 100 is Picsum's /v2/list page-size ceiling, so
+    # we're at the max without needing pagination. (Originally 12 in
+    # STUFF.md #12, then 50.)
+    it 'is 100 (Picsum /v2/list page-size ceiling)' do
+      expect(BackgroundPool::POOL_TARGET_SIZE).to eq(100)
     end
   end
 
@@ -155,7 +156,7 @@ RSpec.describe '/admin/backgrounds routes' do
     # through, not the legacy 12.
     it 'surfaces the bumped POOL_TARGET_SIZE in the page copy' do
       get '/admin/backgrounds'
-      expect(last_response.body).to include('batch of 50')
+      expect(last_response.body).to include('batch of 100')
     end
 
     # STUFF.md #12 — fixed #global-player was overlapping the footer
