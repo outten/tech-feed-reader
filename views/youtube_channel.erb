@@ -1,0 +1,48 @@
+<div class="page-header">
+  <div>
+    <h2><%= h(@feed['title'] || 'YouTube channel') %></h2>
+    <p class="subtitle">
+      <a href="/youtube">&larr; All channels</a>
+      &middot; Showing the <%= @videos.length %> most recent
+      <%= @videos.length == 1 ? 'video' : 'videos' %>
+      <% if @channel_url %>
+        &middot; <a href="<%= h(@channel_url) %>" target="_blank" rel="noopener noreferrer">↗ Channel on YouTube</a>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @videos.empty? %>
+  <div class="empty-state">
+    <p>No videos ingested for this channel yet. Try clicking "Refresh all" in the header.</p>
+  </div>
+<% else %>
+  <section class="benchmark-section">
+    <ul class="youtube-video-grid">
+      <% @videos.each do |video| %>
+        <%
+          # Prefer the per-article image (some feeds carry one), fall
+          # back to YouTube's hqdefault for the video. youtube_thumbnail_url
+          # returns nil if the article URL isn't a recognisable YouTube
+          # video URL — rare for a YouTube feed but possible.
+          thumb = video['image_url'].to_s.empty? ? youtube_thumbnail_url(video) : video['image_url']
+        %>
+        <li class="youtube-video-card <%= video['read'] == 1 ? 'read' : '' %>">
+          <a class="youtube-video-thumb" href="/article/<%= h(video['uid']) %>"
+             title="Open this video">
+            <% if thumb %>
+              <img src="<%= h(thumb) %>" alt="" loading="lazy">
+            <% end %>
+            <span class="youtube-video-play" aria-hidden="true">▶</span>
+          </a>
+          <div class="youtube-video-meta">
+            <a class="youtube-video-title" href="/article/<%= h(video['uid']) %>"><%= h(video['title']) %></a>
+            <span class="muted youtube-video-published">
+              <%= relative_time(video['published_at']) %>
+            </span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>

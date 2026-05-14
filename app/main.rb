@@ -253,6 +253,15 @@ class TechFeedReader < Sinatra::Base
       vid && "https://i.ytimg.com/vi/#{vid}/hqdefault.jpg"
     end
 
+    # STUFF #26 — derive the human-facing YouTube channel URL from the
+    # feed URL we subscribed to. Returns nil for any non-YouTube feed
+    # URL so the caller can decide whether to render the "↗ Channel"
+    # link at all. Used on /youtube to deep-link each channel card.
+    def youtube_channel_url_from(feed_url)
+      m = feed_url.to_s.match(%r{[?&]channel_id=(UC[\w-]+)})
+      m && "https://www.youtube.com/channel/#{m[1]}"
+    end
+
     # Used in feed-fetch UI; ISO8601 timestamps become "2 minutes ago".
     # Skim-mode summary line: prefer LLM, fall back to extractive,
     # else a content_text excerpt. Mirrors the precedence chain used
@@ -1181,6 +1190,38 @@ class TechFeedReader < Sinatra::Base
     @recent_episodes  = ArticlesStore.recent(current_user_id, limit: 25, kind: :podcast)
     @feeds_by_id      = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :podcasts
+  end
+
+  # STUFF #26 — YouTube channel grid. Mirrors /podcasts in shape:
+  # one card per subscribed YouTube channel feed (matched by the
+  # canonical channel-feed URL pattern), with cover art, recent video
+  # count, latest-video age, and a small "↗ Channel" link that opens
+  # the channel on YouTube in a new tab. Card click → /youtube/:feed_id.
+  get '/youtube' do
+    @page_title  = 'YouTube'
+    @channels    = ArticlesStore.youtube_channels(current_user_id)
+    erb :youtube
+  end
+
+  # Single-channel page: the 10 most recent videos for one YouTube
+  # feed. Tiles use the existing hqdefault thumbnail helper +
+  # link to /article/:uid where the player is already embedded
+  # (shipped earlier in STUFF #19).
+  YOUTUBE_CHANNEL_VIDEOS_LIMIT = 10
+  get '/youtube/:feed_id' do |feed_id|
+    @feed = FeedsStore.find(feed_id.to_i)
+    halt 404, erb(:article_not_found) unless @feed
+    unless FeedsStore.subscribed?(current_user_id, @feed['id'])
+      halt 404, erb(:article_not_found)
+    end
+    unless @feed['url'].to_s.include?('youtube.com/feeds/videos.xml')
+      halt 404, erb(:article_not_found)
+    end
+
+    @page_title    = @feed['title'] || 'YouTube channel'
+    @videos        = ArticlesStore.recent_for_feed(current_user_id, @feed['id'], limit: YOUTUBE_CHANNEL_VIDEOS_LIMIT)
+    @channel_url   = youtube_channel_url_from(@feed['url'])
+    erb :youtube_channel
   end
 
   # Sports overview (Phase S5, news-only v1). Aggregates the user's

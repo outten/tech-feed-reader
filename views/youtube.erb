@@ -1,0 +1,69 @@
+<div class="page-header">
+  <div>
+    <h2>YouTube</h2>
+    <p class="subtitle">
+      <% if @channels.empty? %>
+        No YouTube channels subscribed yet.
+      <% else %>
+        <%= @channels.length %> channel<%= 's' unless @channels.length == 1 %>
+        <% if (latest = @channels.first['latest_at']) %>
+          &middot; latest video <%= relative_time(latest) %>
+        <% end %>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @channels.empty? %>
+  <div class="empty-state">
+    <p>
+      Subscribe to a YouTube channel from the catalog at
+      <a href="/feeds">/feeds</a> &rarr; "Discover popular feeds" — categories
+      <em>Nature & wildlife (YouTube)</em> and <em>Sports (YouTube)</em>. Or
+      use the <strong>✨ Ask AI for feed ideas</strong> box on that page to
+      have Claude suggest channels by topic.
+    </p>
+    <p class="subtitle">
+      The channel feed URL pattern we recognise is
+      <code>https://www.youtube.com/feeds/videos.xml?channel_id=UC…</code>.
+    </p>
+  </div>
+<% else %>
+  <section class="benchmark-section">
+    <h3>Subscribed channels</h3>
+    <div class="podcast-shows">
+      <%# Reuse .podcast-shows / .podcast-show-card grid styling — the
+          visual shape (cover art + title + meta) is the same. Card
+          click goes to /youtube/:feed_id (10 most recent videos);
+          the inline ↗ Channel link opens the channel on YouTube in a
+          new tab so a user can browse there directly. %>
+      <% @channels.each do |ch| %>
+        <%
+          channel_url = youtube_channel_url_from(ch['url'])
+          cover = ch['image_url'].to_s.empty? ? nil : ch['image_url']
+        %>
+        <div class="podcast-show-card youtube-channel-card">
+          <a class="podcast-show-card-link" href="/youtube/<%= ch['id'] %>"
+             title="See the 10 most recent videos from <%= h(ch['title'] || ch['url']) %>">
+            <% if cover %>
+              <img class="podcast-show-cover" src="<%= h(cover) %>" alt="" loading="lazy">
+            <% end %>
+            <span class="podcast-show-title"><%= h(ch['title'] || ch['url']) %></span>
+            <span class="podcast-show-meta">
+              <%= ch['video_count'] %> video<%= 's' unless ch['video_count'] == 1 %>
+              <% if ch['latest_at'] %>
+                &middot; latest <%= relative_time(ch['latest_at']) %>
+              <% end %>
+            </span>
+          </a>
+          <% if channel_url %>
+            <a class="youtube-channel-link"
+               href="<%= h(channel_url) %>"
+               target="_blank" rel="noopener noreferrer"
+               title="Open this channel on YouTube">↗ Channel</a>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </section>
+<% end %>

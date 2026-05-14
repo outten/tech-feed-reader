@@ -117,6 +117,46 @@ module ArticlesStore
     SQL
   end
 
+  # STUFF #26 — distinct YouTube channel feeds in the user's
+  # subscriptions. Matched by the canonical YouTube channel-feed URL
+  # pattern (https://www.youtube.com/feeds/videos.xml?channel_id=UC…),
+  # which is the only stable signal we have today; storing a kind
+  # column on feeds is a future-cleanup.
+  YOUTUBE_FEED_URL_PATTERN = '%youtube.com/feeds/videos.xml%'.freeze
+
+  def youtube_channels(user_id)
+    db.execute(<<~SQL, [user_id.to_i, YOUTUBE_FEED_URL_PATTERN])
+      SELECT f.id, f.title, f.url, f.image_url,
+             COUNT(a.id)         AS video_count,
+             MAX(a.published_at) AS latest_at
+      FROM feeds f
+      JOIN user_feed_subscriptions ufs ON ufs.feed_id = f.id AND ufs.user_id = ?
+      LEFT JOIN articles a ON a.feed_id = f.id
+      WHERE f.url LIKE ?
+      GROUP BY f.id
+      ORDER BY latest_at DESC NULLS LAST, f.title ASC
+    SQL
+  end
+
+  # Most recent N articles for one feed_id, joined with read_state for
+  # the user — used by /youtube/:feed_id to render the recent-videos
+  # grid. Doesn't go through state_query because we don't need the
+  # subscription / mute-rule filters here (a single-feed view shows
+  # whatever's there, even muted-author items).
+  def recent_for_feed(user_id, feed_id, limit: 10)
+    db.execute(<<~SQL, [user_id.to_i, feed_id.to_i, limit])
+      SELECT a.*,
+             COALESCE(rs.read, 0)       AS read,
+             COALESCE(rs.bookmarked, 0) AS bookmarked,
+             rs.opened_at               AS opened_at
+      FROM articles a
+      LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
+      WHERE a.feed_id = ?
+      ORDER BY a.published_at DESC, a.id DESC
+      LIMIT ?
+    SQL
+  end
+
   # Articles tagged with the given tag id, scoped to the user.
   def for_tag(user_id, tag_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
     sql, qargs = state_query(

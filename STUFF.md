@@ -278,12 +278,14 @@ All feeds should be free.
 
 As we are now multi user, can we add a Top Chars for each type of Feeds our user are accessing: News, Sports, Podcasts, Nature, YouTube, etc. The doal is Discovery and making it easy to users to "sumble" into new content. That is a key focus of this application.
 
-## [ ] 26. YouTube
+## [x] 26. YouTube
 
 Can you add YouTube as a top level item in the header? The page it loads should like our YouTube subscribe channels. There should be a link to take you directly to a channel in a new tab. Also, can you do an analysis to see if it is possible to:
 
 - have a subpage with a list of the 10 most recent videos
 - clicking a video uses takes you to the page with the embedded player
+
+**Shipped.** New top-level `YouTube` nav link between Podcasts and Sports. `/youtube` lists subscribed YouTube channels as a card grid (cover art + video count + latest age) with a small `↗ Channel` deep-link that opens the channel on YouTube in a new tab. `/youtube/:feed_id` shows the 10 most recent videos as 16:9 tiles using YouTube's `hqdefault` thumbnail + a center play overlay; clicking a tile lands on `/article/:uid`, which already embeds the YouTube player (shipped earlier in STUFF #19). New `ArticlesStore.youtube_channels(user_id)` paralleling `podcast_feeds`, matched on the canonical `youtube.com/feeds/videos.xml?channel_id=UC…` URL pattern.
 
 ## [ ] 27. Feed Filtering
 
@@ -293,4 +295,8 @@ The list of items on the feed list are getting very long. Can you make a suggest
 - AI
 - personalization
 - categories
+- subscribed
+- unsubscribed
 - etc.
+
+Do an anlaysis. Thank you.
