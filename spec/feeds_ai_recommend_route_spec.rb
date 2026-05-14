@@ -72,7 +72,7 @@ RSpec.describe 'POST /feeds/ai-recommend' do
     stub_available(true)
     stub_result(status: :parse_error, error: 'JSON parse failed: unexpected token')
     post '/feeds/ai-recommend', { 'prompt' => 'x' }
-    expect(last_response.body).to include('AI response')
+    expect(last_response.body).to include("Response couldn't be parsed")
     expect(last_response.body).to include('unexpected token')
   end
 
@@ -88,6 +88,32 @@ RSpec.describe 'POST /feeds/ai-recommend' do
     stub_available(true)
     stub_result(status: :no_candidates)
     post '/feeds/ai-recommend', { 'prompt' => 'x' }
-    expect(last_response.body).to include('already subscribed to every feed')
+    expect(last_response.body).to include('subscribed to every catalog feed')
+  end
+
+  it 'renders the token-usage + estimated-cost line under recommendations' do
+    stub_available(true)
+    result = FeedRecommender::Claude::Result.new(
+      status: :ok,
+      recommendations: [
+        { url: 'https://lobste.rs/rss', title: 'Lobsters', category: 'aggregator',
+          topic: 'technology', blurb: 'b', rationale: 'r' }
+      ],
+      raw: nil, model: 'claude-sonnet-4-6', latency_ms: 1234,
+      input_tokens: 4_000, output_tokens: 600, error: nil, prompt: 'p'
+    )
+    allow(FeedRecommender::Claude).to receive(:recommend).and_return(result)
+    post '/feeds/ai-recommend', { 'prompt' => 'p' }
+    # 4000 × 3/M + 600 × 15/M = 0.012 + 0.009 = 0.021
+    expect(last_response.body).to include('4000 in / 600 out tokens')
+    expect(last_response.body).to include('0.0210')
+    expect(last_response.body).to include('1234ms')
+  end
+
+  it 'shows a thinking indicator markup so JS can flip it on at submit' do
+    stub_available(true)
+    get '/feeds'
+    expect(last_response.body).to include('class="ai-thinking"')
+    expect(last_response.body).to include('AI is thinking…')
   end
 end

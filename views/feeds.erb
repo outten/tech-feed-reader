@@ -85,6 +85,121 @@
   <div class="error"><%= h(@error) %></div>
 <% end %>
 
+<%# STUFF.md #23 — Ask-AI prompt box. Hoisted to the top of the page
+    so the result is immediately visible after the synchronous POST
+    reloads. Result block uses an autoscroll target so the browser
+    jumps straight to the response, and a live #ai-thinking indicator
+    flips on at submit time (see public/feeds-ai.js) so the user
+    knows Claude is working — the round-trip is ~1.5–4s typical. %>
+<% if @ai_recommend_available %>
+  <section id="ai-feed-recommend" class="benchmark-section feeds-ai-recommend">
+    <h3>✨ Ask AI for feed ideas</h3>
+    <p class="subtitle">
+      Tell the AI what you're into and it'll pick from the curated catalog.
+      It sees your existing subscriptions, so the picks are personalised.
+      Examples: <em>"Food and travel writing, Bourdain-style."</em> ·
+      <em>"AI safety research blogs."</em> · <em>"Premier League tactics deep dives."</em>
+    </p>
+    <form method="post" action="/feeds/ai-recommend" class="portfolio-form ai-recommend-form js-ai-recommend">
+      <label class="full-width">
+        Your prompt
+        <textarea name="prompt" rows="3" required
+                  placeholder="What kind of feeds, podcasts, or YouTube channels are you looking for?"><%= h(@ai_prompt) if @ai_prompt %></textarea>
+      </label>
+      <div class="ai-recommend-controls">
+        <button type="submit" class="btn-primary" title="Ask Claude to pick matching feeds from the catalog">Recommend feeds</button>
+        <span class="ai-thinking" hidden>
+          <span class="ai-thinking-dot"></span>
+          AI is thinking…
+        </span>
+      </div>
+    </form>
+
+    <% if (result = @ai_recommend_result) %>
+      <div id="ai-recommend-result" class="ai-recommend-result ai-recommend-result--<%= h(result.status) %>"
+           data-status="<%= h(result.status) %>"
+           tabindex="-1">
+        <% if result.status == :ok && result.recommendations.any? %>
+          <h4 class="ai-recommend-result-title">
+            <%= result.recommendations.length %>
+            <%= result.recommendations.length == 1 ? 'recommendation' : 'recommendations' %>
+            for <em>"<%= h(@ai_prompt) %>"</em>
+          </h4>
+          <ul class="catalog-list">
+            <% result.recommendations.each do |rec| %>
+              <li class="catalog-row" data-catalog-url="<%= h(rec[:url]) %>">
+                <div class="catalog-meta">
+                  <strong><%= h(rec[:title]) %></strong>
+                  <span class="muted">&middot; <%= h(@categories[rec[:category].to_sym] || rec[:category]) %></span>
+                  <% unless rec[:blurb].to_s.strip.empty? %>
+                    <div class="muted" style="font-size:0.9rem"><%= h(rec[:blurb]) %></div>
+                  <% end %>
+                  <div class="ai-rationale">↳ <%= h(rec[:rationale]) %></div>
+                </div>
+                <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
+                  <input type="hidden" name="url" value="<%= h(rec[:url]) %>">
+                  <button type="submit" class="btn-primary">Subscribe</button>
+                </form>
+              </li>
+            <% end %>
+          </ul>
+        <% elsif result.status == :ok %>
+          <h4 class="ai-recommend-result-title">No matches in the catalog</h4>
+          <p>
+            Claude didn't find anything matching <em>"<%= h(@ai_prompt) %>"</em> in the
+            curated catalog of <%= FeedCatalog::CATALOG.length %> feeds.
+            The catalog is currently tech / sports / nature heavy — if you
+            were asking about a different domain (food, travel, finance, etc.)
+            it may not be represented yet.
+          </p>
+          <p class="subtitle">
+            Workaround: find a feed URL yourself and paste it into the manual
+            <strong>Add a feed</strong> form below.
+          </p>
+        <% elsif result.status == :parse_error %>
+          <h4 class="ai-recommend-result-title">⚠️ Response couldn't be parsed</h4>
+          <p>Try again or rephrase the prompt.</p>
+          <p class="subtitle"><code><%= h(result.error) %></code></p>
+        <% elsif result.status == :error %>
+          <h4 class="ai-recommend-result-title">⚠️ AI call failed</h4>
+          <p class="subtitle"><code><%= h(result.error) %></code></p>
+        <% elsif result.status == :no_candidates %>
+          <h4 class="ai-recommend-result-title">You're already subscribed to every catalog feed</h4>
+          <p>
+            There's nothing new for the AI to recommend — use the manual
+            <strong>Add a feed</strong> form below for arbitrary URLs.
+          </p>
+        <% end %>
+
+        <% if result.status == :ok && (result.input_tokens || result.output_tokens) %>
+          <%
+            # Sonnet 4.6 pricing (Anthropic Jan 2025 list): $3 / Mtok input,
+            # $15 / Mtok output. Update the constants here when pricing
+            # changes — they're inlined rather than configured because
+            # mis-estimating cost-per-call by a factor of 2 still tells the
+            # user "this is cheap" or "this is expensive" correctly.
+            input_per_mtok  = 3.00
+            output_per_mtok = 15.00
+            in_tokens  = result.input_tokens.to_i
+            out_tokens = result.output_tokens.to_i
+            cost_usd = (in_tokens * input_per_mtok + out_tokens * output_per_mtok) / 1_000_000.0
+          %>
+          <p class="ai-recommend-meta">
+            <%= h(result.model) %> &middot;
+            <%= result.latency_ms %>ms &middot;
+            <%= in_tokens %> in / <%= out_tokens %> out tokens &middot;
+            ≈ $<%= format('%.4f', cost_usd) %>
+          </p>
+        <% elsif result.status == :ok %>
+          <p class="ai-recommend-meta">
+            <%= h(result.model) %> &middot; <%= result.latency_ms %>ms
+          </p>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+<% end %>
+
 <div class="portfolio-add">
   <h3>Add a feed</h3>
   <form method="post" action="/feeds" class="portfolio-form js-add-feed">
@@ -141,74 +256,9 @@
   </tbody>
 </table>
 
-<%# STUFF.md #23 — Ask-AI prompt box. Free-text prompt → Claude picks
-    6–8 catalog feeds matching the brief, with a one-line rationale.
-    Hidden when ANTHROPIC_API_KEY isn't set. Result is rendered inline
-    below the form so the user can subscribe with one click without
-    leaving the page. %>
-<% if @ai_recommend_available %>
-  <section class="benchmark-section feeds-ai-recommend" style="margin-top:2.5rem">
-    <h3>✨ Ask AI for feed ideas</h3>
-    <p class="subtitle">
-      Tell the AI what you're into and it'll pick from the curated catalog.
-      It sees your existing subscriptions, so the picks are personalised.
-      Examples: <em>"Food and travel writing, Bourdain-style."</em> ·
-      <em>"AI safety research blogs."</em> · <em>"Premier League tactics deep dives."</em>
-    </p>
-    <form method="post" action="/feeds/ai-recommend" class="portfolio-form ai-recommend-form">
-      <label class="full-width">
-        Your prompt
-        <textarea name="prompt" rows="3" required
-                  placeholder="What kind of feeds, podcasts, or YouTube channels are you looking for?"><%= h(@ai_prompt) if @ai_prompt %></textarea>
-      </label>
-      <button type="submit" class="btn-primary" title="Ask Claude to pick matching feeds from the catalog">Recommend feeds</button>
-    </form>
-
-    <% if (result = @ai_recommend_result) %>
-      <% if result.status == :ok && result.recommendations.any? %>
-        <ul class="catalog-list" style="margin-top:1.25rem">
-          <% result.recommendations.each do |rec| %>
-            <li class="catalog-row" data-catalog-url="<%= h(rec[:url]) %>">
-              <div class="catalog-meta">
-                <strong><%= h(rec[:title]) %></strong>
-                <span class="muted">&middot; <%= h(@categories[rec[:category].to_sym] || rec[:category]) %></span>
-                <% unless rec[:blurb].to_s.strip.empty? %>
-                  <div class="muted" style="font-size:0.9rem"><%= h(rec[:blurb]) %></div>
-                <% end %>
-                <div class="ai-rationale">↳ <%= h(rec[:rationale]) %></div>
-              </div>
-              <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
-                <input type="hidden" name="url" value="<%= h(rec[:url]) %>">
-                <button type="submit" class="btn-primary">Subscribe</button>
-              </form>
-            </li>
-          <% end %>
-        </ul>
-        <p class="subtitle" style="margin-top:0.5rem; font-size:0.85rem">
-          Picked by Claude <%= h(result.model) %> in <%= result.latency_ms %>ms.
-        </p>
-      <% elsif result.status == :ok %>
-        <p class="subtitle" style="margin-top:1rem">
-          Claude didn't find anything matching that prompt in the curated catalog.
-          Try a different brief, or use the manual "Add a feed" form above.
-        </p>
-      <% elsif result.status == :parse_error %>
-        <p class="error" style="margin-top:1rem">
-          AI response couldn't be parsed. Try again or rephrase. (<%= h(result.error) %>)
-        </p>
-      <% elsif result.status == :error %>
-        <p class="error" style="margin-top:1rem">
-          AI call failed: <%= h(result.error) %>
-        </p>
-      <% elsif result.status == :no_candidates %>
-        <p class="subtitle" style="margin-top:1rem">
-          You're already subscribed to every feed in the catalog. There's nothing
-          new to recommend — try the manual "Add a feed" form above.
-        </p>
-      <% end %>
-    <% end %>
-  </section>
-<% end %>
+<%# (Ask-AI section moved to the top of the page — between the
+    notices and "Add a feed" — so the response lands in view after
+    submit instead of below the feeds table.) %>
 
 <%# Phase 4 follow-up (2026-05-12) — "Recommended for you" callout
     above the full catalog browse. Scores unsubscribed entries against
@@ -340,3 +390,4 @@
 </section>
 
 <script src="/feeds.js?v=<%= asset_mtime('public/feeds.js') %>"></script>
+<script src="/feeds-ai.js?v=<%= asset_mtime('public/feeds-ai.js') %>"></script>
