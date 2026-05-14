@@ -278,18 +278,12 @@ All feeds should be free.
 
 As we are now multi user, can we add a Top Chars for each type of Feeds our user are accessing: News, Sports, Podcasts, Nature, YouTube, etc. The doal is Discovery and making it easy to users to "sumble" into new content. That is a key focus of this application.
 
-## [ ] 25. User ID
-
-Should we be using integer IDs in the database as unique keys ... or GUIDs. Can you analyze and recommend?
-
-IF we switch to grides, carefully phase the work to not lose personalization, or any other usage data from our existing user -- i.e. me.
-
 ## [ ] 26. YouTube
 
-Can you add YouTube as a top level item in the header? The page it loads should like our YouTube subscribe channels. There should be a link to take you directly to a channel. Also, can you do an analysis to see if it is possible to:
+Can you add YouTube as a top level item in the header? The page it loads should like our YouTube subscribe channels. There should be a link to take you directly to a channel in a new tab. Also, can you do an analysis to see if it is possible to:
 
 - have a subpage with a list of the 10 most recent videos
-- clicking a video uses YouTubes embedded video player to view
+- clicking a video uses takes you to the page with the embedded player
 
 ## [ ] 27. Feed Filtering
 
