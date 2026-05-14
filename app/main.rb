@@ -32,6 +32,7 @@ require_relative 'recommendation'
 require_relative 'recommendation/for_you'
 require_relative 'triage/claude'
 require_relative 'triage_store'
+require_relative 'feed_recommender/claude'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'providers/itunes_lookup'
@@ -1874,6 +1875,29 @@ class TechFeedReader < Sinatra::Base
     # subscriptions (cat × 2 + topic). Empty cold-start; otherwise
     # 6 strongest matches surface above the full browse list.
     @recommended = FeedCatalog.recommend_for(subscribed_urls: @subscribed, limit: 6)
+    @ai_recommend_available = FeedRecommender::Claude.available?
+    erb :feeds
+  end
+
+  # STUFF.md #23 — AI-assisted feed recommender. Takes a free-text
+  # `prompt` form field, runs FeedRecommender::Claude against the
+  # curated catalog minus what the user already subscribes to, and
+  # re-renders /feeds with the result rendered in a dedicated section.
+  # Reuses the existing /feeds view so navigation stays in one place.
+  post '/feeds/ai-recommend' do
+    @page_title  = 'Feeds'
+    @ai_prompt   = params['prompt'].to_s.strip
+    @feeds       = FeedsStore.for_user(current_user_id)
+    @notice      = params['notice']
+    @error       = params['error']
+    @catalog     = FeedCatalog.by_category
+    @subscribed  = @feeds.map { |f| f['url'] }.to_set
+    @categories  = FeedCatalog::CATEGORIES
+    @feed_weights = FeedFeedbackStore.weights_by_feed_id(current_user_id, @feeds.map { |f| f['id'] })
+    @mute_rules = MuteRulesStore.all(current_user_id).group_by { |r| r['kind'] }
+    @recommended = FeedCatalog.recommend_for(subscribed_urls: @subscribed, limit: 6)
+    @ai_recommend_available = FeedRecommender::Claude.available?
+    @ai_recommend_result = FeedRecommender::Claude.recommend(current_user_id, prompt: @ai_prompt)
     erb :feeds
   end
 

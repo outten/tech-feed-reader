@@ -261,7 +261,7 @@ So, update the TODO / Microsoft Entra area to reflect this. Also, recommend whic
 
 **Analyzed + locked.** Phase A1 in [TODO.md](TODO.md#multi-user--phase-a1-auth-wall-passkey-only-consumer-facing) rewritten end-to-end. Decision: **passkey-only with one-time recovery codes**. No email anywhere (explicit user direction); no SMS (per-message cost + privacy + SIM swap); no password (adds breach surface for zero gain when the recovery story is non-email). User identity is a chosen username; 10 recovery codes generated at signup hashed with HMAC-SHA256 + `SESSION_SECRET`, shown once. Library: `webauthn` Ruby gem (Mastodon + GitLab use it). No external services, no per-login cost. Three new tables (`users`, `webauthn_credentials`, `recovery_codes`). Phase A2 (per-user data split) is unchanged — provider-agnostic.
 
-## [ ] 23. Use AI to suggest feeds to add
+## [x] 23. Use AI to suggest feeds to add
 
 On the feeds page, add a input box to ask the AI to do and analysis and add feeds for the set to consider subscribing too. For example, "Can you make recommendations on feeds, podcasts, and YouTube follwers that focus on Food & Travel? I really like Anthony Bordain and his travels in Asia, perhaps there are recommendations you can make." 
 
@@ -271,6 +271,8 @@ As the application is about to be multu-user, the number of Feeds that we know a
 - we don't want a long list of possible feeds that a user can subscribe to, we should use personalization, etc. to help direct the user to feeds they will enjoy
 
 All feeds should be free.
+
+**Shipped.** `/feeds` now has an "✨ Ask AI for feed ideas" section above the existing Recommended-for-you callout (visible when `ANTHROPIC_API_KEY` is set). Type a free-text prompt, the route calls `FeedRecommender::Claude.recommend` with your prompt + a JSON list of your current subscriptions + every catalog entry you're NOT subscribed to, and Claude picks up to 8 with a one-line rationale. URLs are validated against the catalog before render (no hallucinations); subscribing is one click via the existing `/feeds/catalog/add` flow. Catalog browse is the safety boundary: every recommendation is from a pre-vetted free feed. Search / categories / catalog-wide discovery beyond what the 79-entry catalog provides is **#27**'s scope.
 
 ## [ ] 24: Most Popular
 
