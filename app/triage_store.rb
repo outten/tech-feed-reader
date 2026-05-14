@@ -15,11 +15,7 @@ module TriageStore
     Database.connection
   end
 
-  # Persist a Triage::Claude::Result. Returns the new row id.
-  # Accepts (user_id, result) OR (result) — the legacy single-arg form
-  # defaults user_id to 1 so pre-A2 specs keep passing.
-  def create(*args)
-    user_id, result = args.length == 2 ? args : [1, args.first]
+  def create(user_id, result)
     sql = <<~SQL
       INSERT INTO triages (
         user_id, generated_at, unread_count, model,
@@ -47,10 +43,7 @@ module TriageStore
     db.last_insert_row_id
   end
 
-  # Most recent triages for `user_id`, listing fields only. When
-  # topic: is passed, filters to runs generated for that scope
-  # (NULL topic = cross-topic legacy run).
-  def recent(user_id = 1, limit: 20, topic: :any)
+  def recent(user_id, limit: 20, topic: :any)
     base_sql = <<~SQL
       SELECT id, generated_at, unread_count, status, model, topic
       FROM triages
@@ -66,10 +59,7 @@ module TriageStore
     end
   end
 
-  # Single row by id, scoped to user. JSON-encoded group columns are
-  # decoded into arrays here.
-  def find(*args)
-    user_id, id = args.length == 2 ? args : [1, args.first]
+  def find(user_id, id)
     row = db.execute('SELECT * FROM triages WHERE user_id = ? AND id = ?', [user_id.to_i, id.to_i]).first
     return nil unless row
     %w[must_read optional skip].each do |key|
@@ -78,7 +68,7 @@ module TriageStore
     row
   end
 
-  def latest(user_id = 1)
+  def latest(user_id)
     row = db.execute(<<~SQL, [user_id.to_i]).first
       SELECT * FROM triages WHERE user_id = ? ORDER BY generated_at DESC, id DESC LIMIT 1
     SQL
@@ -89,7 +79,7 @@ module TriageStore
     row
   end
 
-  def count(user_id = 1)
+  def count(user_id)
     db.execute('SELECT COUNT(*) AS c FROM triages WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 

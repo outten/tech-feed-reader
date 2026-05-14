@@ -23,65 +23,65 @@ end
 RSpec.describe MuteRulesStore do
   describe '.add' do
     it 'inserts a new rule and returns true' do
-      expect(MuteRulesStore.add(kind: 'keyword', value: 'crypto')).to eq(true)
-      expect(MuteRulesStore.count).to eq(1)
+      expect(MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')).to eq(true)
+      expect(MuteRulesStore.count(1)).to eq(1)
     end
 
     it 'is idempotent — re-adding the same rule returns false (no-op)' do
-      MuteRulesStore.add(kind: 'keyword', value: 'crypto')
-      expect(MuteRulesStore.add(kind: 'keyword', value: 'crypto')).to eq(false)
-      expect(MuteRulesStore.count).to eq(1)
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
+      expect(MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')).to eq(false)
+      expect(MuteRulesStore.count(1)).to eq(1)
     end
 
     it 'trims surrounding whitespace on value (so "  Hacker News " == "Hacker News")' do
-      MuteRulesStore.add(kind: 'author', value: '  Hacker News ')
-      expect(MuteRulesStore.add(kind: 'author', value: 'Hacker News')).to eq(false)
-      expect(MuteRulesStore.count).to eq(1)
+      MuteRulesStore.add(user_id: 1, kind: 'author', value: '  Hacker News ')
+      expect(MuteRulesStore.add(user_id: 1, kind: 'author', value: 'Hacker News')).to eq(false)
+      expect(MuteRulesStore.count(1)).to eq(1)
     end
 
     it 'rejects unknown kind' do
-      expect { MuteRulesStore.add(kind: 'sideways', value: 'x') }
+      expect { MuteRulesStore.add(user_id: 1, kind: 'sideways', value: 'x') }
         .to raise_error(ArgumentError, /unknown kind/)
     end
 
     it 'rejects empty value' do
-      expect { MuteRulesStore.add(kind: 'keyword', value: '   ') }
+      expect { MuteRulesStore.add(user_id: 1, kind: 'keyword', value: '   ') }
         .to raise_error(ArgumentError, /value must be non-empty/)
     end
 
     it 'allows the same value across different kinds (composite key)' do
-      MuteRulesStore.add(kind: 'keyword', value: 'foo')
-      MuteRulesStore.add(kind: 'author',  value: 'foo')
-      expect(MuteRulesStore.count).to eq(2)
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'foo')
+      MuteRulesStore.add(user_id: 1, kind: 'author',  value: 'foo')
+      expect(MuteRulesStore.count(1)).to eq(2)
     end
   end
 
   describe '.remove' do
     it 'deletes a matching rule and returns 1' do
-      MuteRulesStore.add(kind: 'keyword', value: 'crypto')
-      expect(MuteRulesStore.remove(kind: 'keyword', value: 'crypto')).to eq(1)
-      expect(MuteRulesStore.count).to eq(0)
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
+      expect(MuteRulesStore.remove(user_id: 1, kind: 'keyword', value: 'crypto')).to eq(1)
+      expect(MuteRulesStore.count(1)).to eq(0)
     end
 
     it 'returns 0 when no rule matches' do
-      expect(MuteRulesStore.remove(kind: 'keyword', value: 'nope')).to eq(0)
+      expect(MuteRulesStore.remove(user_id: 1, kind: 'keyword', value: 'nope')).to eq(0)
     end
 
     it 'rejects unknown kind' do
-      expect { MuteRulesStore.remove(kind: 'sideways', value: 'x') }
+      expect { MuteRulesStore.remove(user_id: 1, kind: 'sideways', value: 'x') }
         .to raise_error(ArgumentError, /unknown kind/)
     end
   end
 
   describe '.all + .for_kind' do
     it 'returns rules grouped / filtered correctly' do
-      MuteRulesStore.add(kind: 'keyword', value: 'crypto')
-      MuteRulesStore.add(kind: 'keyword', value: 'web3')
-      MuteRulesStore.add(kind: 'author',  value: 'Spam McSpamface')
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'web3')
+      MuteRulesStore.add(user_id: 1, kind: 'author',  value: 'Spam McSpamface')
 
-      expect(MuteRulesStore.all.length).to eq(3)
-      expect(MuteRulesStore.for_kind('keyword').map { |r| r['value'] }).to contain_exactly('crypto', 'web3')
-      expect(MuteRulesStore.for_kind('author').length).to eq(1)
+      expect(MuteRulesStore.all(1).length).to eq(3)
+      expect(MuteRulesStore.for_kind(1, 'keyword').map { |r| r['value'] }).to contain_exactly('crypto', 'web3')
+      expect(MuteRulesStore.for_kind(1, 'author').length).to eq(1)
     end
   end
 end
@@ -91,61 +91,61 @@ RSpec.describe ArticlesStore, 'mute filter (Phase 5)' do
     make_mute_article(uid: 'mute00000001', title: 'A piece on crypto markets')
     make_mute_article(uid: 'mute00000002', title: 'A piece on Rails routing')
 
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).to contain_exactly('mute00000001', 'mute00000002')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).to contain_exactly('mute00000001', 'mute00000002')
 
-    MuteRulesStore.add(kind: 'keyword', value: 'crypto')
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).to contain_exactly('mute00000002')
+    MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).to contain_exactly('mute00000002')
   end
 
   it 'matches keyword against content_text too, not just the title' do
     make_mute_article(uid: 'mute00000003', title: 'Innocuous title', content_text: 'But the body talks all about crypto stuff')
-    MuteRulesStore.add(kind: 'keyword', value: 'crypto')
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).not_to include('mute00000003')
+    MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).not_to include('mute00000003')
   end
 
   it 'is case-insensitive (SQLite default LIKE on ASCII)' do
     make_mute_article(uid: 'mute00000004', title: 'ALL CAPS CRYPTO PIECE')
-    MuteRulesStore.add(kind: 'keyword', value: 'crypto')
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).not_to include('mute00000004')
+    MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).not_to include('mute00000004')
   end
 
   it 'hides author-matching articles' do
     make_mute_article(uid: 'mute00000005', title: 'Title A', author: 'Spam McSpamface')
     make_mute_article(uid: 'mute00000006', title: 'Title B', author: 'Cory Doctorow')
-    MuteRulesStore.add(kind: 'author', value: 'Spam McSpamface')
+    MuteRulesStore.add(user_id: 1, kind: 'author', value: 'Spam McSpamface')
 
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).to contain_exactly('mute00000006')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).to contain_exactly('mute00000006')
   end
 
   it 'author match is exact (not substring)' do
     make_mute_article(uid: 'mute00000007', title: 'Title C', author: 'Spam McSpamface, Jr.')
-    MuteRulesStore.add(kind: 'author', value: 'Spam McSpamface')
+    MuteRulesStore.add(user_id: 1, kind: 'author', value: 'Spam McSpamface')
     # Different author string ⇒ should still surface.
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).to include('mute00000007')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).to include('mute00000007')
   end
 
   it 'hides feed-matching articles' do
     feed_a, _ = make_mute_article(uid: 'mute00000008', title: 'A', feed_url: 'https://a.example/rss', feed_title: 'A Feed')
     _,      _ = make_mute_article(uid: 'mute00000009', title: 'B', feed_url: 'https://b.example/rss', feed_title: 'B Feed')
 
-    MuteRulesStore.add(kind: 'feed', value: feed_a['id'].to_s)
-    uids = ArticlesStore.recent.map { |a| a['uid'] }
+    MuteRulesStore.add(user_id: 1, kind: 'feed', value: feed_a['id'].to_s)
+    uids = ArticlesStore.recent(1).map { |a| a['uid'] }
     expect(uids).to     include('mute00000009')
     expect(uids).not_to include('mute00000008')
   end
 
   it 'still surfaces muted articles via .search (FTS5 — bypasses state_query)' do
     make_mute_article(uid: 'mute00000010', title: 'A piece on crypto markets', content_text: 'body about crypto')
-    MuteRulesStore.add(kind: 'keyword', value: 'crypto')
+    MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
 
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).not_to include('mute00000010')
-    expect(ArticlesStore.search('crypto').map { |a| a['uid'] }).to include('mute00000010')
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).not_to include('mute00000010')
+    expect(ArticlesStore.search(1, 'crypto').map { |a| a['uid'] }).to include('mute00000010')
   end
 
   it 'is a no-op when no rules exist (no perf or behavior regression)' do
     make_mute_article(uid: 'mute00000011', title: 'Anything goes')
-    expect(MuteRulesStore.count).to eq(0)
-    expect(ArticlesStore.recent.map { |a| a['uid'] }).to include('mute00000011')
+    expect(MuteRulesStore.count(1)).to eq(0)
+    expect(ArticlesStore.recent(1).map { |a| a['uid'] }).to include('mute00000011')
   end
 end
 
@@ -158,11 +158,11 @@ RSpec.describe 'mute routes' do
       post '/mutes', { kind: 'keyword', value: 'crypto' }
       expect(last_response.status).to eq(302)
       expect(last_response.location).to include('notice=mute-added')
-      expect(MuteRulesStore.count).to eq(1)
+      expect(MuteRulesStore.count(1)).to eq(1)
     end
 
     it 'reports duplicate via the redirect notice' do
-      MuteRulesStore.add(kind: 'keyword', value: 'crypto')
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
       post '/mutes', { kind: 'keyword', value: 'crypto' }
       expect(last_response.location).to include('notice=mute-duplicate')
     end
@@ -185,11 +185,11 @@ RSpec.describe 'mute routes' do
 
   describe 'POST /mutes/delete' do
     it 'removes a rule and redirects with mute-removed notice' do
-      MuteRulesStore.add(kind: 'keyword', value: 'crypto')
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
       post '/mutes/delete', { kind: 'keyword', value: 'crypto' }
       expect(last_response.status).to eq(302)
       expect(last_response.location).to include('notice=mute-removed')
-      expect(MuteRulesStore.count).to eq(0)
+      expect(MuteRulesStore.count(1)).to eq(0)
     end
 
     it 'reports not-found via the notice when the rule is already gone' do
@@ -205,7 +205,7 @@ RSpec.describe 'mute routes' do
 
   describe '/feeds renders the Muted section' do
     it 'shows existing rules with an Unmute button' do
-      MuteRulesStore.add(kind: 'keyword', value: 'crypto')
+      MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
       get '/feeds'
       expect(last_response.body).to include('Muted')
       expect(last_response.body).to include('crypto')

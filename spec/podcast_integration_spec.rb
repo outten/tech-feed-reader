@@ -19,7 +19,7 @@ RSpec.describe 'podcast end-to-end' do
     inserted = ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
     expect(inserted).to eq(parsed[:entries].length)
 
-    rows  = ArticlesStore.recent(limit: 10)
+    rows  = ArticlesStore.recent(1, limit: 10)
     audio = rows.find { |r| r['title'].start_with?('Episode 12') }
     expect(audio['audio_url']).to eq('https://cdn.example.com/audio/ep-12.mp3')
     expect(audio['audio_mime_type']).to eq('audio/mpeg')
@@ -33,7 +33,7 @@ RSpec.describe 'podcast end-to-end' do
     parsed = FeedParser.parse(body, feed_url: feed['url'])
     ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
 
-    ep11 = ArticlesStore.recent(limit: 10).find { |r| r['title'].start_with?('Episode 11') }
+    ep11 = ArticlesStore.recent(1, limit: 10).find { |r| r['title'].start_with?('Episode 11') }
     expect(ep11['image_url']).to be_nil  # ep11 has no per-item itunes:image
   end
 
@@ -43,7 +43,7 @@ RSpec.describe 'podcast end-to-end' do
       parsed = FeedParser.parse(body, feed_url: feed['url'])
       ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
 
-      ep12 = ArticlesStore.recent(limit: 10).find { |r| r['title'].start_with?('Episode 12') }
+      ep12 = ArticlesStore.recent(1, limit: 10).find { |r| r['title'].start_with?('Episode 12') }
       get "/article/#{ep12['uid']}"
 
       expect(last_response.status).to eq(200)

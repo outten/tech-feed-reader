@@ -10,8 +10,7 @@ module DigestStore
     Database.connection
   end
 
-  def create(*args)
-    user_id, digest = args.length == 2 ? args : [1, args.first]
+  def create(user_id, digest)
     sql = <<~SQL
       INSERT INTO digests (user_id, generated_at, window_hours, article_count,
                            subject, text_body, html_body)
@@ -29,7 +28,7 @@ module DigestStore
     db.last_insert_row_id
   end
 
-  def recent(user_id = 1, limit: 50)
+  def recent(user_id, limit: 50)
     db.execute(<<~SQL, [user_id.to_i, limit])
       SELECT id, generated_at, window_hours, article_count, subject
       FROM digests
@@ -39,17 +38,15 @@ module DigestStore
     SQL
   end
 
-  def find(*args)
-    user_id, id = args.length == 2 ? args : [1, args.first]
+  def find(user_id, id)
     db.execute('SELECT * FROM digests WHERE user_id = ? AND id = ?', [user_id.to_i, id.to_i]).first
   end
 
-  def count(user_id = 1)
+  def count(user_id)
     db.execute('SELECT COUNT(*) AS c FROM digests WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 
-  def update_llm_summary(*args, summary:, model:, generated_at: Time.now.utc.iso8601)
-    user_id, id = args.length == 2 ? args : [1, args.first]
+  def update_llm_summary(user_id, id, summary:, model:, generated_at: Time.now.utc.iso8601)
     db.execute(<<~SQL, [summary.to_s, model.to_s, generated_at, user_id.to_i, id.to_i])
       UPDATE digests
       SET llm_summary       = ?,

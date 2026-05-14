@@ -31,11 +31,11 @@ RSpec.describe Recommendation::ForYou, '#corpus_terms (Phase S10 topic scoping)'
                         feed_topic: 'technology', content: 'ruby rails performance bug')
     sports = make_topical(uid: 'scorp01', title: 'Eagles draft strategy',
                           feed_topic: 'sports', content: 'eagles draft picks rounds')
-    ReadStateStore.mark_bookmarked(tech['id'],   value: true)
-    ReadStateStore.mark_bookmarked(sports['id'], value: true)
+    ReadStateStore.mark_bookmarked(1, tech['id'],   value: true)
+    ReadStateStore.mark_bookmarked(1, sports['id'], value: true)
 
-    tech_terms   = Recommendation::ForYou.corpus_terms(positive: true, topic: 'technology')
-    sports_terms = Recommendation::ForYou.corpus_terms(positive: true, topic: 'sports')
+    tech_terms   = Recommendation::ForYou.corpus_terms(1, positive: true, topic: 'technology')
+    sports_terms = Recommendation::ForYou.corpus_terms(1, positive: true, topic: 'sports')
 
     expect(tech_terms).to include('ruby').or include('rails')
     expect(tech_terms).not_to include('eagles')
@@ -46,9 +46,9 @@ RSpec.describe Recommendation::ForYou, '#corpus_terms (Phase S10 topic scoping)'
   it 'unscoped (topic: nil) returns the union — legacy behaviour' do
     make_topical(uid: 'tcorp02', title: 'Ruby T', feed_topic: 'technology', content: 'ruby gem')
     make_topical(uid: 'scorp02', title: 'Eagles S', feed_topic: 'sports',   content: 'eagles touchdown')
-    ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('tcorp02')['id'], value: true)
-    ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('scorp02')['id'], value: true)
-    terms = Recommendation::ForYou.corpus_terms(positive: true)
+    ReadStateStore.mark_bookmarked(1, ArticlesStore.find_by_uid('tcorp02')['id'], value: true)
+    ReadStateStore.mark_bookmarked(1, ArticlesStore.find_by_uid('scorp02')['id'], value: true)
+    terms = Recommendation::ForYou.corpus_terms(1, positive: true)
     expect(terms.length).to be > 0
     # At least one term from each topic appears (union behaviour).
     cross_topic = terms.intersect?(%w[ruby gem].to_set) && terms.intersect?(%w[eagles touchdown].to_set)
@@ -61,9 +61,9 @@ RSpec.describe Recommendation::ForYou, '#score_window (Phase S10 topic scoping)'
     make_topical(uid: 'twin0001', title: 'Tech',   feed_topic: 'technology')
     make_topical(uid: 'swin0001', title: 'Sports', feed_topic: 'sports')
 
-    tech_uids   = Recommendation::ForYou.score_window(state: :all, limit: 50, offset: 0,
+    tech_uids   = Recommendation::ForYou.score_window(1, state: :all, limit: 50, offset: 0,
                                                         topic: 'technology').map { |a| a['uid'] }
-    sports_uids = Recommendation::ForYou.score_window(state: :all, limit: 50, offset: 0,
+    sports_uids = Recommendation::ForYou.score_window(1, state: :all, limit: 50, offset: 0,
                                                         topic: 'sports').map { |a| a['uid'] }
     expect(tech_uids).to     include('twin0001')
     expect(tech_uids).not_to include('swin0001')
@@ -100,7 +100,7 @@ RSpec.describe Triage::Claude, '#run (Phase S10 topic scoping)' do
     make_topical(uid: 'stri01', title: 'Sports unread', feed_topic: 'sports')
 
     captured = stub_claude(JSON.generate(must_read: [], optional: [], skip: []))
-    Triage::Claude.run(topic: 'sports')
+    Triage::Claude.run(1, topic: 'sports')
     prompt = captured.call
     expect(prompt).to     include('Sports unread')
     expect(prompt).not_to include('Tech unread')

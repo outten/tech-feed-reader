@@ -24,18 +24,18 @@ end
 RSpec.describe Recommendation::ForYou, '#next_after (Phase 7)' do
   it 'returns nil when the positive corpus is empty (caller falls back)' do
     _, art = make_read_next_article(uid: 'rn00000001', title: 'A')
-    expect(Recommendation::ForYou.next_after(art)).to be_nil
+    expect(Recommendation::ForYou.next_after(1, art)).to be_nil
   end
 
   it 'returns nil when given nil article' do
-    expect(Recommendation::ForYou.next_after(nil)).to be_nil
+    expect(Recommendation::ForYou.next_after(1, nil)).to be_nil
   end
 
   it 'returns the top-scored unread when corpus has signal' do
     # Seed positive corpus with a Ruby/Rails bookmark.
     _, pos = make_read_next_article(uid: 'rnpositive01', title: 'Rails routing deep dive', content_text: 'rails ruby routing')
-    ReadStateStore.mark_bookmarked(pos['id'], value: true)
-    ReadStateStore.mark_read(pos['id'], read: true)
+    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+    ReadStateStore.mark_read(1, pos['id'], read: true)
 
     # Two unread candidates — one matches the corpus, one doesn't.
     make_read_next_article(uid: 'rnmatch00001', title: 'Advanced Rails performance tuning')
@@ -44,7 +44,7 @@ RSpec.describe Recommendation::ForYou, '#next_after (Phase 7)' do
     # Caller article is yet a third unread piece (not in corpus, not the candidate).
     _, current = make_read_next_article(uid: 'rncurrent0001', title: 'Something unrelated')
 
-    nxt = Recommendation::ForYou.next_after(current)
+    nxt = Recommendation::ForYou.next_after(1, current)
     expect(nxt).not_to be_nil
     expect(nxt['uid']).to eq('rnmatch00001')
   end
@@ -53,13 +53,13 @@ RSpec.describe Recommendation::ForYou, '#next_after (Phase 7)' do
     # Make the current article match the corpus terms — it would be the
     # top scorer if not for the explicit exclusion.
     _, pos = make_read_next_article(uid: 'rnposcurr001', title: 'Rails routing deep dive')
-    ReadStateStore.mark_bookmarked(pos['id'], value: true)
-    ReadStateStore.mark_read(pos['id'], read: true)
+    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+    ReadStateStore.mark_read(1, pos['id'], read: true)
 
     _, current = make_read_next_article(uid: 'rncurrent0002', title: 'Rails routing companion')
     make_read_next_article(uid: 'rnother00001', title: 'Coffee origin guide')
 
-    nxt = Recommendation::ForYou.next_after(current)
+    nxt = Recommendation::ForYou.next_after(1, current)
     # Either the other unread candidate, or nil — but never the current article.
     expect(nxt && nxt['uid']).not_to eq('rncurrent0002')
   end
@@ -86,8 +86,8 @@ RSpec.describe 'GET /article/:uid Read-next card (Phase 7)' do
 
   it 'renders the relevance-pick label when the For You ranker provides the suggestion' do
     _, pos = make_read_next_article(uid: 'rnviewpos001', title: 'Rails routing deep dive', content_text: 'rails ruby routing')
-    ReadStateStore.mark_bookmarked(pos['id'], value: true)
-    ReadStateStore.mark_read(pos['id'], read: true)
+    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+    ReadStateStore.mark_read(1, pos['id'], read: true)
 
     make_read_next_article(uid: 'rnviewmatch01', title: 'Advanced Rails performance tuning')
     _, current = make_read_next_article(uid: 'rnviewcurr01', title: 'Something unrelated')
@@ -107,8 +107,8 @@ RSpec.describe 'GET /article/:uid Read-next card (Phase 7)' do
 
   it 'never points the card back at the current article' do
     _, pos = make_read_next_article(uid: 'rnviewself01', title: 'Self pos', content_text: 'matching content')
-    ReadStateStore.mark_bookmarked(pos['id'], value: true)
-    ReadStateStore.mark_read(pos['id'], read: true)
+    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+    ReadStateStore.mark_read(1, pos['id'], read: true)
     _, current = make_read_next_article(uid: 'rnviewself02', title: 'Self test', content_text: 'matching content')
 
     get '/article/rnviewself02'

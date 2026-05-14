@@ -14,36 +14,33 @@ module TagsStore
 
   module_function
 
-  def all(user_id = 1)
+  def all(user_id)
     db.execute('SELECT * FROM tags WHERE user_id = ? ORDER BY name ASC', [user_id.to_i])
   end
 
-  def find(*args)
-    user_id, id = args.length == 2 ? args : [1, args.first]
+  def find(user_id, id)
     db.execute('SELECT * FROM tags WHERE user_id = ? AND id = ?', [user_id.to_i, id]).first
   end
 
-  def find_by_name(*args)
-    user_id, name = args.length == 2 ? args : [1, args.first]
+  def find_by_name(user_id, name)
     db.execute('SELECT * FROM tags WHERE user_id = ? AND name = ?', [user_id.to_i, name]).first
   end
 
-  def count(user_id = 1)
+  def count(user_id)
     db.execute('SELECT COUNT(*) AS c FROM tags WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 
   # Raises SQLite3::ConstraintException on a duplicate (user_id, name)
   # OR on an unsupported match_kind (the schema CHECK enforces
   # 'regex' | 'keyword' | 'feed_id').
-  def add(user_id: 1, name:, match_kind:, match_value:)
+  def add(user_id:, name:, match_kind:, match_value:)
     db.execute(<<~SQL, [user_id.to_i, name, match_kind, match_value])
       INSERT INTO tags(user_id, name, match_kind, match_value) VALUES (?, ?, ?, ?)
     SQL
     find(user_id, db.last_insert_row_id)
   end
 
-  def remove(*args)
-    user_id, id = args.length == 2 ? args : [1, args.first]
+  def remove(user_id, id)
     db.execute('DELETE FROM tags WHERE user_id = ? AND id = ?', [user_id.to_i, id])
     db.changes.positive?
   end
@@ -72,8 +69,7 @@ module TagsStore
     db.execute('SELECT * FROM tags')
   end
 
-  def tags_for_article(*args)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
+  def tags_for_article(user_id, article_id)
     db.execute(<<~SQL, [user_id.to_i, article_id])
       SELECT t.*
       FROM tags t
@@ -84,8 +80,7 @@ module TagsStore
   end
 
   # { article_id => [tag_row, ...] } scoped to the current user's tags.
-  def tags_for_articles(*args)
-    user_id, article_ids = args.length == 2 ? args : [1, args.first]
+  def tags_for_articles(user_id, article_ids)
     return {} if article_ids.empty?
     placeholders = (['?'] * article_ids.length).join(',')
     rows = db.execute(<<~SQL, [user_id.to_i] + article_ids)
@@ -98,7 +93,7 @@ module TagsStore
     rows.group_by { |r| r['article_id'] }
   end
 
-  def article_counts(user_id = 1)
+  def article_counts(user_id)
     db.execute(<<~SQL, [user_id.to_i]).each_with_object({}) { |r, h| h[r['tag_id']] = r['c'] }
       SELECT at.tag_id, COUNT(*) AS c
       FROM article_tags at
@@ -108,7 +103,7 @@ module TagsStore
     SQL
   end
 
-  def top_in_window(user_id = 1, days: 7, limit: 10)
+  def top_in_window(user_id, days: 7, limit: 10)
     cutoff = (Date.today - days + 1).to_s
     db.execute(<<~SQL, [user_id.to_i, cutoff, limit])
       SELECT t.id, t.name, COUNT(*) AS count

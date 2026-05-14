@@ -24,7 +24,7 @@ RSpec.describe 'tag routes' do
       post '/tags', { 'name' => 'ruby', 'match_kind' => 'keyword', 'match_value' => 'ruby' }
       expect(last_response.headers['Location']).to include('notice=added')
       expect(last_response.headers['Location']).to include('tagged=1')
-      expect(TagsStore.find_by_name('ruby')).not_to be_nil
+      expect(TagsStore.find_by_name(1, 'ruby')).not_to be_nil
     end
 
     it 'rejects missing fields' do
@@ -40,11 +40,11 @@ RSpec.describe 'tag routes' do
     it 'rejects malformed regex before INSERT' do
       post '/tags', { 'name' => 'bad', 'match_kind' => 'regex', 'match_value' => '[unclosed' }
       expect(last_response.headers['Location']).to include('error=invalid-regex')
-      expect(TagsStore.find_by_name('bad')).to be_nil
+      expect(TagsStore.find_by_name(1, 'bad')).to be_nil
     end
 
     it 'reports duplicate names' do
-      TagsStore.add(name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
+      TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
       post '/tags', { 'name' => 'ruby', 'match_kind' => 'keyword', 'match_value' => 'rails' }
       expect(last_response.headers['Location']).to include('error=duplicate-name')
     end
@@ -52,10 +52,10 @@ RSpec.describe 'tag routes' do
 
   describe 'POST /tags/:id/delete' do
     it 'removes the tag and reports notice=removed' do
-      tag = TagsStore.add(name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
+      tag = TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
       post "/tags/#{tag['id']}/delete"
       expect(last_response.headers['Location']).to include('notice=removed')
-      expect(TagsStore.find(tag['id'])).to be_nil
+      expect(TagsStore.find(1, tag['id'])).to be_nil
     end
 
     it 'reports not-found for an unknown id' do
@@ -66,7 +66,7 @@ RSpec.describe 'tag routes' do
 
   describe 'POST /article/:uid/tag/:tag_id' do
     let(:feed) { FeedsStore.add(url: 'https://example.com/feed.rss') }
-    let(:tag)  { TagsStore.add(name: 'manual', match_kind: 'keyword', match_value: 'unrelated') }
+    let(:tag)  { TagsStore.add(user_id: 1, name: 'manual', match_kind: 'keyword', match_value: 'unrelated') }
     let(:article) do
       ArticlesStore.import(feed_id: feed['id'], entries: [{
         uid: 'a' * 12, title: 'Hello', url: 'https://example.com/a', author: nil,
@@ -79,13 +79,13 @@ RSpec.describe 'tag routes' do
     it 'adds the tag to the article (default value=add)' do
       tag # force lazy let
       post "/article/#{article['uid']}/tag/#{tag['id']}"
-      expect(TagsStore.tags_for_article(article['id']).map { |t| t['name'] }).to include('manual')
+      expect(TagsStore.tags_for_article(1, article['id']).map { |t| t['name'] }).to include('manual')
     end
 
     it 'removes the tag when value=remove' do
       TagsStore.tag_article(article['id'], tag['id'])
       post "/article/#{article['uid']}/tag/#{tag['id']}", { 'value' => 'remove' }
-      expect(TagsStore.tags_for_article(article['id'])).to be_empty
+      expect(TagsStore.tags_for_article(1, article['id'])).to be_empty
     end
 
     it '404s for an unknown article uid' do
@@ -111,8 +111,8 @@ RSpec.describe 'tag routes' do
           content_html: '<p>y</p>', content_text: 'mentions go' }
       ])
 
-      tag = TagsStore.add(name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
-      TagsApplier.apply_to_existing(tag['id'])
+      tag = TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
+      TagsApplier.apply_to_existing(tag)
 
       get "/articles?tag=#{tag['id']}"
       expect(last_response.status).to eq(200)

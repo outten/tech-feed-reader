@@ -72,13 +72,13 @@ RSpec.describe ArticlesStore do
     end
 
     it 'orders recent by published_at DESC' do
-      titles = ArticlesStore.recent(limit: 10).map { |a| a['title'] }
+      titles = ArticlesStore.recent(1, limit: 10).map { |a| a['title'] }
       expect(titles).to eq(%w[Newest Newer Old])
     end
 
     it 'paginates via limit / offset' do
-      page1 = ArticlesStore.recent(limit: 2, offset: 0).map { |a| a['title'] }
-      page2 = ArticlesStore.recent(limit: 2, offset: 2).map { |a| a['title'] }
+      page1 = ArticlesStore.recent(1, limit: 2, offset: 0).map { |a| a['title'] }
+      page2 = ArticlesStore.recent(1, limit: 2, offset: 2).map { |a| a['title'] }
       expect(page1).to eq(%w[Newest Newer])
       expect(page2).to eq(%w[Old])
     end
@@ -87,8 +87,8 @@ RSpec.describe ArticlesStore do
       other = FeedsStore.add(url: 'https://other.example.com/feed')
       ArticlesStore.import(feed_id: other['id'], entries: [entry(uid: 'd' * 12, title: 'Other')])
 
-      mine_titles  = ArticlesStore.for_feed(feed['id']).map  { |a| a['title'] }
-      other_titles = ArticlesStore.for_feed(other['id']).map { |a| a['title'] }
+      mine_titles  = ArticlesStore.for_feed(1, feed['id']).map  { |a| a['title'] }
+      other_titles = ArticlesStore.for_feed(1, other['id']).map { |a| a['title'] }
       expect(mine_titles).to contain_exactly('Old', 'Newer', 'Newest')
       expect(other_titles).to eq(['Other'])
     end
@@ -104,17 +104,17 @@ RSpec.describe ArticlesStore do
     end
 
     it 'returns matches via the FTS5 virtual table' do
-      titles = ArticlesStore.search('ruby').map { |a| a['title'] }
+      titles = ArticlesStore.search(1, 'ruby').map { |a| a['title'] }
       expect(titles).to contain_exactly('Ruby on Rails', 'Database tips')
     end
 
     it 'returns an empty array for blank queries (no FTS5 syntax error)' do
-      expect(ArticlesStore.search('')).to eq([])
-      expect(ArticlesStore.search('   ')).to eq([])
+      expect(ArticlesStore.search(1, '')).to eq([])
+      expect(ArticlesStore.search(1, '   ')).to eq([])
     end
 
     it 'honours the limit' do
-      results = ArticlesStore.search('ruby', limit: 1)
+      results = ArticlesStore.search(1, 'ruby', limit: 1)
       expect(results.length).to eq(1)
     end
   end

@@ -17,8 +17,15 @@ require_relative '../app/database'
 require_relative '../app/sports_leagues_store'
 require_relative '../app/sports_teams_store'
 require_relative '../app/sports_follows_store'
+require_relative '../app/users_store'
 
 Database.migrate!
+
+# USER_USERNAME selects the owner of the seeded follows; defaults to user 1.
+username = ENV['USER_USERNAME']
+user = username ? UsersStore.find_by_username(username) : UsersStore.find(1)
+abort "no user found (USER_USERNAME=#{username.inspect})" unless user
+USER_ID = user['id'].to_i
 
 # One-time cleanup: the intl-rugby league (rugby/164205) was the
 # original Phase S3 home for the All Blacks but it doesn't expose
@@ -108,9 +115,9 @@ TEAMS.each do |spec|
 end
 
 FOLLOWS.each do |spec|
-  added = SportsFollowsStore.add(kind: spec[:kind], value: spec[:value])
+  added = SportsFollowsStore.add(user_id: USER_ID, kind: spec[:kind], value: spec[:value])
   puts "  follow  #{spec[:kind]}:#{spec[:value].ljust(12)} #{added ? '(new)' : '(already followed)'}"
 end
 
 puts
-puts "Done. leagues=#{SportsLeaguesStore.count} teams=#{SportsTeamsStore.count} follows=#{SportsFollowsStore.count}"
+puts "Done. leagues=#{SportsLeaguesStore.count} teams=#{SportsTeamsStore.count} follows=#{SportsFollowsStore.count(USER_ID)}"

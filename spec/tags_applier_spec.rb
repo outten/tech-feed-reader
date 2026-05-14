@@ -65,14 +65,14 @@ RSpec.describe TagsApplier do
           content_html: '<p>y</p>', content_text: 'go and rest' }
       ])
 
-      tag = TagsStore.add(name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
-      tagged = TagsApplier.apply_to_existing(tag['id'])
+      tag = TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
+      tagged = TagsApplier.apply_to_existing(tag)
 
       expect(tagged).to eq(1)
       a = ArticlesStore.find_by_uid('a' * 12)
       b = ArticlesStore.find_by_uid('b' * 12)
-      expect(TagsStore.tags_for_article(a['id']).map { |t| t['name'] }).to include('ruby')
-      expect(TagsStore.tags_for_article(b['id'])).to be_empty
+      expect(TagsStore.tags_for_article(1, a['id']).map { |t| t['name'] }).to include('ruby')
+      expect(TagsStore.tags_for_article(1, b['id'])).to be_empty
     end
 
     it 'is idempotent — re-running adds zero new article_tags' do
@@ -82,10 +82,10 @@ RSpec.describe TagsApplier do
         published_at: '2026-05-02T12:00:00Z',
         content_html: '<p>x</p>', content_text: 'ruby talk'
       }])
-      tag = TagsStore.add(name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
+      tag = TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
 
-      expect(TagsApplier.apply_to_existing(tag['id'])).to eq(1)
-      expect(TagsApplier.apply_to_existing(tag['id'])).to eq(0)
+      expect(TagsApplier.apply_to_existing(tag)).to eq(1)
+      expect(TagsApplier.apply_to_existing(tag)).to eq(0)
     end
   end
 end

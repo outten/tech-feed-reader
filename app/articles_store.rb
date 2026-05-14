@@ -38,7 +38,7 @@ module ArticlesStore
 
   # Articles per published-day for the last N days, scoped to the user's
   # subscriptions. Gap-filled to zero so the chart has a stable x-axis.
-  def daily_counts(user_id = 1, days: 30)
+  def daily_counts(user_id, days: 30)
     today  = Date.today
     cutoff = (today - days + 1).to_s
     rows = db.execute(<<~SQL, [user_id.to_i, cutoff]).each_with_object({}) { |r, h| h[r['day']] = r['c'] }
@@ -59,7 +59,7 @@ module ArticlesStore
   end
 
   # Top N feeds (within the user's subscriptions) by article count.
-  def counts_by_feed(user_id = 1, limit: 10)
+  def counts_by_feed(user_id, limit: 10)
     db.execute(<<~SQL, [user_id.to_i, limit])
       SELECT f.id, f.title, f.url, COUNT(a.id) AS c
       FROM feeds f
@@ -91,24 +91,19 @@ module ArticlesStore
   # max_duration_seconds, when set, bounds the query to articles whose
   # audio_duration_seconds is non-NULL and ≤ the given threshold —
   # used by /bus ("what's short enough for my commute?").
-  # `user_id` defaults to 1 (the seeded test user / single-user-mode
-  # owner). Production routes always pass current_user_id explicitly;
-  # specs that pre-date A2 rely on the default to avoid mass churn.
-  # Once we have a real second user, the default goes away.
-  def recent(user_id = 1, limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil, topic: nil)
+  def recent(user_id, limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil, topic: nil)
     sql, args = state_query(user_id: user_id, filter: state, kind: kind, max_duration_seconds: max_duration_seconds, topic: topic)
     db.execute(sql, args + [limit, offset])
   end
 
-  def for_feed(*args, limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    user_id, feed_id = args.length == 2 ? args : [1, args.first]
+  def for_feed(user_id, feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
     sql, qargs = state_query(user_id: user_id, scope: 'a.feed_id = ?', scope_arg: feed_id, filter: state)
     db.execute(sql, qargs + [limit, offset])
   end
 
   # Distinct feeds (within the user's subscriptions) whose imported
   # articles include at least one audio enclosure. Used by /podcasts.
-  def podcast_feeds(user_id = 1)
+  def podcast_feeds(user_id)
     db.execute(<<~SQL, [user_id.to_i])
       SELECT f.id, f.title, f.url, f.image_url,
              COUNT(a.id)         AS episode_count,
@@ -123,8 +118,7 @@ module ArticlesStore
   end
 
   # Articles tagged with the given tag id, scoped to the user.
-  def for_tag(*args, limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    user_id, tag_id = args.length == 2 ? args : [1, args.first]
+  def for_tag(user_id, tag_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
     sql, qargs = state_query(
       user_id:    user_id,
       from_extra: 'JOIN article_tags at ON at.article_id = a.id',
@@ -137,8 +131,7 @@ module ArticlesStore
 
   # FTS hits filtered to the user's subscriptions, with cached
   # extractive summaries inline.
-  def for_topic(*args, limit: 30)
-    user_id, term = args.length == 2 ? args : [1, args.first]
+  def for_topic(user_id, term, limit: 30)
     return [] if term.to_s.strip.empty?
     db.execute(<<~SQL, [term.to_s.strip, user_id.to_i, limit])
       SELECT a.*, s.extractive AS summary, rank
@@ -158,8 +151,7 @@ module ArticlesStore
   end
 
   # Full-text search filtered to the user's subscriptions.
-  def search(*args, limit: DEFAULT_LIMIT, offset: 0)
-    user_id, query = args.length == 2 ? args : [1, args.first]
+  def search(user_id, query, limit: DEFAULT_LIMIT, offset: 0)
     return [] if query.to_s.strip.empty?
 
     db.execute(<<~SQL, [query.to_s.strip, user_id.to_i, limit, offset])

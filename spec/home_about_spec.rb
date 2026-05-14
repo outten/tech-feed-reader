@@ -48,7 +48,7 @@ RSpec.describe 'GET / — returning user' do
       content_html: '<p>x</p>', content_text: 'x',
       audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
     }])
-    ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('home_returning01')['id'], value: true)
+    ReadStateStore.mark_bookmarked(1, ArticlesStore.find_by_uid('home_returning01')['id'], value: true)
   end
 
   it 'renders the What\'s On Today header when read_state has activity' do

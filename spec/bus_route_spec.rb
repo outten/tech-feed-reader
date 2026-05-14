@@ -137,7 +137,7 @@ RSpec.describe ArticlesStore, '.recent with max_duration_seconds' do
     add('justoversec1', 601)
     add('noduration11', nil)
 
-    rows = ArticlesStore.recent(limit: 25, max_duration_seconds: 600)
+    rows = ArticlesStore.recent(1, limit: 25, max_duration_seconds: 600)
     titles = rows.map { |r| r['title'] }
     expect(titles).to contain_exactly('shortmin0001', 'atcutoffsec1')
   end
@@ -147,7 +147,7 @@ RSpec.describe ArticlesStore, '.recent with max_duration_seconds' do
     add('podlong00001', 1800, audio: true)
     add('plainshortwd', 300, audio: false)  # data-integrity outlier; should still get filtered
 
-    rows = ArticlesStore.recent(limit: 25, kind: :podcast, max_duration_seconds: 600)
+    rows = ArticlesStore.recent(1, limit: 25, kind: :podcast, max_duration_seconds: 600)
     titles = rows.map { |r| r['title'] }
     expect(titles).to contain_exactly('podshortma1')
   end

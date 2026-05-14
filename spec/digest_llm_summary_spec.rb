@@ -19,15 +19,15 @@ def make_digest(subject: 'Daily digest 2026-05-06',
   d = Struct.new(:generated_at, :window_hours, :count, :subject, :text, :html).new(
     Time.now.utc, window_hours, article_count, subject, text_body, html_body
   )
-  id = DigestStore.create(d)
-  DigestStore.find(id)
+  id = DigestStore.create(1, d)
+  DigestStore.find(1, id)
 end
 
 RSpec.describe DigestStore, '.update_llm_summary' do
   it 'persists summary + model + generated_at on the digest row' do
     digest = make_digest
-    DigestStore.update_llm_summary(digest['id'], summary: 'A tight 4-sentence digest summary.', model: 'claude-opus-4-7')
-    refreshed = DigestStore.find(digest['id'])
+    DigestStore.update_llm_summary(1, digest['id'], summary: 'A tight 4-sentence digest summary.', model: 'claude-opus-4-7')
+    refreshed = DigestStore.find(1, digest['id'])
     expect(refreshed['llm_summary']).to eq('A tight 4-sentence digest summary.')
     expect(refreshed['llm_model']).to eq('claude-opus-4-7')
     expect(refreshed['llm_generated_at']).not_to be_nil
@@ -35,17 +35,17 @@ RSpec.describe DigestStore, '.update_llm_summary' do
 
   it 'returns 1 when the row was updated' do
     digest = make_digest
-    expect(DigestStore.update_llm_summary(digest['id'], summary: 's', model: 'm')).to eq(1)
+    expect(DigestStore.update_llm_summary(1, digest['id'], summary: 's', model: 'm')).to eq(1)
   end
 
   it 'returns 0 when the digest id does not exist' do
-    expect(DigestStore.update_llm_summary(99_999, summary: 's', model: 'm')).to eq(0)
+    expect(DigestStore.update_llm_summary(1, 99_999, summary: 's', model: 'm')).to eq(0)
   end
 
   it 'leaves other columns untouched' do
     digest = make_digest(subject: 'Original subject')
-    DigestStore.update_llm_summary(digest['id'], summary: 's', model: 'm')
-    refreshed = DigestStore.find(digest['id'])
+    DigestStore.update_llm_summary(1, digest['id'], summary: 's', model: 'm')
+    refreshed = DigestStore.find(1, digest['id'])
     expect(refreshed['subject']).to eq('Original subject')
     expect(refreshed['text_body']).not_to be_empty
   end
@@ -164,14 +164,14 @@ RSpec.describe '/digests/:id summarize routes' do
       post "/digests/#{digest['id']}/summarize"
       expect(last_response.status).to eq(302)
       expect(last_response.location).to include('notice=llm-summarized')
-      refreshed = DigestStore.find(digest['id'])
+      refreshed = DigestStore.find(1, digest['id'])
       expect(refreshed['llm_summary']).to include('tight digest')
       expect(refreshed['llm_model']).to eq(Summarizer::Claude::MODEL)
     end
 
     it 'reports cache hit (no API call) when summary already exists' do
       digest = make_digest
-      DigestStore.update_llm_summary(digest['id'], summary: 'pre-cached', model: 'claude-opus-4-7')
+      DigestStore.update_llm_summary(1, digest['id'], summary: 'pre-cached', model: 'claude-opus-4-7')
 
       # Stub Anthropic to raise — if it gets called, the test fails.
       messages = double('Messages')
@@ -180,7 +180,7 @@ RSpec.describe '/digests/:id summarize routes' do
 
       post "/digests/#{digest['id']}/summarize"
       expect(last_response.location).to include('notice=already-summarized')
-      refreshed = DigestStore.find(digest['id'])
+      refreshed = DigestStore.find(1, digest['id'])
       expect(refreshed['llm_summary']).to eq('pre-cached')
     end
 
@@ -234,7 +234,7 @@ RSpec.describe '/digests/:id summarize routes' do
 
     it 'hides the Summarize button + renders the cached summary when present' do
       digest = make_digest
-      DigestStore.update_llm_summary(digest['id'], summary: 'My cached digest summary.', model: 'claude-opus-4-7')
+      DigestStore.update_llm_summary(1, digest['id'], summary: 'My cached digest summary.', model: 'claude-opus-4-7')
       get "/digests/#{digest['id']}"
       expect(last_response.body).to include('My cached digest summary.')
       expect(last_response.body).to include('Claude summary')

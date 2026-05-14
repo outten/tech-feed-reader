@@ -98,17 +98,17 @@ end
 
 RSpec.describe Recommendation::ForYou, '#corpus_terms' do
   it 'returns an empty set when no positive corpus rows exist' do
-    expect(described_class.corpus_terms(positive: true)).to eq(Set.new)
+    expect(described_class.corpus_terms(1, positive: true)).to eq(Set.new)
   end
 
   it 'extracts terms from bookmarked + 👍 + passive +1 articles (positive corpus)' do
     _, a = make_article_for_you(uid: 'foryou000001', title: 'Ruby on Rails performance tips')
-    ReadStateStore.mark_bookmarked(a['id'], value: true)
+    ReadStateStore.mark_bookmarked(1, a['id'], value: true)
 
     _, b = make_article_for_you(uid: 'foryou000002', title: 'Sinatra microservice patterns')
-    ReadStateStore.mark_feedback(b['id'], value: 1)
+    ReadStateStore.mark_feedback(1, b['id'], value: 1)
 
-    terms = described_class.corpus_terms(positive: true)
+    terms = described_class.corpus_terms(1, positive: true)
     %w[ruby rails sinatra performance microservice patterns].each do |t|
       expect(terms).to include(t)
     end
@@ -116,13 +116,13 @@ RSpec.describe Recommendation::ForYou, '#corpus_terms' do
 
   it 'extracts terms from 👎 + passive -1 + archived-without-reading (negative corpus)' do
     _, a = make_article_for_you(uid: 'foryou000003', title: 'Crypto market volatility')
-    ReadStateStore.mark_feedback(a['id'], value: -1)
+    ReadStateStore.mark_feedback(1, a['id'], value: -1)
 
     _, b = make_article_for_you(uid: 'foryou000004', title: 'NFT speculation guide')
     # archived without reading
-    ReadStateStore.mark_archived(b['id'], value: true)
+    ReadStateStore.mark_archived(1, b['id'], value: true)
 
-    terms = described_class.corpus_terms(positive: false)
+    terms = described_class.corpus_terms(1, positive: false)
     %w[crypto market volatility nft speculation guide].each do |t|
       expect(terms).to include(t)
     end
@@ -130,38 +130,38 @@ RSpec.describe Recommendation::ForYou, '#corpus_terms' do
 
   it 'archive + read does NOT count as negative (read+archive is the user filing it away, not rejecting it)' do
     _, a = make_article_for_you(uid: 'foryou000005', title: 'Filed away properly')
-    ReadStateStore.mark_read(a['id'], read: true)
-    ReadStateStore.mark_archived(a['id'], value: true)
+    ReadStateStore.mark_read(1, a['id'], read: true)
+    ReadStateStore.mark_archived(1, a['id'], value: true)
 
-    expect(described_class.corpus_terms(positive: false)).to be_empty
+    expect(described_class.corpus_terms(1, positive: false)).to be_empty
   end
 end
 
 RSpec.describe Recommendation::ForYou, '#score_window' do
   let(:now) { Time.parse('2026-05-06T12:00:00Z').utc }
 
-  it 'returns the same set of articles as ArticlesStore.recent when corpus is empty + weights default' do
+  it 'returns the same set of articles as ArticlesStore.recent(1) when corpus is empty + weights default' do
     # Three articles, each with default feed weight and no feedback.
     %w[a b c].each_with_index do |slug, i|
       make_article_for_you(uid: "fyempty#{slug}001", title: "Article #{slug}",
                            published_at: (now - i * 3600).iso8601)
     end
 
-    chronological = ArticlesStore.recent(state: :unread).map { |a| a['uid'] }
-    relevance     = described_class.score_window(state: :unread, limit: 50, offset: 0, now: now).map { |a| a['uid'] }
+    chronological = ArticlesStore.recent(1, state: :unread).map { |a| a['uid'] }
+    relevance     = described_class.score_window(1, state: :unread, limit: 50, offset: 0, now: now).map { |a| a['uid'] }
     expect(relevance).to eq(chronological)
   end
 
   it 'floats positive-overlap articles to the top of the unread list' do
     # Negative corpus seed: 👎 on a "crypto" article.
     _, neg = make_article_for_you(uid: 'fynegseed001', title: 'Crypto rant', published_at: (now - 24 * 3600).iso8601)
-    ReadStateStore.mark_feedback(neg['id'], value: -1)
-    ReadStateStore.mark_read(neg['id'], read: true)
+    ReadStateStore.mark_feedback(1, neg['id'], value: -1)
+    ReadStateStore.mark_read(1, neg['id'], read: true)
 
     # Positive corpus seed: bookmarked Ruby/Rails article.
     _, pos = make_article_for_you(uid: 'fyposseed001', title: 'Rails routing deep dive', published_at: (now - 24 * 3600).iso8601)
-    ReadStateStore.mark_bookmarked(pos['id'], value: true)
-    ReadStateStore.mark_read(pos['id'], read: true)
+    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+    ReadStateStore.mark_read(1, pos['id'], read: true)
 
     # Two unread candidates: one matches the positive corpus (rails),
     # one matches neither. Same publish time so recency is equal.
@@ -170,7 +170,7 @@ RSpec.describe Recommendation::ForYou, '#score_window' do
     make_article_for_you(uid: 'fycandnone001', title: 'Coffee origin guide',
                          published_at: (now - 1 * 3600).iso8601)
 
-    ranked = described_class.score_window(state: :unread, limit: 50, offset: 0, now: now)
+    ranked = described_class.score_window(1, state: :unread, limit: 50, offset: 0, now: now)
     uids   = ranked.map { |a| a['uid'] }
     rails_idx = uids.index('fycandrails01')
     none_idx  = uids.index('fycandnone001')
@@ -181,7 +181,7 @@ RSpec.describe Recommendation::ForYou, '#score_window' do
 
   it 'stamps each row with a _score key for inspection' do
     make_article_for_you(uid: 'fyscore000001', title: 'Score me')
-    ranked = described_class.score_window(state: :unread, limit: 50, offset: 0, now: now)
+    ranked = described_class.score_window(1, state: :unread, limit: 50, offset: 0, now: now)
     expect(ranked.first['_score']).to be_a(Float)
   end
 end
@@ -207,7 +207,7 @@ RSpec.describe 'GET /articles?sort=relevance' do
 
   it 'forces state=unread when sort=relevance is on (so already-read articles disappear)' do
     _, a = make_article_for_you(uid: 'fyroute0003', title: 'Already read')
-    ReadStateStore.mark_read(a['id'], read: true)
+    ReadStateStore.mark_read(1, a['id'], read: true)
     make_article_for_you(uid: 'fyroute0004', title: 'Still unread')
 
     get '/articles?sort=relevance&state=all'

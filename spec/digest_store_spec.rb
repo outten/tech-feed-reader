@@ -11,16 +11,16 @@ RSpec.describe DigestStore do
   end
 
   it 'starts with an empty digests table' do
-    expect(DigestStore.count).to eq(0)
-    expect(DigestStore.recent).to eq([])
+    expect(DigestStore.count(1)).to eq(0)
+    expect(DigestStore.recent(1)).to eq([])
   end
 
   it 'persists every column on .create and returns the new row id' do
     res = make_result(generated_at: Time.utc(2026, 5, 4, 7, 0, 0))
-    id  = DigestStore.create(res)
+    id  = DigestStore.create(1, res)
     expect(id).to be > 0
 
-    row = DigestStore.find(id)
+    row = DigestStore.find(1, id)
     expect(row['subject']).to eq('Subj')
     expect(row['text_body']).to eq('TEXT')
     expect(row['html_body']).to eq('<div>HTML</div>')
@@ -30,20 +30,20 @@ RSpec.describe DigestStore do
   end
 
   it 'lists rows newest-first via .recent' do
-    DigestStore.create(make_result(generated_at: Time.utc(2026, 5, 1, 7, 0, 0), subject: 'oldest'))
-    DigestStore.create(make_result(generated_at: Time.utc(2026, 5, 4, 7, 0, 0), subject: 'newest'))
-    DigestStore.create(make_result(generated_at: Time.utc(2026, 5, 2, 7, 0, 0), subject: 'middle'))
+    DigestStore.create(1, make_result(generated_at: Time.utc(2026, 5, 1, 7, 0, 0), subject: 'oldest'))
+    DigestStore.create(1, make_result(generated_at: Time.utc(2026, 5, 4, 7, 0, 0), subject: 'newest'))
+    DigestStore.create(1, make_result(generated_at: Time.utc(2026, 5, 2, 7, 0, 0), subject: 'middle'))
 
-    subjects = DigestStore.recent.map { |r| r['subject'] }
+    subjects = DigestStore.recent(1).map { |r| r['subject'] }
     expect(subjects).to eq(%w[newest middle oldest])
   end
 
   it 'honours the limit kwarg on .recent' do
-    5.times { |i| DigestStore.create(make_result(generated_at: Time.utc(2026, 5, i + 1, 7, 0, 0))) }
-    expect(DigestStore.recent(limit: 2).length).to eq(2)
+    5.times { |i| DigestStore.create(1, make_result(generated_at: Time.utc(2026, 5, i + 1, 7, 0, 0))) }
+    expect(DigestStore.recent(1, limit: 2).length).to eq(2)
   end
 
   it '.find returns nil for unknown id' do
-    expect(DigestStore.find(99_999)).to be_nil
+    expect(DigestStore.find(1, 99_999)).to be_nil
   end
 end

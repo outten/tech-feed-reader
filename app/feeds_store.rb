@@ -40,18 +40,18 @@ module FeedsStore
   end
 
   # Test + script convenience: insert into the catalog AND subscribe
-  # user 1 (the seeded test user / single-user-mode owner). Preserves
+  # `subscriber_id` (defaults to 1, the seeded test user). Preserves
   # the pre-A2 contract of raising SQLite3::ConstraintException on a
   # duplicate URL so existing specs keep passing. Production routes
   # call #add_for_user(user_id:, ...) instead.
-  def add(url:, title: nil, fetch_interval_seconds: PUBLISHER_INTERVAL, topic: 'general')
+  def add(url:, title: nil, fetch_interval_seconds: PUBLISHER_INTERVAL, topic: 'general', subscriber_id: 1)
     raise SQLite3::ConstraintException, "UNIQUE constraint failed: feeds.url" if find_by_url(url)
     feed = add_to_catalog(
       url: url, title: title,
       fetch_interval_seconds: fetch_interval_seconds,
       topic: topic
     )
-    subscribe(1, feed['id'])
+    subscribe(subscriber_id, feed['id'])
     feed
   end
 

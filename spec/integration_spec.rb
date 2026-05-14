@@ -35,7 +35,7 @@ RSpec.describe 'fetch → parse → sanitize → import' do
     inserted = ArticlesStore.import(feed_id: feed['id'], entries: result.entries)
     expect(inserted).to eq(2)
     expect(ArticlesStore.count).to eq(2)
-    expect(ArticlesStore.for_feed(feed['id']).map { |a| a['title'] })
+    expect(ArticlesStore.for_feed(1, feed['id']).map { |a| a['title'] })
       .to contain_exactly('Hello, world', 'Second post')
   end
 
@@ -56,7 +56,7 @@ RSpec.describe 'fetch → parse → sanitize → import' do
     result = FeedFetcher.fetch_feed(feed)
     ArticlesStore.import(feed_id: feed['id'], entries: result.entries)
 
-    rows = ArticlesStore.for_feed(feed['id'])
+    rows = ArticlesStore.for_feed(1, feed['id'])
     rows.each do |row|
       expect(row['content_html']).not_to include('<script')
       expect(row['content_html']).not_to include('<iframe')
@@ -68,7 +68,7 @@ RSpec.describe 'fetch → parse → sanitize → import' do
     result = FeedFetcher.fetch_feed(feed)
     ArticlesStore.import(feed_id: feed['id'], entries: result.entries)
 
-    titles = ArticlesStore.search('first').map { |a| a['title'] }
+    titles = ArticlesStore.search(1, 'first').map { |a| a['title'] }
     expect(titles).to include('Hello, world')
   end
 

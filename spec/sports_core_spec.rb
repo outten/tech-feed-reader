@@ -174,42 +174,42 @@ end
 RSpec.describe SportsFollowsStore do
   describe '.add' do
     it 'inserts a new follow row' do
-      expect(SportsFollowsStore.add(kind: 'team', value: 'eagles')).to be(true)
-      expect(SportsFollowsStore.count).to eq(1)
+      expect(SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')).to be(true)
+      expect(SportsFollowsStore.count(1)).to eq(1)
     end
 
     it 'is idempotent — re-adding returns false (no new row)' do
-      SportsFollowsStore.add(kind: 'team', value: 'eagles')
-      expect(SportsFollowsStore.add(kind: 'team', value: 'eagles')).to be(false)
-      expect(SportsFollowsStore.count).to eq(1)
+      SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')
+      expect(SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')).to be(false)
+      expect(SportsFollowsStore.count(1)).to eq(1)
     end
 
     it 'rejects unknown kind' do
-      expect { SportsFollowsStore.add(kind: 'made-up', value: 'x') }
+      expect { SportsFollowsStore.add(user_id: 1, kind: 'made-up', value: 'x') }
         .to raise_error(ArgumentError, /unknown kind/)
     end
 
     it 'rejects empty value' do
-      expect { SportsFollowsStore.add(kind: 'team', value: '   ') }
+      expect { SportsFollowsStore.add(user_id: 1, kind: 'team', value: '   ') }
         .to raise_error(ArgumentError, /value must be non-empty/)
     end
 
     it 'allows the same value across kinds' do
-      SportsFollowsStore.add(kind: 'team',   value: 'eagles')
-      SportsFollowsStore.add(kind: 'league', value: 'eagles')
-      expect(SportsFollowsStore.count).to eq(2)
+      SportsFollowsStore.add(user_id: 1, kind: 'team',   value: 'eagles')
+      SportsFollowsStore.add(user_id: 1, kind: 'league', value: 'eagles')
+      expect(SportsFollowsStore.count(1)).to eq(2)
     end
   end
 
   describe '.follow? + .for_kind + .remove' do
     it 'round-trips correctly' do
-      SportsFollowsStore.add(kind: 'team', value: 'eagles')
-      SportsFollowsStore.add(kind: 'team', value: 'sixers')
-      expect(SportsFollowsStore.follow?('team', 'eagles')).to be(true)
-      expect(SportsFollowsStore.follow?('team', 'lakers')).to be(false)
-      expect(SportsFollowsStore.for_kind('team').map { |f| f['value'] }).to contain_exactly('eagles', 'sixers')
-      expect(SportsFollowsStore.remove(kind: 'team', value: 'eagles')).to eq(1)
-      expect(SportsFollowsStore.follow?('team', 'eagles')).to be(false)
+      SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')
+      SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'sixers')
+      expect(SportsFollowsStore.follow?(1, 'team', 'eagles')).to be(true)
+      expect(SportsFollowsStore.follow?(1, 'team', 'lakers')).to be(false)
+      expect(SportsFollowsStore.for_kind(1, 'team').map { |f| f['value'] }).to contain_exactly('eagles', 'sixers')
+      expect(SportsFollowsStore.remove(user_id: 1, kind: 'team', value: 'eagles')).to eq(1)
+      expect(SportsFollowsStore.follow?(1, 'team', 'eagles')).to be(false)
     end
   end
 end

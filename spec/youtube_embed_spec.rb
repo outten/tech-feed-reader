@@ -150,7 +150,7 @@ RSpec.describe 'GET / To watch today thumbnails' do
       content_html: '<p>x</p>', content_text: 'x',
       audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
     }])
-    ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('whatsonwatch1')['id'], value: true)
+    ReadStateStore.mark_bookmarked(1, ArticlesStore.find_by_uid('whatsonwatch1')['id'], value: true)
 
     get '/'
     expect(last_response.body).to include('To watch today')

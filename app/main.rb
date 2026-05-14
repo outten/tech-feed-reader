@@ -1318,7 +1318,7 @@ class TechFeedReader < Sinatra::Base
     days_forward = (params['days'].to_s.match?(/\A\d+\z/) ? params['days'].to_i : 30).clamp(1, 365)
     @days_forward = days_forward
 
-    matches      = SportsMatchesStore.upcoming_for_followed_teams(days_forward: days_forward)
+    matches      = SportsMatchesStore.upcoming_for_followed_teams(current_user_id, days_forward: days_forward)
     @matches     = matches
     @teams_by_id = build_teams_by_id_for_matches(matches)
     @leagues_by_id = build_leagues_by_id_for_matches(matches)
@@ -1334,7 +1334,7 @@ class TechFeedReader < Sinatra::Base
   # because matches don't carry a duration on the row.
   get '/sports/calendar.ics' do
     days_forward = (params['days'].to_s.match?(/\A\d+\z/) ? params['days'].to_i : 30).clamp(1, 365)
-    matches      = SportsMatchesStore.upcoming_for_followed_teams(days_forward: days_forward)
+    matches      = SportsMatchesStore.upcoming_for_followed_teams(current_user_id, days_forward: days_forward)
     teams_by_id  = build_teams_by_id_for_matches(matches)
     leagues_by_id = build_leagues_by_id_for_matches(matches)
 
@@ -1519,7 +1519,7 @@ class TechFeedReader < Sinatra::Base
   post '/digests' do
     window = (params['window_hours'].to_s.match?(/\A\d+\z/) ? params['window_hours'].to_i : Digests::DEFAULT_WINDOW_HOURS).clamp(1, 720)
     limit  = (params['limit'].to_s.match?(/\A\d+\z/)        ? params['limit'].to_i        : Digests::DEFAULT_LIMIT).clamp(1, 200)
-    id, result = Digests.generate_and_store!(window_hours: window, limit: limit)
+    id, result = Digests.generate_and_store!(current_user_id, window_hours: window, limit: limit)
     AppLogger.info('digest_manual_trigger', id: id, count: result.count, window_hours: window)
     redirect to("/digests/#{id}?notice=generated&count=#{result.count}")
   end
@@ -2114,7 +2114,7 @@ class TechFeedReader < Sinatra::Base
 
     begin
       tag    = TagsStore.add(user_id: current_user_id, name: name, match_kind: kind, match_value: val)
-      tagged = TagsApplier.apply_to_existing(tag['id'])
+      tagged = TagsApplier.apply_to_existing(tag)
       redirect to("/tags?notice=added&tagged=#{tagged}")
     rescue SQLite3::ConstraintException
       redirect to('/tags?error=duplicate-name')

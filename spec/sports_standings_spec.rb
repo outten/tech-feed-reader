@@ -167,7 +167,7 @@ RSpec.describe '/sports/league/:slug' do
     SportsStandingsStore.upsert(league_id: league['id'], team_id: cowboys['id'], group_name: 'NFC',
                                  source_provider: 'espn', position: 7, wins: 7, losses: 10,
                                  win_percent: '.412', point_differential: -45, streak: 'W2')
-    SportsFollowsStore.add(kind: 'team', value: 'eagles')
+    SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')
 
     get '/sports/league/nfl'
     expect(last_response.status).to eq(200)

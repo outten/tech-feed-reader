@@ -21,7 +21,7 @@ def seed_returning!
     content_html: '<p>x</p>', content_text: 'x',
     audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
   }])
-  ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('whatson_sentinel')['id'], value: true)
+  ReadStateStore.mark_bookmarked(1, ArticlesStore.find_by_uid('whatson_sentinel')['id'], value: true)
 end
 
 def make_today_article(uid:, title:, audio_url: nil, topic: 'technology',

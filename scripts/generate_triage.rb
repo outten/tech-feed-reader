@@ -26,9 +26,18 @@ require_relative '../app/credentials'
 require_relative '../app/database'
 require_relative '../app/triage/claude'
 require_relative '../app/triage_store'
+require_relative '../app/users_store'
 require_relative '../app/logger'
 
 Database.migrate!
+
+# USER env var selects the owner of the generated rows. Defaults to
+# the owner who originally seeded the app (user 1, t-money). Multi-user
+# deployments will iterate over users in a wrapper script.
+username = ENV['USER_USERNAME']
+user = username ? UsersStore.find_by_username(username) : UsersStore.find(1)
+abort "no user found (USER_USERNAME=#{username.inspect})" unless user
+user_id = user['id'].to_i
 
 # nil = cross-topic legacy run; the rest scope unread + corpus to
 # one feed.topic. Order matters only for log readability.
@@ -37,7 +46,7 @@ TRIAGE_TOPICS = [nil, 'technology', 'sports'].freeze
 failures = []
 TRIAGE_TOPICS.each do |topic|
   scope = topic || 'all'
-  result = Triage::Claude.run(topic: topic)
+  result = Triage::Claude.run(user_id, topic: topic)
 
   case result.status
   when :unavailable
@@ -46,13 +55,13 @@ TRIAGE_TOPICS.each do |topic|
     next
   when :error
     warn "Triage::Claude failed (topic=#{scope}): #{result.error}"
-    TriageStore.create(result)
+    TriageStore.create(user_id, result)
     failures << :error
     next
   end
 
-  id = TriageStore.create(result)
-  puts "Triage stored id=#{id} topic=#{scope} status=#{result.status} " \
+  id = TriageStore.create(user_id, result)
+  puts "Triage stored id=#{id} user=#{user['username']} topic=#{scope} status=#{result.status} " \
        "must_read=#{result.must_read.length} optional=#{result.optional.length} " \
        "skip=#{result.skip.length}"
 end

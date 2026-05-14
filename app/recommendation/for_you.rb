@@ -53,7 +53,7 @@ module Recommendation
     # candidate window so a 👍 on an Eagles article doesn't boost
     # tech rankings (and vice versa). nil = unscoped (legacy
     # behaviour, used when no topic filter is in effect).
-    def score_window(user_id = 1, state: :unread, kind: :all, limit:, offset:, topic: nil, now: Time.now.utc)
+    def score_window(user_id, state: :unread, kind: :all, limit:, offset:, topic: nil, now: Time.now.utc)
       pos_terms = corpus_terms(user_id, positive: true,  topic: topic)
       neg_terms = corpus_terms(user_id, positive: false, topic: topic)
 
@@ -102,7 +102,7 @@ module Recommendation
     # for O(1) intersection in the per-article scorer. Empty when the
     # corpus has no rows yet (cold start). Phase S10: `topic:` scopes
     # the SQL to articles whose feed.topic matches.
-    def corpus_terms(user_id = 1, positive:, topic: nil)
+    def corpus_terms(user_id, positive:, topic: nil)
       rows = positive ? positive_corpus(user_id, topic: topic) : negative_corpus(user_id, topic: topic)
       return [].to_set if rows.empty?
 
@@ -110,7 +110,7 @@ module Recommendation
       Recommendation.top_keywords(text, limit: TOP_TERMS).to_set
     end
 
-    def positive_corpus(user_id = 1, topic: nil)
+    def positive_corpus(user_id, topic: nil)
       sql = <<~SQL
         SELECT a.title, a.content_text
         FROM articles a
@@ -129,7 +129,7 @@ module Recommendation
       Database.connection.execute(sql, args)
     end
 
-    def negative_corpus(user_id = 1, topic: nil)
+    def negative_corpus(user_id, topic: nil)
       sql = <<~SQL
         SELECT a.title, a.content_text
         FROM articles a
@@ -167,8 +167,7 @@ module Recommendation
     # positive corpus" check is what differentiates the personalised
     # signal from chronological — when there's nothing to personalise
     # against, FTS5 content-similarity is the better fallback.
-    def next_after(*args, now: Time.now.utc)
-      user_id, article = args.length == 2 ? args : [1, args.first]
+    def next_after(user_id, article, now: Time.now.utc)
       return nil if article.nil?
       return nil if positive_corpus(user_id).empty?
 

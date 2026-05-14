@@ -29,8 +29,7 @@ module FeedFeedbackStore
     Database.connection
   end
 
-  def weight_for(*args)
-    user_id, feed_id = args.length == 2 ? args : [1, args.first]
+  def weight_for(user_id, feed_id)
     row = db.execute(
       'SELECT weight FROM feed_feedback WHERE user_id = ? AND feed_id = ?',
       [user_id.to_i, feed_id.to_i]
@@ -38,8 +37,7 @@ module FeedFeedbackStore
     row ? row['weight'].to_f : DEFAULT_WEIGHT
   end
 
-  def weights_by_feed_id(*args)
-    user_id, feed_ids = args.length == 2 ? args : [1, args.first]
+  def weights_by_feed_id(user_id, feed_ids)
     ids = Array(feed_ids).map(&:to_i).uniq
     return {} if ids.empty?
     placeholders = (['?'] * ids.length).join(', ')
@@ -51,8 +49,7 @@ module FeedFeedbackStore
     ids.each_with_object({}) { |id, h| h[id] = stored.fetch(id, DEFAULT_WEIGHT) }
   end
 
-  def bump(*args, direction:)
-    user_id, feed_id = args.length == 2 ? args : [1, args.first]
+  def bump(user_id, feed_id, direction:)
     raise ArgumentError, "direction must be one of #{DIRECTIONS.inspect} (got #{direction.inspect})" unless DIRECTIONS.include?(direction)
     uid = user_id.to_i
     fid = feed_id.to_i
@@ -75,7 +72,7 @@ module FeedFeedbackStore
     nextval
   end
 
-  def count(user_id = 1)
+  def count(user_id)
     db.execute('SELECT COUNT(*) AS c FROM feed_feedback WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 end
