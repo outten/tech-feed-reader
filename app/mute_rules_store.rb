@@ -1,6 +1,6 @@
 require_relative 'database'
 
-# Phase 5 — wrapper around the mute_rules table.
+# Phase 5 — per-user wrapper around mute_rules.
 #
 # Three kinds of rule, each with a different match shape:
 #   keyword → substring match against title OR content_text (case-insensitive,
@@ -9,51 +9,60 @@ require_relative 'database'
 #   feed    → match against articles.feed_id (value stored as the id-as-string)
 #
 # The matching itself lives in ArticlesStore.state_query as a single
-# NOT EXISTS sub-query — see the rationale there. This module is just
-# CRUD + validation. The schema's CHECK constraint on `kind` is a
-# belt-and-suspenders against a malformed row.
+# NOT EXISTS sub-query — see the rationale there.
 module MuteRulesStore
   KINDS = %w[keyword author feed].freeze
 
   module_function
 
-  def all
-    db.execute('SELECT * FROM mute_rules ORDER BY kind, created_at DESC')
+  def all(user_id = 1)
+    db.execute(
+      'SELECT * FROM mute_rules WHERE user_id = ? ORDER BY kind, created_at DESC',
+      [user_id.to_i]
+    )
   end
 
-  def for_kind(kind)
+  def for_kind(*args)
+    user_id, kind = args.length == 2 ? args : [1, args.first]
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind.to_s)
-    db.execute('SELECT * FROM mute_rules WHERE kind = ? ORDER BY created_at DESC', [kind.to_s])
+    db.execute(
+      'SELECT * FROM mute_rules WHERE user_id = ? AND kind = ? ORDER BY created_at DESC',
+      [user_id.to_i, kind.to_s]
+    )
   end
 
-  def count
-    db.execute('SELECT COUNT(*) AS c FROM mute_rules').first['c']
+  def count(user_id = 1)
+    db.execute('SELECT COUNT(*) AS c FROM mute_rules WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 
-  # Insert a rule. Idempotent — re-adding (kind, value) is a no-op
-  # because (kind, value) is the natural key. Trims surrounding
-  # whitespace on `value` so "  Hacker News " and "Hacker News" don't
-  # become two rules. Returns true if a new row was inserted, false
+  # Idempotent — re-adding (user_id, kind, value) is a no-op because
+  # (user_id, kind, value) is the natural key. Trims surrounding
+  # whitespace on `value`. Returns true if a new row was inserted, false
   # if the rule already existed.
-  def add(kind:, value:)
+  def add(user_id: 1, kind:, value:)
     kind  = kind.to_s
     value = value.to_s.strip
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind)
     raise ArgumentError, 'value must be non-empty'      if value.empty?
 
-    db.execute('INSERT OR IGNORE INTO mute_rules(kind, value) VALUES (?, ?)', [kind, value])
+    db.execute(
+      'INSERT OR IGNORE INTO mute_rules(user_id, kind, value) VALUES (?, ?, ?)',
+      [user_id.to_i, kind, value]
+    )
     db.changes.positive?
   end
 
   # Delete a rule. No-op if it doesn't exist. Returns the number of
-  # rows actually removed (0 or 1) so the caller can flash a useful
-  # notice.
-  def remove(kind:, value:)
+  # rows actually removed (0 or 1).
+  def remove(user_id: 1, kind:, value:)
     kind  = kind.to_s
     value = value.to_s.strip
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind)
 
-    db.execute('DELETE FROM mute_rules WHERE kind = ? AND value = ?', [kind, value])
+    db.execute(
+      'DELETE FROM mute_rules WHERE user_id = ? AND kind = ? AND value = ?',
+      [user_id.to_i, kind, value]
+    )
     db.changes
   end
 

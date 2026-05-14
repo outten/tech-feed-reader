@@ -80,6 +80,17 @@ module Auth
       !current_user.nil?
     end
 
+    # The shorthand routes use to scope per-user store calls. Asserts
+    # the request has a signed-in user — if you hit this with nil
+    # current_user the before-filter forgot to redirect, which is a
+    # programming error. Returns an Integer so DB layer doesn't have to
+    # re-coerce.
+    def current_user_id
+      u = current_user
+      raise 'current_user_id called without a signed-in user' unless u
+      u['id'].to_i
+    end
+
     def require_signed_in!
       return if signed_in?
       session[:return_to] = request.fullpath if request.get?
@@ -93,12 +104,14 @@ module Auth
       session.clear
       session[:user_id] = user['id'].to_i
       UsersStore.touch_last_seen!(user['id'])
+      remove_instance_variable(:@current_user) if defined?(@current_user)
       AppLogger.info('user_signed_in', user_id: user['id'], username: user['username'])
     end
 
     def sign_out!
       uid = session[:user_id]
       session.clear
+      remove_instance_variable(:@current_user) if defined?(@current_user)
       AppLogger.info('user_signed_out', user_id: uid)
     end
   end

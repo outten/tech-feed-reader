@@ -83,11 +83,14 @@ RSpec.describe 'TechFeedReader smoke' do
   end
 
   describe 'POST /feeds/:id/delete' do
-    it 'removes the feed and redirects with notice=removed' do
+    it 'unsubscribes the user and redirects with notice=removed (catalog row stays)' do
       feed = FeedsStore.add(url: 'https://gone.example.com/rss')
       post "/feeds/#{feed['id']}/delete"
       expect(last_response.headers['Location']).to include('/feeds?notice=removed')
-      expect(FeedsStore.find(feed['id'])).to be_nil
+      # A2: delete now means unsubscribe — the shared catalog row stays
+      # so a co-subscribed user keeps their feed.
+      expect(FeedsStore.subscribed?(1, feed['id'])).to be(false)
+      expect(FeedsStore.find(feed['id'])).not_to be_nil
     end
 
     it 'reports a missing feed with error=not-found' do

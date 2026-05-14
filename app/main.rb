@@ -188,11 +188,28 @@ class TechFeedReader < Sinatra::Base
   # in a before/after pair.
   set :enforce_auth_wall, ENV['RACK_ENV'] != 'test'
   before do
-    next unless settings.enforce_auth_wall
-    next if Auth.public_path?(request.path_info)
-    next if signed_in?
-    session[:return_to] = request.fullpath if request.get?
-    redirect to('/sign-in')
+    if settings.enforce_auth_wall
+      next if Auth.public_path?(request.path_info)
+      next if signed_in?
+      session[:return_to] = request.fullpath if request.get?
+      redirect to('/sign-in')
+    else
+      # Test/dev override: when the wall is off, every request implicitly
+      # adopts user 1 (the seeded test user / single-user-mode owner).
+      # Restores the pre-A2 "single user owns the app" behaviour so
+      # existing specs continue to pass without a sign-in dance.
+      # Skip auth endpoints themselves — sign-up / sign-in / /api/auth/*
+      # need to see the unauthenticated visitor for their own ceremony.
+      next if signed_in?
+      # Skip auth endpoints (need to see the unauth visitor for the
+      # ceremony) + the diagnostic endpoints (/health deliberately
+      # tests an unreachable DB; running UsersStore.find here would
+      # explode before the route returns its expected 503).
+      next if request.path_info.start_with?('/sign-up', '/sign-in', '/sign-out', '/api/auth/')
+      next if request.path_info == '/health' || request.path_info == '/metrics'
+      user = UsersStore.find(1)
+      sign_in!(user) if user
+    end
   end
 
   helpers do
@@ -294,12 +311,12 @@ class TechFeedReader < Sinatra::Base
       today        = Date.today
       start_of_day = Time.new(today.year, today.month, today.day, 0, 0, 0).utc
 
-      @today_matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 1)
+      @today_matches = SportsMatchesStore.upcoming_for_followed_teams(current_user_id, days_forward: 1)
 
-      scored = Recommendation::ForYou.score_window(state: :all, limit: 200, offset: 0)
+      scored = Recommendation::ForYou.score_window(current_user_id, state: :all, limit: 200, offset: 0)
       todays = scored.select { |a| a['published_at'].to_s >= start_of_day.iso8601 }
 
-      @feeds_by_id ||= FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+      @feeds_by_id ||= FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
 
       # Phase 2 follow-up (2026-05-12) — "To watch today" partitions
       # by whether the article has a YouTube video URL, NOT by feed
@@ -519,7 +536,7 @@ class TechFeedReader < Sinatra::Base
     # team in that league. Drives the "By league:" TOC row on
     # /sports and the future calendar/iCal scope (S9).
     def leagues_for_followed_teams
-      slugs = SportsFollowsStore.for_kind('team').map { |f| f['value'] }
+      slugs = SportsFollowsStore.for_kind(current_user_id, 'team').map { |f| f['value'] }
       return [] if slugs.empty?
       league_ids = slugs.filter_map { |s| (t = SportsTeamsStore.find_by_slug(s)) && t['league_id'] }.uniq
       league_ids.filter_map { |lid| SportsLeaguesStore.find(lid) }
@@ -668,7 +685,7 @@ class TechFeedReader < Sinatra::Base
     # (server-side) and the /api/feeds endpoints (returned as `row_html`)
     # so JS-inserted rows match server-rendered ones.
     def render_feed_row(feed)
-      weight = FeedFeedbackStore.weight_for(feed['id'])
+      weight = FeedFeedbackStore.weight_for(current_user_id, feed['id'])
       erb :_feed_row, locals: { feed: feed, weight: weight }, layout: false
     end
 
@@ -823,15 +840,17 @@ class TechFeedReader < Sinatra::Base
   get '/' do
     @page_title  = 'Tech Feed Reader'
     @public_page = true
-    @returning_user = ArticlesStore.count.positive? && ReadStateStore.any_activity?
+    @returning_user = signed_in? &&
+                      ArticlesStore.count.positive? &&
+                      ReadStateStore.any_activity?(current_user_id)
     if @returning_user
       load_whats_on_today!
       @stats = {
-        unread:     ReadStateStore.unread_count,
-        bookmarks:  ReadStateStore.bookmarked_count,
-        articles:   ArticlesStore.count
+        unread:     ReadStateStore.unread_count(current_user_id),
+        bookmarks:  ReadStateStore.bookmarked_count(current_user_id),
+        articles:   ArticlesStore.count_for_user(current_user_id)
       }
-      @latest_triage = TriageStore.latest
+      @latest_triage = TriageStore.latest(current_user_id)
     end
     erb :home
   end
@@ -1051,20 +1070,17 @@ class TechFeedReader < Sinatra::Base
 
   get '/admin/dashboard' do
     @page_title       = 'Dashboard'
-    @articles         = ArticlesStore.recent(limit: 20, state: :unread)
-    @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-    @article_count    = ArticlesStore.count
-    @unread_count     = ReadStateStore.unread_count
-    @bookmark_count   = ReadStateStore.bookmarked_count
-    @feed_count       = FeedsStore.count
+    @articles         = ArticlesStore.recent(current_user_id, limit: 20, state: :unread)
+    @feeds_by_id      = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    @article_count    = ArticlesStore.count_for_user(current_user_id)
+    @unread_count     = ReadStateStore.unread_count(current_user_id)
+    @bookmark_count   = ReadStateStore.bookmarked_count(current_user_id)
+    @feed_count       = FeedsStore.count_for_user(current_user_id)
     @degraded         = HealthRegistry.degraded?
-    # Cosmetics 5 — drive the activity chart from the actual retention
-    # window. RETENTION_DAYS=7 means anything older was already swept
-    # by Pruner, so a 30-day chart is mostly empty axes.
     @activity_window  = Pruner.effective_retention_days
-    @daily_counts     = ArticlesStore.daily_counts(days: @activity_window)
-    @top_feeds        = ArticlesStore.counts_by_feed(limit: 10)
-    @top_tags_week    = TagsStore.top_in_window(days: 7, limit: 8)
+    @daily_counts     = ArticlesStore.daily_counts(current_user_id, days: @activity_window)
+    @top_feeds        = ArticlesStore.counts_by_feed(current_user_id, limit: 10)
+    @top_tags_week    = TagsStore.top_in_window(current_user_id, days: 7, limit: 8)
     @topic_clusters   = TopicClusters.recent(days: 14, limit: 8)
     erb :dashboard
   end
@@ -1079,7 +1095,7 @@ class TechFeedReader < Sinatra::Base
     feed_id      = params['feed_id'].to_i
     tag_id       = params['tag'].to_i
     @feed_filter = feed_id.positive? ? FeedsStore.find(feed_id) : nil
-    @tag_filter  = tag_id.positive?  ? TagsStore.find(tag_id)   : nil
+    @tag_filter  = tag_id.positive?  ? TagsStore.find(current_user_id, tag_id) : nil
 
     @state_filter = (params['state'] || 'all').to_sym
     @state_filter = :all unless ARTICLES_STATE_FILTERS.include?(@state_filter)
@@ -1092,29 +1108,26 @@ class TechFeedReader < Sinatra::Base
     @sort_filter = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     @articles = if @tag_filter
-                  ArticlesStore.for_tag(tag_id, limit: @per_page, offset: offset, state: @state_filter)
+                  ArticlesStore.for_tag(current_user_id, tag_id, limit: @per_page, offset: offset, state: @state_filter)
                 elsif @feed_filter
-                  ArticlesStore.for_feed(feed_id, limit: @per_page, offset: offset, state: @state_filter)
+                  ArticlesStore.for_feed(current_user_id, feed_id, limit: @per_page, offset: offset, state: @state_filter)
                 elsif @sort_filter == :relevance
-                  # Phase 6 — For You ranker. Forces state=:unread for
-                  # the relevance feed (re-ranking already-read articles
-                  # is rarely what the user wants); the chips above still
-                  # render so they can flip back to chronological with
-                  # any state.
                   @state_filter = :unread
-                  Recommendation::ForYou.score_window(state: :unread, kind: @kind_filter,
+                  Recommendation::ForYou.score_window(current_user_id,
+                                                      state: :unread, kind: @kind_filter,
                                                       topic: @topic_filter,
                                                       limit: @per_page, offset: offset)
                 else
                   ArticlesStore.recent(
+                    current_user_id,
                     limit: @per_page, offset: offset,
                     state: @state_filter, kind: @kind_filter,
                     topic: @topic_filter
                   )
                 end
 
-    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-    @tags_by_article = TagsStore.tags_for_articles(@articles.map { |a| a['id'] })
+    @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    @tags_by_article = TagsStore.tags_for_articles(current_user_id, @articles.map { |a| a['id'] })
     # Skim mode shows a summary line per row — batch-fetch the cached
     # summaries for the page so the view doesn't N+1 SummaryStore.find.
     @summaries_by_article_id = if @view_filter == :skim
@@ -1128,7 +1141,7 @@ class TechFeedReader < Sinatra::Base
     # corpus (used in the "of <N> total" line). Total-for-current-
     # filter is harder to compute without a parallel COUNT query;
     # leaving that as a follow-up.
-    @articles_total       = ArticlesStore.count
+    @articles_total       = ArticlesStore.count_for_user(current_user_id)
     @most_active_24h_feed = articles_most_active_feed_24h
     erb :articles
   end
@@ -1152,19 +1165,20 @@ class TechFeedReader < Sinatra::Base
     @cutoff_seconds   = @max_minutes * 60
 
     @episodes    = ArticlesStore.recent(
+      current_user_id,
       limit:                BUS_LIMIT,
       kind:                 :podcast,
       max_duration_seconds: @cutoff_seconds
     )
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :bus
   end
 
   get '/podcasts' do
     @page_title       = 'Podcasts'
-    @shows            = ArticlesStore.podcast_feeds
-    @recent_episodes  = ArticlesStore.recent(limit: 25, kind: :podcast)
-    @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @shows            = ArticlesStore.podcast_feeds(current_user_id)
+    @recent_episodes  = ArticlesStore.recent(current_user_id, limit: 25, kind: :podcast)
+    @feeds_by_id      = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :podcasts
   end
 
@@ -1176,7 +1190,7 @@ class TechFeedReader < Sinatra::Base
   # podcast show grid.
   get '/sports' do
     @page_title  = 'Sports'
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     sports_feeds = @feeds_by_id.values.select { |f| f['topic'] == 'sports' }
 
     # Per-sport subscribed-feed list, keyed by sub-category from the
@@ -1192,7 +1206,7 @@ class TechFeedReader < Sinatra::Base
     # only follow a couple of sports.
     @recent_by_sport = Hash.new { |h, k| h[k] = [] }
     if sports_feeds.any?
-      ArticlesStore.recent(limit: 100, topic: 'sports').each do |a|
+      ArticlesStore.recent(current_user_id, limit: 100, topic: 'sports').each do |a|
         feed  = @feeds_by_id[a['feed_id']]
         next unless feed
         entry = FeedCatalog.find_by_url(feed['url'])
@@ -1248,7 +1262,7 @@ class TechFeedReader < Sinatra::Base
     # Phase S7 follow-up — followed-player slugs (so view can mark
     # the ★ chip on each row + render the "My followed players"
     # callout above the rankings).
-    @followed_player_slugs = SportsFollowsStore.for_kind('player').map { |f| f['value'] }.to_set
+    @followed_player_slugs = SportsFollowsStore.for_kind(current_user_id, 'player').map { |f| f['value'] }.to_set
     @followed_players = @followed_player_slugs.filter_map do |slug|
       SportsPlayersStore.find_by_slug(slug)
     end
@@ -1262,7 +1276,7 @@ class TechFeedReader < Sinatra::Base
     @page_title    = @player['full_name']
     # ESPN player-card link reconstructed from external_id + slug.
     @espn_url      = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}"
-    @is_followed   = SportsFollowsStore.follow?('player', slug)
+    @is_followed   = SportsFollowsStore.follow?(current_user_id, 'player', slug)
     # S7 follow-up #2 — articles mentioning the player. Refresh
     # if the cache is stale (TTL 1h), then read from the join table.
     SportsEntityArticlesStore.refresh_for(
@@ -1271,7 +1285,7 @@ class TechFeedReader < Sinatra::Base
     @related_articles = SportsEntityArticlesStore.for_entity(
       kind: 'player', entity_id: @player['id'], limit: 30
     )
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @summaries_by_article_id = SummaryStore.find_for_ids(@related_articles.map { |a| a['id'] })
     erb :sports_player
   end
@@ -1283,7 +1297,7 @@ class TechFeedReader < Sinatra::Base
     slug = params['slug'].to_s
     halt 400, 'slug required' if slug.empty?
     halt 404 unless SportsPlayersStore.find_by_slug(slug)
-    SportsFollowsStore.add(kind: 'player', value: slug)
+    SportsFollowsStore.add(user_id: current_user_id, kind: 'player', value: slug)
     AppLogger.info('player_follow', slug: slug)
     redirect to(params['return_to'] || "/sports/player/#{slug}")
   end
@@ -1291,7 +1305,7 @@ class TechFeedReader < Sinatra::Base
   post '/sports/players/unfollow' do
     slug = params['slug'].to_s
     halt 400, 'slug required' if slug.empty?
-    SportsFollowsStore.remove(kind: 'player', value: slug)
+    SportsFollowsStore.remove(user_id: current_user_id, kind: 'player', value: slug)
     AppLogger.info('player_unfollow', slug: slug)
     redirect to(params['return_to'] || "/sports/player/#{slug}")
   end
@@ -1348,7 +1362,7 @@ class TechFeedReader < Sinatra::Base
     end
 
     # Followed-team highlight: which slug is in sports_follows?
-    @followed_slugs = SportsFollowsStore.for_kind('team').map { |f| f['value'] }.to_set
+    @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team').map { |f| f['value'] }.to_set
     erb :sports_league
   end
 
@@ -1360,15 +1374,12 @@ class TechFeedReader < Sinatra::Base
     @team = SportsTeams.find(slug)
     halt 404, erb(:article_not_found) unless @team
 
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @team_feeds  = SportsTeams.subscribed_feeds_for(@team)
     feed_ids     = @team_feeds.map { |f| f['id'] }
 
-    # Fetch recent articles across the team's feeds. Per-feed-id
-    # dispatch keeps the SQL bounded: ArticlesStore.for_feed already
-    # exists, just collect across N (small) feeds and merge-sort.
     @articles = feed_ids.flat_map do |fid|
-      ArticlesStore.for_feed(fid, limit: 25, state: :all)
+      ArticlesStore.for_feed(current_user_id, fid, limit: 25, state: :all)
     end.sort_by { |a| a['published_at'].to_s }.reverse.first(50)
 
     @summaries_by_article_id = SummaryStore.find_for_ids(@articles.map { |a| a['id'] })
@@ -1402,12 +1413,12 @@ class TechFeedReader < Sinatra::Base
   # list; the detail view renders the saved html_body inline.
   get '/digests' do
     @page_title = 'Digests'
-    @digests    = DigestStore.recent(limit: 100)
+    @digests    = DigestStore.recent(current_user_id, limit: 100)
     erb :digests
   end
 
   get '/digests/:id' do |id|
-    @digest = DigestStore.find(id)
+    @digest = DigestStore.find(current_user_id, id)
     halt 404, 'Digest not found' unless @digest
     @page_title       = @digest['subject']
     @claude_available = Summarizer::Claude.available?
@@ -1421,7 +1432,7 @@ class TechFeedReader < Sinatra::Base
   # digest's stored text_body, which is composed offline by
   # `make digest`, so this route is fast and doesn't need Sidekiq.
   post '/digests/:id/summarize' do |id|
-    digest = DigestStore.find(id)
+    digest = DigestStore.find(current_user_id, id)
     halt 404 unless digest
 
     if digest['llm_summary'].to_s.strip != ''
@@ -1435,7 +1446,7 @@ class TechFeedReader < Sinatra::Base
     )
     case result.status
     when :ok
-      DigestStore.update_llm_summary(id, summary: result.text, model: result.model)
+      DigestStore.update_llm_summary(current_user_id, id, summary: result.text, model: result.model)
       AppLogger.info('digest_summarize', id: id, status: :ok, model: result.model)
       redirect to("/digests/#{id}?notice=llm-summarized&model=#{CGI.escape(result.model.to_s)}")
     when :unavailable
@@ -1454,22 +1465,21 @@ class TechFeedReader < Sinatra::Base
   get '/triage' do
     @page_title       = 'Triage'
     @claude_available = Triage::Claude.available?
-    @recent_runs      = TriageStore.recent(limit: 20)
+    @recent_runs      = TriageStore.recent(current_user_id, limit: 20)
     @triage_result    = nil
     @triage_topic     = sanitize_topic_filter(params['topic'])
     erb :triage
   end
 
   get '/triage/:id' do |id|
-    row = TriageStore.find(id)
+    row = TriageStore.find(current_user_id, id)
     halt 404, 'Triage not found' unless row
     @page_title       = "Triage — #{row['generated_at']}"
     @claude_available = Triage::Claude.available?
-    @recent_runs      = TriageStore.recent(limit: 20)
+    @recent_runs      = TriageStore.recent(current_user_id, limit: 20)
     @triage_result    = triage_struct_from_row(row)
     @articles_by_uid  = preload_articles_by_uid(@triage_result)
-    @feeds_by_id      = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-    # STUFF.md #8 — inline article summaries on the triage cards.
+    @feeds_by_id      = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     article_ids = @articles_by_uid.values.map { |a| a['id'] }
     @summaries_by_article_id = SummaryStore.find_for_ids(article_ids)
     @triage_id        = row['id']
@@ -1480,7 +1490,7 @@ class TechFeedReader < Sinatra::Base
     @page_title       = 'Triage'
     @claude_available = Triage::Claude.available?
     @triage_topic     = sanitize_topic_filter(params['topic'])
-    @triage_result    = Triage::Claude.run(topic: @triage_topic)
+    @triage_result    = Triage::Claude.run(current_user_id, topic: @triage_topic)
     AppLogger.info('triage_manual_trigger',
                    status:        @triage_result.status,
                    topic:         @triage_topic,
@@ -1488,14 +1498,13 @@ class TechFeedReader < Sinatra::Base
                    must_read:     @triage_result.must_read.to_a.length,
                    optional:      @triage_result.optional.to_a.length,
                    skip:          @triage_result.skip.to_a.length)
-    # Persist (skip the unavailable case — there's no row worth keeping).
     if @triage_result.status != :unavailable
-      @triage_id = TriageStore.create(@triage_result)
+      @triage_id = TriageStore.create(current_user_id, @triage_result)
       AppLogger.info('triage_stored', id: @triage_id, status: @triage_result.status)
     end
-    @recent_runs     = TriageStore.recent(limit: 20)
+    @recent_runs     = TriageStore.recent(current_user_id, limit: 20)
     @articles_by_uid = preload_articles_by_uid(@triage_result)
-    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     # STUFF.md #8 — inline summaries for the triage cards.
     article_ids = @articles_by_uid.values.map { |a| a['id'] }
     @summaries_by_article_id = SummaryStore.find_for_ids(article_ids)
@@ -1520,19 +1529,15 @@ class TechFeedReader < Sinatra::Base
     halt 404, erb(:article_not_found) unless @article
 
     @feed            = FeedsStore.find(@article['feed_id'])
-    @state           = ReadStateStore.opened!(@article['id'])
-    @article_tags    = TagsStore.tags_for_article(@article['id'])
-    @all_tags        = TagsStore.all
+    @state           = ReadStateStore.opened!(current_user_id, @article['id'])
+    @article_tags    = TagsStore.tags_for_article(current_user_id, @article['id'])
+    @all_tags        = TagsStore.all(current_user_id)
     @summary         = SummaryStore.find(@article['id'])
     @claude_available = Summarizer::Claude.available?
-    @related         = Recommendation.for_article(@article, limit: 5)
-    # Phase 7 — single-card "Read next" suggestion below the article
-    # body. Tries the personalised For You ranker first; when the
-    # positive corpus is empty (cold start) or it can't pick a row,
-    # falls back to the existing FTS5 "Related" top hit.
-    @read_next       = Recommendation::ForYou.next_after(@article) ||
+    @related         = Recommendation.for_article(current_user_id, @article, limit: 5)
+    @read_next       = Recommendation::ForYou.next_after(current_user_id, @article) ||
                        @related.find { |a| a['id'] != @article['id'] }
-    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title      = @article['title']
     # Chat context — give the assistant the article body (capped) so
     # it can answer questions about what the user is reading. The
@@ -1631,7 +1636,7 @@ class TechFeedReader < Sinatra::Base
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
     read = params['read'] != '0'  # default true; pass read=0 to mark unread
-    ReadStateStore.mark_read(article['id'], read: read)
+    ReadStateStore.mark_read(current_user_id, article['id'], read: read)
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
@@ -1639,7 +1644,7 @@ class TechFeedReader < Sinatra::Base
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
     value = params['value'] != '0'
-    ReadStateStore.mark_bookmarked(article['id'], value: value)
+    ReadStateStore.mark_bookmarked(current_user_id, article['id'], value: value)
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
@@ -1647,7 +1652,7 @@ class TechFeedReader < Sinatra::Base
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
     value = params['value'] != '0'
-    ReadStateStore.mark_archived(article['id'], value: value)
+    ReadStateStore.mark_archived(current_user_id, article['id'], value: value)
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
@@ -1663,7 +1668,7 @@ class TechFeedReader < Sinatra::Base
             when '0', ''   then 0
             else                halt 400, 'feedback value must be -1, 0, or +1'
             end
-    ReadStateStore.mark_feedback(article['id'], value: value)
+    ReadStateStore.mark_feedback(current_user_id, article['id'], value: value)
     AppLogger.info('article_feedback', uid: uid, value: value)
     redirect to(params['return_to'] || "/article/#{uid}")
   end
@@ -1689,8 +1694,8 @@ class TechFeedReader < Sinatra::Base
     halt 400, JSON.generate(error: 'signal must be -1, 0, or +1') unless [-1, 0, 1].include?(signal)
 
     listened_pct = body['listened_pct'].to_f
-    explicit_present = ReadStateStore.get(article['id'])['feedback'].to_i != 0
-    ReadStateStore.mark_passive_feedback(article['id'], value: signal)
+    explicit_present = ReadStateStore.get(current_user_id, article['id'])['feedback'].to_i != 0
+    ReadStateStore.mark_passive_feedback(current_user_id, article['id'], value: signal)
 
     AppLogger.info('podcast_passive_feedback',
                    uid: uid, signal: signal, listened_pct: listened_pct,
@@ -1707,7 +1712,7 @@ class TechFeedReader < Sinatra::Base
     halt 404 unless feed
     direction = params['direction'].to_s.to_sym
     halt 400, 'direction must be up, down, or reset' unless FeedFeedbackStore::DIRECTIONS.include?(direction)
-    weight = FeedFeedbackStore.bump(feed['id'], direction: direction)
+    weight = FeedFeedbackStore.bump(current_user_id, feed['id'], direction: direction)
     AppLogger.info('feed_feedback', feed_id: feed['id'], direction: direction, weight: weight)
     redirect to(params['return_to'] || '/feeds')
   end
@@ -1724,7 +1729,7 @@ class TechFeedReader < Sinatra::Base
     halt 400, "kind must be one of #{MuteRulesStore::KINDS.join(', ')}" unless MuteRulesStore::KINDS.include?(kind)
     halt 400, 'value must be non-empty' if value.strip.empty?
 
-    added = MuteRulesStore.add(kind: kind, value: value)
+    added = MuteRulesStore.add(user_id: current_user_id, kind: kind, value: value)
     AppLogger.info('mute_rule_add', kind: kind, value: value, added: added)
     redirect to(params['return_to'] || "/feeds?notice=#{added ? 'mute-added' : 'mute-duplicate'}&kind=#{kind}&value=#{CGI.escape(value)}")
   end
@@ -1734,7 +1739,7 @@ class TechFeedReader < Sinatra::Base
     value = params['value'].to_s
     halt 400 unless MuteRulesStore::KINDS.include?(kind)
 
-    removed = MuteRulesStore.remove(kind: kind, value: value)
+    removed = MuteRulesStore.remove(user_id: current_user_id, kind: kind, value: value)
     AppLogger.info('mute_rule_remove', kind: kind, value: value, removed: removed)
     redirect to(params['return_to'] || "/feeds?notice=#{removed.positive? ? 'mute-removed' : 'mute-not-found'}")
   end
@@ -1745,12 +1750,12 @@ class TechFeedReader < Sinatra::Base
   # returns a per-uid result list so the UI can flag any uids that
   # didn't resolve. Cap is 500 uids per call to keep the SQL bounded.
   BULK_ACTIONS = {
-    'read'       => ->(id) { ReadStateStore.mark_read(id,       read:  true)  },
-    'unread'     => ->(id) { ReadStateStore.mark_read(id,       read:  false) },
-    'bookmark'   => ->(id) { ReadStateStore.mark_bookmarked(id, value: true)  },
-    'unbookmark' => ->(id) { ReadStateStore.mark_bookmarked(id, value: false) },
-    'archive'    => ->(id) { ReadStateStore.mark_archived(id,   value: true)  },
-    'unarchive'  => ->(id) { ReadStateStore.mark_archived(id,   value: false) }
+    'read'       => ->(uid, id) { ReadStateStore.mark_read(uid, id,       read:  true)  },
+    'unread'     => ->(uid, id) { ReadStateStore.mark_read(uid, id,       read:  false) },
+    'bookmark'   => ->(uid, id) { ReadStateStore.mark_bookmarked(uid, id, value: true)  },
+    'unbookmark' => ->(uid, id) { ReadStateStore.mark_bookmarked(uid, id, value: false) },
+    'archive'    => ->(uid, id) { ReadStateStore.mark_archived(uid, id,   value: true)  },
+    'unarchive'  => ->(uid, id) { ReadStateStore.mark_archived(uid, id,   value: false) }
   }.freeze
   BULK_UIDS_MAX = 500
 
@@ -1767,7 +1772,7 @@ class TechFeedReader < Sinatra::Base
     uids = params['uids'].to_s.split(',').map(&:strip).reject(&:empty?).first(ARTICLE_LOOKUP_MAX_UIDS)
     halt 200, JSON.generate(articles: []) if uids.empty?
 
-    feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     rows = uids.filter_map do |uid|
       article = ArticlesStore.find_by_uid(uid)
       next unless article
@@ -1804,7 +1809,7 @@ class TechFeedReader < Sinatra::Base
     results = uids.map do |uid|
       article = ArticlesStore.find_by_uid(uid)
       if article
-        handler.call(article['id'])
+        handler.call(current_user_id, article['id'])
         applied += 1
         { uid: uid, ok: true }
       else
@@ -1840,8 +1845,8 @@ class TechFeedReader < Sinatra::Base
   # there from import).
   get '/topics/:term' do |term|
     @term        = term.to_s
-    @articles    = ArticlesStore.for_topic(@term, limit: 30)
-    @feeds_by_id = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @articles    = ArticlesStore.for_topic(current_user_id, @term, limit: 30)
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title  = "Topic: #{@term}"
 
     @highlights = @articles.filter_map do |article|
@@ -1856,18 +1861,14 @@ class TechFeedReader < Sinatra::Base
 
   get '/feeds' do
     @page_title  = 'Feeds'
-    @feeds       = FeedsStore.all
+    @feeds       = FeedsStore.for_user(current_user_id)
     @notice      = params['notice']
     @error       = params['error']
     @catalog     = FeedCatalog.by_category
     @subscribed  = @feeds.map { |f| f['url'] }.to_set
     @categories  = FeedCatalog::CATEGORIES
-    # Phase 3 — per-feed weights for the show-more / show-less controls
-    # in the feed-row actions column. Default 1.0 for unweighted feeds.
-    @feed_weights = FeedFeedbackStore.weights_by_feed_id(@feeds.map { |f| f['id'] })
-    # Phase 5 — surface the mute rules in the "Muted" subsection.
-    # Hash keyed by kind so the view can render three small lists.
-    @mute_rules = MuteRulesStore.all.group_by { |r| r['kind'] }
+    @feed_weights = FeedFeedbackStore.weights_by_feed_id(current_user_id, @feeds.map { |f| f['id'] })
+    @mute_rules = MuteRulesStore.all(current_user_id).group_by { |r| r['kind'] }
     # Phase 4 follow-up (2026-05-12) — "Recommended for you" callout.
     # Scores unsubscribed catalog entries against the user's current
     # subscriptions (cat × 2 + topic). Empty cold-start; otherwise
@@ -1885,15 +1886,16 @@ class TechFeedReader < Sinatra::Base
     entry = FeedCatalog.find_by_url(url)
     redirect to('/feeds?error=not-in-catalog') unless entry
 
-    if FeedsStore.find_by_url(url)
-      redirect to("/feeds?notice=already-subscribed&title=#{CGI.escape(entry[:title])}")
-    else
-      FeedsStore.add(
-        url: entry[:url], title: entry[:title],
-        fetch_interval_seconds: entry[:interval],
-        topic: FeedCatalog.topic_for(entry).to_s
-      )
+    _feed, inserted = FeedsStore.add_for_user(
+      user_id: current_user_id,
+      url: entry[:url], title: entry[:title],
+      fetch_interval_seconds: entry[:interval],
+      topic: FeedCatalog.topic_for(entry).to_s
+    )
+    if inserted
       redirect to("/feeds?notice=catalog-added&title=#{CGI.escape(entry[:title])}")
+    else
+      redirect to("/feeds?notice=already-subscribed&title=#{CGI.escape(entry[:title])}")
     end
   end
 
@@ -1934,19 +1936,22 @@ class TechFeedReader < Sinatra::Base
       end
     end
 
-    begin
-      FeedsStore.add(url: url, title: title, fetch_interval_seconds: interval)
+    _feed, inserted = FeedsStore.add_for_user(
+      user_id: current_user_id,
+      url: url, title: title, fetch_interval_seconds: interval
+    )
+    if inserted
       redirect to("/feeds?notice=#{notice}")
-    rescue SQLite3::ConstraintException
+    else
       redirect to('/feeds?error=duplicate-url')
     end
   end
 
   # POST-for-delete because plain HTML forms only support GET / POST.
-  # Cascades through articles → read_state / summaries / article_tags
-  # via the FK chain in 001_init.sql.
+  # A2: this is now an unsubscribe — the catalog feed row stays so other
+  # users keep their subscriptions and the fetcher's de-dup still works.
   post '/feeds/:id/delete' do |id|
-    if FeedsStore.remove(id.to_i)
+    if FeedsStore.unsubscribe(current_user_id, id.to_i)
       redirect to('/feeds?notice=removed')
     else
       redirect to('/feeds?error=not-found')
@@ -1980,11 +1985,14 @@ class TechFeedReader < Sinatra::Base
     interval = params['fetch_interval_seconds'].to_i
     interval = FeedsStore::PUBLISHER_INTERVAL if interval <= 0
 
-    begin
-      feed = FeedsStore.add(url: url, title: title, fetch_interval_seconds: interval)
+    feed, inserted = FeedsStore.add_for_user(
+      user_id: current_user_id,
+      url: url, title: title, fetch_interval_seconds: interval
+    )
+    if inserted
       status 201
       { ok: true, feed: feed, row_html: render_feed_row(feed) }.to_json
-    rescue SQLite3::ConstraintException
+    else
       status 422
       { ok: false, error: 'duplicate-url', message: 'That feed is already subscribed.' }.to_json
     end
@@ -1992,7 +2000,7 @@ class TechFeedReader < Sinatra::Base
 
   delete '/api/feeds/:id' do |id|
     content_type :json
-    if FeedsStore.remove(id.to_i)
+    if FeedsStore.unsubscribe(current_user_id, id.to_i)
       { ok: true, id: id.to_i }.to_json
     else
       status 404
@@ -2010,16 +2018,17 @@ class TechFeedReader < Sinatra::Base
       next({ ok: false, error: 'not-in-catalog', message: "That URL isn't in the curated catalog." }.to_json)
     end
 
-    if (existing = FeedsStore.find_by_url(url))
-      { ok: true, status: 'already-subscribed', feed: existing, row_html: render_feed_row(existing) }.to_json
-    else
-      feed = FeedsStore.add(
-        url: entry[:url], title: entry[:title],
-        fetch_interval_seconds: entry[:interval],
-        topic: FeedCatalog.topic_for(entry).to_s
-      )
+    feed, inserted = FeedsStore.add_for_user(
+      user_id: current_user_id,
+      url: entry[:url], title: entry[:title],
+      fetch_interval_seconds: entry[:interval],
+      topic: FeedCatalog.topic_for(entry).to_s
+    )
+    if inserted
       status 201
       { ok: true, status: 'added', feed: feed, row_html: render_feed_row(feed) }.to_json
+    else
+      { ok: true, status: 'already-subscribed', feed: feed, row_html: render_feed_row(feed) }.to_json
     end
   end
 
@@ -2056,12 +2065,11 @@ class TechFeedReader < Sinatra::Base
       added   = 0
       skipped = 0
       entries.each do |entry|
-        if FeedsStore.find_by_url(entry[:url])
-          skipped += 1
-        else
-          FeedsStore.add(url: entry[:url], title: entry[:title])
-          added += 1
-        end
+        _feed, inserted = FeedsStore.add_for_user(
+          user_id: current_user_id,
+          url: entry[:url], title: entry[:title]
+        )
+        inserted ? added += 1 : skipped += 1
       end
       redirect to("/feeds?notice=imported&added=#{added}&skipped=#{skipped}&total=#{entries.length}")
     rescue StandardError => e
@@ -2069,19 +2077,18 @@ class TechFeedReader < Sinatra::Base
     end
   end
 
-  # Export every subscribed feed as OPML 2.0 — moves the feed list to
-  # any other reader (or back into a fresh tech-feed-reader install).
+  # Export the user's subscribed feeds as OPML 2.0.
   get '/feeds/export.opml' do
     content_type 'text/x-opml'
     attachment "tech-feed-reader-feeds-#{Date.today}.opml"
-    OPML.build(FeedsStore.all)
+    OPML.build(FeedsStore.for_user(current_user_id))
   end
 
   get '/tags' do
     @page_title     = 'Tags'
-    @tags           = TagsStore.all
-    @article_counts = TagsStore.article_counts
-    @feeds_by_id    = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
+    @tags           = TagsStore.all(current_user_id)
+    @article_counts = TagsStore.article_counts(current_user_id)
+    @feeds_by_id    = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @notice         = params['notice']
     @error          = params['error']
     erb :tags
@@ -2106,7 +2113,7 @@ class TechFeedReader < Sinatra::Base
     end
 
     begin
-      tag    = TagsStore.add(name: name, match_kind: kind, match_value: val)
+      tag    = TagsStore.add(user_id: current_user_id, name: name, match_kind: kind, match_value: val)
       tagged = TagsApplier.apply_to_existing(tag['id'])
       redirect to("/tags?notice=added&tagged=#{tagged}")
     rescue SQLite3::ConstraintException
@@ -2115,7 +2122,7 @@ class TechFeedReader < Sinatra::Base
   end
 
   post '/tags/:id/delete' do |id|
-    if TagsStore.remove(id.to_i)
+    if TagsStore.remove(current_user_id, id.to_i)
       redirect to('/tags?notice=removed')
     else
       redirect to('/tags?error=not-found')
@@ -2127,7 +2134,7 @@ class TechFeedReader < Sinatra::Base
   post '/article/:uid/tag/:tag_id' do |uid, tag_id|
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
-    halt 404 unless TagsStore.find(tag_id.to_i)
+    halt 404 unless TagsStore.find(current_user_id, tag_id.to_i)
 
     if params['value'] == 'remove'
       TagsStore.untag_article(article['id'], tag_id.to_i)
@@ -2148,7 +2155,7 @@ class TechFeedReader < Sinatra::Base
       @error   = nil
     else
       begin
-        @results = ArticlesStore.search(@query, limit: @per_page, offset: offset)
+        @results = ArticlesStore.search(current_user_id, @query, limit: @per_page, offset: offset)
         @error   = nil
       rescue SQLite3::SQLException => e
         @results = []
@@ -2156,8 +2163,8 @@ class TechFeedReader < Sinatra::Base
       end
     end
 
-    @feeds_by_id     = FeedsStore.all.each_with_object({}) { |f, h| h[f['id']] = f }
-    @tags_by_article = TagsStore.tags_for_articles(@results.map { |a| a['id'] })
+    @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    @tags_by_article = TagsStore.tags_for_articles(current_user_id, @results.map { |a| a['id'] })
     @page_title      = @query.empty? ? 'Search' : "Search: #{@query}"
     erb :search
   end
@@ -2173,9 +2180,9 @@ class TechFeedReader < Sinatra::Base
     @counts = {
       feeds:         FeedsStore.count,
       articles:      ArticlesStore.count,
-      unread:        ReadStateStore.unread_count,
-      bookmarked:    ReadStateStore.bookmarked_count,
-      tags:          TagsStore.count,
+      unread:        ReadStateStore.unread_count(current_user_id),
+      bookmarked:    ReadStateStore.bookmarked_count(current_user_id),
+      tags:          TagsStore.count(current_user_id),
       article_tags:  db.execute('SELECT COUNT(*) AS c FROM article_tags').first['c'],
       summaries:     db.execute('SELECT COUNT(*) AS c FROM summaries').first['c'],
       summaries_llm: db.execute("SELECT COUNT(*) AS c FROM summaries WHERE llm IS NOT NULL AND llm != ''").first['c']

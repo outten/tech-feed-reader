@@ -19,21 +19,37 @@ module ArticlesStore
 
   module_function
 
+  # Total articles in the catalog. Returns the global count; views that
+  # care about a single user's reach call #count_for_user instead.
   def count
     db.execute('SELECT COUNT(*) AS c FROM articles').first['c']
   end
 
-  # Articles per published-day for the last N days, gap-filled to zero
-  # so the chart has a stable x-axis. Returns [{day:, count:}] in
-  # chronological order.
-  def daily_counts(days: 30)
+  def count_for_user(user_id)
+    db.execute(<<~SQL, [user_id.to_i]).first['c']
+      SELECT COUNT(*) AS c
+      FROM articles a
+      WHERE EXISTS (
+        SELECT 1 FROM user_feed_subscriptions ufs
+        WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+      )
+    SQL
+  end
+
+  # Articles per published-day for the last N days, scoped to the user's
+  # subscriptions. Gap-filled to zero so the chart has a stable x-axis.
+  def daily_counts(user_id = 1, days: 30)
     today  = Date.today
     cutoff = (today - days + 1).to_s
-    rows = db.execute(<<~SQL, [cutoff]).each_with_object({}) { |r, h| h[r['day']] = r['c'] }
-      SELECT DATE(published_at) AS day, COUNT(*) AS c
-      FROM articles
-      WHERE DATE(published_at) >= ?
-      GROUP BY DATE(published_at)
+    rows = db.execute(<<~SQL, [user_id.to_i, cutoff]).each_with_object({}) { |r, h| h[r['day']] = r['c'] }
+      SELECT DATE(a.published_at) AS day, COUNT(*) AS c
+      FROM articles a
+      WHERE EXISTS (
+        SELECT 1 FROM user_feed_subscriptions ufs
+        WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+      )
+      AND DATE(a.published_at) >= ?
+      GROUP BY DATE(a.published_at)
     SQL
 
     (0...days).map do |i|
@@ -42,13 +58,12 @@ module ArticlesStore
     end
   end
 
-  # Top N feeds by total article count. Used by the /dashboard "Most
-  # active feeds" widget. LEFT JOIN so feeds with zero articles still
-  # show, but they sort to the bottom.
-  def counts_by_feed(limit: 10)
-    db.execute(<<~SQL, [limit])
+  # Top N feeds (within the user's subscriptions) by article count.
+  def counts_by_feed(user_id = 1, limit: 10)
+    db.execute(<<~SQL, [user_id.to_i, limit])
       SELECT f.id, f.title, f.url, COUNT(a.id) AS c
       FROM feeds f
+      JOIN user_feed_subscriptions ufs ON ufs.feed_id = f.id AND ufs.user_id = ?
       LEFT JOIN articles a ON a.feed_id = f.id
       GROUP BY f.id
       ORDER BY c DESC, f.title ASC
@@ -76,27 +91,30 @@ module ArticlesStore
   # max_duration_seconds, when set, bounds the query to articles whose
   # audio_duration_seconds is non-NULL and ≤ the given threshold —
   # used by /bus ("what's short enough for my commute?").
-  def recent(limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil, topic: nil)
-    sql, args = state_query(filter: state, kind: kind, max_duration_seconds: max_duration_seconds, topic: topic)
+  # `user_id` defaults to 1 (the seeded test user / single-user-mode
+  # owner). Production routes always pass current_user_id explicitly;
+  # specs that pre-date A2 rely on the default to avoid mass churn.
+  # Once we have a real second user, the default goes away.
+  def recent(user_id = 1, limit: DEFAULT_LIMIT, offset: 0, state: :all, kind: :all, max_duration_seconds: nil, topic: nil)
+    sql, args = state_query(user_id: user_id, filter: state, kind: kind, max_duration_seconds: max_duration_seconds, topic: topic)
     db.execute(sql, args + [limit, offset])
   end
 
-  def for_feed(feed_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    sql, args = state_query(scope: 'a.feed_id = ?', filter: state)
-    db.execute(sql, [feed_id, *args, limit, offset])
+  def for_feed(*args, limit: DEFAULT_LIMIT, offset: 0, state: :all)
+    user_id, feed_id = args.length == 2 ? args : [1, args.first]
+    sql, qargs = state_query(user_id: user_id, scope: 'a.feed_id = ?', scope_arg: feed_id, filter: state)
+    db.execute(sql, qargs + [limit, offset])
   end
 
-  # Distinct feeds whose imported articles include at least one audio
-  # enclosure — i.e. the user's subscribed podcasts. Used by /podcasts
-  # to build the show grouping. Returns hash-rows with episode counts
-  # and the most-recent published_at so the view can surface "freshest
-  # show first" ordering.
-  def podcast_feeds
-    db.execute(<<~SQL)
+  # Distinct feeds (within the user's subscriptions) whose imported
+  # articles include at least one audio enclosure. Used by /podcasts.
+  def podcast_feeds(user_id = 1)
+    db.execute(<<~SQL, [user_id.to_i])
       SELECT f.id, f.title, f.url, f.image_url,
              COUNT(a.id)         AS episode_count,
              MAX(a.published_at) AS latest_at
       FROM feeds f
+      JOIN user_feed_subscriptions ufs ON ufs.feed_id = f.id AND ufs.user_id = ?
       JOIN articles a ON a.feed_id = f.id
       WHERE a.audio_url IS NOT NULL
       GROUP BY f.id
@@ -104,32 +122,34 @@ module ArticlesStore
     SQL
   end
 
-  # Articles tagged with the given tag id, with read-state columns and
-  # optional state filter. Joins article_tags inside the FROM clause
-  # (vs. as a sub-select) so SQLite can use the article_tags PK index.
-  def for_tag(tag_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
-    sql, args = state_query(
+  # Articles tagged with the given tag id, scoped to the user.
+  def for_tag(*args, limit: DEFAULT_LIMIT, offset: 0, state: :all)
+    user_id, tag_id = args.length == 2 ? args : [1, args.first]
+    sql, qargs = state_query(
+      user_id:    user_id,
       from_extra: 'JOIN article_tags at ON at.article_id = a.id',
       scope:      'at.tag_id = ?',
+      scope_arg:  tag_id,
       filter:     state
     )
-    db.execute(sql, [tag_id, *args, limit, offset])
+    db.execute(sql, qargs + [limit, offset])
   end
 
-  # Articles matching an FTS5 term, with their cached extractive
-  # summaries inline (`summary` column) so the /topics/:term view can
-  # render a "highlights" panel without a follow-up SummaryStore loop.
-  # Ordered by FTS5 BM25 rank (most relevant first). Returns [] for
-  # blank input or on FTS5 query syntax errors — same fallthrough as
-  # ArticlesStore.search.
-  def for_topic(term, limit: 30)
+  # FTS hits filtered to the user's subscriptions, with cached
+  # extractive summaries inline.
+  def for_topic(*args, limit: 30)
+    user_id, term = args.length == 2 ? args : [1, args.first]
     return [] if term.to_s.strip.empty?
-    db.execute(<<~SQL, [term.to_s.strip, limit])
+    db.execute(<<~SQL, [term.to_s.strip, user_id.to_i, limit])
       SELECT a.*, s.extractive AS summary, rank
       FROM articles a
       JOIN articles_fts f ON a.id = f.rowid
       LEFT JOIN summaries s ON s.article_id = a.id
       WHERE articles_fts MATCH ?
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
       ORDER BY rank
       LIMIT ?
     SQL
@@ -137,28 +157,21 @@ module ArticlesStore
     []
   end
 
-  # Full-text search via the articles_fts virtual table. `rank` is FTS5's
-  # built-in relevance score (lower = better). Empty / blank queries
-  # return [] instead of raising — FTS5 errors on empty MATCH terms.
-  #
-  # Returned rows include an `excerpt` column built via FTS5's snippet()
-  # function — content_text with up to 16 tokens around the match,
-  # surrounded by <mark>…</mark> tags. Safe to render unescaped (the
-  # underlying content_text was sanitized at import; snippet only adds
-  # <mark> markers).
-  #
-  # Raises SQLite3::SQLException on a malformed FTS5 query (e.g. an
-  # unmatched quote). Callers — currently the /search route — rescue
-  # and surface the message to the user.
-  def search(query, limit: DEFAULT_LIMIT, offset: 0)
+  # Full-text search filtered to the user's subscriptions.
+  def search(*args, limit: DEFAULT_LIMIT, offset: 0)
+    user_id, query = args.length == 2 ? args : [1, args.first]
     return [] if query.to_s.strip.empty?
 
-    db.execute(<<~SQL, [query.to_s.strip, limit, offset])
+    db.execute(<<~SQL, [query.to_s.strip, user_id.to_i, limit, offset])
       SELECT a.*,
              snippet(articles_fts, 1, '<mark>', '</mark>', '…', 16) AS excerpt
       FROM articles a
       JOIN articles_fts f ON a.id = f.rowid
       WHERE articles_fts MATCH ?
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
       ORDER BY rank
       LIMIT ? OFFSET ?
     SQL
@@ -179,7 +192,10 @@ module ArticlesStore
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     SQL
 
-    rules    = TagsStore.all  # snapshot once per import batch
+    # Cross-user tag snapshot — at import time we apply every user's
+    # tag rules so the bridge (article_tags) is populated for all of
+    # them. tag_id implicitly carries its owning user via tags.user_id.
+    rules    = TagsStore.all_across_users
     inserted = 0
     # Run readability OUTSIDE the transaction — readability does HTTP, and
     # we don't want the SQLite write lock held for the full duration of N
@@ -256,12 +272,37 @@ module ArticlesStore
 
     # Build a SELECT a.*, read_state... over articles LEFT JOIN read_state
     # with optional WHERE-scope (e.g. "a.feed_id = ?"), an optional extra
-    # FROM-clause join (used by for_tag), a read-state filter, and an
-    # article-kind filter (:podcast → audio_url IS NOT NULL).
-    def state_query(scope: nil, filter: :all, from_extra: nil, kind: :all, max_duration_seconds: nil, topic: nil)
+    # FROM-clause join (used by for_tag), a read-state filter, an
+    # article-kind filter (:podcast → audio_url IS NOT NULL), and the
+    # mandatory user_id scoping that excludes articles outside the user's
+    # subscriptions / hides their muted authors+keywords / and joins
+    # read_state to the calling user.
+    #
+    # Returns [sql, args]. `args` is the full param list in placeholder
+    # order; callers append [limit, offset]. `scope_arg` is templated
+    # into the args list at the right spot so callers don't have to
+    # interleave manually.
+    def state_query(user_id:, scope: nil, scope_arg: nil, filter: :all, from_extra: nil, kind: :all, max_duration_seconds: nil, topic: nil)
+      uid = user_id.to_i
       where_clauses = []
-      extra_args    = []
-      where_clauses << scope if scope
+      args = []
+
+      # Subscription scope — every list view filters to articles whose
+      # feed the user is subscribed to. No-op for users subscribed to
+      # everything (e.g. t-money post-A2 migration).
+      where_clauses << <<~SQL.strip
+        EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
+      SQL
+      args << uid
+
+      if scope
+        where_clauses << scope
+        args << scope_arg unless scope_arg.nil?
+      end
+
       case filter
       when :unread     then where_clauses << 'COALESCE(rs.read, 0) = 0'
       when :bookmarked then where_clauses << 'rs.bookmarked = 1'
@@ -269,48 +310,35 @@ module ArticlesStore
       when :all        then # no extra clause
       else raise ArgumentError, "Unknown read-state filter: #{filter.inspect}"
       end
+
       case kind
       when :podcast then where_clauses << 'a.audio_url IS NOT NULL'
       when :all     then # no extra clause
       else raise ArgumentError, "Unknown kind filter: #{kind.inspect}"
       end
+
       if max_duration_seconds
-        # Inlined as a number, not a placeholder, so the existing
-        # callers' [limit, offset] / [feed_id, limit, offset] arg
-        # arrays don't have to grow. Coerced to integer to keep the
-        # SQL safe even if a string sneaks in.
         cutoff = Integer(max_duration_seconds)
         where_clauses << "a.audio_duration_seconds IS NOT NULL AND a.audio_duration_seconds <= #{cutoff}"
       end
 
-      # Sports Phase S1 — filter to a top-level topic (technology /
-      # sports / general). Joins through feeds, parameterised so the
-      # arg array stays SQL-safe.
       if topic
         where_clauses << 'EXISTS (SELECT 1 FROM feeds f WHERE f.id = a.feed_id AND f.topic = ?)'
-        extra_args << topic.to_s
+        args << topic.to_s
       end
 
-      # Phase 5 — hide articles that match any mute_rules row. Single
-      # NOT EXISTS sub-query that dispatches on `mr.kind`, so it's a
-      # no-op (sub-query returns no rows ⇒ NOT EXISTS is true) when
-      # mute_rules is empty. The PK index on mute_rules + the kind
-      # index keep this cheap even with hundreds of rules. Keyword
-      # match uses LIKE with leading + trailing wildcards (substring,
-      # case-insensitive on ASCII per SQLite's default LIKE). Caveat:
-      # a literal `%` or `_` in a keyword rule is treated as a LIKE
-      # wildcard — fine for v1, document if it bites a user.
+      # Phase 5 — hide articles matching the user's mute_rules.
       where_clauses << <<~SQL.strip
         NOT EXISTS (
           SELECT 1 FROM mute_rules mr
-          WHERE
+          WHERE mr.user_id = ? AND (
               (mr.kind = 'keyword' AND (a.title LIKE '%' || mr.value || '%' OR a.content_text LIKE '%' || mr.value || '%'))
            OR (mr.kind = 'author'  AND a.author = mr.value)
            OR (mr.kind = 'feed'    AND a.feed_id = CAST(mr.value AS INTEGER))
+          )
         )
       SQL
-
-      where_sql = where_clauses.empty? ? '' : "WHERE #{where_clauses.join(' AND ')}"
+      args << uid
 
       sql = <<~SQL
         SELECT a.*,
@@ -320,13 +348,15 @@ module ArticlesStore
                COALESCE(rs.feedback, 0)   AS feedback,
                rs.opened_at               AS opened_at
         FROM articles a
-        LEFT JOIN read_state rs ON a.id = rs.article_id
+        LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
         #{from_extra}
-        #{where_sql}
+        WHERE #{where_clauses.join(' AND ')}
         ORDER BY a.published_at DESC, a.id DESC
         LIMIT ? OFFSET ?
       SQL
-      [sql, extra_args]
+      # rs.user_id placeholder lives at the very front of args (it's in
+      # the LEFT JOIN, which runs before WHERE).
+      [sql, [uid] + args]
     end
 
     def db
