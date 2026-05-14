@@ -261,3 +261,40 @@ So, update the TODO / Microsoft Entra area to reflect this. Also, recommend whic
 
 **Analyzed + locked.** Phase A1 in [TODO.md](TODO.md#multi-user--phase-a1-auth-wall-passkey-only-consumer-facing) rewritten end-to-end. Decision: **passkey-only with one-time recovery codes**. No email anywhere (explicit user direction); no SMS (per-message cost + privacy + SIM swap); no password (adds breach surface for zero gain when the recovery story is non-email). User identity is a chosen username; 10 recovery codes generated at signup hashed with HMAC-SHA256 + `SESSION_SECRET`, shown once. Library: `webauthn` Ruby gem (Mastodon + GitLab use it). No external services, no per-login cost. Three new tables (`users`, `webauthn_credentials`, `recovery_codes`). Phase A2 (per-user data split) is unchanged — provider-agnostic.
 
+## [ ] 23. Use AI to suggest feeds to add
+
+On the feeds page, add a input box to ask the AI to do and analysis and add feeds for the set to consider subscribing too. For example, "Can you make recommendations on feeds, podcasts, and YouTube follwers that focus on Food & Travel? I really like Anthony Bordain and his travels in Asia, perhaps there are recommendations you can make." 
+
+As the application is about to be multu-user, the number of Feeds that we know about (ie. database) will grow significantly. On the Feeds page, we need:
+
+- a good search option to find feeds by keyworks, tages, etc.
+- we don't want a long list of possible feeds that a user can subscribe to, we should use personalization, etc. to help direct the user to feeds they will enjoy
+
+All feeds should be free.
+
+## [ ] 24: Most Popular
+
+As we are now multi user, can we add a Top Chars for each type of Feeds our user are accessing: News, Sports, Podcasts, Nature, YouTube, etc. The doal is Discovery and making it easy to users to "sumble" into new content. That is a key focus of this application.
+
+## [ ] 25. User ID
+
+Should we be using integer IDs in the database as unique keys ... or GUIDs. Can you analyze and recommend?
+
+IF we switch to grides, carefully phase the work to not lose personalization, or any other usage data from our existing user -- i.e. me.
+
+## [ ] 26. YouTube
+
+Can you add YouTube as a top level item in the header? The page it loads should like our YouTube subscribe channels. There should be a link to take you directly to a channel. Also, can you do an analysis to see if it is possible to:
+
+- have a subpage with a list of the 10 most recent videos
+- clicking a video uses YouTubes embedded video player to view
+
+## [ ] 27. Feed Filtering
+
+The list of items on the feed list are getting very long. Can you make a suggestion on how to filter the list so that the user can easily find and discover a feed? Consider:
+
+- search
+- AI
+- personalization
+- categories
+- etc.
