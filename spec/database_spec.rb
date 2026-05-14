@@ -61,7 +61,7 @@ RSpec.describe Database do
       SQL
       article_id = db.last_insert_row_id
 
-      db.execute('INSERT INTO read_state(article_id, read) VALUES (?, 1)', [article_id])
+      db.execute('INSERT INTO read_state(user_id, article_id, read) VALUES (1, ?, 1)', [article_id])
       db.execute(<<~SQL, [article_id, 'short'])
         INSERT INTO summaries(article_id, extractive) VALUES (?, ?)
       SQL
@@ -76,7 +76,7 @@ RSpec.describe Database do
     it 'rejects invalid match_kind on tags via CHECK constraint' do
       db = Database.connection
       expect {
-        db.execute('INSERT INTO tags(name, match_kind, match_value) VALUES (?, ?, ?)',
+        db.execute('INSERT INTO tags(user_id, name, match_kind, match_value) VALUES (1, ?, ?, ?)',
                    ['x', 'bogus', 'whatever'])
       }.to raise_error(SQLite3::ConstraintException, /CHECK/)
     end

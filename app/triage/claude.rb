@@ -74,10 +74,10 @@ module Triage
     # Phase S10 — `topic:` scopes the unread queue + corpus
     # exemplars to a single topic (tech / sports / general). nil
     # means cross-topic, the legacy behaviour.
-    def run(topic: nil)
+    def run(user_id = 1, topic: nil)
       return Result.new(status: :unavailable, unread_count: 0, topic: topic) unless available?
 
-      unread = ArticlesStore.recent(limit: UNREAD_LIMIT, state: :unread, topic: topic)
+      unread = ArticlesStore.recent(user_id, limit: UNREAD_LIMIT, state: :unread, topic: topic)
       if unread.empty?
         AppLogger.info('triage_run', status: :empty, topic: topic)
         return Result.new(status: :empty, unread_count: 0, topic: topic,

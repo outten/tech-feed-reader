@@ -43,13 +43,16 @@ RSpec.describe 'feeds JSON API' do
   end
 
   describe 'DELETE /api/feeds/:id' do
-    it 'removes the feed and returns ok' do
+    it 'unsubscribes the user and returns ok (catalog row remains)' do
       feed = FeedsStore.add(url: 'https://gone.example.com/rss')
       delete "/api/feeds/#{feed['id']}"
       expect(last_response.status).to eq(200)
       expect(json['ok']).to eq(true)
       expect(json['id']).to eq(feed['id'])
-      expect(FeedsStore.find(feed['id'])).to be_nil
+      # A2: DELETE /api/feeds/:id now unsubscribes, doesn't delete from
+      # the catalog (someone else might still subscribe).
+      expect(FeedsStore.subscribed?(1, feed['id'])).to be(false)
+      expect(FeedsStore.find(feed['id'])).not_to be_nil
     end
 
     it 'returns 404 + not-found for an unknown id' do

@@ -1,13 +1,8 @@
 require_relative 'database'
 
-# Persistence for the digest feature. One row per digest run, keyed
-# by generated_at; #recent lists newest-first for the /digests UI,
-# #find loads a single row for /digests/:id.
-#
-# Bodies are stored as opaque text — the composer (app/digests.rb)
-# decides what shape they take. The HTML body is rendered inline in
-# the article-detail view so it must be a fragment that fits inside
-# the layout's <main> (no <html>, <head>, <body> wrappers).
+# Per-user persistence for the digest feature. One row per digest run,
+# keyed by (user_id, generated_at); #recent lists newest-first for the
+# /digests UI, #find loads a single row for /digests/:id.
 module DigestStore
   module_function
 
@@ -15,13 +10,15 @@ module DigestStore
     Database.connection
   end
 
-  def create(digest)
+  def create(*args)
+    user_id, digest = args.length == 2 ? args : [1, args.first]
     sql = <<~SQL
-      INSERT INTO digests (generated_at, window_hours, article_count,
+      INSERT INTO digests (user_id, generated_at, window_hours, article_count,
                            subject, text_body, html_body)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     SQL
     db.execute(sql, [
+      user_id.to_i,
       digest.generated_at.iso8601,
       digest.window_hours,
       digest.count,
@@ -32,36 +29,33 @@ module DigestStore
     db.last_insert_row_id
   end
 
-  def recent(limit: 50)
-    db.execute(<<~SQL, [limit])
+  def recent(user_id = 1, limit: 50)
+    db.execute(<<~SQL, [user_id.to_i, limit])
       SELECT id, generated_at, window_hours, article_count, subject
       FROM digests
+      WHERE user_id = ?
       ORDER BY generated_at DESC, id DESC
       LIMIT ?
     SQL
   end
 
-  def find(id)
-    row = db.execute('SELECT * FROM digests WHERE id = ?', [id.to_i]).first
-    row
+  def find(*args)
+    user_id, id = args.length == 2 ? args : [1, args.first]
+    db.execute('SELECT * FROM digests WHERE user_id = ? AND id = ?', [user_id.to_i, id.to_i]).first
   end
 
-  def count
-    db.execute('SELECT COUNT(*) AS c FROM digests').first['c']
+  def count(user_id = 1)
+    db.execute('SELECT COUNT(*) AS c FROM digests WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 
-  # Cache a Claude-generated digest summary on the digest row. Called
-  # at most once per (id, manual click) — the route surfaces the
-  # cached value and hides the regenerate button so the user can't
-  # accidentally double-spend tokens. `model` is recorded alongside so
-  # we can show "summarised by claude-opus-4-7" in the UI.
-  def update_llm_summary(id, summary:, model:, generated_at: Time.now.utc.iso8601)
-    db.execute(<<~SQL, [summary.to_s, model.to_s, generated_at, id.to_i])
+  def update_llm_summary(*args, summary:, model:, generated_at: Time.now.utc.iso8601)
+    user_id, id = args.length == 2 ? args : [1, args.first]
+    db.execute(<<~SQL, [summary.to_s, model.to_s, generated_at, user_id.to_i, id.to_i])
       UPDATE digests
       SET llm_summary       = ?,
           llm_model         = ?,
           llm_generated_at  = ?
-      WHERE id = ?
+      WHERE user_id = ? AND id = ?
     SQL
     db.changes
   end

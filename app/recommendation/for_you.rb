@@ -53,11 +53,12 @@ module Recommendation
     # candidate window so a 👍 on an Eagles article doesn't boost
     # tech rankings (and vice versa). nil = unscoped (legacy
     # behaviour, used when no topic filter is in effect).
-    def score_window(state: :unread, kind: :all, limit:, offset:, topic: nil, now: Time.now.utc)
-      pos_terms = corpus_terms(positive: true,  topic: topic)
-      neg_terms = corpus_terms(positive: false, topic: topic)
+    def score_window(user_id = 1, state: :unread, kind: :all, limit:, offset:, topic: nil, now: Time.now.utc)
+      pos_terms = corpus_terms(user_id, positive: true,  topic: topic)
+      neg_terms = corpus_terms(user_id, positive: false, topic: topic)
 
       candidates = ArticlesStore.recent(
+        user_id,
         limit:  CANDIDATE_WINDOW,
         offset: 0,
         state:  state,
@@ -65,7 +66,7 @@ module Recommendation
         topic:  topic
       )
 
-      feed_weights = FeedFeedbackStore.weights_by_feed_id(candidates.map { |a| a['feed_id'] })
+      feed_weights = FeedFeedbackStore.weights_by_feed_id(user_id, candidates.map { |a| a['feed_id'] })
 
       scored = candidates.map do |a|
         a.merge('_score' => score_article(a, pos_terms: pos_terms, neg_terms: neg_terms,
@@ -101,19 +102,19 @@ module Recommendation
     # for O(1) intersection in the per-article scorer. Empty when the
     # corpus has no rows yet (cold start). Phase S10: `topic:` scopes
     # the SQL to articles whose feed.topic matches.
-    def corpus_terms(positive:, topic: nil)
-      rows = positive ? positive_corpus(topic: topic) : negative_corpus(topic: topic)
+    def corpus_terms(user_id = 1, positive:, topic: nil)
+      rows = positive ? positive_corpus(user_id, topic: topic) : negative_corpus(user_id, topic: topic)
       return [].to_set if rows.empty?
 
       text = rows.map { |r| "#{r['title']} #{r['content_text']}" }.join(' ')
       Recommendation.top_keywords(text, limit: TOP_TERMS).to_set
     end
 
-    def positive_corpus(topic: nil)
+    def positive_corpus(user_id = 1, topic: nil)
       sql = <<~SQL
         SELECT a.title, a.content_text
         FROM articles a
-        JOIN read_state rs ON rs.article_id = a.id
+        JOIN read_state rs ON rs.article_id = a.id AND rs.user_id = ?
         #{'JOIN feeds f ON f.id = a.feed_id' if topic}
         WHERE (rs.bookmarked = 1
            OR rs.feedback = 1
@@ -122,14 +123,17 @@ module Recommendation
         ORDER BY a.id DESC
         LIMIT ?
       SQL
-      Database.connection.execute(sql, topic ? [topic.to_s, CORPUS_LIMIT] : [CORPUS_LIMIT])
+      args = [user_id.to_i]
+      args << topic.to_s if topic
+      args << CORPUS_LIMIT
+      Database.connection.execute(sql, args)
     end
 
-    def negative_corpus(topic: nil)
+    def negative_corpus(user_id = 1, topic: nil)
       sql = <<~SQL
         SELECT a.title, a.content_text
         FROM articles a
-        JOIN read_state rs ON rs.article_id = a.id
+        JOIN read_state rs ON rs.article_id = a.id AND rs.user_id = ?
         #{'JOIN feeds f ON f.id = a.feed_id' if topic}
         WHERE (rs.feedback = -1
            OR rs.passive_feedback = -1
@@ -138,7 +142,10 @@ module Recommendation
         ORDER BY a.id DESC
         LIMIT ?
       SQL
-      Database.connection.execute(sql, topic ? [topic.to_s, CORPUS_LIMIT] : [CORPUS_LIMIT])
+      args = [user_id.to_i]
+      args << topic.to_s if topic
+      args << CORPUS_LIMIT
+      Database.connection.execute(sql, args)
     end
 
     # Title-only tokens. See module-level comment for the perf rationale.
@@ -160,11 +167,12 @@ module Recommendation
     # positive corpus" check is what differentiates the personalised
     # signal from chronological — when there's nothing to personalise
     # against, FTS5 content-similarity is the better fallback.
-    def next_after(article, now: Time.now.utc)
+    def next_after(*args, now: Time.now.utc)
+      user_id, article = args.length == 2 ? args : [1, args.first]
       return nil if article.nil?
-      return nil if positive_corpus.empty?
+      return nil if positive_corpus(user_id).empty?
 
-      ranked = score_window(state: :unread, limit: 25, offset: 0, now: now)
+      ranked = score_window(user_id, state: :unread, limit: 25, offset: 0, now: now)
       ranked.find { |a| a['id'] != article['id'] }
     end
 

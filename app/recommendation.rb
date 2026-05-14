@@ -24,18 +24,24 @@ module Recommendation
 
   # Returns rows shaped like ArticlesStore.recent (with the FTS5 `rank`
   # column added). Empty array when there's nothing to compare against.
-  def for_article(article, limit: DEFAULT_LIMIT)
+  def for_article(*args, limit: DEFAULT_LIMIT)
+    user_id, article = args.length == 2 ? args : [1, args.first]
     return [] if article.nil?
 
     keywords = top_keywords(article['content_text'].to_s)
     return [] if keywords.empty?
 
     query = keywords.join(' OR ')
-    Database.connection.execute(<<~SQL, [query, article['id'], limit])
+    Database.connection.execute(<<~SQL, [query, article['id'], user_id.to_i, limit])
       SELECT a.*, rank
       FROM articles a
       JOIN articles_fts f ON a.id = f.rowid
-      WHERE articles_fts MATCH ? AND a.id != ?
+      WHERE articles_fts MATCH ?
+        AND a.id != ?
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
       ORDER BY rank
       LIMIT ?
     SQL
