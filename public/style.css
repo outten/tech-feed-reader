@@ -2112,6 +2112,9 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
    rationale line under each recommendation so it visually trails the
    blurb without competing with it. */
 .ai-recommend-form textarea {
+  /* box-sizing keeps the padding + border INSIDE the 100% width so the
+     textarea doesn't overflow its containing .full-width label. */
+  box-sizing: border-box;
   width: 100%;
   font: inherit;
   padding: 0.5rem 0.7rem;
@@ -2131,6 +2134,88 @@ html.dark .ai-recommend-form textarea {
   font-style: italic;
 }
 html.dark .ai-rationale { color: #98989d; }
+
+/* STUFF.md #23 polish — make the response block visually obvious so it
+   doesn't get lost on a long /feeds page, plus a "thinking" indicator
+   between submit and the synchronous server render. */
+.feeds-ai-recommend {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: #f8f3ff;
+  border: 1px solid #d6c2ff;
+  border-radius: 10px;
+}
+html.dark .feeds-ai-recommend {
+  background: #221a33;
+  border-color: #4a3a6e;
+}
+.ai-recommend-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+/* Hidden by default — JS adds .is-visible at form submit. (Using a class
+   toggle instead of the [hidden] attribute because the latter conflicts
+   with the explicit `display` rule we'd otherwise need: `display:
+   inline-flex` would silently win over the UA stylesheet's
+   `display: none` for `[hidden]`, and the indicator would render at
+   page load.) */
+.ai-thinking {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  color: #5a5a5f;
+  font-size: 0.9rem;
+}
+.ai-thinking.is-visible {
+  display: inline-flex;
+}
+html.dark .ai-thinking { color: #c7c7cc; }
+.ai-thinking-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #7c4dff;
+  animation: ai-thinking-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ai-thinking-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1.0; transform: scale(1.0); }
+}
+.ai-recommend-result {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  border: 2px solid #7c4dff;
+  border-radius: 8px;
+  outline: none;
+}
+html.dark .ai-recommend-result {
+  background: #1c1c1e;
+  border-color: #a47bff;
+}
+.ai-recommend-result--parse_error,
+.ai-recommend-result--error {
+  border-color: #d32f2f;
+}
+.ai-recommend-result-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+}
+.ai-recommend-meta {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #d2d2d7;
+  font-size: 0.82rem;
+  color: #5a5a5f;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+html.dark .ai-recommend-meta {
+  border-top-color: #3a3a3c;
+  color: #98989d;
+}
 
 /* /topics page table — keeps the term-chip column to its content width
    so all chips align flush-left, and lets the samples column take the
