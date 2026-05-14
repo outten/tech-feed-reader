@@ -141,6 +141,75 @@
   </tbody>
 </table>
 
+<%# STUFF.md #23 — Ask-AI prompt box. Free-text prompt → Claude picks
+    6–8 catalog feeds matching the brief, with a one-line rationale.
+    Hidden when ANTHROPIC_API_KEY isn't set. Result is rendered inline
+    below the form so the user can subscribe with one click without
+    leaving the page. %>
+<% if @ai_recommend_available %>
+  <section class="benchmark-section feeds-ai-recommend" style="margin-top:2.5rem">
+    <h3>✨ Ask AI for feed ideas</h3>
+    <p class="subtitle">
+      Tell the AI what you're into and it'll pick from the curated catalog.
+      It sees your existing subscriptions, so the picks are personalised.
+      Examples: <em>"Food and travel writing, Bourdain-style."</em> ·
+      <em>"AI safety research blogs."</em> · <em>"Premier League tactics deep dives."</em>
+    </p>
+    <form method="post" action="/feeds/ai-recommend" class="portfolio-form ai-recommend-form">
+      <label class="full-width">
+        Your prompt
+        <textarea name="prompt" rows="3" required
+                  placeholder="What kind of feeds, podcasts, or YouTube channels are you looking for?"><%= h(@ai_prompt) if @ai_prompt %></textarea>
+      </label>
+      <button type="submit" class="btn-primary" title="Ask Claude to pick matching feeds from the catalog">Recommend feeds</button>
+    </form>
+
+    <% if (result = @ai_recommend_result) %>
+      <% if result.status == :ok && result.recommendations.any? %>
+        <ul class="catalog-list" style="margin-top:1.25rem">
+          <% result.recommendations.each do |rec| %>
+            <li class="catalog-row" data-catalog-url="<%= h(rec[:url]) %>">
+              <div class="catalog-meta">
+                <strong><%= h(rec[:title]) %></strong>
+                <span class="muted">&middot; <%= h(@categories[rec[:category].to_sym] || rec[:category]) %></span>
+                <% unless rec[:blurb].to_s.strip.empty? %>
+                  <div class="muted" style="font-size:0.9rem"><%= h(rec[:blurb]) %></div>
+                <% end %>
+                <div class="ai-rationale">↳ <%= h(rec[:rationale]) %></div>
+              </div>
+              <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
+                <input type="hidden" name="url" value="<%= h(rec[:url]) %>">
+                <button type="submit" class="btn-primary">Subscribe</button>
+              </form>
+            </li>
+          <% end %>
+        </ul>
+        <p class="subtitle" style="margin-top:0.5rem; font-size:0.85rem">
+          Picked by Claude <%= h(result.model) %> in <%= result.latency_ms %>ms.
+        </p>
+      <% elsif result.status == :ok %>
+        <p class="subtitle" style="margin-top:1rem">
+          Claude didn't find anything matching that prompt in the curated catalog.
+          Try a different brief, or use the manual "Add a feed" form above.
+        </p>
+      <% elsif result.status == :parse_error %>
+        <p class="error" style="margin-top:1rem">
+          AI response couldn't be parsed. Try again or rephrase. (<%= h(result.error) %>)
+        </p>
+      <% elsif result.status == :error %>
+        <p class="error" style="margin-top:1rem">
+          AI call failed: <%= h(result.error) %>
+        </p>
+      <% elsif result.status == :no_candidates %>
+        <p class="subtitle" style="margin-top:1rem">
+          You're already subscribed to every feed in the catalog. There's nothing
+          new to recommend — try the manual "Add a feed" form above.
+        </p>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>
+
 <%# Phase 4 follow-up (2026-05-12) — "Recommended for you" callout
     above the full catalog browse. Scores unsubscribed entries against
     the user's existing subscriptions (category × 2 + topic). Empty on
