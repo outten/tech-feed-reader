@@ -98,7 +98,7 @@ RSpec.describe 'ArticlesStore podcast helpers' do
     parsed = FeedParser.parse(body, feed_url: feed['url'])
     ArticlesStore.import(feed_id: feed['id'], entries: parsed[:entries])
 
-    rows = ArticlesStore.podcast_feeds
+    rows = ArticlesStore.podcast_feeds(1)
     expect(rows.length).to eq(1)
     expect(rows.first['title']).to eq('Pod')
     expect(rows.first['episode_count']).to eq(3)   # 3 of 4 entries have audio_url
@@ -116,7 +116,7 @@ RSpec.describe 'ArticlesStore podcast helpers' do
         audio_url: 'https://cdn.example.com/x.mp3',
         audio_mime_type: 'audio/mpeg', audio_duration_seconds: 1234 }
     ])
-    titles = ArticlesStore.recent(kind: :podcast).map { |a| a['title'] }
+    titles = ArticlesStore.recent(1, kind: :podcast).map { |a| a['title'] }
     expect(titles).to eq(['audio'])
   end
 end

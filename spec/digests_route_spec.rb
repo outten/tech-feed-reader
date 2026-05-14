@@ -11,7 +11,7 @@ RSpec.describe 'Digest routes' do
   end
 
   def stash(generated_at:, subject: 'Subj', count: 3, window: 24, html: '<div class="digest-items">stored fragment</div>')
-    DigestStore.create(Digests::Result.new(
+    DigestStore.create(1, Digests::Result.new(
       subject: subject, text: 'TXT', html: html, count: count,
       window_hours: window, generated_at: generated_at
     ))
@@ -95,7 +95,7 @@ RSpec.describe 'Digest routes' do
       add_unread_article(uid: 'manualart001', hours_ago: 2)
       add_unread_article(uid: 'manualart002', hours_ago: 4)
 
-      expect { post '/digests' }.to change { DigestStore.count }.by(1)
+      expect { post '/digests' }.to change { DigestStore.count(1) }.by(1)
       expect(last_response.status).to eq(302)
       expect(last_response.headers['Location']).to match(%r{/digests/\d+\?notice=generated&count=2})
     end
@@ -107,7 +107,7 @@ RSpec.describe 'Digest routes' do
       post '/digests', { window_hours: '168', limit: '10' }
       expect(last_response.status).to eq(302)
       detail_id = last_response.headers['Location'][%r{/digests/(\d+)}, 1].to_i
-      row = DigestStore.find(detail_id)
+      row = DigestStore.find(1, detail_id)
       expect(row['window_hours']).to eq(168)
       expect(row['article_count']).to eq(2)  # both fall inside the 7-day window
     end
@@ -115,14 +115,14 @@ RSpec.describe 'Digest routes' do
     it 'falls back to the defaults when the params are non-numeric' do
       post '/digests', { window_hours: 'spaceship', limit: 'twenty' }
       detail_id = last_response.headers['Location'][%r{/digests/(\d+)}, 1].to_i
-      row = DigestStore.find(detail_id)
+      row = DigestStore.find(1, detail_id)
       expect(row['window_hours']).to eq(Digests::DEFAULT_WINDOW_HOURS)
     end
 
     it 'clamps wildly large window_hours to a sane ceiling' do
       post '/digests', { window_hours: '99999' }
       detail_id = last_response.headers['Location'][%r{/digests/(\d+)}, 1].to_i
-      expect(DigestStore.find(detail_id)['window_hours']).to be <= 720  # one month
+      expect(DigestStore.find(1, detail_id)['window_hours']).to be <= 720  # one month
     end
 
     it 'renders the Generate-now button on /digests' do

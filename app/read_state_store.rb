@@ -6,15 +6,13 @@ require_relative 'database'
 # archived: 0, opened_at: nil } by .get and the LEFT-JOIN queries in
 # ArticlesStore.
 #
-# Every per-user method accepts (user_id, article_id) OR (article_id)
-# alone — in the second form, user_id defaults to 1 (the seeded test
-# user / single-user-mode owner). Production routes always pass an
-# explicit current_user_id.
+# Every method requires the calling user's id explicitly. Production
+# routes pass current_user_id; scripts read it from ENV['USER_USERNAME']
+# at boot; specs that exercise the store directly use UsersStore.find(1).
 module ReadStateStore
   module_function
 
-  def get(*args)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
+  def get(user_id, article_id)
     row = db.execute(
       'SELECT * FROM read_state WHERE user_id = ? AND article_id = ?',
       [user_id, article_id]
@@ -31,42 +29,36 @@ module ReadStateStore
     }
   end
 
-  def opened!(*args)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
+  def opened!(user_id, article_id)
     upsert(user_id, article_id, read: true, opened_at: Time.now.utc.iso8601)
   end
 
-  def mark_read(*args, read: true)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
+  def mark_read(user_id, article_id, read: true)
     upsert(user_id, article_id, read: read)
   end
 
-  def mark_bookmarked(*args, value: true)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
+  def mark_bookmarked(user_id, article_id, value: true)
     upsert(user_id, article_id, bookmarked: value)
   end
 
-  def mark_archived(*args, value: true)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
+  def mark_archived(user_id, article_id, value: true)
     upsert(user_id, article_id, archived: value)
   end
 
   FEEDBACK_VALUES = [-1, 0, 1].freeze
-  def mark_feedback(*args, value:)
+  def mark_feedback(user_id, article_id, value:)
     raise ArgumentError, "feedback must be -1, 0, or +1 (got #{value.inspect})" unless FEEDBACK_VALUES.include?(value)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
     upsert(user_id, article_id, feedback: value)
   end
 
-  def mark_passive_feedback(*args, value:)
+  def mark_passive_feedback(user_id, article_id, value:)
     raise ArgumentError, "passive_feedback must be -1, 0, or +1 (got #{value.inspect})" unless FEEDBACK_VALUES.include?(value)
-    user_id, article_id = args.length == 2 ? args : [1, args.first]
     current = get(user_id, article_id)
     return current if current['feedback'].to_i != 0
     upsert(user_id, article_id, passive_feedback: value)
   end
 
-  def unread_count(user_id = 1)
+  def unread_count(user_id)
     db.execute(<<~SQL, [user_id]).first['c']
       SELECT COUNT(*) AS c
       FROM articles a
@@ -75,7 +67,7 @@ module ReadStateStore
     SQL
   end
 
-  def bookmarked_count(user_id = 1)
+  def bookmarked_count(user_id)
     db.execute(
       'SELECT COUNT(*) AS c FROM read_state WHERE user_id = ? AND bookmarked = 1',
       [user_id]
@@ -84,7 +76,7 @@ module ReadStateStore
 
   # STUFF.md #14 — has this user opened/bookmarked/archived/thumbed
   # anything yet?
-  def any_activity?(user_id = 1)
+  def any_activity?(user_id)
     !db.execute('SELECT 1 FROM read_state WHERE user_id = ? LIMIT 1', [user_id]).first.nil?
   end
 

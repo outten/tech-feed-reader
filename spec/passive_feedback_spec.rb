@@ -28,71 +28,71 @@ RSpec.describe ReadStateStore, '#mark_passive_feedback (Phase 4)' do
   let(:article_id) { article['id'] }
 
   it 'defaults to 0 (no signal) for an article with no row yet' do
-    expect(ReadStateStore.get(article_id)['passive_feedback']).to eq(0)
+    expect(ReadStateStore.get(1, article_id)['passive_feedback']).to eq(0)
   end
 
   it 'persists +1 (≥80% listened)' do
-    ReadStateStore.mark_passive_feedback(article_id, value: 1)
-    expect(ReadStateStore.get(article_id)['passive_feedback']).to eq(1)
+    ReadStateStore.mark_passive_feedback(1, article_id, value: 1)
+    expect(ReadStateStore.get(1, article_id)['passive_feedback']).to eq(1)
   end
 
   it 'persists -1 (skip)' do
-    ReadStateStore.mark_passive_feedback(article_id, value: -1)
-    expect(ReadStateStore.get(article_id)['passive_feedback']).to eq(-1)
+    ReadStateStore.mark_passive_feedback(1, article_id, value: -1)
+    expect(ReadStateStore.get(1, article_id)['passive_feedback']).to eq(-1)
   end
 
   it 'clears via value: 0' do
-    ReadStateStore.mark_passive_feedback(article_id, value: 1)
-    ReadStateStore.mark_passive_feedback(article_id, value: 0)
-    expect(ReadStateStore.get(article_id)['passive_feedback']).to eq(0)
+    ReadStateStore.mark_passive_feedback(1, article_id, value: 1)
+    ReadStateStore.mark_passive_feedback(1, article_id, value: 0)
+    expect(ReadStateStore.get(1, article_id)['passive_feedback']).to eq(0)
   end
 
   it 'rejects values outside the {-1, 0, +1} set' do
     expect {
-      ReadStateStore.mark_passive_feedback(article_id, value: 2)
+      ReadStateStore.mark_passive_feedback(1, article_id, value: 2)
     }.to raise_error(ArgumentError, /must be -1, 0, or \+1/)
   end
 
   describe 'explicit-wins guard' do
     it 'is a no-op when explicit feedback is +1 (passive cannot overwrite)' do
-      ReadStateStore.mark_feedback(article_id, value: 1)
-      ReadStateStore.mark_passive_feedback(article_id, value: -1)
-      row = ReadStateStore.get(article_id)
+      ReadStateStore.mark_feedback(1, article_id, value: 1)
+      ReadStateStore.mark_passive_feedback(1, article_id, value: -1)
+      row = ReadStateStore.get(1, article_id)
       expect(row['feedback']).to eq(1)
       expect(row['passive_feedback']).to eq(0)
     end
 
     it 'is a no-op when explicit feedback is -1' do
-      ReadStateStore.mark_feedback(article_id, value: -1)
-      ReadStateStore.mark_passive_feedback(article_id, value: 1)
-      row = ReadStateStore.get(article_id)
+      ReadStateStore.mark_feedback(1, article_id, value: -1)
+      ReadStateStore.mark_passive_feedback(1, article_id, value: 1)
+      row = ReadStateStore.get(1, article_id)
       expect(row['feedback']).to eq(-1)
       expect(row['passive_feedback']).to eq(0)
     end
 
     it 'persists when explicit feedback is 0 (cleared or never set)' do
-      ReadStateStore.mark_passive_feedback(article_id, value: 1)
-      row = ReadStateStore.get(article_id)
+      ReadStateStore.mark_passive_feedback(1, article_id, value: 1)
+      row = ReadStateStore.get(1, article_id)
       expect(row['feedback']).to eq(0)
       expect(row['passive_feedback']).to eq(1)
     end
 
     it 'persists once, then becomes a no-op when explicit lands later' do
-      ReadStateStore.mark_passive_feedback(article_id, value: 1)
-      expect(ReadStateStore.get(article_id)['passive_feedback']).to eq(1)
-      ReadStateStore.mark_feedback(article_id, value: -1)
-      ReadStateStore.mark_passive_feedback(article_id, value: 0)
-      row = ReadStateStore.get(article_id)
+      ReadStateStore.mark_passive_feedback(1, article_id, value: 1)
+      expect(ReadStateStore.get(1, article_id)['passive_feedback']).to eq(1)
+      ReadStateStore.mark_feedback(1, article_id, value: -1)
+      ReadStateStore.mark_passive_feedback(1, article_id, value: 0)
+      row = ReadStateStore.get(1, article_id)
       expect(row['feedback']).to eq(-1)
       expect(row['passive_feedback']).to eq(1)  # untouched after explicit
     end
   end
 
   it 'leaves read / bookmarked / archived / explicit feedback untouched' do
-    ReadStateStore.mark_read(article_id, read: true)
-    ReadStateStore.mark_bookmarked(article_id, value: true)
-    ReadStateStore.mark_passive_feedback(article_id, value: 1)
-    row = ReadStateStore.get(article_id)
+    ReadStateStore.mark_read(1, article_id, read: true)
+    ReadStateStore.mark_bookmarked(1, article_id, value: true)
+    ReadStateStore.mark_passive_feedback(1, article_id, value: 1)
+    row = ReadStateStore.get(1, article_id)
     expect(row['read']).to eq(1)
     expect(row['bookmarked']).to eq(1)
     expect(row['archived']).to eq(0)
@@ -114,25 +114,25 @@ RSpec.describe 'POST /api/podcasts/:uid/feedback' do
     post_json "/api/podcasts/#{article['uid']}/feedback", { signal: 1, listened_pct: 0.92 }
     expect(last_response.status).to eq(200)
     expect(JSON.parse(last_response.body)).to include('ok' => true, 'applied' => true, 'explicit_present' => false)
-    expect(ReadStateStore.get(article['id'])['passive_feedback']).to eq(1)
+    expect(ReadStateStore.get(1, article['id'])['passive_feedback']).to eq(1)
   end
 
   it 'persists -1 from a valid JSON body' do
     article = make_podcast_article
     post_json "/api/podcasts/#{article['uid']}/feedback", { signal: -1, listened_pct: 0.04 }
     expect(last_response.status).to eq(200)
-    expect(ReadStateStore.get(article['id'])['passive_feedback']).to eq(-1)
+    expect(ReadStateStore.get(1, article['id'])['passive_feedback']).to eq(-1)
   end
 
   it 'reports applied: false + explicit_present: true when explicit feedback already set' do
     article = make_podcast_article
-    ReadStateStore.mark_feedback(article['id'], value: 1)
+    ReadStateStore.mark_feedback(1, article['id'], value: 1)
     post_json "/api/podcasts/#{article['uid']}/feedback", { signal: -1, listened_pct: 0.05 }
     expect(last_response.status).to eq(200)
     body = JSON.parse(last_response.body)
     expect(body).to include('ok' => true, 'applied' => false, 'explicit_present' => true)
     # And the explicit value is unchanged.
-    row = ReadStateStore.get(article['id'])
+    row = ReadStateStore.get(1, article['id'])
     expect(row['feedback']).to eq(1)
     expect(row['passive_feedback']).to eq(0)
   end

@@ -46,7 +46,7 @@ RSpec.describe Recommendation do
       insert('d' * 12, 'Database tips',
              'Indexes, queries, and Ruby ORM patterns are common in Rails applications.')
 
-      ranked = Recommendation.for_article(target, limit: 2).map { |r| r['title'] }
+      ranked = Recommendation.for_article(1, target, limit: 2).map { |r| r['title'] }
       # The two strong ruby/rails matches outrank the language-only JS post.
       expect(ranked).to contain_exactly('More Ruby tips', 'Database tips')
     end
@@ -55,20 +55,20 @@ RSpec.describe Recommendation do
       target = insert('a' * 12, 'Self', 'kubernetes networking is hard. kubernetes scaling is harder.')
       insert('b' * 12, 'Other', 'kubernetes pods and services explained.')
 
-      ids = Recommendation.for_article(target).map { |r| r['id'] }
+      ids = Recommendation.for_article(1, target).map { |r| r['id'] }
       expect(ids).not_to include(target['id'])
     end
 
     it 'returns [] when the article has too little content to extract keywords from' do
       target = insert('a' * 12, 'Empty', '')
-      expect(Recommendation.for_article(target)).to eq([])
+      expect(Recommendation.for_article(1, target)).to eq([])
     end
 
     it 'returns [] when no other article shares any keyword' do
       target = insert('a' * 12, 'Lonely',
                       'thisisanunusualwordsequence quintessentialdiagonalpurpleflamingosparklingnonsense')
       insert('b' * 12, 'Unrelated', 'a completely different topic about cooking and recipes.')
-      expect(Recommendation.for_article(target)).to eq([])
+      expect(Recommendation.for_article(1, target)).to eq([])
     end
 
     it 'honours the limit kwarg' do
@@ -76,11 +76,11 @@ RSpec.describe Recommendation do
       6.times do |i|
         insert("b#{i}".ljust(12, '0'), "K post #{i}", 'kubernetes pods replicas autoscaling.')
       end
-      expect(Recommendation.for_article(target, limit: 3).length).to eq(3)
+      expect(Recommendation.for_article(1, target, limit: 3).length).to eq(3)
     end
 
     it 'returns [] (no raise) on a nil article' do
-      expect(Recommendation.for_article(nil)).to eq([])
+      expect(Recommendation.for_article(1, nil)).to eq([])
     end
   end
 end

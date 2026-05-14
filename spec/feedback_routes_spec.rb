@@ -28,20 +28,20 @@ RSpec.describe 'POST /article/:uid/feedback' do
     article = make_article
     post "/article/#{article['uid']}/feedback", { value: '1' }
     expect(last_response.status).to eq(302)
-    expect(ReadStateStore.get(article['id'])['feedback']).to eq(1)
+    expect(ReadStateStore.get(1, article['id'])['feedback']).to eq(1)
   end
 
   it 'persists -1 when value=-1 is submitted' do
     article = make_article
     post "/article/#{article['uid']}/feedback", { value: '-1' }
-    expect(ReadStateStore.get(article['id'])['feedback']).to eq(-1)
+    expect(ReadStateStore.get(1, article['id'])['feedback']).to eq(-1)
   end
 
   it 'clears via value=0 (toggle)' do
     article = make_article
-    ReadStateStore.mark_feedback(article['id'], value: 1)
+    ReadStateStore.mark_feedback(1, article['id'], value: 1)
     post "/article/#{article['uid']}/feedback", { value: '0' }
-    expect(ReadStateStore.get(article['id'])['feedback']).to eq(0)
+    expect(ReadStateStore.get(1, article['id'])['feedback']).to eq(0)
   end
 
   it '400s on an invalid value' do
@@ -76,24 +76,24 @@ RSpec.describe 'POST /feeds/:id/feedback' do
     feed = FeedsStore.add(url: 'https://x.com/feedrt', title: 'X')
     post "/feeds/#{feed['id']}/feedback", { direction: 'up' }
     expect(last_response.status).to eq(302)
-    expect(FeedFeedbackStore.weight_for(feed['id'])).to eq(1.25)
+    expect(FeedFeedbackStore.weight_for(1, feed['id'])).to eq(1.25)
   end
 
   it 'bumps weight down by STEP on direction=down' do
     feed = FeedsStore.add(url: 'https://x.com/feedrt', title: 'X')
     post "/feeds/#{feed['id']}/feedback", { direction: 'down' }
-    expect(FeedFeedbackStore.weight_for(feed['id'])).to eq(0.75)
+    expect(FeedFeedbackStore.weight_for(1, feed['id'])).to eq(0.75)
   end
 
   it 'resets via direction=reset (deletes the row, returns to default)' do
     feed = FeedsStore.add(url: 'https://x.com/feedrt', title: 'X')
-    FeedFeedbackStore.bump(feed['id'], direction: :up)
-    FeedFeedbackStore.bump(feed['id'], direction: :up)
-    expect(FeedFeedbackStore.count).to eq(1)
+    FeedFeedbackStore.bump(1, feed['id'], direction: :up)
+    FeedFeedbackStore.bump(1, feed['id'], direction: :up)
+    expect(FeedFeedbackStore.count(1)).to eq(1)
 
     post "/feeds/#{feed['id']}/feedback", { direction: 'reset' }
-    expect(FeedFeedbackStore.weight_for(feed['id'])).to eq(1.0)
-    expect(FeedFeedbackStore.count).to eq(0)
+    expect(FeedFeedbackStore.weight_for(1, feed['id'])).to eq(1.0)
+    expect(FeedFeedbackStore.count(1)).to eq(0)
   end
 
   it '400s on an invalid direction' do
@@ -152,7 +152,7 @@ RSpec.describe 'Feedback UI surfaces' do
 
     it 'highlights the 👍 button when feedback is +1' do
       article = make_article
-      ReadStateStore.mark_feedback(article['id'], value: 1)
+      ReadStateStore.mark_feedback(1, article['id'], value: 1)
       get "/article/#{article['uid']}"
       expect(last_response.body).to include('feedback-on-up')
       expect(last_response.body).to include('👍 Boosted')
@@ -162,7 +162,7 @@ RSpec.describe 'Feedback UI surfaces' do
 
     it 'highlights the 👎 button when feedback is -1' do
       article = make_article
-      ReadStateStore.mark_feedback(article['id'], value: -1)
+      ReadStateStore.mark_feedback(1, article['id'], value: -1)
       get "/article/#{article['uid']}"
       expect(last_response.body).to include('feedback-on-down')
       expect(last_response.body).to include('👎 Demoted')
@@ -184,7 +184,7 @@ RSpec.describe 'Feedback UI surfaces' do
 
     it 'flips the toggle target + adds .feedback-set when the article has been voted on' do
       article = make_article
-      ReadStateStore.mark_feedback(article['id'], value: 1)
+      ReadStateStore.mark_feedback(1, article['id'], value: 1)
       get '/articles'
       # The 👍 button is now in is-on state and posts value=0 to clear
       expect(last_response.body).to include('feedback-set')
@@ -206,8 +206,8 @@ RSpec.describe 'Feedback UI surfaces' do
 
     it 'reflects a non-default stored weight in the readout + drops the .is-default modifier' do
       feed = FeedsStore.add(url: 'https://x.com/fbview3', title: 'Weighted Feed')
-      FeedFeedbackStore.bump(feed['id'], direction: :up)  # 1.25
-      FeedFeedbackStore.bump(feed['id'], direction: :up)  # 1.50
+      FeedFeedbackStore.bump(1, feed['id'], direction: :up)  # 1.25
+      FeedFeedbackStore.bump(1, feed['id'], direction: :up)  # 1.50
       get '/feeds'
       expect(last_response.body).to include('1.50×')
       # The is-default modifier shouldn't be on this feed's row.

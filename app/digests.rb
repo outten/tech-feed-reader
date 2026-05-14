@@ -23,10 +23,10 @@ module Digests
 
   module_function
 
-  def compose(window_hours: DEFAULT_WINDOW_HOURS, limit: DEFAULT_LIMIT, now: Time.now.utc)
-    rows  = query_unread(window_hours: window_hours, limit: limit, now: now)
+  def compose(user_id, window_hours: DEFAULT_WINDOW_HOURS, limit: DEFAULT_LIMIT, now: Time.now.utc)
+    rows  = query_unread(user_id, window_hours: window_hours, limit: limit, now: now)
     count = rows.length
-    AppLogger.info('digest_compose', count: count, window_hours: window_hours, limit: limit)
+    AppLogger.info('digest_compose', user_id: user_id, count: count, window_hours: window_hours, limit: limit)
 
     Result.new(
       subject:      build_subject(count, window_hours, now),
@@ -40,17 +40,18 @@ module Digests
 
   # Compose + persist. Returns [id, Result] so callers can log the
   # row id and report the count in one go.
-  def generate_and_store!(window_hours: DEFAULT_WINDOW_HOURS, limit: DEFAULT_LIMIT, now: Time.now.utc)
+  def generate_and_store!(user_id, window_hours: DEFAULT_WINDOW_HOURS, limit: DEFAULT_LIMIT, now: Time.now.utc)
     require_relative 'digest_store'
-    result = compose(window_hours: window_hours, limit: limit, now: now)
-    id = DigestStore.create(result)
+    result = compose(user_id, window_hours: window_hours, limit: limit, now: now)
+    id = DigestStore.create(user_id, result)
     [id, result]
   end
 
-  # Exposed for specs; pulls the raw rows + their summary fields.
-  def query_unread(window_hours:, limit:, now: Time.now.utc)
+  # Pulls the raw rows + their summary fields, scoped to articles whose
+  # feed the user is subscribed to and not already marked read by them.
+  def query_unread(user_id, window_hours:, limit:, now: Time.now.utc)
     cutoff = (now - (window_hours * 3600)).iso8601
-    Database.connection.execute(<<~SQL, [cutoff, limit])
+    Database.connection.execute(<<~SQL, [user_id.to_i, user_id.to_i, cutoff, limit])
       SELECT a.id, a.uid, a.title, a.url, a.published_at, a.content_text,
              a.audio_url,
              f.title AS feed_title,
@@ -58,7 +59,8 @@ module Digests
              s.extractive AS summary_extractive
       FROM articles a
       JOIN feeds  f ON f.id = a.feed_id
-      LEFT JOIN read_state rs ON rs.article_id = a.id
+      JOIN user_feed_subscriptions ufs ON ufs.feed_id = a.feed_id AND ufs.user_id = ?
+      LEFT JOIN read_state rs ON rs.article_id = a.id AND rs.user_id = ?
       LEFT JOIN summaries  s  ON s.article_id  = a.id
       WHERE COALESCE(rs.read, 0) = 0
         AND a.published_at >= ?

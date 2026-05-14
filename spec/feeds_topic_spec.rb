@@ -86,9 +86,9 @@ RSpec.describe ArticlesStore, '.recent topic filter (Phase S1)' do
     make_topical_article(uid: 'topicart02', title: 'sports', feed_topic: 'sports',
                           feed_url: 'https://x.com/sports-rss', feed_title: 'Sports Feed')
 
-    tech_uids   = ArticlesStore.recent(topic: 'technology').map { |a| a['uid'] }
-    sports_uids = ArticlesStore.recent(topic: 'sports').map { |a| a['uid'] }
-    all_uids    = ArticlesStore.recent.map { |a| a['uid'] }
+    tech_uids   = ArticlesStore.recent(1, topic: 'technology').map { |a| a['uid'] }
+    sports_uids = ArticlesStore.recent(1, topic: 'sports').map { |a| a['uid'] }
+    all_uids    = ArticlesStore.recent(1).map { |a| a['uid'] }
 
     expect(tech_uids).to   include('topicart01')
     expect(tech_uids).not_to include('topicart02')
@@ -99,14 +99,14 @@ RSpec.describe ArticlesStore, '.recent topic filter (Phase S1)' do
 
   it 'returns an empty array when topic matches no feed' do
     make_topical_article(uid: 'topicart03', title: 'one', feed_topic: 'technology')
-    expect(ArticlesStore.recent(topic: 'sports')).to eq([])
+    expect(ArticlesStore.recent(1, topic: 'sports')).to eq([])
   end
 
   it 'composes with state filter' do
     _, art = make_topical_article(uid: 'topicart04', title: 'sports unread', feed_topic: 'sports')
-    expect(ArticlesStore.recent(topic: 'sports', state: :unread).map { |a| a['uid'] }).to include('topicart04')
-    ReadStateStore.mark_read(art['id'], read: true)
-    expect(ArticlesStore.recent(topic: 'sports', state: :unread).map { |a| a['uid'] }).not_to include('topicart04')
+    expect(ArticlesStore.recent(1, topic: 'sports', state: :unread).map { |a| a['uid'] }).to include('topicart04')
+    ReadStateStore.mark_read(1, art['id'], read: true)
+    expect(ArticlesStore.recent(1, topic: 'sports', state: :unread).map { |a| a['uid'] }).not_to include('topicart04')
   end
 end
 

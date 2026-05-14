@@ -17,15 +17,14 @@ module SportsFollowsStore
     Database.connection
   end
 
-  def all(user_id = 1)
+  def all(user_id)
     db.execute(
       'SELECT * FROM sports_follows WHERE user_id = ? ORDER BY kind, created_at',
       [user_id.to_i]
     )
   end
 
-  def for_kind(*args)
-    user_id, kind = args.length == 2 ? args : [1, args.first]
+  def for_kind(user_id, kind)
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind.to_s)
     db.execute(
       'SELECT * FROM sports_follows WHERE user_id = ? AND kind = ? ORDER BY created_at',
@@ -33,8 +32,7 @@ module SportsFollowsStore
     )
   end
 
-  def follow?(*args)
-    user_id, kind, value = args.length == 3 ? args : ([1] + args)
+  def follow?(user_id, kind, value)
     !db.execute(
       'SELECT 1 FROM sports_follows WHERE user_id = ? AND kind = ? AND value = ? LIMIT 1',
       [user_id.to_i, kind.to_s, value.to_s]
@@ -43,7 +41,7 @@ module SportsFollowsStore
 
   # Idempotent — re-following is a no-op (UNIQUE(user_id, kind, value)).
   # Returns true on insert, false on already-present.
-  def add(user_id: 1, kind:, value:)
+  def add(user_id:, kind:, value:)
     raise ArgumentError, "unknown kind: #{kind.inspect}"  unless KINDS.include?(kind.to_s)
     raise ArgumentError, 'value must be non-empty'        if value.to_s.strip.empty?
 
@@ -54,7 +52,7 @@ module SportsFollowsStore
     db.changes.positive?
   end
 
-  def remove(user_id: 1, kind:, value:)
+  def remove(user_id:, kind:, value:)
     db.execute(
       'DELETE FROM sports_follows WHERE user_id = ? AND kind = ? AND value = ?',
       [user_id.to_i, kind.to_s, value.to_s]
@@ -62,7 +60,7 @@ module SportsFollowsStore
     db.changes
   end
 
-  def count(user_id = 1)
+  def count(user_id)
     db.execute('SELECT COUNT(*) AS c FROM sports_follows WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 

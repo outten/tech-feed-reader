@@ -8,7 +8,7 @@ require_relative '../app/sports_follows_store'
 # Sports Phase S9 — calendar view + iCal export.
 #
 # Covers four surfaces:
-#   1. SportsMatchesStore.upcoming_for_followed_teams (DB query)
+#   1. SportsMatchesStore.upcoming_for_followed_teams(1, 1) (DB query)
 #   2. /sports/calendar HTML view
 #   3. /sports/calendar.ics export (RFC 5545 structure)
 #   4. The "Calendar →" link from /sports
@@ -35,7 +35,7 @@ def setup_followed_match(scheduled_at:, sport: 'football', league_slug: 'nfl',
     home_team_id: home['id'], away_team_id: away['id'],
     venue: venue
   )
-  SportsFollowsStore.add(kind: 'team', value: team_slug)
+  SportsFollowsStore.add(user_id: 1, kind: 'team', value: team_slug)
   [league, home, away, match]
 end
 
@@ -44,29 +44,29 @@ RSpec.describe SportsMatchesStore, '.upcoming_for_followed_teams' do
 
   it 'returns scheduled matches for followed teams within the window' do
     setup_followed_match(scheduled_at: '2026-05-05T00:00Z')
-    matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now)
+    matches = SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now)
     expect(matches.length).to eq(1)
   end
 
   it 'excludes matches outside the days_forward window' do
     setup_followed_match(scheduled_at: '2027-01-01T00:00Z') # 8 months out
-    matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now)
+    matches = SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now)
     expect(matches).to be_empty
   end
 
   it 'excludes matches in the past' do
     setup_followed_match(scheduled_at: '2026-04-01T00:00Z') # before now
-    expect(SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now)).to be_empty
+    expect(SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now)).to be_empty
   end
 
   it 'excludes matches whose status is final / cancelled / postponed' do
     setup_followed_match(scheduled_at: '2026-05-05T00:00Z', status: 'final')
-    expect(SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now)).to be_empty
+    expect(SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now)).to be_empty
   end
 
   it 'includes live matches' do
     setup_followed_match(scheduled_at: '2026-05-05T00:00Z', status: 'live')
-    expect(SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now).length).to eq(1)
+    expect(SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now).length).to eq(1)
   end
 
   it 'excludes matches for unfollowed teams' do
@@ -80,7 +80,7 @@ RSpec.describe SportsMatchesStore, '.upcoming_for_followed_teams' do
       home_team_id: team['id']
     )
     # No follow — should not surface.
-    expect(SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now)).to be_empty
+    expect(SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now)).to be_empty
   end
 
   it 'orders matches chronologically (soonest first)' do
@@ -88,7 +88,7 @@ RSpec.describe SportsMatchesStore, '.upcoming_for_followed_teams' do
     setup_followed_match(scheduled_at: '2026-05-05T00:00Z',
                           team_slug: 'sixers', team_name: 'Philadelphia 76ers',
                           league_slug: 'nba', sport: 'basketball')
-    matches = SportsMatchesStore.upcoming_for_followed_teams(days_forward: 30, now: now)
+    matches = SportsMatchesStore.upcoming_for_followed_teams(1, days_forward: 30, now: now)
     expect(matches.first['scheduled_at']).to eq('2026-05-05T00:00Z')
     expect(matches.last['scheduled_at']).to  eq('2026-05-10T00:00Z')
   end

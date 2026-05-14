@@ -80,7 +80,7 @@ RSpec.describe 'GET / — Continue progress slot (returning user)' do
       content_html: '<p>x</p>', content_text: 'x',
       audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
     }])
-    ReadStateStore.mark_bookmarked(ArticlesStore.find_by_uid('continue_sentinel')['id'], value: true)
+    ReadStateStore.mark_bookmarked(1, ArticlesStore.find_by_uid('continue_sentinel')['id'], value: true)
   end
 
   it 'renders an empty #continue-progress slot + the JS that fills it' do

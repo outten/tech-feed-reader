@@ -28,7 +28,7 @@ def seed_triage_with_article(uid:, title:, url:, content_text:, group: :must_rea
     skip:      group == :skip      ? [{ 'uid' => uid, 'rationale' => rationale }] : [],
     unread_count: 1, latency_ms: 100
   )
-  TriageStore.create(result)
+  TriageStore.create(1, result)
 end
 
 RSpec.describe 'GET /triage/:id card layout (STUFF.md #8)' do

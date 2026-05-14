@@ -48,7 +48,7 @@ RSpec.describe 'POST /api/articles/bulk' do
     expect(body['results'].map { |r| r['ok'] }).to all(be true)
 
     rows.each do |r|
-      state = ReadStateStore.get(r['id'])
+      state = ReadStateStore.get(1, r['id'])
       expect(state['read']).to eq(1)
     end
   end
@@ -62,7 +62,7 @@ RSpec.describe 'POST /api/articles/bulk' do
       expect(JSON.parse(last_response.body)['action']).to eq(action)
     end
 
-    state = ReadStateStore.get(row['id'])
+    state = ReadStateStore.get(1, row['id'])
     expect(state['read']).to       eq(0)  # last action was unarchive; before that, unbookmark; read was set then unset
     expect(state['bookmarked']).to eq(0)
     expect(state['archived']).to   eq(0)
@@ -107,7 +107,7 @@ RSpec.describe 'POST /api/articles/bulk' do
 
     # The two real rows ARE archived even though one uid in the batch failed.
     rows.each do |r|
-      expect(ReadStateStore.get(r['id'])['archived']).to eq(1)
+      expect(ReadStateStore.get(1, r['id'])['archived']).to eq(1)
     end
   end
 

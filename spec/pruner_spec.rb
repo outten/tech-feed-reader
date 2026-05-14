@@ -49,7 +49,7 @@ RSpec.describe Pruner do
     it 'preserves bookmarked articles past the window' do
       old = add(uid: 'oldbookmrkbk', title: 'Old + bookmarked', days_ago: 30)
       add(uid: 'oldarticleab', title: 'Old, unread', days_ago: 30)
-      ReadStateStore.mark_bookmarked(old['id'], value: true)
+      ReadStateStore.mark_bookmarked(1, old['id'], value: true)
 
       result = Pruner.prune_old(now: now)
       expect(result.deleted).to eq(1)
@@ -61,7 +61,7 @@ RSpec.describe Pruner do
     it 'with keep_unread:true, also preserves unread articles past the window' do
       add(uid: 'oldunread011', title: 'Old + unread', days_ago: 30)
       old_read = add(uid: 'oldreadthis1', title: 'Old + read', days_ago: 30)
-      ReadStateStore.mark_read(old_read['id'], read: true)
+      ReadStateStore.mark_read(1, old_read['id'], read: true)
 
       result = Pruner.prune_old(keep_unread: true, now: now)
       expect(result.deleted).to eq(1)             # only the read one
@@ -91,10 +91,10 @@ RSpec.describe Pruner do
 
     it 'cascades through read_state / summaries / article_tags / articles_fts' do
       old = add(uid: 'oldwithdeps1', title: 'Old + deps', days_ago: 30)
-      tag = TagsStore.add(name: 'tag1', match_kind: 'keyword', match_value: 'foo')
+      tag = TagsStore.add(user_id: 1, name: 'tag1', match_kind: 'keyword', match_value: 'foo')
       TagsStore.tag_article(old['id'], tag['id'])
       SummaryStore.upsert(old['id'], extractive: 'old summary', llm: 'old llm', llm_model: 'claude-x')
-      ReadStateStore.mark_read(old['id'], read: true)
+      ReadStateStore.mark_read(1, old['id'], read: true)
 
       Pruner.prune_old(now: now)
 
@@ -110,7 +110,7 @@ RSpec.describe Pruner do
 
     it 'still deletes archived articles past the window (archived is not a protection signal)' do
       old = add(uid: 'oldarchived1', title: 'Old + archived', days_ago: 30)
-      ReadStateStore.mark_archived(old['id'], value: true)
+      ReadStateStore.mark_archived(1, old['id'], value: true)
       result = Pruner.prune_old(now: now)
       expect(result.deleted).to eq(1)
       expect(ArticlesStore.find_by_uid('oldarchived1')).to be_nil

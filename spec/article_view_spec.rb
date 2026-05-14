@@ -30,7 +30,7 @@ RSpec.describe 'article view + state-toggle routes' do
       expect(last_response.body).to include('Hello')
       expect(last_response.body).to include('Example Tech')
 
-      state = ReadStateStore.get(article['id'])
+      state = ReadStateStore.get(1, article['id'])
       expect(state['read']).to eq(1)
       expect(state['opened_at']).not_to be_nil
     end
@@ -44,16 +44,16 @@ RSpec.describe 'article view + state-toggle routes' do
 
   describe 'POST /article/:uid/read' do
     it 'marks unread when read=0 is passed' do
-      ReadStateStore.mark_read(article['id'])
+      ReadStateStore.mark_read(1, article['id'])
       post "/article/#{uid}/read", { 'read' => '0' }
       expect(last_response.status).to eq(302)
-      expect(ReadStateStore.get(article['id'])['read']).to eq(0)
+      expect(ReadStateStore.get(1, article['id'])['read']).to eq(0)
     end
 
     it 'marks read when no read param is passed (default true)' do
-      ReadStateStore.mark_read(article['id'], read: false)
+      ReadStateStore.mark_read(1, article['id'], read: false)
       post "/article/#{uid}/read"
-      expect(ReadStateStore.get(article['id'])['read']).to eq(1)
+      expect(ReadStateStore.get(1, article['id'])['read']).to eq(1)
     end
 
     it 'honours return_to for redirect target' do
@@ -65,18 +65,18 @@ RSpec.describe 'article view + state-toggle routes' do
   describe 'POST /article/:uid/bookmark' do
     it 'flips bookmarked state' do
       post "/article/#{uid}/bookmark", { 'value' => '1' }
-      expect(ReadStateStore.get(article['id'])['bookmarked']).to eq(1)
+      expect(ReadStateStore.get(1, article['id'])['bookmarked']).to eq(1)
       post "/article/#{uid}/bookmark", { 'value' => '0' }
-      expect(ReadStateStore.get(article['id'])['bookmarked']).to eq(0)
+      expect(ReadStateStore.get(1, article['id'])['bookmarked']).to eq(0)
     end
   end
 
   describe 'POST /article/:uid/archive' do
     it 'flips archived state' do
       post "/article/#{uid}/archive", { 'value' => '1' }
-      expect(ReadStateStore.get(article['id'])['archived']).to eq(1)
+      expect(ReadStateStore.get(1, article['id'])['archived']).to eq(1)
       post "/article/#{uid}/archive", { 'value' => '0' }
-      expect(ReadStateStore.get(article['id'])['archived']).to eq(0)
+      expect(ReadStateStore.get(1, article['id'])['archived']).to eq(0)
     end
   end
 
@@ -89,7 +89,7 @@ RSpec.describe 'article view + state-toggle routes' do
         content_html: '<p>r</p>', content_text: 'r'
       }])
       r = ArticlesStore.find_by_uid('r' * 12)
-      ReadStateStore.mark_read(r['id'])
+      ReadStateStore.mark_read(1, r['id'])
       r
     end
 

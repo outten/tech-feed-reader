@@ -69,7 +69,7 @@
       <% else %>
         <p class="muted">
           No tagged articles this week.
-          <% if TagsStore.count.zero? %>
+          <% if TagsStore.count(current_user_id).zero? %>
             Add a rule at <a href="/tags">/tags</a> to start tagging.
           <% end %>
         </p>

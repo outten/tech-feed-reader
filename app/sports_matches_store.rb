@@ -58,7 +58,7 @@ module SportsMatchesStore
   # Phase S9 — upcoming matches across every team the user follows
   # (sports_follows kind=team), within the next `days_forward` days.
   # Drives /sports/calendar and the iCal export.
-  def upcoming_for_followed_teams(user_id = 1, days_forward: 30, now: Time.now.utc)
+  def upcoming_for_followed_teams(user_id, days_forward: 30, now: Time.now.utc)
     cutoff = (now + days_forward * 86_400).iso8601
     uid    = user_id.to_i
     db.execute(<<~SQL, [now.iso8601, cutoff, uid, uid])

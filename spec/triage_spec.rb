@@ -8,7 +8,7 @@ require_relative '../app/triage_store'
 
 # Phase 8 — AI-assisted triage. Specs cover three layers:
 #   1. Triage::Claude.available?      (env-key gating)
-#   2. Triage::Claude.run             (SDK stubbed, parser, error paths)
+#   2. Triage::Claude.run(1)             (SDK stubbed, parser, error paths)
 #   3. /triage routes (GET + POST)    (view surface)
 #
 # Anthropic SDK is fully stubbed — no real network calls in test env.
@@ -74,13 +74,13 @@ RSpec.describe Triage::Claude, '.run' do
 
   it 'returns :unavailable when no API key is set' do
     ENV.delete('ANTHROPIC_API_KEY')
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:unavailable)
   end
 
   it 'returns :empty when there are no unread articles' do
     # No DB rows at all → empty state.
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:empty)
     expect(result.must_read).to eq([])
   end
@@ -96,7 +96,7 @@ RSpec.describe Triage::Claude, '.run' do
       skip:      [{ uid: art3['uid'], rationale: 'low relevance' }]
     ))
 
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:ok)
     expect(result.must_read.length).to eq(1)
     expect(result.must_read.first['uid']).to eq('triage000001')
@@ -108,7 +108,7 @@ RSpec.describe Triage::Claude, '.run' do
   it 'strips markdown code fences before parsing' do
     art = make_triage_article(uid: 'triagefence01', title: 'Fenced')
     stub_response("```json\n#{JSON.generate(must_read: [{ uid: art['uid'], rationale: 'r' }], optional: [], skip: [])}\n```")
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:ok)
     expect(result.must_read.first['uid']).to eq('triagefence01')
   end
@@ -116,7 +116,7 @@ RSpec.describe Triage::Claude, '.run' do
   it 'salvages a JSON object embedded in surrounding prose' do
     art = make_triage_article(uid: 'triagesalvg1', title: 'Salvage me')
     stub_response("Here's my analysis: #{JSON.generate(must_read: [{ uid: art['uid'], rationale: 'r' }], optional: [], skip: [])} hope that helps!")
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:ok)
     expect(result.must_read.first['uid']).to eq('triagesalvg1')
   end
@@ -124,7 +124,7 @@ RSpec.describe Triage::Claude, '.run' do
   it 'falls back to skip-all on un-parseable output (status :parse_error)' do
     art = make_triage_article(uid: 'triagefail001', title: 'Unparsable')
     stub_response('this is not JSON and cannot be salvaged')
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:parse_error)
     expect(result.must_read).to eq([])
     expect(result.skip.length).to eq(1)
@@ -144,7 +144,7 @@ RSpec.describe Triage::Claude, '.run' do
     second_attempt = JSON.generate(must_read: [{ uid: art['uid'], rationale: 'corrected' }],
                                    optional: [], skip: [])
     stub_response("```json\n#{first_attempt}\n```\n\nWait, I made errors with duplicates. Let me redo this cleanly with the right uids:\n\n```json\n#{second_attempt}\n```")
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:ok)
     expect(result.must_read.first['uid']).to eq('triageredo001')
     expect(result.must_read.first['rationale']).to eq('corrected')
@@ -156,7 +156,7 @@ RSpec.describe Triage::Claude, '.run' do
     second_attempt = JSON.generate(must_read: [{ uid: art['uid'], rationale: 'final' }],
                                    optional: [], skip: [])
     stub_response("#{first_attempt}\n\nLet me redo this cleanly:\n\n#{second_attempt}")
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:ok)
     expect(result.must_read.first['uid']).to eq('triageredo002')
   end
@@ -171,21 +171,21 @@ RSpec.describe Triage::Claude, '.run' do
   it 'persists the raw model output on every triage row' do
     art = make_triage_article(uid: 'triageraw0001', title: 'Saved raw')
     stub_response(JSON.generate(must_read: [{ uid: art['uid'], rationale: 'r' }], optional: [], skip: []))
-    result = Triage::Claude.run
-    id = TriageStore.create(result)
+    result = Triage::Claude.run(1)
+    id = TriageStore.create(1, result)
     row = Database.connection.execute('SELECT raw FROM triages WHERE id = ?', [id]).first
     expect(row['raw']).to include(art['uid'])
   end
 
   it 'includes the positive corpus excerpts in the user prompt' do
     pos = make_triage_article(uid: 'triagepos0001', title: 'Liked Ruby piece', content_text: 'rails ruby routing')
-    ReadStateStore.mark_bookmarked(pos['id'], value: true)
-    ReadStateStore.mark_read(pos['id'], read: true)
+    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+    ReadStateStore.mark_read(1, pos['id'], read: true)
 
     make_triage_article(uid: 'triageunread1', title: 'Unread one')
 
     capture = capture_call_args
-    Triage::Claude.run
+    Triage::Claude.run(1)
     args = capture.call
     user_msg = args[:messages].first[:content]
 
@@ -200,7 +200,7 @@ RSpec.describe Triage::Claude, '.run' do
     make_triage_article(uid: 'triagebig0001', title: 'Big body', content_text: long)
 
     capture = capture_call_args
-    Triage::Claude.run
+    Triage::Claude.run(1)
     args = capture.call
     user_msg = args[:messages].first[:content]
 
@@ -213,7 +213,7 @@ RSpec.describe Triage::Claude, '.run' do
   it 'sends Sonnet, not Opus (per the cost guard)' do
     make_triage_article(uid: 'triagemodel01', title: 'Model check')
     capture = capture_call_args
-    Triage::Claude.run
+    Triage::Claude.run(1)
     args = capture.call
     expect(args[:model]).to eq(Triage::Claude::MODEL.to_sym)
     expect(Triage::Claude::MODEL).to start_with('claude-sonnet-')
@@ -226,7 +226,7 @@ RSpec.describe Triage::Claude, '.run' do
     client = double('Client', messages: messages)
     allow(Anthropic::Client).to receive(:new).and_return(client)
 
-    result = Triage::Claude.run
+    result = Triage::Claude.run(1)
     expect(result.status).to eq(:error)
     expect(result.error).to include('connection refused')
   end
@@ -237,7 +237,7 @@ RSpec.describe Triage::Claude, '.run' do
     end
 
     capture = capture_call_args
-    Triage::Claude.run
+    Triage::Claude.run(1)
     args = capture.call
     user_msg = args[:messages].first[:content]
 

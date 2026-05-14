@@ -6,7 +6,7 @@ require_relative '../app/tags_store'
 require_relative '../app/main'
 
 RSpec.describe 'dashboard charts' do
-  describe 'ArticlesStore.daily_counts' do
+  describe 'ArticlesStore.daily_counts(1)' do
     let!(:feed) { FeedsStore.add(url: 'https://example.com/feed.rss') }
 
     def insert_article(uid, day_offset)
@@ -23,7 +23,7 @@ RSpec.describe 'dashboard charts' do
       insert_article('b' * 12, 0)
       insert_article('c' * 12, 5)
 
-      counts = ArticlesStore.daily_counts(days: 7)
+      counts = ArticlesStore.daily_counts(1, days: 7)
       expect(counts.length).to eq(7)
       expect(counts.last[:day]).to  eq(Date.today.to_s)
       expect(counts.last[:count]).to eq(2)
@@ -34,12 +34,12 @@ RSpec.describe 'dashboard charts' do
 
     it 'excludes articles older than the window' do
       insert_article('a' * 12, 100)
-      counts = ArticlesStore.daily_counts(days: 30)
+      counts = ArticlesStore.daily_counts(1, days: 30)
       expect(counts.sum { |c| c[:count] }).to eq(0)
     end
   end
 
-  describe 'ArticlesStore.counts_by_feed' do
+  describe 'ArticlesStore.counts_by_feed(1)' do
     it 'returns feeds in descending count order, with zero-count feeds at the bottom' do
       a = FeedsStore.add(url: 'https://a.example.com/rss', title: 'A')
       b = FeedsStore.add(url: 'https://b.example.com/rss', title: 'B')
@@ -55,7 +55,7 @@ RSpec.describe 'dashboard charts' do
         published_at: '2026-05-02T12:00:00Z', content_html: '<p>x</p>', content_text: 'x'
       }])
 
-      ranked = ArticlesStore.counts_by_feed(limit: 10).map { |r| [r['title'], r['c']] }
+      ranked = ArticlesStore.counts_by_feed(1, limit: 10).map { |r| [r['title'], r['c']] }
       expect(ranked).to eq([['A', 3], ['B', 1], ['C', 0]])
     end
   end
@@ -72,20 +72,20 @@ RSpec.describe 'dashboard charts' do
     end
 
     it 'counts articles with the tag inside the window only' do
-      ai   = TagsStore.add(name: 'ai',   match_kind: 'keyword', match_value: 'ai')
-      rust = TagsStore.add(name: 'rust', match_kind: 'keyword', match_value: 'rust')
+      ai   = TagsStore.add(user_id: 1, name: 'ai',   match_kind: 'keyword', match_value: 'ai')
+      rust = TagsStore.add(user_id: 1, name: 'rust', match_kind: 'keyword', match_value: 'rust')
 
       insert_article('a' * 12, 'machine learning ai future',     0)
       insert_article('b' * 12, 'ai is everywhere',               2)
       insert_article('c' * 12, 'rust borrow checker',             1)
       insert_article('d' * 12, 'old ai story',                   30)  # outside window
 
-      result = TagsStore.top_in_window(days: 7, limit: 10).map { |r| [r['name'], r['count']] }
+      result = TagsStore.top_in_window(1, days: 7, limit: 10).map { |r| [r['name'], r['count']] }
       expect(result).to contain_exactly(['ai', 2], ['rust', 1])
     end
 
     it 'returns [] when nothing matches in the window' do
-      expect(TagsStore.top_in_window(days: 7)).to eq([])
+      expect(TagsStore.top_in_window(1, days: 7)).to eq([])
     end
   end
 

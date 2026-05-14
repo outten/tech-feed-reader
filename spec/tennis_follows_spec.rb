@@ -29,7 +29,7 @@ RSpec.describe 'POST /sports/players/follow' do
     make_tennis_player(slug: 'jannik-sinner', full_name: 'Jannik Sinner')
     post '/sports/players/follow', { slug: 'jannik-sinner' }
     expect(last_response.status).to eq(302)
-    expect(SportsFollowsStore.follow?('player', 'jannik-sinner')).to be(true)
+    expect(SportsFollowsStore.follow?(1, 'player', 'jannik-sinner')).to be(true)
   end
 
   it 'is idempotent — re-follow does not 500' do
@@ -37,7 +37,7 @@ RSpec.describe 'POST /sports/players/follow' do
     post '/sports/players/follow', { slug: 'jannik-sinner' }
     post '/sports/players/follow', { slug: 'jannik-sinner' }
     expect(last_response.status).to eq(302)
-    expect(SportsFollowsStore.count).to eq(1)
+    expect(SportsFollowsStore.count(1)).to eq(1)
   end
 
   it '404s on an unknown player slug' do
@@ -63,9 +63,9 @@ RSpec.describe 'POST /sports/players/unfollow' do
 
   it 'removes the sports_follows row' do
     make_tennis_player(slug: 'jannik-sinner', full_name: 'Jannik Sinner')
-    SportsFollowsStore.add(kind: 'player', value: 'jannik-sinner')
+    SportsFollowsStore.add(user_id: 1, kind: 'player', value: 'jannik-sinner')
     post '/sports/players/unfollow', { slug: 'jannik-sinner' }
-    expect(SportsFollowsStore.follow?('player', 'jannik-sinner')).to be(false)
+    expect(SportsFollowsStore.follow?(1, 'player', 'jannik-sinner')).to be(false)
   end
 
   it 'is idempotent — unfollow when not followed is a no-op' do
@@ -87,7 +87,7 @@ RSpec.describe '/sports/tennis follow buttons + followed callout' do
 
   it 'flips the followed row to ★ + renders the My followed players callout' do
     make_tennis_player(slug: 'jannik-sinner', full_name: 'Jannik Sinner', tour: 'atp', current_rank: 1)
-    SportsFollowsStore.add(kind: 'player', value: 'jannik-sinner')
+    SportsFollowsStore.add(user_id: 1, kind: 'player', value: 'jannik-sinner')
     get '/sports/tennis'
     expect(last_response.body).to include('My followed players')
     # The followed row's button reads ★ (and its action is /unfollow).
@@ -100,8 +100,8 @@ RSpec.describe '/sports/tennis follow buttons + followed callout' do
   it 'sorts followed callout by current_rank ascending' do
     make_tennis_player(slug: 'sinner',  full_name: 'Sinner',  current_rank: 1)
     make_tennis_player(slug: 'alcaraz', full_name: 'Alcaraz', current_rank: 2)
-    SportsFollowsStore.add(kind: 'player', value: 'alcaraz')
-    SportsFollowsStore.add(kind: 'player', value: 'sinner')
+    SportsFollowsStore.add(user_id: 1, kind: 'player', value: 'alcaraz')
+    SportsFollowsStore.add(user_id: 1, kind: 'player', value: 'sinner')
     get '/sports/tennis'
     callout = last_response.body[/<section class="benchmark-section sports-tennis-followed"[\s\S]*?<\/section>/]
     expect(callout).not_to be_nil
@@ -124,7 +124,7 @@ RSpec.describe '/sports/player/:slug follow toggle' do
 
   it 'shows ★ + Unfollow button when followed' do
     make_tennis_player(slug: 'jannik-sinner', full_name: 'Jannik Sinner')
-    SportsFollowsStore.add(kind: 'player', value: 'jannik-sinner')
+    SportsFollowsStore.add(user_id: 1, kind: 'player', value: 'jannik-sinner')
     get '/sports/player/jannik-sinner'
     expect(last_response.body).to include('★ Followed')
     expect(last_response.body).to include('action="/sports/players/unfollow"')

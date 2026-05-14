@@ -15,15 +15,14 @@ module MuteRulesStore
 
   module_function
 
-  def all(user_id = 1)
+  def all(user_id)
     db.execute(
       'SELECT * FROM mute_rules WHERE user_id = ? ORDER BY kind, created_at DESC',
       [user_id.to_i]
     )
   end
 
-  def for_kind(*args)
-    user_id, kind = args.length == 2 ? args : [1, args.first]
+  def for_kind(user_id, kind)
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind.to_s)
     db.execute(
       'SELECT * FROM mute_rules WHERE user_id = ? AND kind = ? ORDER BY created_at DESC',
@@ -31,7 +30,7 @@ module MuteRulesStore
     )
   end
 
-  def count(user_id = 1)
+  def count(user_id)
     db.execute('SELECT COUNT(*) AS c FROM mute_rules WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 
@@ -39,7 +38,7 @@ module MuteRulesStore
   # (user_id, kind, value) is the natural key. Trims surrounding
   # whitespace on `value`. Returns true if a new row was inserted, false
   # if the rule already existed.
-  def add(user_id: 1, kind:, value:)
+  def add(user_id:, kind:, value:)
     kind  = kind.to_s
     value = value.to_s.strip
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind)
@@ -54,7 +53,7 @@ module MuteRulesStore
 
   # Delete a rule. No-op if it doesn't exist. Returns the number of
   # rows actually removed (0 or 1).
-  def remove(user_id: 1, kind:, value:)
+  def remove(user_id:, kind:, value:)
     kind  = kind.to_s
     value = value.to_s.strip
     raise ArgumentError, "unknown kind: #{kind.inspect}" unless KINDS.include?(kind)

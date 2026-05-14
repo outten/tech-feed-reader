@@ -48,12 +48,14 @@ module TagsApplier
     false
   end
 
-  # Backfill: scan every article against `tag_id`'s rule and insert
+  # Backfill: scan every article against a tag rule and insert
   # article_tags rows for matches. Returns the count of newly tagged
   # articles. Idempotent — INSERT OR IGNORE handles re-runs cleanly.
-  def apply_to_existing(tag_id)
-    rule = TagsStore.find(tag_id)
+  # Accepts the full tag row so we don't need to round-trip TagsStore
+  # (which would require user_id for the lookup).
+  def apply_to_existing(rule)
     return 0 unless rule
+    tag_id = rule['id']
 
     tagged = 0
     db = Database.connection

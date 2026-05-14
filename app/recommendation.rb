@@ -24,8 +24,7 @@ module Recommendation
 
   # Returns rows shaped like ArticlesStore.recent (with the FTS5 `rank`
   # column added). Empty array when there's nothing to compare against.
-  def for_article(*args, limit: DEFAULT_LIMIT)
-    user_id, article = args.length == 2 ? args : [1, args.first]
+  def for_article(user_id, article, limit: DEFAULT_LIMIT)
     return [] if article.nil?
 
     keywords = top_keywords(article['content_text'].to_s)

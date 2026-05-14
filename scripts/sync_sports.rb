@@ -46,7 +46,9 @@ end
 
 Database.migrate!
 
-followed_team_slugs = SportsFollowsStore.for_kind('team').map { |f| f['value'] }
+# Sync follows the union of every user's followed teams so a single
+# nightly cron pass keeps every subscriber's match data fresh.
+followed_team_slugs = SportsFollowsStore.distinct_values('team')
 if followed_team_slugs.empty?
   puts 'No team follows yet — run `make seed-sports-data` first or follow teams via the UI.'
   exit 0

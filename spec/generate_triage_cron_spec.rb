@@ -49,12 +49,12 @@ RSpec.describe 'scripts/generate_triage.rb multi-topic loop' do
     stub_claude_ok
     expect {
       [nil, 'technology', 'sports'].each do |topic|
-        result = Triage::Claude.run(topic: topic)
-        TriageStore.create(result)
+        result = Triage::Claude.run(1, topic: topic)
+        TriageStore.create(1, result)
       end
-    }.to change { TriageStore.count }.by(3)
+    }.to change { TriageStore.count(1) }.by(3)
 
-    topics = TriageStore.recent.map { |r| r['topic'] }
+    topics = TriageStore.recent(1).map { |r| r['topic'] }
     expect(topics).to contain_exactly(nil, 'technology', 'sports')
   end
 

@@ -27,8 +27,8 @@ end
 RSpec.describe TriageStore do
   describe '.create' do
     it 'persists a triage row with all metadata + JSON-encoded groups' do
-      id = TriageStore.create(triage_result)
-      row = TriageStore.find(id)
+      id = TriageStore.create(1, triage_result)
+      row = TriageStore.find(1, id)
       expect(row['status']).to eq('ok')
       expect(row['model']).to eq('claude-sonnet-4-6')
       expect(row['unread_count']).to eq(3)
@@ -41,15 +41,15 @@ RSpec.describe TriageStore do
     end
 
     it 'persists a parse_error result so failures are auditable' do
-      id = TriageStore.create(triage_result(status: :parse_error))
-      row = TriageStore.find(id)
+      id = TriageStore.create(1, triage_result(status: :parse_error))
+      row = TriageStore.find(1, id)
       expect(row['status']).to eq('parse_error')
     end
 
     it 'persists empty-state runs for the daily-history record' do
-      id = TriageStore.create(triage_result(status: :empty, unread_count: 0,
+      id = TriageStore.create(1, triage_result(status: :empty, unread_count: 0,
                                             must_read: [], optional: [], skip: []))
-      row = TriageStore.find(id)
+      row = TriageStore.find(1, id)
       expect(row['unread_count']).to eq(0)
       expect(row['must_read']).to eq([])
     end
@@ -57,12 +57,12 @@ RSpec.describe TriageStore do
 
   describe '.find' do
     it 'returns nil for an unknown id' do
-      expect(TriageStore.find(99_999)).to be_nil
+      expect(TriageStore.find(1, 99_999)).to be_nil
     end
 
     it 'returns parsed group arrays (not the JSON strings)' do
-      id = TriageStore.create(triage_result)
-      row = TriageStore.find(id)
+      id = TriageStore.create(1, triage_result)
+      row = TriageStore.find(1, id)
       expect(row['must_read']).to be_a(Array)
       expect(row['must_read'].first).to be_a(Hash)
     end
@@ -70,20 +70,20 @@ RSpec.describe TriageStore do
 
   describe '.recent + .latest + .count' do
     it 'returns runs ordered newest-first' do
-      first  = TriageStore.create(triage_result(unread_count: 1))
+      first  = TriageStore.create(1, triage_result(unread_count: 1))
       sleep 0.01
-      second = TriageStore.create(triage_result(unread_count: 2))
+      second = TriageStore.create(1, triage_result(unread_count: 2))
 
-      ids = TriageStore.recent.map { |r| r['id'] }
+      ids = TriageStore.recent(1).map { |r| r['id'] }
       expect(ids.first).to eq(second)
       expect(ids.last).to eq(first)
-      expect(TriageStore.latest['id']).to eq(second)
-      expect(TriageStore.count).to eq(2)
+      expect(TriageStore.latest(1)['id']).to eq(second)
+      expect(TriageStore.count(1)).to eq(2)
     end
 
     it 'returns lightweight rows on .recent (no group JSON parse)' do
-      TriageStore.create(triage_result)
-      row = TriageStore.recent.first
+      TriageStore.create(1, triage_result)
+      row = TriageStore.recent(1).first
       expect(row.keys).to include('id', 'generated_at', 'unread_count', 'status', 'model', 'topic')
       expect(row.keys).not_to include('must_read', 'optional', 'skip')
     end
@@ -92,25 +92,25 @@ RSpec.describe TriageStore do
   # Phase S10 follow-up — daily cron writes one row per topic.
   describe '.create + .recent with topic (Phase S10 follow-up)' do
     it 'round-trips topic on create + find' do
-      id = TriageStore.create(triage_result(topic: 'sports'))
-      row = TriageStore.find(id)
+      id = TriageStore.create(1, triage_result(topic: 'sports'))
+      row = TriageStore.find(1, id)
       expect(row['topic']).to eq('sports')
     end
 
     it 'persists NULL topic for cross-topic legacy runs' do
-      id = TriageStore.create(triage_result(topic: nil))
-      row = TriageStore.find(id)
+      id = TriageStore.create(1, triage_result(topic: nil))
+      row = TriageStore.find(1, id)
       expect(row['topic']).to be_nil
     end
 
     it '.recent(topic: ...) filters to that topic only' do
-      TriageStore.create(triage_result(topic: nil))
-      TriageStore.create(triage_result(topic: 'technology'))
-      TriageStore.create(triage_result(topic: 'sports'))
+      TriageStore.create(1, triage_result(topic: nil))
+      TriageStore.create(1, triage_result(topic: 'technology'))
+      TriageStore.create(1, triage_result(topic: 'sports'))
 
-      tech_rows   = TriageStore.recent(topic: 'technology')
-      sports_rows = TriageStore.recent(topic: 'sports')
-      cross_rows  = TriageStore.recent(topic: nil)
+      tech_rows   = TriageStore.recent(1, topic: 'technology')
+      sports_rows = TriageStore.recent(1, topic: 'sports')
+      cross_rows  = TriageStore.recent(1, topic: nil)
 
       expect(tech_rows.length).to eq(1)
       expect(tech_rows.first['topic']).to eq('technology')
@@ -121,10 +121,10 @@ RSpec.describe TriageStore do
     end
 
     it '.recent (no topic kwarg) returns rows across every topic' do
-      TriageStore.create(triage_result(topic: nil))
-      TriageStore.create(triage_result(topic: 'technology'))
-      TriageStore.create(triage_result(topic: 'sports'))
-      expect(TriageStore.recent.length).to eq(3)
+      TriageStore.create(1, triage_result(topic: nil))
+      TriageStore.create(1, triage_result(topic: 'technology'))
+      TriageStore.create(1, triage_result(topic: 'sports'))
+      expect(TriageStore.recent(1).length).to eq(3)
     end
   end
 end
@@ -138,14 +138,14 @@ RSpec.describe Triage::Claude, '#run topic plumbing (Phase S10 follow-up)' do
   end
 
   it 'sets Result.topic on :unavailable so the persisted row carries scope' do
-    result = Triage::Claude.run(topic: 'sports')
+    result = Triage::Claude.run(1, topic: 'sports')
     expect(result.status).to eq(:unavailable)
     expect(result.topic).to eq('sports')
   end
 
   it 'sets Result.topic on :empty so the persisted row carries scope' do
     ENV['ANTHROPIC_API_KEY'] = 'sk-test-fake-key'
-    result = Triage::Claude.run(topic: 'technology')
+    result = Triage::Claude.run(1, topic: 'technology')
     expect(result.status).to eq(:empty)
     expect(result.topic).to eq('technology')
   end
@@ -157,7 +157,7 @@ RSpec.describe '/triage routes (with persistence)' do
 
   describe 'GET /triage with persisted runs' do
     it 'lists recent runs in a Recent triage runs section' do
-      TriageStore.create(triage_result(unread_count: 5))
+      TriageStore.create(1, triage_result(unread_count: 5))
       get '/triage'
       expect(last_response.body).to include('Recent triage runs')
       expect(last_response.body).to match(%r{<a href="/triage/\d+">View &rarr;</a>})
@@ -179,7 +179,7 @@ RSpec.describe '/triage routes (with persistence)' do
       ])
       result = triage_result(must_read: [{ 'uid' => 'cronuid00001', 'rationale' => 'because reasons' }],
                               optional: [], skip: [])
-      id = TriageStore.create(result)
+      id = TriageStore.create(1, result)
 
       get "/triage/#{id}"
       expect(last_response.status).to eq(200)
@@ -222,13 +222,13 @@ RSpec.describe '/triage routes (with persistence)' do
       stub_summary(JSON.generate(must_read: [{ uid: 'persist00001', rationale: 'fits the corpus' }],
                                   optional: [], skip: []))
 
-      expect { post '/triage' }.to change { TriageStore.count }.by(1)
+      expect { post '/triage' }.to change { TriageStore.count(1) }.by(1)
       expect(last_response.body).to match(%r{Stored as triage <code>#\d+</code>})
     end
 
     it 'does NOT persist when status is :unavailable (no row worth keeping)' do
       ENV.delete('ANTHROPIC_API_KEY')
-      expect { post '/triage' }.not_to change { TriageStore.count }
+      expect { post '/triage' }.not_to change { TriageStore.count(1) }
     end
   end
 end
