@@ -287,7 +287,7 @@ Can you add YouTube as a top level item in the header? The page it loads should 
 
 **Shipped.** New top-level `YouTube` nav link between Podcasts and Sports. `/youtube` lists subscribed YouTube channels as a card grid (cover art + video count + latest age) with a small `↗ Channel` deep-link that opens the channel on YouTube in a new tab. `/youtube/:feed_id` shows the 10 most recent videos as 16:9 tiles using YouTube's `hqdefault` thumbnail + a center play overlay; clicking a tile lands on `/article/:uid`, which already embeds the YouTube player (shipped earlier in STUFF #19). New `ArticlesStore.youtube_channels(user_id)` paralleling `podcast_feeds`, matched on the canonical `youtube.com/feeds/videos.xml?channel_id=UC…` URL pattern.
 
-## [ ] 27. Feed Filtering
+## [x] 27. Feed Filtering
 
 The list of items on the feed list are getting very long. Can you make a suggestion on how to filter the list so that the user can easily find and discover a feed? Consider:
 
@@ -300,3 +300,5 @@ The list of items on the feed list are getting very long. Can you make a suggest
 - etc.
 
 Do an anlaysis. Thank you.
+
+**Shipped (Phase 27.1).** Each long list on `/feeds` now has a filter toolbar at the top: a `<input type="search">` that narrows by title / URL / blurb substring, plus topic chips (`All / Tech / Sports / Nature / General` for subscribed; `All / Tech / Sports / Nature` for catalog). Search + chip combine as AND. Pure client-side filter (`public/feeds-filter.js`) — no server round-trip. Catalog category headings auto-hide when every row beneath is filtered out; a small "showing N of M" counter appears when the result is narrower than the full list. Rows carry `data-topic` / `data-search` from the existing `feed.topic` column and `FeedCatalog::CATEGORY_TO_TOPIC`. Deferred to follow-up phases: a "hide already-subscribed" toggle on the catalog (27.2), sort options on the subscribed table (27.3), and cross-user "most popular" ranking (that's STUFF #24, separate).

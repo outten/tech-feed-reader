@@ -277,7 +277,26 @@
   </p>
 </div>
 
-<table class="data-table feeds-table" style="margin-top:2rem<%= '; display:none' if @feeds.empty? %>">
+<%# STUFF #27 — filter toolbar for the subscribed feeds table. Pure
+    client-side filter (public/feeds-filter.js): the search input filters
+    by title/url substring, the chips narrow by topic. Hidden when
+    there's nothing to filter (no rows yet). %>
+<% if @feeds.any? %>
+  <div class="feeds-filter-bar" data-target="feeds-table">
+    <input type="search" class="feeds-filter-search" placeholder="Filter your feeds…"
+           aria-label="Filter your subscribed feeds by title or URL">
+    <div class="feeds-filter-chips" role="tablist" aria-label="Filter by topic">
+      <button type="button" class="feeds-filter-chip is-active" data-topic="">All</button>
+      <button type="button" class="feeds-filter-chip" data-topic="technology">Tech</button>
+      <button type="button" class="feeds-filter-chip" data-topic="sports">Sports</button>
+      <button type="button" class="feeds-filter-chip" data-topic="nature">Nature</button>
+      <button type="button" class="feeds-filter-chip" data-topic="general">General</button>
+    </div>
+    <span class="feeds-filter-count" aria-live="polite"></span>
+  </div>
+<% end %>
+
+<table class="data-table feeds-table" style="margin-top:0.5rem<%= '; display:none' if @feeds.empty? %>">
   <thead>
     <tr>
       <th>Title</th>
@@ -331,7 +350,7 @@
   </section>
 <% end %>
 
-<section class="benchmark-section" style="margin-top:2.5rem">
+<section id="discover-catalog" class="benchmark-section" style="margin-top:2.5rem">
   <h3>Discover popular feeds</h3>
   <p class="subtitle">
     Hand-picked catalog of <%= FeedCatalog.all.length %> feeds across tech, sports, podcasts,
@@ -339,14 +358,36 @@
     the URL goes straight into the subscriptions list. Already-subscribed entries are
     marked.
   </p>
+
+  <%# STUFF #27 — filter toolbar mirroring the one above the subscribed
+      feeds table. Same JS module handles both via the data-target pair. %>
+  <div class="feeds-filter-bar" data-target="catalog">
+    <input type="search" class="feeds-filter-search" placeholder="Filter the catalog…"
+           aria-label="Filter catalog feeds by title, blurb, or URL">
+    <div class="feeds-filter-chips" role="tablist" aria-label="Filter by topic">
+      <button type="button" class="feeds-filter-chip is-active" data-topic="">All</button>
+      <button type="button" class="feeds-filter-chip" data-topic="technology">Tech</button>
+      <button type="button" class="feeds-filter-chip" data-topic="sports">Sports</button>
+      <button type="button" class="feeds-filter-chip" data-topic="nature">Nature</button>
+    </div>
+    <span class="feeds-filter-count" aria-live="polite"></span>
+  </div>
+
   <% @categories.each do |key, label| %>
     <% entries = @catalog[key] %>
     <% next if entries.empty? %>
-    <h4 class="catalog-category"><%= label %></h4>
+    <%# data-topic on the category header lets feeds-filter.js hide
+        the whole heading when every row beneath it is filtered out. %>
+    <h4 class="catalog-category" data-topic="<%= h(FeedCatalog::CATEGORY_TO_TOPIC[key].to_s) %>"><%= label %></h4>
     <ul class="catalog-list">
       <% entries.each do |entry| %>
         <% subscribed = @subscribed.include?(entry[:url]) %>
-        <li class="catalog-row <%= 'subscribed' if subscribed %>" data-catalog-url="<%= h(entry[:url]) %>">
+        <% topic_key  = FeedCatalog.topic_for(entry).to_s %>
+        <li class="catalog-row <%= 'subscribed' if subscribed %>"
+            data-catalog-url="<%= h(entry[:url]) %>"
+            data-topic="<%= h(topic_key) %>"
+            data-subscribed="<%= subscribed ? '1' : '0' %>"
+            data-search="<%= h([entry[:title], entry[:blurb], entry[:url]].join(' ').downcase) %>">
           <div class="catalog-meta">
             <span class="catalog-title"><%= h(entry[:title]) %></span>
             <span class="catalog-blurb"><%= h(entry[:blurb]) %></span>
@@ -429,3 +470,4 @@
 
 <script src="/feeds.js?v=<%= asset_mtime('public/feeds.js') %>"></script>
 <script src="/feeds-ai.js?v=<%= asset_mtime('public/feeds-ai.js') %>"></script>
+<script src="/feeds-filter.js?v=<%= asset_mtime('public/feeds-filter.js') %>"></script>
