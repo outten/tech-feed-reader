@@ -100,7 +100,14 @@
       Examples: <em>"Food and travel writing, Bourdain-style."</em> ·
       <em>"AI safety research blogs."</em> · <em>"Premier League tactics deep dives."</em>
     </p>
-    <form method="post" action="/feeds/ai-recommend" class="portfolio-form ai-recommend-form js-ai-recommend">
+    <%# data-turbo="false" opts this form out of Turbo's fetch-based form
+        submission. Turbo expects successful POSTs to be 3xx redirects; this
+        route renders the same /feeds page with a result block inline (200 +
+        full HTML). Without the opt-out, Turbo silently keeps the existing
+        form on screen and the result block never renders. Native form
+        submission + full page navigation is the right model here. %>
+    <form method="post" action="/feeds/ai-recommend" data-turbo="false"
+          class="portfolio-form ai-recommend-form js-ai-recommend">
       <label class="full-width">
         Your prompt
         <textarea name="prompt" rows="3" required
@@ -108,7 +115,7 @@
       </label>
       <div class="ai-recommend-controls">
         <button type="submit" class="btn-primary" title="Ask Claude to pick matching feeds from the catalog">Recommend feeds</button>
-        <span class="ai-thinking" hidden>
+        <span class="ai-thinking" aria-live="polite">
           <span class="ai-thinking-dot"></span>
           AI is thinking…
         </span>
@@ -125,36 +132,77 @@
             <%= result.recommendations.length == 1 ? 'recommendation' : 'recommendations' %>
             for <em>"<%= h(@ai_prompt) %>"</em>
           </h4>
+          <%
+            # Kind breakdown — surfaces whether Claude returned a mix of
+            # rss/podcast/youtube and how many of each survived validation.
+            # Useful when results look one-kind-heavy: tells you whether
+            # Claude leaned that way, or whether the other kinds got
+            # filtered out by validation (likely cause for YouTube: wrong
+            # channel IDs).
+            kb = result.kind_breakdown || { suggested: {}, validated: {} }
+            kind_labels = %w[rss podcast youtube].map do |k|
+              s = kb[:suggested][k].to_i
+              v = kb[:validated][k].to_i
+              next if s.zero?
+              "#{k} #{v}/#{s}"
+            end.compact
+          %>
+          <% if result.suggested_count.to_i > result.validated_count.to_i || kind_labels.any? %>
+            <p class="subtitle" style="margin-top:-0.25rem">
+              <% if result.suggested_count.to_i > result.validated_count.to_i %>
+                Claude suggested <%= result.suggested_count %>;
+                <%= result.validated_count %> validated as live feeds
+                (<%= result.suggested_count - result.validated_count %> couldn't be reached or didn't parse).
+              <% end %>
+              <% if kind_labels.any? %>
+                <span class="muted">By kind (validated/suggested): <%= kind_labels.join(', ') %>.</span>
+              <% end %>
+            </p>
+          <% end %>
           <ul class="catalog-list">
             <% result.recommendations.each do |rec| %>
               <li class="catalog-row" data-catalog-url="<%= h(rec[:url]) %>">
                 <div class="catalog-meta">
                   <strong><%= h(rec[:title]) %></strong>
-                  <span class="muted">&middot; <%= h(@categories[rec[:category].to_sym] || rec[:category]) %></span>
-                  <% unless rec[:blurb].to_s.strip.empty? %>
-                    <div class="muted" style="font-size:0.9rem"><%= h(rec[:blurb]) %></div>
+                  <span class="muted">&middot; <%= h(rec[:kind]) %></span>
+                  <% if rec[:entry_count].to_i.positive? %>
+                    <span class="muted">&middot; <%= rec[:entry_count] %> recent entries</span>
                   <% end %>
+                  <div class="muted catalog-url" style="font-size:0.78rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"><%= h(rec[:url]) %></div>
                   <div class="ai-rationale">↳ <%= h(rec[:rationale]) %></div>
                 </div>
-                <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
+                <%# Subscribe via the existing manual-add JSON endpoint
+                    (POST /api/feeds) so we can insert the row in-place
+                    instead of full-reloading the AI panel away. Distinct
+                    class from .js-catalog-add to avoid being intercepted
+                    by the catalog-add handler in public/feeds.js — that
+                    one posts to /api/feeds/catalog/add, which rejects
+                    URLs that aren't in the curated catalog (and ours
+                    aren't, by design). %>
+                <form method="post" action="/api/feeds" class="js-ai-subscribe">
                   <input type="hidden" name="url" value="<%= h(rec[:url]) %>">
+                  <input type="hidden" name="title" value="<%= h(rec[:title]) %>">
                   <button type="submit" class="btn-primary">Subscribe</button>
                 </form>
               </li>
             <% end %>
           </ul>
-        <% elsif result.status == :ok %>
-          <h4 class="ai-recommend-result-title">No matches in the catalog</h4>
+        <% elsif result.status == :ok || result.status == :no_validated %>
+          <h4 class="ai-recommend-result-title">No verified feeds found</h4>
           <p>
-            Claude didn't find anything matching <em>"<%= h(@ai_prompt) %>"</em> in the
-            curated catalog of <%= FeedCatalog::CATALOG.length %> feeds.
-            The catalog is currently tech / sports / nature heavy — if you
-            were asking about a different domain (food, travel, finance, etc.)
-            it may not be represented yet.
+            <% if result.suggested_count.to_i.zero? %>
+              Claude didn't have any known free feeds matching
+              <em>"<%= h(@ai_prompt) %>"</em>.
+            <% else %>
+              Claude suggested <%= result.suggested_count %> URLs for
+              <em>"<%= h(@ai_prompt) %>"</em>, but none validated as live
+              feeds (404 / timeout / not RSS).
+            <% end %>
           </p>
           <p class="subtitle">
-            Workaround: find a feed URL yourself and paste it into the manual
-            <strong>Add a feed</strong> form below.
+            Try a more specific prompt, name a publication directly, or
+            paste a known feed URL into the manual <strong>Add a feed</strong>
+            form below.
           </p>
         <% elsif result.status == :parse_error %>
           <h4 class="ai-recommend-result-title">⚠️ Response couldn't be parsed</h4>
@@ -163,15 +211,9 @@
         <% elsif result.status == :error %>
           <h4 class="ai-recommend-result-title">⚠️ AI call failed</h4>
           <p class="subtitle"><code><%= h(result.error) %></code></p>
-        <% elsif result.status == :no_candidates %>
-          <h4 class="ai-recommend-result-title">You're already subscribed to every catalog feed</h4>
-          <p>
-            There's nothing new for the AI to recommend — use the manual
-            <strong>Add a feed</strong> form below for arbitrary URLs.
-          </p>
         <% end %>
 
-        <% if result.status == :ok && (result.input_tokens || result.output_tokens) %>
+        <% if (result.status == :ok || result.status == :no_validated) && (result.input_tokens || result.output_tokens) %>
           <%
             # Sonnet 4.6 pricing (Anthropic Jan 2025 list): $3 / Mtok input,
             # $15 / Mtok output. Update the constants here when pricing
@@ -186,13 +228,9 @@
           %>
           <p class="ai-recommend-meta">
             <%= h(result.model) %> &middot;
-            <%= result.latency_ms %>ms &middot;
+            <%= result.latency_ms %>ms (LLM + validation) &middot;
             <%= in_tokens %> in / <%= out_tokens %> out tokens &middot;
             ≈ $<%= format('%.4f', cost_usd) %>
-          </p>
-        <% elsif result.status == :ok %>
-          <p class="ai-recommend-meta">
-            <%= h(result.model) %> &middot; <%= result.latency_ms %>ms
           </p>
         <% end %>
       </div>

@@ -2112,6 +2112,9 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
    rationale line under each recommendation so it visually trails the
    blurb without competing with it. */
 .ai-recommend-form textarea {
+  /* box-sizing keeps the padding + border INSIDE the 100% width so the
+     textarea doesn't overflow its containing .full-width label. */
+  box-sizing: border-box;
   width: 100%;
   font: inherit;
   padding: 0.5rem 0.7rem;
@@ -2153,12 +2156,21 @@ html.dark .feeds-ai-recommend {
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
+/* Hidden by default — JS adds .is-visible at form submit. (Using a class
+   toggle instead of the [hidden] attribute because the latter conflicts
+   with the explicit `display` rule we'd otherwise need: `display:
+   inline-flex` would silently win over the UA stylesheet's
+   `display: none` for `[hidden]`, and the indicator would render at
+   page load.) */
 .ai-thinking {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 0.4rem;
   color: #5a5a5f;
   font-size: 0.9rem;
+}
+.ai-thinking.is-visible {
+  display: inline-flex;
 }
 html.dark .ai-thinking { color: #c7c7cc; }
 .ai-thinking-dot {

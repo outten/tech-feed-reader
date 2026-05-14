@@ -25,6 +25,8 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 7. **Pause.** Wait for the user to merge the PR (or to grant explicit authority to merge after green CI).
 8. After merge, sync local: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
 
+**UI approval gate** — for any change that affects what a human sees in a browser (views/, public/*.js, public/*.css, anything click-driven), the "pause before staging" in step 4 means: **green specs are not enough**. The user must manually verify in the browser and explicitly approve before `git commit`. Specs caught the data-layer plumbing on STUFF #23 but missed two JS/CSS bugs (a `hidden` attribute overridden by a `display: inline-flex` rule; a `button.disabled = true` inside the submit handler that cancelled the form submission) — both only visible by clicking the actual button. Backend-only changes (stores, migrations, scripts) don't trigger the gate.
+
 **Documentation rule** — every PR that changes behaviour updates the touched docs in the same PR. The bar is "no doc reads as untrue after this PR." Concretely, when shipping a new page or module, update:
 - [README.md](README.md) page table + status line
 - AGENTS.md (this file) — if there's a new module / store / external integration / convention worth documenting
