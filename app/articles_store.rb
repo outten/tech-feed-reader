@@ -220,8 +220,17 @@ module ArticlesStore
     sql = <<~SQL
       INSERT OR IGNORE INTO articles
         (uid, feed_id, title, url, author, published_at, content_html, content_text,
-         audio_url, audio_mime_type, audio_duration_seconds, image_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         audio_url, audio_mime_type, audio_duration_seconds, image_url, categories)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    SQL
+
+    # STUFF #28 — when a duplicate uid causes the INSERT to no-op, fill
+    # in `categories` if the existing row's column is still NULL (i.e.
+    # the article was imported before #28 shipped). All other columns
+    # stay untouched. This piggybacks the regular sync-feeds cycle to
+    # backfill the corpus naturally over the next 24h.
+    backfill_sql = <<~SQL
+      UPDATE articles SET categories = ? WHERE uid = ? AND categories IS NULL
     SQL
 
     # Cross-user tag snapshot — at import time we apply every user's
@@ -243,9 +252,14 @@ module ArticlesStore
           entry[:author], entry[:published_at],
           entry[:content_html].to_s, entry[:content_text].to_s,
           entry[:audio_url], entry[:audio_mime_type], entry[:audio_duration_seconds],
-          entry[:image_url]
+          entry[:image_url], entry[:categories]
         ])
-        next if db.changes.zero?  # uid was a duplicate, skip tag + summary
+        if db.changes.zero?
+          # uid was a duplicate — opportunistically backfill categories
+          # if we have a value and the existing row doesn't.
+          db.execute(backfill_sql, [entry[:categories], entry[:uid]]) if entry[:categories]
+          next
+        end
 
         inserted  += 1
         article_id = db.last_insert_row_id

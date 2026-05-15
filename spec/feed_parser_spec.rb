@@ -17,7 +17,8 @@ RSpec.describe FeedParser do
       expect(e.keys).to contain_exactly(
         :uid, :title, :url, :author, :published_at, :content_html, :content_text,
         :image_url,
-        :audio_url, :audio_mime_type, :audio_duration_seconds
+        :audio_url, :audio_mime_type, :audio_duration_seconds,
+        :categories
       )
     end
 
@@ -144,6 +145,62 @@ RSpec.describe FeedParser do
     it 'returns nil channel image_url when neither <itunes:image> nor <image> is present' do
       result = FeedParser.parse(rss_body, feed_url: 'https://example.com/feed.rss')
       expect(result[:image_url]).to be_nil
+    end
+  end
+
+  # STUFF #28 — publisher-supplied category tags. Stored as a JSON
+  # array (string) so downstream consumers (TopicClusters) can parse
+  # without a separate normalization pass.
+  describe '.parse — category extraction (STUFF #28)' do
+    def parse_with_categories(category_xml)
+      body = <<~XML
+        <?xml version="1.0"?>
+        <rss version="2.0"><channel>
+          <title>Cat blog</title>
+          <link>https://example.com/blog</link>
+          <description>fixture</description>
+          <item>
+            <title>Hello</title>
+            <link>https://example.com/blog/1</link>
+            <guid>1</guid>
+            <pubDate>Mon, 04 May 2026 12:00:00 +0000</pubDate>
+            <description>Body.</description>
+            #{category_xml}
+          </item>
+        </channel></rss>
+      XML
+      FeedParser.parse(body, feed_url: 'https://example.com/blog/feed')[:entries].first
+    end
+
+    it 'serializes RSS <category> tags as a JSON array, lowercased + trimmed' do
+      e = parse_with_categories('<category>Politics</category><category>  Tech  </category>')
+      expect(JSON.parse(e[:categories])).to contain_exactly('politics', 'tech')
+    end
+
+    it 'dedupes case-insensitive duplicates' do
+      e = parse_with_categories('<category>Tech</category><category>tech</category><category>TECH</category>')
+      expect(JSON.parse(e[:categories])).to eq(['tech'])
+    end
+
+    it 'splits comma-/semicolon-packed category strings' do
+      e = parse_with_categories('<category>politics, tech; gaming</category>')
+      expect(JSON.parse(e[:categories])).to contain_exactly('politics', 'tech', 'gaming')
+    end
+
+    it 'rejects empty / sentence-length category strings' do
+      e = parse_with_categories("<category></category><category>#{'x' * 80}</category><category>real</category>")
+      expect(JSON.parse(e[:categories])).to eq(['real'])
+    end
+
+    it 'returns nil categories when the entry emits no <category> tags' do
+      e = parse_with_categories('')
+      expect(e[:categories]).to be_nil
+    end
+
+    it 'caps the stored list at MAX_CATEGORIES (10)' do
+      cats = (1..15).map { |i| "<category>tag#{i}</category>" }.join
+      e = parse_with_categories(cats)
+      expect(JSON.parse(e[:categories]).length).to eq(10)
     end
   end
 
