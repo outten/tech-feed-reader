@@ -4,7 +4,7 @@
 
 ## One-liner
 
-A single-user web application that aggregates public, free RSS / Atom feeds **across multiple categories (technology, sports, …)**, with reading, tagging, search, summarization, and personalised relevance ranking. Conventions inherited from `t-money-terminal` (Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh) but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
+A multi-user web application that aggregates public, free RSS / Atom feeds **across multiple categories (technology, sports, nature/YouTube, podcasts, …)**, with reading, tagging, search, summarization, and personalised relevance ranking. Conventions inherited from `t-money-terminal` (Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh) but storage is SQLite (single `data/app.db`, FTS5 for search) instead of `t-money`'s file-per-store JSON.
 
 > **Note on this document.** SPEC.md is the v1 brief, kept as the historical baseline so the reasoning at kickoff stays auditable. The brief below is the original (technology-only, no recommendation engine). The **Scope evolution** section that follows records every place reality has diverged — what shipped, why we changed our mind, and where to find the current backlog. Treat that section, plus [TODO.md](TODO.md), as the source of truth for what the app does today.
 
@@ -32,11 +32,23 @@ The original brief lists "Recommendation engine ('you might like...'). Out of sc
 
 The non-goal was right at the time (we needed to avoid premature personalisation), and the change of mind is intentional, not accidental.
 
+### Multi-user (consumer auth + per-user data split)
+
+The original brief was explicit: "**Single-user**, web-based." That ran its course. As of v1.x the app is multi-user behind a passkey auth wall.
+
+- **Phase A1 (passkey auth)** — STUFF #22 pivoted from an early Microsoft Entra ID plan to **consumer-facing passkey-only** (WebAuthn) with one-time recovery codes. No email, no SMS, no password. Username is the only identity field. Auth wall middleware gates every protected route. Commits `005b607` + `a9e5032` (#88).
+- **Phase A2 (per-user data split)** — migration `022_a2_per_user_data.sql` widens every user-state table's PK / unique constraint to include `user_id` with `ON DELETE CASCADE`. Tables covered: `read_state`, `feed_feedback`, `mute_rules`, `tags`, `sports_follows`, `triages`, `digests`. `feeds` itself stays a **shared catalog** so one fetch keeps every subscriber up to date — per-user subscriptions live in a new `user_feed_subscriptions` bridge. Every store method that touches user-state takes `user_id` explicitly; cross-user isolation locked by [spec/cross_user_isolation_spec.rb](spec/cross_user_isolation_spec.rb). Commits `7b1533a` (#89) + `7b7bcca` (#90).
+- **`/account` page (A1 follow-up)** — display name, passkey list / + Add this device / Revoke (with lockout protection), recovery-code regeneration (one-shot reveal), and account deletion with a typed-username confirmation gate. Commit `e548857` (#97).
+
 ### Other deltas the original brief didn't anticipate
 
 - **Podcasts as first-class** — full audio pipeline, persistent mini-player surviving Turbo navigations, podcast-specific UX (Bus mode for short commute episodes). Multiple commits ending at `4a48f1e` and `42040f4`.
+- **YouTube as first-class** — top-level `/youtube` nav, subscribed-channel grid, 10-most-recent-videos drill-down, in-page embedded player on YouTube articles, watch-progress that feeds the same For You corpus that podcasts use, and (STUFF #30) a bulk `@handle` resolver that scrapes the channel page to extract `channelId` + queues a background fetch on subscribe.
 - **Mute filters** (Phase 5) — keyword / author / feed hard-hide rules. Commit `4234961`.
 - **AI digest summaries** — Claude summarises a daily digest, cached per row. Commit `400468e`.
+- **AI feed recommender** (STUFF #23) — Claude picks from the curated catalog given a free-text prompt; validates URLs before render so no hallucinations make it to the UI.
+- **Popular-with-other-readers top charts** (STUFF #24) — `/feeds` shows top-5 per type (📰 News / 🏟 Sports / 🎧 Podcasts / 📺 Nature / 🎬 YouTube) ranked by distinct subscriber count.
+- **/topics quality overhaul** (STUFF #28) — URL-stripping tokenizer + expanded stopwords + publisher-supplied categories (new `articles.categories` column) + weighted scoring + ubiquity ceiling + proper-noun phrase detection (e.g. "Jannik Sinner" stays one cluster). Consolidated stopword module at [app/stopwords.rb](app/stopwords.rb).
 - **Tracing + observability** — OpenTelemetry SDK, `/admin/traces`, optional OTLP exporter. Multiple commits.
 
 ### Where to read what
@@ -62,7 +74,7 @@ The user is one person reading ~50–200 articles a week across ~20–50 feeds. 
 
 ## Non-goals
 
-- Multi-user / authentication / accounts.
+- ~~Multi-user / authentication / accounts.~~ **Superseded.** Phase A1 (passkey auth, recovery codes, auth wall) shipped in `a9e5032` (#88) and Phase A2 (per-user data split) in `7b1533a` (#89) + `7b7bcca` (#90). The pivot rationale and final design are in *Scope evolution* above.
 - Paid / authenticated feeds (Substack-paywalled, NYT-subscriber, etc.).
 - Mobile-native app — responsive web only.
 - Real-time push (websockets, server-sent events). Polling is fine.
@@ -165,7 +177,7 @@ Hard test in `spec/articles_perf_spec.rb` (mirroring `portfolio_perf_spec.rb`) a
 
 ## Out of scope / dropped (recorded so the choice is visible)
 
-- **Multi-user** — single-user personal tool, like `t-money`.
+- ~~**Multi-user** — single-user personal tool, like `t-money`.~~ **Reversed v1.x.** Consumer passkey auth + per-user data split shipped — see Phase A1/A2 in *Scope evolution* above.
 - **Hosted LLM APIs other than Claude** — keep one provider for summarization; Claude API only.
 - **Comments / replies** — not the use case.
 - **Real-time push** — polling is fine, web app refresh on click.

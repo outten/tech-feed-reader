@@ -65,7 +65,7 @@ No other API keys required — RSS / Atom feeds are public and unauthenticated. 
 ```bash
 make install                 # bundle install
 make migrate                 # apply any pending db/migrations/*.sql (idempotent)
-make seed-feeds              # insert FeedCatalog::seed_defaults (5 starters; 25-entry catalog browsable on /feeds)
+make seed-feeds              # insert FeedCatalog::seed_defaults (5 starters; 79-entry catalog browsable on /feeds)
 make run                     # auto-reload via rerun → http://localhost:4567 (alias: make dev)
 make serve                   # one-shot run, no auto-reload
 make test                    # RSpec
@@ -144,17 +144,27 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 
 | Table | Purpose |
 |---|---|
-| `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status |
-| `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text, audio_url, audio_mime_type, audio_duration_seconds |
+| `users` | Phase A1: id, username (lowercase, unique), display_name, created_at, last_seen_at. Identity is username-only — no email, no phone. |
+| `webauthn_credentials` | Phase A1: per-user passkey records. credential_id (unique), public_key (BLOB), sign_count, transports, label, last_used_at. Multiple per user supported (phone + laptop). FK CASCADE on users. |
+| `recovery_codes` | Phase A1: 10 single-use codes per user, hashed with HMAC-SHA256 keyed by `SESSION_SECRET`. consumed_at set on use. FK CASCADE on users. |
+| `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status, topic, image_url. **Shared catalog** — one row per URL across all users; subscriptions live in `user_feed_subscriptions`. |
+| `user_feed_subscriptions` | Phase A2: bridge (user_id, feed_id) unique. One fetch keeps every subscriber up to date. |
+| `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text, audio_url, audio_mime_type, audio_duration_seconds, image_url, `categories` (JSON-encoded publisher tags, STUFF #28.2) |
 | `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via INSERT/UPDATE/DELETE triggers |
-| `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4) |
-| `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore` |
-| `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`, composite PK on `(kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
+| `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4). Phase A2: composite PK `(user_id, article_id)`. |
+| `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore`. Phase A2: composite PK `(user_id, feed_id)`. |
+| `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`. Phase A2: composite PK `(user_id, kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
+| `tags` / `article_tags` | User tag rules + article-tag bridge. Phase A2: `tags` carry `user_id` with UNIQUE `(user_id, name)`; matcher runs every user's rules at import time and writes one `article_tags` row per match. |
+| `triages` | Phase 8 + STUFF #8: AI-classified unread snapshots. Phase A2: scoped by `user_id`. Stores `must_read` / `optional` / `skip` as JSON arrays of article uids + per-row `topic` + `raw` LLM payload. |
+| `digests` | Phase 6 / STUFF #5: stored daily-digest snapshots; subject + text_body + html_body + LLM-summary cache (`llm_summary`, `llm_model`, `llm_generated_at`). Phase A2: `user_id`. |
 | `sports_leagues` | Sports Phase S3: NFL / NBA / MLS / intl rugby etc., one row per league synced from a provider |
-| `sports_teams` | Sports Phase S3: teams across all leagues, FK to `sports_leagues`. Idempotent upsert by `(source_provider, external_id)` |
+| `sports_teams` | Sports Phase S3: teams across all leagues, FK to `sports_leagues`. Idempotent upsert by `(source_provider, league_id, external_id)` |
 | `sports_matches` | Sports Phase S3: scheduled / live / final games. FK to `sports_teams` (home + away). Status ∈ `{scheduled, live, final, postponed, cancelled}` |
-| `sports_players` | Sports Phase S3: schema only — populated when the player-following UI (S7) ships |
-| `sports_follows` | Sports Phase S3: user's "I follow these" list. kind ∈ `{team, player, league}`, value = entity slug |
+| `sports_players` | Sports Phase S7: tennis players + per-player follows. ATP/WTA rankings cached in a separate sports_standings rollup. |
+| `sports_follows` | Sports Phase S3: user's "I follow these" list. kind ∈ `{team, player, league}`. Phase A2: UNIQUE `(user_id, kind, value)`. |
+| `sports_standings` | Sports Phase S8: per-league standings rollup (W / L / D / GF / GA / pts), refreshed via `make sync-sports`. |
+| `sports_entity_articles` | Sports Phase S7 follow-up: bridge for "articles mentioning Sinner / Eagles" on per-entity pages. |
+| `background_pool` | Pool of Picsum image IDs powering the per-page background. STUFF #21 doubled the pool to 100. |
 
 **Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (FTS5 BM25, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the FTS5 path when the corpus is cold.
 
@@ -168,6 +178,16 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 `HealthRegistry` is in-memory only (bounded ring buffer of feed-fetch observations); surfaces at `/admin/health`, clears on process restart.
 
 Per-store wrapper classes (`FeedsStore`, `ArticlesStore`, etc.) sit on top of the DB and present a higher-level API to the app — but the data lives in SQLite, not in JSON files.
+
+## Authentication + multi-user (Phases A1 + A2)
+
+[app/auth.rb](app/auth.rb) — passkey-only auth (WebAuthn) with one-time recovery codes as the lost-device fallback. No email, no SMS, no password. Username is the only identity field. Implementation uses the [`webauthn`](https://github.com/cedarcode/webauthn-ruby) gem (same library as Mastodon + GitLab); browser side is native `navigator.credentials.create()` / `.get()` with no library — see [public/auth.js](public/auth.js) for the ~240-LoC ceremony driver.
+
+**Auth wall** — a Sinatra `before` filter on every request enforces sign-in unless the path is in the public allowlist (`/`, `/about`, `/health`, `/metrics`, `/sign-up`, `/sign-in`, `/sign-out`, `/api/auth/*`, plus static assets). The wall is OFF in `RACK_ENV=test` by default so existing specs don't need a sign-in dance; specs that explicitly want to exercise the wall flip `TechFeedReader.enforce_auth_wall = true` in a before/after pair (see [spec/auth_spec.rb](spec/auth_spec.rb)).
+
+**Per-user data split (A2)** — every table that holds user-state carries a `user_id` FK with `ON DELETE CASCADE`, defined in migration `022_a2_per_user_data.sql`. Composite PKs / unique constraints widened to include `user_id`: `read_state(user_id, article_id)`, `feed_feedback(user_id, feed_id)`, `mute_rules(user_id, kind, value)`, `tags UNIQUE(user_id, name)`, `sports_follows UNIQUE(user_id, kind, value)`. `feeds` itself stays a shared catalog so one fetch keeps every subscriber up to date; per-user subscriptions live in `user_feed_subscriptions`. Every store method that touches user-state takes `user_id` explicitly — routes call `current_user_id`, defined in [app/auth.rb](app/auth.rb) as a Sinatra helper. Cross-user isolation is locked by [spec/cross_user_isolation_spec.rb](spec/cross_user_isolation_spec.rb).
+
+**`/account` page** — manages display name, registered passkeys (list / + Add this device / Revoke per row), recovery-code regeneration (one-shot reveal), and account deletion (typed-username confirmation gate; cascade deletes via the FK chain in migration 022 wipe every per-user row). Lockout protection: refuses to revoke the user's last passkey when zero unused recovery codes remain.
 
 ## Article id
 
@@ -263,62 +283,92 @@ app/
   credentials.rb                   # loads .credentials/.env; aliases CLAUDE_API_KEY → ANTHROPIC_API_KEY
   database.rb                      # SQLite handle + migration runner
   logger.rb                        # JSON-line structured logger
+  request_log_middleware.rb        # Rack middleware: per-HTTP-request JSON log line (sees static assets too)
   version.rb                       # AppVersion::GIT_SHA + STARTED_AT (used by /health, OTel resource)
-  feed_fetcher.rb                  # conditional GET → parse → update FeedsStore (wrapped in OTel feed.fetch span)
-  feed_parser.rb                   # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom
-  feed_catalog.rb                  # curated 25-feed catalog + seed_defaults
+
+  # Auth (Phase A1)
+  auth.rb                          # WebAuthn config + current_user / require_signed_in! helpers + before-filter
+  users_store.rb                   # users CRUD: create / find / update_display_name! / delete!
+  webauthn_credentials_store.rb    # passkey records: register! / delete_for_user! / bump_sign_count!
+  recovery_codes_store.rb          # mint_for! / consume! / regenerate_for! — HMAC-SHA256 codes
+  stopwords.rb                     # STUFF #28.5: single home for STOPWORDS::GENERAL / PHRASE / CATEGORY
+
+  # Feeds + articles core
+  feed_fetcher.rb                  # conditional GET → parse → update FeedsStore (OTel feed.fetch span)
+  feed_parser.rb                   # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom; extracts entry.categories
+  feed_catalog.rb                  # curated 79-feed catalog + seed_defaults + recommend_for personalisation
+  feeds_store.rb                   # feeds + user_feed_subscriptions bridge; popular_by_type for #24 top charts
+  articles_store.rb                # articles + FTS5 + audio + categories backfill; podcast_feeds + youtube_channels
+  read_state_store.rb              # per-user-per-article read / bookmark / archive / feedback
+  feed_feedback_store.rb           # per-user-per-feed weight (Phase 3)
+  mute_rules_store.rb              # per-user keyword / author / feed hard-hide rules (Phase 5)
+  tags_store.rb / tags_applier.rb  # per-user tag rules + cross-user tag-snapshot matcher at import time
   sanitizer.rb                     # loofah whitelist; sanitize_html + text_only
+
+  # Providers (external HTTP)
   providers/
     http_client.rb                 # shared user-agent + retry/backoff + 301/302 redirect-following
     readability.rb                 # main-content extraction (teaser-feed fallback)
-  feeds_store.rb                   # CRUD on feeds
-  articles_store.rb                # CRUD on articles + FTS5
-  read_state_store.rb              # per-article read / bookmark / archive
-  tags_store.rb                    # tag rules + many-to-many links
-  tags_applier.rb                  # tag-rule matcher used at import time
-  summary_store.rb                 # extractive + LLM summaries
+    itunes_lookup.rb               # podcast cover-art + Apple-Podcasts URL → RSS resolver
+    espn.rb                        # NFL / NBA / MLS / rugby — reverse-engineered public endpoints
+    youtube_channel_resolver.rb    # STUFF #30: @handle / /channel/UC… → canonical feed URL
+
+  # Summaries + LLM
+  summary_store.rb                 # extractive + LLM summaries cache
   summarizer/
-    extractive.rb                  # TextRank-style; pure Ruby
-    claude.rb                      # Anthropic SDK wrapper for summaries (Opus)
-  chat.rb                          # Chat::Claude — chat backend, page-context system prompt (Sonnet)
-  digests.rb                       # composer for the daily-digest snapshot (text + HTML fragment)
-  digest_store.rb                  # CRUD on the digests table
-  recommendation.rb                # FTS5-overlap "Related" panel
-  topic_clusters.rb                # /topics term-clustering across the recent window
-  pruner.rb                        # retention sweep — delete articles older than RETENTION_DAYS; bookmarks always kept
+    extractive.rb                  # frequency-based picker; references Stopwords::GENERAL
+    claude.rb                      # Anthropic SDK wrapper for article + digest summaries (Opus 4.7)
+  chat.rb                          # Chat::Claude — page-context chat backend (Sonnet 4.6)
+
+  # AI feeds + triage
+  feed_recommender/claude.rb       # STUFF #23: ✨ Ask AI for feed ideas on /feeds
+  triage/claude.rb                 # Phase 8: /triage classifier (Sonnet 4.6)
+  triage_store.rb                  # persisted triage runs per user per topic
+  digests.rb / digest_store.rb     # daily-digest composer + persistence; LLM summary cached on the row
+  recommendation.rb                # FTS5-overlap "Related" panel + top_keywords + top_phrases (#28.4)
+  recommendation/for_you.rb        # personalised ranker for /articles?sort=relevance
+  topic_clusters.rb                # /topics weighted-scoring clustering (STUFF #28)
+
+  # Sports
+  sports_teams_store.rb / sports_leagues_store.rb / sports_matches_store.rb
+  sports_players_store.rb / sports_follows_store.rb / sports_standings_store.rb
+  sports_entity_articles_store.rb  # cross-store: articles mentioning a followed entity
+  sports_teams.rb                  # sports team registry + slug helpers
+
+  # Infra
+  background_pool.rb               # Picsum image-id pool (100 images, refreshable from /admin/backgrounds)
+  pruner.rb                        # retention sweep — delete articles older than RETENTION_DAYS
   health_registry.rb               # bounded ring buffer of feed-fetch observations
-  metrics.rb                       # Prometheus registry + counter / gauge / histogram defs
-  metrics_middleware.rb            # Rack middleware: per-request counter + histogram
-  sidekiq_metrics_middleware.rb    # mirrors metrics_middleware for Sidekiq jobs
-  tracing.rb                       # OpenTelemetry SDK boot + RecorderProcessor (in-memory) + optional OTLP exporter
+  metrics.rb / metrics_middleware.rb / sidekiq_metrics_middleware.rb  # Prometheus + Sidekiq
+  tracing.rb                       # OpenTelemetry SDK boot + RecorderProcessor + optional OTLP exporter
   scheduler.rb                     # due-feed picker + refresh_one helper
-  sidekiq_boot.rb                  # worker boot file: requires credentials + tracing + workers
-  sidekiq_config.rb                # Sidekiq client/server config + middleware wiring
-  workers/
-    feed_refresh_worker.rb         # background job that refreshes a single feed
+  sidekiq_boot.rb / sidekiq_config.rb  # worker boot + middleware wiring
+  workers/feed_refresh_worker.rb   # background job that refreshes a single feed
+
 db/
-  migrations/
-    001_init.sql                   # initial schema
-    002_articles_audio.sql         # audio_url + audio_mime_type + audio_duration_seconds on articles
-    003_digests.sql                # digests table
+  migrations/                      # 23 migrations; runner in app/database.rb applies in filename order
+    001_init.sql                   # initial schema (feeds, articles, articles_fts, read_state, tags, …)
+    002_articles_audio.sql … 022_a2_per_user_data.sql + 023_articles_categories.sql
+
 views/                             # ERB templates
 public/
-  style.css                        # all CSS lives here (light + dark)
+  style.css                        # all CSS lives here (light + dark) — ~4000 LoC
   global-player.js                 # singleton Player + mini-player UI bindings
   chat-widget.js                   # floating chat button + panel + /chat client
   header-refresh.js                # AJAX refresh-all button
-  feeds.js                         # /feeds page interactions (add feed, etc.)
+  feeds.js / feeds-ai.js / feeds-filter.js  # /feeds: add feed / AI recommender / search+chip toolbar
+  auth.js                          # WebAuthn ceremony driver (signup / signin / recovery / +add passkey)
+  youtube-watch.js                 # YouTube IFrame API watch-progress tracking
+
 scripts/
-  migrate.rb                       # one-shot migration runner (web boot also auto-migrates)
-  seed_feeds.rb                    # insert FeedCatalog::seed_defaults
-  scheduler.rb                     # long-running poller
-  refresh_feed.rb                  # poll one feed (id or URL)
-  refresh_feeds.rb                 # poll every feed once
-  generate_digest.rb               # compose + persist a digest (cron entry point; `make digest`)
-  prune_articles.rb                # delete articles older than RETENTION_DAYS (`make prune`); bookmarks always kept
-  backfill_audio.rb                # one-shot recovery: fill NULL audio_url for articles whose feed publishes enclosures
-  run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for a one-command dev session
-spec/                              # RSpec (test env: in-memory SQLite, no real HTTP)
+  migrate.rb / seed_feeds.rb / scheduler.rb
+  refresh_feed.rb / refresh_feeds.rb
+  generate_digest.rb / prune_articles.rb / triage_run.rb
+  seed_sports.rb / sync_sports.rb / backfill_podcast_images.rb
+  backfill_audio.rb
+  run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for one-command dev
+
+spec/                              # RSpec (test env: in-memory SQLite, no real HTTP, auth wall OFF by default)
 data/                              # SQLite DB + raw-feed cache (git-ignored)
 .github/workflows/ci.yml           # RSpec + scripts syntax check on push to main + every PR
 ```
