@@ -1294,6 +1294,49 @@ class TechFeedReader < Sinatra::Base
     erb :articles
   end
 
+  # Dedicated bookmarks surface. The /articles route already supports
+  # ?state=bookmarked, but URL-hacking it isn't discoverable — users
+  # save articles with no clear path back to them. /bookmarks pins
+  # the state filter, sets a bookmarks-specific page header + empty
+  # state, and gets its own top-level nav link. Renders the existing
+  # articles.erb view (with @bookmarks_page = true so the header /
+  # empty-state copy adjust); reuses the bulk-action toolbar, skim
+  # mode, pagination — every affordance /articles has.
+  BOOKMARKS_PER_PAGE = 50
+
+  get '/bookmarks' do
+    @page_title     = 'Bookmarks'
+    @bookmarks_page = true
+    @page           = [params['page'].to_i, 1].max
+    @per_page       = BOOKMARKS_PER_PAGE
+    offset          = (@page - 1) * @per_page
+
+    @state_filter = :bookmarked
+    @kind_filter  = :all
+    @view_filter  = params['view'].to_s == 'skim' ? :skim : :default
+    @sort_filter  = :chronological
+    @topic_filter = nil
+    @feed_filter  = nil
+    @tag_filter   = nil
+
+    @articles = ArticlesStore.recent(
+      current_user_id,
+      limit: @per_page, offset: offset,
+      state: :bookmarked
+    )
+
+    @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    @tags_by_article = TagsStore.tags_for_articles(current_user_id, @articles.map { |a| a['id'] })
+    @summaries_by_article_id = if @view_filter == :skim
+                                 SummaryStore.find_for_ids(@articles.map { |a| a['id'] })
+                               else
+                                 {}
+                               end
+    @articles_total       = ArticlesStore.count_for_user(current_user_id)
+    @most_active_24h_feed = nil  # context strip is hidden on bookmarks
+    erb :articles
+  end
+
   # Browse view across every subscribed podcast feed. Top of the page
   # surfaces each show with its episode count + latest-episode age,
   # so the user can spot the freshest show at a glance. Below, the

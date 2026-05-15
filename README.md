@@ -22,6 +22,7 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | Home | `/` | Marketing pitch for first-time visitors; **What's On Today** (sports / read / listen / watch) for returning users. Continue-progress tile when any podcast or YouTube video has a saved position |
 | About | `/about` | Philosophy, anti-swivel-chair argument, how-it-works, tech stack |
 | Articles | `/articles` | Unified reading list (📄 articles + 🎧 podcasts + 📺 videos). Day-group dividers, left-anchored thumbnails, source-cluster ribbons, 📖 reading-time pill, For You sort, topic chips, skim mode |
+| Bookmarks | `/bookmarks` | Every article you've saved with the ☆ button, newest first; reuses /articles list affordances |
 | Article | `/article/:uid` | Single article + cached summary + Read-next. Podcasts get a "Play episode" affordance; YouTube articles embed the player with watch-progress + resume |
 | Topics | `/topics` | Trending term clusters with sample articles; 7/14/30-day window selector |
 | Topic detail | `/topics/:term` | Synthesized "highlights" + every article in the cluster, summaries inline |

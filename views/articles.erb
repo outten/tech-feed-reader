@@ -1,12 +1,19 @@
 <div class="page-header">
   <div>
     <h2>
-      Articles
+      <%= @bookmarks_page ? '★ Bookmarks' : 'Articles' %>
       <% if @feed_filter %> &mdash; <%= h(@feed_filter['title'] || @feed_filter['url']) %><% end %>
       <% if @tag_filter %> &mdash; <span class="tag-chip"><%= h(@tag_filter['name']) %></span><% end %>
       <% if @kind_filter == :podcast %> &mdash; <span class="badge podcast-badge">PODCAST</span><% end %>
     </h2>
-    <% if @feed_filter || @tag_filter %>
+    <% if @bookmarks_page %>
+      <p class="subtitle">
+        Every article you've saved with the ☆ button.
+        <% if @articles.any? %>
+          <strong><%= @articles.length %></strong> on this page<% if @page > 1 %> (page <%= @page %>)<% end %>.
+        <% end %>
+      </p>
+    <% elsif @feed_filter || @tag_filter %>
       <p class="subtitle">Filtered. <a href="/articles">Clear filter</a>.</p>
     <% else %>
       <p class="subtitle state-filter">
@@ -93,7 +100,9 @@
 
 <% if @articles.empty? %>
   <div class="empty-state">
-    <% if @feed_filter || @tag_filter %>
+    <% if @bookmarks_page %>
+      No bookmarks yet. Click the <strong>☆ Bookmark</strong> button on any article (or pick "Bookmark" from the bulk-action toolbar on <a href="/articles">/articles</a>) to save it for later.
+    <% elsif @feed_filter || @tag_filter %>
       No articles match this filter.
     <% else %>
       No articles yet. Add a feed at <a href="/feeds">/feeds</a> and click

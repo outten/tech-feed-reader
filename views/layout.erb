@@ -53,6 +53,7 @@
           /whats-on link is redundant. Title-click reaches both for
           returning users. /dashboard is one click further into Admin. %>
       <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
+      <a href="/bookmarks" class="<%= request.path_info == '/bookmarks' ? 'active' : '' %>" title="Articles you've saved">★ Bookmarks</a>
       <a href="/podcasts"  class="<%= request.path_info == '/podcasts' ? 'active' : '' %>">Podcasts</a>
       <a href="/youtube"   class="<%= (request.path_info == '/youtube' || request.path_info.start_with?('/youtube/')) ? 'active' : '' %>">YouTube</a>
       <a href="/sports"    class="<%= request.path_info == '/sports'   ? 'active' : '' %>">Sports</a>
