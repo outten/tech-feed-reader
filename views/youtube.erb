@@ -14,6 +14,70 @@
   </div>
 </div>
 
+<%# STUFF #30 — bulk-add textarea. Paste channel handles or URLs,
+    one per line; the resolver in Providers::YouTubeChannelResolver
+    handles @handles (scrape) and /channel/UC… URLs (direct feed
+    XML). Synchronous POST; capped at YOUTUBE_BULK_ADD_MAX lines. %>
+<section class="benchmark-section youtube-bulk-add">
+  <h3>+ Add channels</h3>
+  <p class="subtitle">
+    Paste channel handles or URLs, one per line. Supported shapes:
+    <code>@PBSNewsHour</code>,
+    <code>https://www.youtube.com/@CNN</code>,
+    <code>https://www.youtube.com/channel/UC…</code>.
+    Up to <%= TechFeedReader::YOUTUBE_BULK_ADD_MAX %> at a time.
+  </p>
+  <form method="post" action="/youtube/subscribe-bulk" data-turbo="false" class="portfolio-form youtube-bulk-form">
+    <label class="full-width">
+      Channels
+      <textarea name="channels" rows="5" required
+                placeholder="@PBSNewsHour
+@CNN
+https://www.youtube.com/@bbcnews"><%= h(params['channels']) if params['channels'] %></textarea>
+    </label>
+    <button type="submit" class="btn-primary" title="Resolve each line and subscribe">Add channels</button>
+  </form>
+
+  <% if @bulk_error %>
+    <div class="error" style="margin-top:1rem"><%= h(@bulk_error) %></div>
+  <% end %>
+
+  <% if @bulk_results %>
+    <div class="youtube-bulk-results" style="margin-top:1rem">
+      <h4 style="margin:0 0 0.5rem 0">Results <span class="muted" style="font-weight:normal; font-size:0.85rem">(<%= @bulk_results.length %> of <%= @bulk_total %><%= ', remainder ignored — re-submit in a new wave' if @bulk_truncated %>)</span></h4>
+      <ul class="youtube-bulk-result-list">
+        <% @bulk_results.each do |r| %>
+          <li class="youtube-bulk-result youtube-bulk-result--<%= r[:status] %>">
+            <% case r[:status]
+               when :subscribed_pending_fetch %>
+              <span class="bulk-result-icon">✓</span>
+              Subscribed: <strong><%= h(r[:title]) %></strong>
+              <span class="muted">(<%= h(r[:input] || '') %>)</span>
+              <div class="bulk-result-hint">Give the system ~30s to fetch the channel's recent videos, then refresh this page.</div>
+            <% when :subscribed %>
+              <span class="bulk-result-icon">✓</span>
+              Subscribed: <strong><%= h(r[:title]) %></strong>
+              <span class="muted">(<%= h(r[:input]) %>)</span>
+            <% when :already %>
+              <span class="bulk-result-icon">ℹ</span>
+              Already subscribed: <strong><%= h(r[:title]) %></strong>
+              <span class="muted">(<%= h(r[:input]) %>)</span>
+            <% when :not_found %>
+              <span class="bulk-result-icon">✗</span>
+              Not found: <code><%= h(r[:input]) %></code>
+              <span class="muted"><%= h(r[:message]) %></span>
+            <% else %>
+              <span class="bulk-result-icon">⚠</span>
+              Error: <code><%= h(r[:input]) %></code>
+              <span class="muted"><%= h(r[:message]) %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</section>
+
 <% if @channels.empty? %>
   <div class="empty-state">
     <p>

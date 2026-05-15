@@ -2461,6 +2461,52 @@ html.dark .podcast-show-title { color: #f5f5f7; }
 .youtube-channel-link:hover { text-decoration: underline; }
 html.dark .youtube-channel-link { color: #4dabff; }
 
+/* STUFF #30 — bulk-add channels form + per-line result panel on
+   /youtube. Reuses .benchmark-section + .portfolio-form for the base
+   shape; this block styles the result list with status-color borders
+   so subscribed/already/error rows are visually distinct at a glance. */
+.youtube-bulk-add textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  resize: vertical;
+}
+html.dark .youtube-bulk-add textarea { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+
+.youtube-bulk-result-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.youtube-bulk-result {
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid #d2d2d7;
+  background: #f7f7f7;
+  border-radius: 4px;
+  font-size: 0.92rem;
+}
+.youtube-bulk-result--subscribed                { border-left-color: #34c759; background: #effaf1; }
+.youtube-bulk-result--subscribed_pending_fetch  { border-left-color: #34c759; background: #effaf1; }
+.youtube-bulk-result--already                   { border-left-color: #007aff; background: #eaf3fc; }
+.youtube-bulk-result--not_found                 { border-left-color: #ff9500; background: #fff5e6; }
+.youtube-bulk-result--error                     { border-left-color: #ff3b30; background: #fdeceb; }
+.bulk-result-icon { font-weight: 700; margin-right: 0.35rem; }
+.bulk-result-hint { font-size: 0.82rem; color: #3a3a3c; margin-top: 0.25rem; font-style: italic; }
+html.dark .youtube-bulk-result                              { background: #1c1c1e; border-left-color: #3a3a3c; }
+html.dark .youtube-bulk-result--subscribed                  { background: #14321a; border-left-color: #34c759; }
+html.dark .youtube-bulk-result--subscribed_pending_fetch    { background: #14321a; border-left-color: #34c759; }
+html.dark .youtube-bulk-result--already                     { background: #122a40; border-left-color: #4dabff; }
+html.dark .youtube-bulk-result--not_found                   { background: #3a2a10; border-left-color: #ff9f0a; }
+html.dark .youtube-bulk-result--error                       { background: #3a1816; border-left-color: #ff453a; }
+html.dark .bulk-result-hint                                 { color: #c7c7cc; }
+
 /* /youtube/:feed_id — the recent-videos grid. Card style is the same
    visual idiom as the podcast show cards but bigger so the thumbnail
    has room to breathe (videos are 16:9). */

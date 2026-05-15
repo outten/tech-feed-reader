@@ -36,6 +36,7 @@ require_relative 'feed_recommender/claude'
 require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'providers/itunes_lookup'
+require_relative 'providers/youtube_channel_resolver'
 require_relative 'auth'
 
 # Phase A1 (consumer auth) — load .env in dev/test for SESSION_SECRET
@@ -1200,6 +1201,70 @@ class TechFeedReader < Sinatra::Base
   get '/youtube' do
     @page_title  = 'YouTube'
     @channels    = ArticlesStore.youtube_channels(current_user_id)
+    erb :youtube
+  end
+
+  # STUFF #30 — bulk-subscribe to YouTube channels via @handles / URLs.
+  # Accepts a newline-separated list in `channels` form param; resolves
+  # each line via Providers::YouTubeChannelResolver (channel-page scrape
+  # for @handles, direct feed-XML fetch for /channel/UC… URLs); routes
+  # the resolved canonical feed URL through the existing
+  # FeedsStore.add_for_user flow; re-renders /youtube with a per-line
+  # result panel so the user sees which lines succeeded vs failed.
+  YOUTUBE_BULK_ADD_MAX = 25  # synchronous request — keep bounded
+  post '/youtube/subscribe-bulk' do
+    @page_title = 'YouTube'
+    raw_lines   = (params['channels'] || '').split(/\r?\n/).map(&:strip).reject(&:empty?)
+    if raw_lines.empty?
+      @bulk_error = 'Paste at least one channel handle or URL.'
+      @channels   = ArticlesStore.youtube_channels(current_user_id)
+      return erb :youtube
+    end
+
+    truncated = raw_lines.length > YOUTUBE_BULK_ADD_MAX
+    lines     = raw_lines.first(YOUTUBE_BULK_ADD_MAX)
+
+    @bulk_results = lines.map do |line|
+      result = Providers::YouTubeChannelResolver.resolve(line)
+      case result.status
+      when :ok
+        feed, inserted = FeedsStore.add_for_user(
+          user_id: current_user_id,
+          url:     result.feed_url,
+          title:   result.title,
+          fetch_interval_seconds: FeedsStore::PUBLISHER_INTERVAL,
+          topic:   'general'
+        )
+        # Brand-new feeds (never fetched yet — articles table is empty
+        # for this feed_id) get a background refresh kicked off so the
+        # /youtube grid is populated within ~30s instead of waiting for
+        # the next scheduler tick. If another user was already subscribed
+        # to this feed, content is already imported and no refresh is
+        # needed.
+        needs_fetch = inserted && feed['last_fetched_at'].nil?
+        FeedRefreshWorker.perform_async(feed['id']) if needs_fetch
+
+        AppLogger.info('youtube_bulk_add', input: line, channel_id: result.channel_id,
+                                            title: result.title, inserted: inserted,
+                                            queued_fetch: needs_fetch)
+        status = if !inserted
+                   :already
+                 elsif needs_fetch
+                   :subscribed_pending_fetch
+                 else
+                   :subscribed
+                 end
+        { input: line, status: status, title: result.title }
+      when :not_found
+        { input: line, status: :not_found, message: result.error }
+      else
+        { input: line, status: :error, message: result.error }
+      end
+    end
+
+    @bulk_truncated = truncated
+    @bulk_total     = raw_lines.length
+    @channels       = ArticlesStore.youtube_channels(current_user_id)
     erb :youtube
   end
 

@@ -340,7 +340,26 @@ Are you storing the keywords in the database, a text file, code, etc.? They prob
 
 What is left in A1 to do before moving to A2?
 
-## [ ] 30: Add to YouTube List
+## [x] 30: Add to YouTube List
 
-Can you add the ability on the /youtube page to give a list of channels to add to a user's YouTube channel list?
+Can you add the ability on the /youtube page to give a list of channels to add to a user's YouTube channel list? Example: `@PBSNewsHour`. Allow the user to specify multiple channels in one request.
+
+**Shipped.** New `+ Add channels` section on `/youtube` with a textarea — paste up to 25 lines, one channel per line, hit the button. Submit goes to `POST /youtube/subscribe-bulk`, which resolves each line via the new [`Providers::YouTubeChannelResolver`](app/providers/youtube_channel_resolver.rb) and routes each successful resolution through the existing `FeedsStore.add_for_user` flow. Per-line results render inline (✓ subscribed / ✓ subscribed-pending-fetch / ℹ already subscribed / ✗ not found / ⚠ error) with status-color borders.
+
+**Background fetch on new feeds.** Brand-new feeds (never fetched before — `feeds.last_fetched_at IS NULL`) get a `FeedRefreshWorker.perform_async(feed_id)` enqueued so the channel grid populates within ~30s instead of waiting for the next scheduler tick. The result row shows an italicized hint: *"Give the system ~30s to fetch the channel's recent videos, then refresh this page."* Feeds another user already subscribed to (so content is already imported) skip the refresh — they go straight to the plain ✓ Subscribed message.
+
+**Resolver accepts every shape a user might paste:**
+
+- `@PBSNewsHour` / `PBSNewsHour` — bare @handle or handle alone
+- `https://www.youtube.com/@PBSNewsHour` — handle URL
+- `https://www.youtube.com/c/PBSNewsHour` / `/user/…` — legacy custom URLs
+- `https://www.youtube.com/channel/UC…` — direct channel URL
+- `https://www.youtube.com/feeds/videos.xml?channel_id=UC…` — already-canonical feed URL
+- `UC…` — bare channel id
+
+**How it resolves:** direct-UC paths go straight to the feed XML (one HTTP, validates + grabs title); handle/legacy paths scrape the channel page HTML for the embedded `"channelId":"UC…"` token (stable for years, used by every third-party YouTube-to-RSS tool) with a fallback to `<link rel="canonical">`. Title comes from `og:title` (or the Atom feed `<title>`); HTML entities decoded. No API key required.
+
+**Why synchronous + 25-line cap**: at ~1–2s per resolve, 25 channels is ~30–50s worst case — fine for an occasional bulk-add. If larger batches become common we have Sidekiq for the async path.
+
+**Specs**: 15 resolver examples (every input shape, network-failure, HTML-without-channelId, entity decoding) in [spec/providers/youtube_channel_resolver_spec.rb](spec/providers/youtube_channel_resolver_spec.rb); 5 route examples (subscribe-with-pending-fetch / subscribe-skipping-fetch-when-content-exists / cap-truncation / empty-input / error-path) appended to [spec/youtube_routes_spec.rb](spec/youtube_routes_spec.rb). **Suite: 1151/0** (was 1129; 22 new examples).
 
