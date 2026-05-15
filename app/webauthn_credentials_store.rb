@@ -59,4 +59,16 @@ module WebauthnCredentialsStore
       [user_id.to_i]
     ).first['c']
   end
+
+  # STUFF #29 follow-up — revoke a single passkey from the signed-in
+  # user's account. Scoped to (user_id, credential_id) so an attacker
+  # who guesses someone else's credential_id can't delete it. Returns
+  # true if a row was deleted, false otherwise.
+  def delete_for_user!(user_id, credential_id)
+    db.execute(
+      'DELETE FROM webauthn_credentials WHERE user_id = ? AND credential_id = ?',
+      [user_id.to_i, credential_id.to_s]
+    )
+    db.changes.positive?
+  end
 end

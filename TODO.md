@@ -331,7 +331,9 @@ Following a player or team only pinned them to their topical landing page; nothi
 
 ## Multi-user — Phase A1: Auth wall (passkey-only, consumer-facing)
 
-**Status: `proposed`** — awaiting user go-ahead on the locked decisions below; no Azure / Entra dependency anymore
+**Status: ✅ shipped** — `a9e5032` (#88). Passkey-only sign-up + sign-in, recovery codes, auth wall middleware. Original Entra ID plan replaced by consumer passkey direction (STUFF #22).
+
+> **Historical note (kept for design rationale).** The detailed planning below documents the state-of-the-plan at the time A1 was implemented. Several "deferred" items have since shipped (notably multi-passkey UI, account deletion, recovery-code regeneration — all in the account-management follow-up). See "Multi-user — open follow-ups" below for the current punch list.
 
 **Pivot 2026-05-13:** the original A1 plan targeted an enterprise rollout against Microsoft Entra ID for a single company tenant. STUFF.md #22 changed the direction — this is a **consumer-facing app now**, anyone on the internet can sign up. Auth provider, recovery story, and cost profile all change. Phase A2 (per-user data split) is unaffected — that work is provider-agnostic.
 
@@ -430,17 +432,28 @@ WEBAUTHN_ORIGIN=http://localhost:4567   # in prod: https://tfr.example.com
 
 ## Multi-user — Phase A2: per-user data split
 
-**Status: `not started`** — depends on Phase A1 shipping first
+**Status: ✅ shipped** — `7b1533a` (#89, A2.0) + `7b7bcca` (#90, A2.1 + A2.2).
 
-Per-user data split, ordered by user impact. Each is its own PR.
+Per-user data split via migration `022_a2_per_user_data.sql` (composite PKs or `(user_id, …)` unique constraints + `ON DELETE CASCADE` FKs). Every store method now takes `user_id` explicitly; 109 `current_user_id` call-sites in [app/main.rb](app/main.rb). Tables covered:
 
-1. **`read_state` + `feedback`** → `user_id` column, scope every read in `ReadStateStore` / `FeedbackStore`. Backfill existing rows to `user_id = 1`.
-2. **`bookmarks`, `tags`, `mute_rules`** → same pattern.
-3. **`sports_follows`, `chat_history`, `triages`** → same.
-4. **For You corpus + Triage** → already filters by feedback signals; once #1 lands, these inherit per-user automatically.
-5. **`feeds`** → trickier. Either: (a) shared catalog + new `user_feed_subscriptions` table, or (b) duplicate per user. (a) is the right answer but a bigger refactor.
+1. ✅ `read_state` + `feed_feedback` — composite PK `(user_id, …)`.
+2. ✅ `mute_rules`, `tags` — composite PK / unique-per-user.
+3. ✅ `sports_follows`, `triages`, `digests` — `user_id` columns.
+4. ✅ `feeds` — option (a) chosen: shared catalog stays; new `user_feed_subscriptions` bridge table.
 
-None of these should land before Phase A1 is in.
+Cross-user isolation regression suite in [spec/cross_user_isolation_spec.rb](spec/cross_user_isolation_spec.rb).
+
+---
+
+## Multi-user — open follow-ups
+
+Phase A1 + A2 deferrals + production gating. Not blockers for the auth/data split themselves; ordered by user-visible value.
+
+1. ✅ **Account management page** — `/account` with profile + passkey list / add / revoke + recovery-codes regenerate + account deletion (STUFF #29 follow-up; landed alongside this TODO refresh).
+2. **Production `WEBAUTHN_RP_ID`** — still `localhost` in dev. Tied to picking a deploy target (overlaps with STUFF #11's SQLite-on-EBS-with-Litestream sketch).
+3. **Admin user list** — small admin-namespace page showing signed-up accounts with last-seen-at, useful when signups open up.
+4. **Per-user data export** — GDPR-style "download my data" endpoint. Only matters at scale.
+5. **Open-signups rate limit** — per-day signup-rate cap or invite codes; only needed if abuse appears.
 
 ---
 

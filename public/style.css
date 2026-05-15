@@ -199,8 +199,11 @@ html.dark .whats-on-bus-chip:hover { background: #4a3a14; }
   font-size: 0.85rem;
   color: #1d1d1f;
   margin-right: 0.3rem;
+  text-decoration: none;
 }
+.auth-chip:hover { background: #e5e5ea; }
 html.dark .auth-chip { background: #2c2c2e; color: #f5f5f7; }
+html.dark .auth-chip:hover { background: #3a3a3c; }
 .auth-signout-form { display: inline; margin-right: 0.3rem; }
 .auth-header-link {
   font-size: 0.9rem;
@@ -4018,3 +4021,60 @@ html.dark .about-section p, html.dark .about-section ul, html.dark .about-sectio
   }
   .home-feature-with-image:nth-child(odd) .home-feature-image { order: 0; }
 }
+
+/* STUFF #29 follow-up — /account page. Section blocks reuse the
+   existing .benchmark-section shell; this block styles the bits that
+   are new: the passkey table, the regenerated-codes card, and the
+   typed-confirmation account-delete pattern. */
+.account-section { margin-bottom: 1.5rem; }
+.account-display-name-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 480px; }
+.account-display-name-form label { display: flex; flex-direction: column; gap: 0.3rem; }
+.account-display-name-form input { padding: 0.5rem; border: 1px solid #d2d2d7; border-radius: 6px; max-width: 360px; }
+html.dark .account-display-name-form input { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+.account-display-name-form .btn-primary { align-self: flex-start; }
+
+.account-passkey-table { margin-top: 0.5rem; }
+.account-passkey-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  display: inline-block;
+  margin-right: 0.4rem;
+}
+.account-passkey-revoke-form { margin: 0; }
+.account-add-passkey { margin-top: 1rem; }
+
+.account-recovery-codes-card {
+  background: #fff8e1;
+  border: 1px solid #f0ce80;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+.account-recovery-codes {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  padding: 0.75rem;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+  white-space: pre;
+  user-select: all;
+}
+html.dark .account-recovery-codes-card { background: #3a2f10; border-color: #6b5a25; }
+html.dark .account-recovery-codes { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+
+.account-delete-section { border-left: 3px solid #ff3b30; padding-left: 1rem; }
+.account-delete-details { margin-top: 0.5rem; }
+.account-delete-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #ff3b30;
+  padding: 0.4rem 0;
+  user-select: none;
+}
+.account-delete-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 480px; margin-top: 1rem; }
+.account-delete-form label { display: flex; flex-direction: column; gap: 0.3rem; }
+.account-delete-form input { padding: 0.5rem; border: 1px solid #d2d2d7; border-radius: 6px; max-width: 360px; }
+html.dark .account-delete-form input { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
+.account-delete-btn { align-self: flex-start; }

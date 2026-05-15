@@ -56,4 +56,31 @@ module UsersStore
     db.execute('UPDATE users SET last_seen_at = datetime(?) WHERE id = ?',
                [Time.now.utc.strftime('%Y-%m-%d %H:%M:%S'), id.to_i])
   end
+
+  # STUFF #29 follow-up — let a signed-in user edit their display name.
+  # Display name is free-form (any unicode); we strip + cap length. An
+  # empty string falls back to the username so the header chip never
+  # renders blank.
+  MAX_DISPLAY_NAME = 80
+
+  def update_display_name!(id, display_name)
+    user = find(id)
+    return nil unless user
+    clean = display_name.to_s.strip
+    clean = clean[0, MAX_DISPLAY_NAME]
+    clean = user['username'] if clean.empty?
+    db.execute('UPDATE users SET display_name = ? WHERE id = ?', [clean, id.to_i])
+    find(id)
+  end
+
+  # STUFF #29 follow-up — account deletion. Per-user tables defined in
+  # migration 022 (read_state, feed_feedback, mute_rules, tags,
+  # sports_follows, triages, digests, user_feed_subscriptions) all
+  # carry `ON DELETE CASCADE` references back to users, so a single
+  # DELETE here wipes every trace of the user. The shared `feeds`
+  # catalog rows stay (other subscribers may still rely on them).
+  def delete!(id)
+    db.execute('DELETE FROM users WHERE id = ?', [id.to_i])
+    db.changes.positive?
+  end
 end

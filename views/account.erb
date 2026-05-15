@@ -1,0 +1,160 @@
+<div class="page-header">
+  <div>
+    <h2>Account</h2>
+    <p class="subtitle">
+      Signed in as <strong><%= h(@account_user['username']) %></strong>.
+      Manage your profile, passkeys, recovery codes, and delete the account.
+    </p>
+  </div>
+</div>
+
+<%# Notice + error flashes — covers all five status messages this
+    page emits via redirect-back. %>
+<% case @account_notice
+   when 'display-name-updated' %>
+  <div class="notice">Display name updated.</div>
+<% when 'passkey-revoked' %>
+  <div class="notice">Passkey revoked.</div>
+<% when 'passkey-added' %>
+  <div class="notice">Passkey added to this account.</div>
+<% when 'recovery-codes-regenerated' %>
+  <div class="notice">
+    New recovery codes generated. <strong>Save them now</strong> — the previous batch is invalid and we can't show this list again.
+  </div>
+<% end %>
+
+<% case @account_error
+   when 'last-passkey-no-recovery' %>
+  <div class="error">
+    Can't revoke your last passkey while you have zero unused recovery codes — you'd lock yourself out.
+    Add another passkey or regenerate recovery codes first.
+  </div>
+<% when 'passkey-not-found' %>
+  <div class="error">That passkey wasn't found on your account.</div>
+<% when 'delete-confirm-mismatch' %>
+  <div class="error">Type your username exactly to confirm account deletion.</div>
+<% end %>
+
+<%# Section 1 — Profile. %>
+<section class="benchmark-section account-section">
+  <h3>Profile</h3>
+  <form method="post" action="/account/display-name" class="portfolio-form account-display-name-form">
+    <label>
+      Display name
+      <input type="text" name="display_name" value="<%= h(@account_user['display_name']) %>"
+             maxlength="80" placeholder="<%= h(@account_user['username']) %>">
+    </label>
+    <button type="submit" class="btn-primary">Save</button>
+  </form>
+  <p class="subtitle" style="margin-top:0.5rem">
+    Shown in the header chip and around the app. Username (<code><%= h(@account_user['username']) %></code>) is permanent.
+  </p>
+</section>
+
+<%# Section 2 — Passkeys. %>
+<section class="benchmark-section account-section" id="account-passkeys">
+  <h3>Passkeys <span class="muted" style="font-weight:normal; font-size:0.85rem">(<%= @account_passkeys.length %>)</span></h3>
+  <p class="subtitle">
+    Each device that can sign you in. Register your phone AND your laptop so losing one doesn't lock you out.
+  </p>
+
+  <% if @account_passkeys.any? %>
+    <table class="data-table account-passkey-table">
+      <thead>
+        <tr>
+          <th>Credential</th>
+          <th>Registered</th>
+          <th>Last used</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @account_passkeys.each do |pk| %>
+          <tr>
+            <td>
+              <span class="account-passkey-id"><%= h(pk['credential_id'][0, 16]) %>…</span>
+              <% if pk['transports'].to_s.length.positive? %>
+                <span class="muted" style="font-size:0.78rem"><%= h(pk['transports']) %></span>
+              <% end %>
+            </td>
+            <td><%= relative_time(pk['created_at']) %></td>
+            <td><%= pk['last_used_at'] ? relative_time(pk['last_used_at']) : '—' %></td>
+            <td>
+              <form method="post" action="/account/passkey/<%= h(pk['credential_id']) %>/delete"
+                    class="account-passkey-revoke-form"
+                    onsubmit="return confirm('Revoke this passkey? It cannot be undone.');">
+                <button type="submit" class="danger" title="Revoke this passkey">Revoke</button>
+              </form>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+
+  <div class="account-add-passkey">
+    <button type="button" id="account-add-passkey-btn" class="btn-primary"
+            title="Register this device as another passkey for your account">+ Add this device as a passkey</button>
+    <p id="account-add-passkey-error" class="error" hidden style="margin-top:0.6rem"></p>
+    <p class="subtitle" style="margin-top:0.5rem">
+      You'll be prompted for Touch ID / Face ID / your hardware key. Works on the device you're currently using.
+    </p>
+  </div>
+</section>
+
+<%# Section 3 — Recovery codes. %>
+<section class="benchmark-section account-section">
+  <h3>Recovery codes</h3>
+  <p class="subtitle">
+    Single-use fallback when you've lost all your passkeys. You have
+    <strong><%= @account_recovery_remain %></strong> unused
+    code<%= 's' unless @account_recovery_remain == 1 %> left.
+    <% if @account_recovery_remain < 3 %>
+      <span style="color:#ff3b30">Regenerate soon — you're nearly out.</span>
+    <% end %>
+  </p>
+
+  <% if @account_new_codes %>
+    <div class="account-recovery-codes-card">
+      <p><strong>Save these now — we can't show them again.</strong></p>
+      <pre class="account-recovery-codes"><%= h(@account_new_codes.join("\n")) %></pre>
+      <p class="subtitle">
+        Each code is single-use. Lose all of these AND your passkeys and you are locked out.
+      </p>
+    </div>
+  <% end %>
+
+  <form method="post" action="/account/recovery-codes/regenerate"
+        onsubmit="return confirm('Regenerate recovery codes? The current set (used or not) will be invalidated.');">
+    <button type="submit" class="btn-primary">Regenerate recovery codes</button>
+  </form>
+</section>
+
+<%# Section 4 — Delete account. Two-step: button reveals a typed-
+    confirmation card; user must type their username exactly to enable
+    the final destructive button. %>
+<section class="benchmark-section account-section account-delete-section">
+  <h3 style="color:#ff3b30">Delete account</h3>
+  <p class="subtitle">
+    Permanently deletes your account, every bookmark, every read state, every subscription,
+    every tag, every mute rule, every recovery code, every passkey. The shared feed catalog stays.
+    Cannot be undone.
+  </p>
+
+  <details class="account-delete-details">
+    <summary class="account-delete-summary">I want to delete my account</summary>
+    <form method="post" action="/account/delete" class="account-delete-form">
+      <label>
+        Type your username (<code><%= h(@account_user['username']) %></code>) to confirm:
+        <input type="text" name="confirm_username" required autocomplete="off"
+               placeholder="<%= h(@account_user['username']) %>">
+      </label>
+      <button type="submit" class="danger account-delete-btn"
+              onclick="return confirm('Last chance — really delete this account?');">
+        Permanently delete my account
+      </button>
+    </form>
+  </details>
+</section>
+
+<script src="/auth.js?v=<%= asset_mtime('public/auth.js') %>"></script>

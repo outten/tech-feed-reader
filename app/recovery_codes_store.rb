@@ -84,4 +84,15 @@ module RecoveryCodesStore
       [user_id.to_i]
     ).first['c']
   end
+
+  # STUFF #29 follow-up — wipe every existing code (consumed or not)
+  # and mint a fresh batch. Returns the new plaintexts so the caller
+  # can render them once on the account page. Atomic so a partial
+  # failure can't leave the user with zero codes AND no fresh batch.
+  def regenerate_for!(user_id)
+    db.transaction do
+      db.execute('DELETE FROM recovery_codes WHERE user_id = ?', [user_id.to_i])
+    end
+    mint_for!(user_id: user_id)
+  end
 end
