@@ -113,6 +113,120 @@ RSpec.describe 'YouTube routes' do
       expect(last_response.body).to match(/href="\/youtube"\s+class="active"/)
     end
   end
+
+  # STUFF #30 — bulk-add channels textarea + resolver. The resolver is
+  # stubbed at the module level so the route specs don't depend on
+  # YouTube being reachable + on a stable HTML shape.
+  describe 'GET /youtube — bulk-add form' do
+    it 'renders the "+ Add channels" form on the page' do
+      get '/youtube'
+      expect(last_response.body).to include('+ Add channels')
+      expect(last_response.body).to include('name="channels"')
+      expect(last_response.body).to include('action="/youtube/subscribe-bulk"')
+    end
+
+    it 'shows the supported-shape examples (@handle / handle URL / channel URL)' do
+      get '/youtube'
+      expect(last_response.body).to include('@PBSNewsHour')
+      expect(last_response.body).to include('youtube.com/channel/UC')
+    end
+  end
+
+  describe 'POST /youtube/subscribe-bulk' do
+    def stub_resolver(map)
+      allow(Providers::YouTubeChannelResolver).to receive(:resolve) do |input|
+        result = map[input.strip]
+        if result.is_a?(Hash)
+          Providers::YouTubeChannelResolver::Result.new(**result)
+        else
+          Providers::YouTubeChannelResolver::Result.new(status: :error, error: 'no stub for input')
+        end
+      end
+    end
+
+    it 'subscribes every line that resolves; reports already-subscribed for dupes; reports failures' do
+      stub_resolver(
+        '@PBSNewsHour' => {
+          status: :ok, channel_id: 'UCnp2WgGyc4VyB9HZeUjjeUw', title: 'PBS NewsHour',
+          feed_url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCnp2WgGyc4VyB9HZeUjjeUw'
+        },
+        '@CNN' => {
+          status: :ok, channel_id: 'UCupvZG-5ko_eiXAupbDfxWw', title: 'CNN',
+          feed_url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCupvZG-5ko_eiXAupbDfxWw'
+        },
+        '@nope' => { status: :not_found, error: 'channel page returned 404' }
+      )
+
+      # Pre-subscribe CNN so the second line reports "already subscribed".
+      FeedsStore.add(url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCupvZG-5ko_eiXAupbDfxWw', title: 'CNN')
+
+      # The brand-new PBS NewsHour subscription should enqueue a refresh.
+      expect(FeedRefreshWorker).to receive(:perform_async)
+        .with(an_instance_of(Integer)).once
+
+      post '/youtube/subscribe-bulk', channels: "@PBSNewsHour\n@CNN\n@nope"
+      expect(last_response.status).to eq(200)
+      body = last_response.body
+
+      # Brand-new feed → ✓ + pending-fetch hint
+      expect(body).to match(/Subscribed:\s*<strong>PBS NewsHour/)
+      expect(body).to include('Give the system ~30s')
+      # Already-existing-in-catalog feed (CNN added pre-test) → already subscribed
+      expect(body).to match(/Already subscribed:\s*<strong>CNN/)
+      expect(body).to match(/Not found:\s*<code>@nope/)
+
+      # PBS NewsHour should now be in the user's feeds.
+      expect(FeedsStore.find_by_url('https://www.youtube.com/feeds/videos.xml?channel_id=UCnp2WgGyc4VyB9HZeUjjeUw')).not_to be_nil
+    end
+
+    it 'does NOT enqueue a refresh when the underlying feed already has content' do
+      # Set up: a feed exists in the catalog AND has been fetched already
+      # (last_fetched_at set). Another user subscribes — we should add
+      # the subscription but skip the refresh-worker enqueue because
+      # content is already imported.
+      stub_resolver(
+        '@PBSNewsHour' => {
+          status: :ok, channel_id: 'UCnp2WgGyc4VyB9HZeUjjeUw', title: 'PBS NewsHour',
+          feed_url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCnp2WgGyc4VyB9HZeUjjeUw'
+        }
+      )
+      feed_url = 'https://www.youtube.com/feeds/videos.xml?channel_id=UCnp2WgGyc4VyB9HZeUjjeUw'
+      # Use subscriber_id: 2 so user 1 is NOT subscribed yet.
+      Database.connection.execute('INSERT OR IGNORE INTO users (id, username, display_name) VALUES (2, ?, ?)',
+                                  ['otheruser', 'Other'])
+      feed = FeedsStore.add(url: feed_url, title: 'PBS NewsHour', subscriber_id: 2)
+      FeedsStore.update(feed['id'], last_fetched_at: '2026-05-14T10:00:00Z')
+
+      expect(FeedRefreshWorker).not_to receive(:perform_async)
+
+      post '/youtube/subscribe-bulk', channels: '@PBSNewsHour'
+      body = last_response.body
+      expect(body).to match(/Subscribed:\s*<strong>PBS NewsHour/)
+      expect(body).not_to include('Give the system ~30s')
+    end
+
+    it 'reports an error when the textarea is empty' do
+      post '/youtube/subscribe-bulk', channels: ''
+      expect(last_response.body).to include('Paste at least one channel handle or URL.')
+    end
+
+    it 'caps processing at YOUTUBE_BULK_ADD_MAX lines and surfaces a truncation hint' do
+      cap   = TechFeedReader::YOUTUBE_BULK_ADD_MAX
+      lines = (1..(cap + 3)).map { |i| "@chan#{i}" }
+      stub_resolver(lines.to_h { |l| [l, { status: :not_found, error: 'stub' }] })
+
+      post '/youtube/subscribe-bulk', channels: lines.join("\n")
+      expect(last_response.body).to include("#{cap} of #{cap + 3}")
+      expect(last_response.body).to include('remainder ignored')
+    end
+
+    it 'gracefully handles a resolver :error path (e.g. network failure)' do
+      stub_resolver('@boom' => { status: :error, error: 'SocketError: DNS failure' })
+      post '/youtube/subscribe-bulk', channels: '@boom'
+      expect(last_response.body).to match(/Error:\s*<code>@boom/)
+      expect(last_response.body).to include('SocketError')
+    end
+  end
 end
 
 RSpec.describe ArticlesStore, '.youtube_channels' do
