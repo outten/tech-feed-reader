@@ -1917,6 +1917,7 @@ class TechFeedReader < Sinatra::Base
     # 6 strongest matches surface above the full browse list.
     @recommended = FeedCatalog.recommend_for(subscribed_urls: @subscribed, limit: 6)
     @ai_recommend_available = FeedRecommender::Claude.available?
+    @popular_by_type = FeedsStore::POPULAR_TYPES.to_h { |t| [t, FeedsStore.popular_by_type(t)] }
     erb :feeds
   end
 
@@ -1939,6 +1940,7 @@ class TechFeedReader < Sinatra::Base
     @recommended = FeedCatalog.recommend_for(subscribed_urls: @subscribed, limit: 6)
     @ai_recommend_available = FeedRecommender::Claude.available?
     @ai_recommend_result = FeedRecommender::Claude.recommend(current_user_id, prompt: @ai_prompt)
+    @popular_by_type = FeedsStore::POPULAR_TYPES.to_h { |t| [t, FeedsStore.popular_by_type(t)] }
     erb :feeds
   end
 

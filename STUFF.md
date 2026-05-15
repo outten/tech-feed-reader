@@ -274,9 +274,11 @@ All feeds should be free.
 
 **Shipped.** `/feeds` now has an "✨ Ask AI for feed ideas" section above the existing Recommended-for-you callout (visible when `ANTHROPIC_API_KEY` is set). Type a free-text prompt, the route calls `FeedRecommender::Claude.recommend` with your prompt + a JSON list of your current subscriptions + every catalog entry you're NOT subscribed to, and Claude picks up to 8 with a one-line rationale. URLs are validated against the catalog before render (no hallucinations); subscribing is one click via the existing `/feeds/catalog/add` flow. Catalog browse is the safety boundary: every recommendation is from a pre-vetted free feed. Search / categories / catalog-wide discovery beyond what the 79-entry catalog provides is **#27**'s scope.
 
-## [ ] 24: Most Popular
+## [x] 24: Most Popular
 
 As we are now multi user, can we add a Top Chars for each type of Feeds our user are accessing: News, Sports, Podcasts, Nature, YouTube, etc. The doal is Discovery and making it easy to users to "sumble" into new content. That is a key focus of this application.
+
+**Shipped.** New "🔥 Popular with other readers" section on `/feeds`, between the "Recommended for you" callout and the full catalog browse. Five mutually-exclusive type buckets — 📰 News, 🏟 Sports, 🎧 Podcasts, 📺 Nature, 🎬 YouTube — each rendered as a top-5 strip ranked by distinct subscriber count desc (tiebreak: feed id asc). Bucket assignment: `youtube` matches the canonical `youtube.com/feeds/videos.xml` URL pattern; `podcasts` is any feed with at least one article carrying `audio_url`; the remaining three are `topic = 'sports' / 'nature' / IN ('technology','general')` with podcasts + YouTube excluded so a feed never appears in two charts. Single-user world: every feed shows `1 subscriber` today; the chart goes live automatically once multi-user data starts accumulating. Subscribed feeds carry the existing `✓ Subscribed` badge; unsubscribed feeds show an `+ Add` button (routes via `/feeds/catalog/add` for curated feeds, `/api/feeds` for arbitrary URLs). New `FeedsStore.popular_by_type` + `views/_popular_feeds.erb`; 8 store specs + 5 view-route specs in [spec/feeds_store_spec.rb](spec/feeds_store_spec.rb) and [spec/feeds_popular_route_spec.rb](spec/feeds_popular_route_spec.rb).
 
 ## [x] 26. YouTube
 
@@ -287,7 +289,7 @@ Can you add YouTube as a top level item in the header? The page it loads should 
 
 **Shipped.** New top-level `YouTube` nav link between Podcasts and Sports. `/youtube` lists subscribed YouTube channels as a card grid (cover art + video count + latest age) with a small `↗ Channel` deep-link that opens the channel on YouTube in a new tab. `/youtube/:feed_id` shows the 10 most recent videos as 16:9 tiles using YouTube's `hqdefault` thumbnail + a center play overlay; clicking a tile lands on `/article/:uid`, which already embeds the YouTube player (shipped earlier in STUFF #19). New `ArticlesStore.youtube_channels(user_id)` paralleling `podcast_feeds`, matched on the canonical `youtube.com/feeds/videos.xml?channel_id=UC…` URL pattern.
 
-## [ ] 27. Feed Filtering
+## [x] 27. Feed Filtering
 
 The list of items on the feed list are getting very long. Can you make a suggestion on how to filter the list so that the user can easily find and discover a feed? Consider:
 
@@ -300,3 +302,16 @@ The list of items on the feed list are getting very long. Can you make a suggest
 - etc.
 
 Do an anlaysis. Thank you.
+
+**Shipped (Phase 27.1).** Each long list on `/feeds` now has a filter toolbar at the top: a `<input type="search">` that narrows by title / URL / blurb substring, plus topic chips (`All / Tech / Sports / Nature / General` for subscribed; `All / Tech / Sports / Nature` for catalog). Search + chip combine as AND. Pure client-side filter (`public/feeds-filter.js`) — no server round-trip. Catalog category headings auto-hide when every row beneath is filtered out; a small "showing N of M" counter appears when the result is narrower than the full list. Rows carry `data-topic` / `data-search` from the existing `feed.topic` column and `FeedCatalog::CATEGORY_TO_TOPIC`. Deferred to follow-up phases: a "hide already-subscribed" toggle on the catalog (27.2), sort options on the subscribed table (27.3), and cross-user "most popular" ranking (that's STUFF #24, separate).
+
+## [ ] 28. Topics
+
+On the /topics page, the topics are off. I see things like: com, https, can, said, comments, instagram. Can you analyze? Perhaps we need to:
+
+- use a "topic" field is it is in the feed description
+- use relevant keywords in the description
+  - prabably need to do weighted keywords
+- eliminate anything vague
+
+And we should run this on all existing and future contents.

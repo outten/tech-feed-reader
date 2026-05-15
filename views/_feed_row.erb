@@ -1,7 +1,11 @@
 <%# Single <tr> for the feeds table. Used both server-side from
     feeds.erb's loop and emitted as JSON `row_html` from /api/feeds
-    so JS-inserted rows match server-rendered ones byte-for-byte. %>
-<tr data-feed-id="<%= feed['id'] %>">
+    so JS-inserted rows match server-rendered ones byte-for-byte.
+    data-topic + data-search drive the STUFF #27 client-side
+    text + topic-chip filter (see public/feeds-filter.js). %>
+<tr data-feed-id="<%= feed['id'] %>"
+    data-topic="<%= h(feed['topic'] || 'general') %>"
+    data-search="<%= h([feed['title'], feed['url']].compact.join(' ').downcase) %>">
   <%# Title is also a link to the raw feed XML — saves the URL column
       while keeping the "open the raw feed" affordance one click away. %>
   <td>

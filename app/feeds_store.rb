@@ -150,11 +150,56 @@ module FeedsStore
     [feed, inserted]
   end
 
+  # ---- top charts (STUFF #24 — cross-user discovery) ------------------
+
+  # Mirrors ArticlesStore::YOUTUBE_FEED_URL_PATTERN — kept local so the
+  # store doesn't need to require articles_store just for this constant.
+  YOUTUBE_FEED_URL_PATTERN = '%youtube.com/feeds/videos.xml%'.freeze
+
+  POPULAR_TYPES = %w[news sports podcasts nature youtube].freeze
+  POPULAR_TYPE_LABELS = {
+    'news'     => '📰 News',
+    'sports'   => '🏟 Sports',
+    'podcasts' => '🎧 Podcasts',
+    'nature'   => '📺 Nature',
+    'youtube'  => '🎬 YouTube'
+  }.freeze
+
+  # Top feeds for one type, ranked by distinct subscriber count desc.
+  # Today every feed has count=1 (single user); the chart goes live as
+  # more users subscribe to overlapping feeds. Types are mutually
+  # exclusive (a YouTube nature channel is in `youtube`, not `nature`).
+  def popular_by_type(type, limit: 5)
+    case type.to_s
+    when 'youtube'  then popular_query("f.url LIKE ?",                              [YOUTUBE_FEED_URL_PATTERN], limit)
+    when 'podcasts' then popular_query("f.url NOT LIKE ? AND f.id IN (SELECT feed_id FROM articles WHERE audio_url IS NOT NULL)",
+                                      [YOUTUBE_FEED_URL_PATTERN], limit)
+    when 'sports'   then popular_query("f.url NOT LIKE ? AND f.id NOT IN (SELECT feed_id FROM articles WHERE audio_url IS NOT NULL) AND f.topic = 'sports'",
+                                      [YOUTUBE_FEED_URL_PATTERN], limit)
+    when 'nature'   then popular_query("f.url NOT LIKE ? AND f.id NOT IN (SELECT feed_id FROM articles WHERE audio_url IS NOT NULL) AND f.topic = 'nature'",
+                                      [YOUTUBE_FEED_URL_PATTERN], limit)
+    when 'news'     then popular_query("f.url NOT LIKE ? AND f.id NOT IN (SELECT feed_id FROM articles WHERE audio_url IS NOT NULL) AND f.topic IN ('technology', 'general')",
+                                      [YOUTUBE_FEED_URL_PATTERN], limit)
+    else []
+    end
+  end
+
   class << self
     private
 
     def db
       Database.connection
+    end
+
+    def popular_query(where_clause, where_args, limit)
+      db.execute(<<~SQL, where_args + [limit])
+        SELECT f.id, f.url, f.title, f.image_url, f.topic,
+               (SELECT COUNT(*) FROM user_feed_subscriptions WHERE feed_id = f.id) AS subscriber_count
+        FROM feeds f
+        WHERE #{where_clause}
+        ORDER BY subscriber_count DESC, f.id ASC
+        LIMIT ?
+      SQL
     end
   end
 end
