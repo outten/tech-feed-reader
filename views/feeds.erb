@@ -350,6 +350,11 @@
   </section>
 <% end %>
 
+<%# STUFF #24 — Most Popular feeds across all readers. Renders nothing
+    if every type is empty (e.g. brand-new instance with no feeds yet);
+    otherwise five strips of top-5 ranked by subscriber count. %>
+<%= erb :_popular_feeds, layout: false %>
+
 <section id="discover-catalog" class="benchmark-section" style="margin-top:2.5rem">
   <h3>Discover popular feeds</h3>
   <p class="subtitle">

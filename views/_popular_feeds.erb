@@ -1,0 +1,54 @@
+<%# STUFF #24 — Most Popular feeds across all users. One block per
+    type (news / sports / podcasts / nature / youtube). Each type that
+    has no feeds is omitted; if every type is empty the caller hides
+    the whole section. Subscriber counts are rendered as-is — today
+    every feed has count=1 (single user), the chart goes live once
+    multi-user data accumulates. %>
+<% any_rendered = FeedsStore::POPULAR_TYPES.any? { |t| (@popular_by_type[t] || []).any? } %>
+<% if any_rendered %>
+  <section class="benchmark-section feeds-popular" style="margin-top:2.5rem">
+    <h3>🔥 Popular with other readers</h3>
+    <p class="subtitle">
+      Top picks from across the reader. Subscribe to anything that catches your eye —
+      a quick way to stumble onto something new.
+    </p>
+
+    <% FeedsStore::POPULAR_TYPES.each do |type| %>
+      <% rows = @popular_by_type[type] || [] %>
+      <% next if rows.empty? %>
+      <h4 class="catalog-category"><%= FeedsStore::POPULAR_TYPE_LABELS[type] %></h4>
+      <ul class="catalog-list">
+        <% rows.each do |feed| %>
+          <% subscribed = @subscribed.include?(feed['url']) %>
+          <% count = feed['subscriber_count'].to_i %>
+          <li class="catalog-row <%= 'subscribed' if subscribed %>" data-catalog-url="<%= h(feed['url']) %>">
+            <div class="catalog-meta">
+              <span class="catalog-title"><%= h(feed['title'] || feed['url']) %></span>
+              <span class="catalog-blurb">
+                <%= count %> subscriber<%= 's' unless count == 1 %>
+              </span>
+              <span class="muted catalog-url"><%= h(feed['url']) %></span>
+            </div>
+            <% if subscribed %>
+              <span class="badge subscribed-badge" title="You already subscribe to this feed">✓ Subscribed</span>
+            <% elsif FeedCatalog.find_by_url(feed['url']) %>
+              <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
+                <input type="hidden" name="url" value="<%= h(feed['url']) %>">
+                <button type="submit" class="btn-primary" title="Subscribe to &lsquo;<%= h(feed['title'] || feed['url']) %>&rsquo;">+ Add</button>
+              </form>
+            <% else %>
+              <%# Not in the curated catalog (someone added it via the
+                  manual Add-a-feed form). Subscribe via /api/feeds, which
+                  accepts arbitrary URLs. %>
+              <form method="post" action="/api/feeds" class="js-ai-subscribe">
+                <input type="hidden" name="url" value="<%= h(feed['url']) %>">
+                <input type="hidden" name="title" value="<%= h(feed['title']) %>">
+                <button type="submit" class="btn-primary" title="Subscribe to &lsquo;<%= h(feed['title'] || feed['url']) %>&rsquo;">+ Add</button>
+              </form>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>

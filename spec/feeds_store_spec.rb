@@ -1,6 +1,7 @@
 require_relative 'spec_helper'
 require_relative '../app/database'
 require_relative '../app/feeds_store'
+require_relative '../app/users_store'
 
 RSpec.describe FeedsStore do
   before(:each) do
@@ -102,6 +103,104 @@ RSpec.describe FeedsStore do
 
     it 'returns false when no row matches' do
       expect(FeedsStore.remove(999)).to be(false)
+    end
+  end
+
+  describe '.popular_by_type (STUFF #24)' do
+    let(:db) { Database.connection }
+
+    # Seed: 3 users (1 = default), 2 = kate, 3 = jane.
+    # Catalog of feeds across the five buckets, with overlapping
+    # subscriptions so the rank order is non-trivial.
+    before do
+      kate = UsersStore.create(username: 'kate')
+      jane = UsersStore.create(username: 'jane')
+
+      # NEWS — technology + general
+      news_a = FeedsStore.add_to_catalog(url: 'https://news-a.example/rss', title: 'News A', topic: 'technology')
+      news_b = FeedsStore.add_to_catalog(url: 'https://news-b.example/rss', title: 'News B', topic: 'general')
+      news_c = FeedsStore.add_to_catalog(url: 'https://news-c.example/rss', title: 'News C', topic: 'technology')
+
+      # SPORTS
+      sport_a = FeedsStore.add_to_catalog(url: 'https://sport-a.example/rss', title: 'Sport A', topic: 'sports')
+      sport_b = FeedsStore.add_to_catalog(url: 'https://sport-b.example/rss', title: 'Sport B', topic: 'sports')
+
+      # NATURE
+      nature_a = FeedsStore.add_to_catalog(url: 'https://nature-a.example/rss', title: 'Nature A', topic: 'nature')
+
+      # YOUTUBE (channel-feed URL pattern)
+      yt_a = FeedsStore.add_to_catalog(url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCAAA', title: 'YT A', topic: 'nature')
+      yt_b = FeedsStore.add_to_catalog(url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCBBB', title: 'YT B', topic: 'sports')
+
+      # PODCAST — signalled by an article with audio_url set
+      pod_a = FeedsStore.add_to_catalog(url: 'https://pod-a.example/rss', title: 'Pod A', topic: 'technology')
+      pod_b = FeedsStore.add_to_catalog(url: 'https://pod-b.example/rss', title: 'Pod B', topic: 'general')
+      db.execute("INSERT INTO articles(uid, feed_id, title, url, audio_url) VALUES (?, ?, ?, ?, ?)",
+                 ['pod_a_ep1', pod_a['id'], 'Ep 1', 'https://pod-a.example/ep1', 'https://pod-a.example/ep1.mp3'])
+      db.execute("INSERT INTO articles(uid, feed_id, title, url, audio_url) VALUES (?, ?, ?, ?, ?)",
+                 ['pod_b_ep1', pod_b['id'], 'Ep 1', 'https://pod-b.example/ep1', 'https://pod-b.example/ep1.mp3'])
+
+      # Subscriptions: News A → 3, News B → 2, News C → 1.
+      #                Sport A → 2, Sport B → 1.
+      #                Nature A → 1.
+      #                YT A → 2, YT B → 1.
+      #                Pod A → 3, Pod B → 1.
+      sub = ->(uid, fid) { FeedsStore.subscribe(uid, fid) }
+      sub.call(1, news_a['id']); sub.call(kate['id'], news_a['id']); sub.call(jane['id'], news_a['id'])
+      sub.call(1, news_b['id']); sub.call(kate['id'], news_b['id'])
+      sub.call(1, news_c['id'])
+      sub.call(1, sport_a['id']); sub.call(kate['id'], sport_a['id'])
+      sub.call(1, sport_b['id'])
+      sub.call(1, nature_a['id'])
+      sub.call(1, yt_a['id']); sub.call(kate['id'], yt_a['id'])
+      sub.call(1, yt_b['id'])
+      sub.call(1, pod_a['id']); sub.call(kate['id'], pod_a['id']); sub.call(jane['id'], pod_a['id'])
+      sub.call(1, pod_b['id'])
+    end
+
+    it 'ranks news feeds by subscriber count desc' do
+      rows = FeedsStore.popular_by_type('news')
+      expect(rows.map { |r| r['title'] }).to eq(['News A', 'News B', 'News C'])
+      expect(rows.map { |r| r['subscriber_count'] }).to eq([3, 2, 1])
+    end
+
+    it 'excludes podcasts and youtube from the news bucket' do
+      titles = FeedsStore.popular_by_type('news').map { |r| r['title'] }
+      expect(titles).not_to include('Pod A', 'Pod B', 'YT A', 'YT B')
+    end
+
+    it 'ranks sports feeds and excludes the youtube sports channel' do
+      rows = FeedsStore.popular_by_type('sports')
+      expect(rows.map { |r| r['title'] }).to eq(['Sport A', 'Sport B'])
+      expect(rows.map { |r| r['title'] }).not_to include('YT B')
+    end
+
+    it 'ranks nature feeds and excludes the youtube nature channel' do
+      rows = FeedsStore.popular_by_type('nature')
+      expect(rows.map { |r| r['title'] }).to eq(['Nature A'])
+      expect(rows.map { |r| r['title'] }).not_to include('YT A')
+    end
+
+    it 'identifies podcasts by audio_url presence regardless of topic' do
+      rows = FeedsStore.popular_by_type('podcasts')
+      expect(rows.map { |r| r['title'] }).to eq(['Pod A', 'Pod B'])
+      expect(rows.map { |r| r['subscriber_count'] }).to eq([3, 1])
+    end
+
+    it 'identifies youtube channels by URL pattern' do
+      rows = FeedsStore.popular_by_type('youtube')
+      expect(rows.map { |r| r['title'] }).to eq(['YT A', 'YT B'])
+      expect(rows.map { |r| r['subscriber_count'] }).to eq([2, 1])
+    end
+
+    it 'honors the limit argument' do
+      rows = FeedsStore.popular_by_type('news', limit: 2)
+      expect(rows.length).to eq(2)
+      expect(rows.map { |r| r['title'] }).to eq(['News A', 'News B'])
+    end
+
+    it 'returns an empty array for an unknown type' do
+      expect(FeedsStore.popular_by_type('bogus')).to eq([])
     end
   end
 end
