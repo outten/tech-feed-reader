@@ -336,9 +336,32 @@ Are you storing the keywords in the database, a text file, code, etc.? They prob
 
 **Answer + shipped (Phase 28.5).** Before #28.1 was raised, the three stopword lists lived in three different Ruby files (one beside each consumer). Consolidated into a single module at [app/stopwords.rb](app/stopwords.rb) exposing `Stopwords::GENERAL` (~250 words — single-word topic + summary filter), `Stopwords::PHRASE` (24 words — phrase-rejection articles/pronouns), and `Stopwords::CATEGORY` (14 words — publisher-tag brand noise). One greppable home; relationships between lists are now visible (e.g. `PHRASE ⊂ GENERAL` mostly, but intentionally narrower so `new`/`north`/`first` aren't in PHRASE — they ARE legitimate first words of proper-noun phrases). Lists stay in Ruby (not YAML/DB) because (a) they change rarely so a code review is the right gate, (b) zero parse overhead at boot, and (c) a too-broad word here can nuke a legitimate cluster, which is exactly the kind of change that benefits from PR review.
 
-## [ ] 29: A1 and A2
+## [x] 29: A1 and A2
 
 What is left in A1 to do before moving to A2?
+
+**Reality check + shipped.** Both A1 and A2 already landed before this question was raised:
+
+- **Phase A1** (auth wall, passkeys, recovery codes) — `a9e5032` (#88)
+- **Phase A2.0** (per-user data split — migration 022 + stores + routes) — `7b1533a` (#89)
+- **Phase A2.1 + A2.2** (explicit `user_id` everywhere + cross-user isolation specs) — `7b7bcca` (#90)
+
+What WAS left was the top three A1 deferrals — multi-passkey UI, account deletion, and self-serve revoke. All three landed in the account-management PR this question prompted.
+
+**Shipped — `/account` page** with four sections behind the auth wall:
+
+1. **Profile** — edit display name (free-form, 80-char cap, empty falls back to username; `UsersStore.update_display_name!`).
+2. **Passkeys** — table of registered credentials with `created_at` + `last_used_at`; a `+ Add this device as a passkey` button kicks off a fresh WebAuthn ceremony (`POST /account/passkey/options` → `verify`) scoped to the signed-in user via session (no username needed); per-row Revoke button with lockout protection (refuses to delete the last passkey when zero unused recovery codes remain — caller gets a friendly error explaining why).
+3. **Recovery codes** — shows unused count; Regenerate button wipes the old batch + mints a fresh 10, shown ONCE on the next page render (session-passed plaintext list, cleared after first render).
+4. **Delete account** — `<details>` reveal → typed-username confirmation form. `POST /account/delete` only succeeds when `confirm_username` matches the signed-in user's username (case-insensitive). Cascade-deletes through the FK chain on migration 022 (per-user tables) + `webauthn_credentials` + `recovery_codes`. Shared catalog rows (`feeds`, `articles`) stay. Signs out + redirects to `/` with a notice.
+
+**Header chip is now a link** to `/account` (was a plain `<span>`); CSS adds a hover state.
+
+**Lockout protection logic**: refuses to revoke the user's last passkey when `RecoveryCodesStore.unconsumed_count_for(user) == 0`. Documented in the error message: "Add another passkey or regenerate recovery codes first." Means a careful user can never lock themselves out via the UI.
+
+**Specs**: 18 new examples in [spec/account_routes_spec.rb](spec/account_routes_spec.rb) — wall enforcement, display-name update (including blank-fallback + length cap), passkey revoke with + without lockout protection, recovery-code regenerate + once-only render, account-delete (with all four typed-confirmation paths: missing / mismatched / case-insensitive match / cascade verification), add-another-passkey ceremony, header chip as link. **Suite: 1169/0** (was 1151; 18 new examples).
+
+**TODO.md updated**: A1 + A2 sections flipped to ✅ with pointers to the shipping PRs; new "Multi-user — open follow-ups" section enumerates the remaining nice-to-haves (admin user list, account-export endpoint, `WEBAUTHN_RP_ID` production target).
 
 ## [x] 30: Add to YouTube List
 

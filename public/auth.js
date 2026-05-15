@@ -230,7 +230,42 @@
     });
   }
 
+  // ---- /account "Add this device as a passkey" ---------------------------
+  // STUFF #29 follow-up. The button on /account triggers a fresh
+  // WebAuthn registration ceremony scoped to the signed-in user (the
+  // server identifies them by session, not by username from the body).
+  // On success the page reloads with the new passkey row rendered.
+  function hookAccountAddPasskey() {
+    var btn = document.getElementById('account-add-passkey-btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      hideError('account-add-passkey-error');
+      btn.disabled = true;
+      btn.textContent = 'Waiting for passkey…';
+
+      postJson('/account/passkey/options', {})
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.data.error || 'Server rejected the request.');
+          return navigator.credentials.create({ publicKey: decodePublicKeyOptions(r.data.publicKey) });
+        })
+        .then(function (cred) {
+          return postJson('/account/passkey/verify', encodeAttestation(cred));
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.data.error || 'Could not register the passkey.');
+          window.location.href = '/account?notice=passkey-added';
+        })
+        .catch(function (err) {
+          showError('account-add-passkey-error', err.message);
+          btn.disabled = false;
+          btn.textContent = '+ Add this device as a passkey';
+        });
+    });
+  }
+
   hookSignup();
   hookLogin();
   hookRecovery();
+  hookAccountAddPasskey();
 })();

@@ -1064,6 +1064,143 @@ class TechFeedReader < Sinatra::Base
     JSON.generate(ok: true, return_to: return_to, recovery_codes_remaining: remaining)
   end
 
+  # ===================================================================
+  # Account management (STUFF #29 follow-up)
+  # ===================================================================
+  # /account lets a signed-in user edit their display name, manage
+  # their registered passkeys (list / add another / revoke), regenerate
+  # the recovery-code batch, and delete their account. Routes live
+  # under `/account/*` (not `/api/auth/account/*`) so the public-route
+  # allowlist (`/api/auth/*` is public for the sign-in/up ceremonies)
+  # doesn't accidentally expose them.
+
+  get '/account' do
+    require_signed_in!
+    @page_title              = 'Account'
+    @account_user            = current_user
+    @account_passkeys        = WebauthnCredentialsStore.for_user(current_user_id)
+    @account_recovery_remain = RecoveryCodesStore.unconsumed_count_for(current_user_id)
+    @account_new_codes       = session.delete(:account_new_codes)
+    @account_notice          = params['notice']
+    @account_error           = params['error']
+    erb :account
+  end
+
+  post '/account/display-name' do
+    require_signed_in!
+    UsersStore.update_display_name!(current_user_id, params['display_name'])
+    AppLogger.info('account_display_name_updated', user_id: current_user_id)
+    redirect to('/account?notice=display-name-updated')
+  end
+
+  # Step 1 of "add another passkey" ceremony. Identifies the user by
+  # session (NOT by username from the body) — they're already signed in.
+  # The new credential is added to webauthn_credentials_excluded so the
+  # browser won't let the user accidentally register a passkey they've
+  # already got registered on this device.
+  post '/account/passkey/options' do
+    require_signed_in!
+    content_type :json
+    existing = WebauthnCredentialsStore.for_user(current_user_id)
+
+    options = WebAuthn::Credential.options_for_create(
+      user: {
+        id:           WebAuthn.generate_user_id,
+        name:         current_user['username'],
+        display_name: current_user['display_name'] || current_user['username']
+      },
+      authenticator_selection: { user_verification: 'preferred' },
+      exclude: existing.map { |c| c['credential_id'] }
+    )
+
+    session[:webauthn_account_register] = {
+      challenge: options.challenge,
+      user_id:   current_user_id
+    }
+    JSON.generate(publicKey: options.as_json)
+  end
+
+  post '/account/passkey/verify' do
+    require_signed_in!
+    content_type :json
+    stash = session.delete(:webauthn_account_register)
+    halt 400, JSON.generate(error: 'No registration in progress — start over.') unless stash
+    halt 400, JSON.generate(error: 'Session mismatch.') unless stash[:user_id].to_i == current_user_id
+
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+
+    credential = WebAuthn::Credential.from_create(body)
+    begin
+      credential.verify(stash[:challenge])
+    rescue WebAuthn::Error => e
+      AppLogger.warn('account_passkey_register_failed', user_id: current_user_id,
+                                                         error: e.class.name, message: e.message)
+      halt 400, JSON.generate(error: 'Passkey verification failed. Try again.')
+    end
+
+    WebauthnCredentialsStore.register!(
+      user_id:       current_user_id,
+      credential_id: credential.id,
+      public_key:    credential.public_key,
+      sign_count:    credential.sign_count,
+      transports:    body.dig('response', 'transports'),
+      label:         body['label'].to_s.strip.empty? ? nil : body['label'].to_s.strip[0, 60]
+    )
+    AppLogger.info('account_passkey_registered', user_id: current_user_id, credential_id: credential.id)
+    JSON.generate(ok: true)
+  end
+
+  # Lockout protection: refuse to delete the last passkey if the user
+  # has zero unused recovery codes. Otherwise they'd be locked out of
+  # their own account by the next browser-cache wipe.
+  post '/account/passkey/:credential_id/delete' do |credential_id|
+    require_signed_in!
+    passkey_count = WebauthnCredentialsStore.count_for_user(current_user_id)
+    recovery_left = RecoveryCodesStore.unconsumed_count_for(current_user_id)
+    if passkey_count <= 1 && recovery_left.zero?
+      redirect to('/account?error=last-passkey-no-recovery')
+    end
+
+    if WebauthnCredentialsStore.delete_for_user!(current_user_id, credential_id)
+      AppLogger.info('account_passkey_revoked', user_id: current_user_id, credential_id: credential_id)
+      redirect to('/account?notice=passkey-revoked')
+    else
+      redirect to('/account?error=passkey-not-found')
+    end
+  end
+
+  post '/account/recovery-codes/regenerate' do
+    require_signed_in!
+    codes = RecoveryCodesStore.regenerate_for!(current_user_id)
+    # Pass through the session so a refresh after the redirect still
+    # surfaces the codes once. Cleared on the next /account GET.
+    session[:account_new_codes] = codes
+    AppLogger.info('account_recovery_codes_regenerated', user_id: current_user_id, count: codes.length)
+    redirect to('/account?notice=recovery-codes-regenerated')
+  end
+
+  # Hard-delete the signed-in user's account. Per-user tables cascade
+  # via the ON DELETE CASCADE FKs in migration 022. Shared catalog rows
+  # (`feeds`, `articles`) stay so other users keep their subscriptions.
+  # Confirmation gate: the form must POST `confirm_username` matching
+  # the signed-in user's username exactly. Anything else 400s back to
+  # /account so an accidental click can't nuke the account.
+  post '/account/delete' do
+    require_signed_in!
+    expected = current_user['username'].to_s
+    typed    = params['confirm_username'].to_s.strip.downcase
+    if typed != expected
+      redirect to('/account?error=delete-confirm-mismatch')
+    end
+
+    uid = current_user_id
+    UsersStore.delete!(uid)
+    AppLogger.info('account_deleted', user_id: uid, username: expected)
+    sign_out!
+    redirect to('/?notice=account-deleted')
+  end
+
   # /whats-on → / 301-redirect for backwards compatibility with old
   # bookmarks / nav links. The "What's On Today" experience lives at
   # / now (for returning users; anonymous still gets marketing).

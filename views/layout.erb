@@ -114,12 +114,14 @@
     </form>
     <div id="header-flash" aria-live="polite"></div>
     <%# Phase A1 (consumer auth) — signed-in chip + Sign out button, or
-        Sign in / Sign up links for visitors. The chip is a plain span
-        (no menu yet — multi-user account UI lands in Phase A2 / later). %>
+        Sign in / Sign up links for visitors. STUFF #29 follow-up: the
+        chip is now a link to /account where the user can edit their
+        profile, manage passkeys, regenerate recovery codes, and
+        delete their account. %>
     <% if signed_in? %>
-      <span class="auth-chip" title="Signed in as <%= h(current_user['username']) %>">
+      <a href="/account" class="auth-chip" title="Manage your account (signed in as <%= h(current_user['username']) %>)">
         <%= h(current_user['display_name'] || current_user['username']) %>
-      </span>
+      </a>
       <form method="post" action="/sign-out" class="auth-signout-form">
         <button type="submit" class="header-icon-btn" title="Sign out" aria-label="Sign out">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"
