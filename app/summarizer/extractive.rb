@@ -1,4 +1,5 @@
 require 'set'
+require_relative '../stopwords'
 
 # Pure-Ruby extractive summarizer. Picks the top N sentences from a
 # document by scoring each sentence on the sum of its non-stopword
@@ -18,27 +19,6 @@ module Summarizer
     DEFAULT_SENTENCES = 3
     MIN_SENTENCE_LEN  = 4   # word tokens
     MAX_SENTENCE_LEN  = 80  # word tokens; chops up giant block paragraphs
-
-    # Common English stopwords. Not exhaustive but covers the bulk of
-    # term-frequency noise. Lowercase; punctuation stripped before lookup.
-    STOPWORDS = %w[
-      a about above after again against all am an and any are aren as at
-      be because been before being below between both but by could
-      did didn do does doesn doing don down during each
-      few for from further had hadn has hasn have haven having he her here
-      hers herself him himself his how i if in into is isn it its itself
-      just like
-      ll m me might more most mustn my myself
-      no nor not now
-      of off on once only or other our ours ourselves out over own
-      re s same shan she should shouldn so some such
-      t than that the their theirs them themselves then there these they
-      this those through to too
-      under until up
-      ve very
-      was wasn we were weren what when where which while who whom why will with won would
-      y you your yours yourself yourselves
-    ].to_set.freeze
 
     SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z0-9"'(])/
 
@@ -87,7 +67,7 @@ module Summarizer
         sentence
           .downcase
           .scan(/[a-z][a-z'-]*/)
-          .reject { |w| STOPWORDS.include?(w) }
+          .reject { |w| Stopwords::GENERAL.include?(w) }
       end
 
       def word_frequencies(tokens_per_sentence)

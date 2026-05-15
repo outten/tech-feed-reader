@@ -1,5 +1,6 @@
 require_relative 'database'
 require_relative 'summarizer/extractive'
+require_relative 'stopwords'
 
 # "Articles like this" — deterministic, term-overlap based, no
 # personalization. Validates against SPEC.md's "no recommendation
@@ -50,14 +51,58 @@ module Recommendation
     []
   end
 
+  # STUFF #28 — strip URLs, emails, and bare hostnames before
+  # tokenization so fragments like `com`, `https`, `www` don't leak in
+  # as standalone tokens. content_text is the post-loofah plaintext —
+  # `<a>` markup is gone, but bare URLs that appeared as body text stay.
+  URL_RX   = %r{https?://\S+}i
+  EMAIL_RX = /\S+@\S+\.\S+/
+  HOST_RX  = %r{\b[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:/\S*)?}i
+
+  # STUFF #28.4 — proper-noun phrase pattern: exactly 2 adjacent
+  # capitalized words (e.g. "Jannik Sinner", "New York"). A single
+  # capitalized word at sentence-start is too ambiguous to use as a
+  # signal, so we require pairs minimum. Bigram-only (not trigram) so
+  # repeated phrases like "Jannik Sinner Jannik Sinner" stay countable
+  # via String#scan's non-overlapping advance: a `{1,2}` trailing-word
+  # quantifier would greedily consume three words and corrupt the
+  # frequency tally on tightly-packed mentions. Trigrams like
+  # "New York City" cluster as "new york" — acceptable trade.
+  PHRASE_RX = /\b[A-Z][a-z'À-ſ]+\s+[A-Z][a-z'À-ſ]+\b/
+
+  # Stopword sets (STUFF #28.5) — three lists live in app/stopwords.rb:
+  #   * Stopwords::GENERAL  — single-word topic + summary filter
+  #   * Stopwords::PHRASE   — phrase-rejection (articles, pronouns)
+  #   * Stopwords::CATEGORY — publisher-category brand noise
+  # Recommendation uses GENERAL for top_keywords and PHRASE for top_phrases.
+
+  def strip_noise(text)
+    text.to_s.gsub(URL_RX, ' ').gsub(EMAIL_RX, ' ').gsub(HOST_RX, ' ')
+  end
+
   # Top-N most frequent non-stopword tokens, ordered by frequency
   # descending. Stopword list is shared with the extractive summarizer.
   def top_keywords(text, limit: TARGET_KEYWORDS)
-    tokens = text
+    tokens = strip_noise(text)
       .downcase
       .scan(/[a-z][a-z'-]{#{MIN_TOKEN_LEN - 1},}/)
-      .reject { |t| Summarizer::Extractive::STOPWORDS.include?(t) }
+      .reject { |t| Stopwords::GENERAL.include?(t) }
 
     tokens.tally.sort_by { |_, c| -c }.first(limit).map(&:first)
+  end
+
+  # STUFF #28.4 — top-N proper-noun phrases, frequency-ordered.
+  # Phrases are returned as lowercase, space-joined strings ("jannik
+  # sinner") so callers can split on space to reach the component
+  # tokens. Filters out phrases where any component is a stopword
+  # (kills "The President" / "I Said" leakage from sentence-initial
+  # capitals). Used by TopicClusters to keep "Jannik Sinner" as one
+  # cluster rather than two competing single-word clusters.
+  def top_phrases(text, limit: TARGET_KEYWORDS)
+    candidates = strip_noise(text).scan(PHRASE_RX).map(&:downcase)
+    candidates.reject! do |phrase|
+      phrase.split(/\s+/).any? { |w| Stopwords::PHRASE.include?(w) }
+    end
+    candidates.tally.sort_by { |_, c| -c }.first(limit).map(&:first)
   end
 end
