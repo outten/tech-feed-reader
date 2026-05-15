@@ -305,7 +305,7 @@ Do an anlaysis. Thank you.
 
 **Shipped (Phase 27.1).** Each long list on `/feeds` now has a filter toolbar at the top: a `<input type="search">` that narrows by title / URL / blurb substring, plus topic chips (`All / Tech / Sports / Nature / General` for subscribed; `All / Tech / Sports / Nature` for catalog). Search + chip combine as AND. Pure client-side filter (`public/feeds-filter.js`) — no server round-trip. Catalog category headings auto-hide when every row beneath is filtered out; a small "showing N of M" counter appears when the result is narrower than the full list. Rows carry `data-topic` / `data-search` from the existing `feed.topic` column and `FeedCatalog::CATEGORY_TO_TOPIC`. Deferred to follow-up phases: a "hide already-subscribed" toggle on the catalog (27.2), sort options on the subscribed table (27.3), and cross-user "most popular" ranking (that's STUFF #24, separate).
 
-## [ ] 28. Topics
+## [x] 28. Topics
 
 On the /topics page, the topics are off. I see things like: com, https, can, said, comments, instagram. Can you analyze? Perhaps we need to:
 
@@ -315,3 +315,32 @@ On the /topics page, the topics are off. I see things like: com, https, can, sai
 - eliminate anything vague
 
 And we should run this on all existing and future contents.
+
+**Shipped in four phases on one PR.** Topic-cluster quality overhaul addressing every part of the complaint plus a follow-up on multi-word names.
+
+**Phase 28.1 — stopword + URL hygiene.** Root cause of the user-reported tokens: bare URLs in `content_text` were tokenized into `com` / `https` / `www`, and the `STOPWORDS` list in [extractive.rb](app/summarizer/extractive.rb) was missing common modals (`can`, `said`, `told`), site/social boilerplate (`comments`, `subscribe`, `instagram`, `twitter`, `facebook`), time-vague words (`today`, `year`), and filler verbs (`get`, `make`, `look`). [recommendation.rb](app/recommendation.rb) now strips URLs, emails, and bare hostnames *before* tokenization; `STOPWORDS` expanded ~5x with named buckets. No schema change — `/topics` renders correctly on the next page load. 7 regression specs in [spec/recommendation_spec.rb](spec/recommendation_spec.rb) lock the user-reported tokens.
+
+**Phase 28.2 — publisher-supplied categories.** New `articles.categories` column (migration `023_articles_categories.sql`; JSON-encoded array of normalized strings). [FeedParser](app/feed_parser.rb) extracts `entry.categories` (feedjira normalizes RSS `<category>` and Atom `<category term="…">` into the same accessor), downcases + trims + dedupes + splits comma/semi-packed values + caps at 10 per entry. [ArticlesStore.import](app/articles_store.rb) writes the column on new inserts; on duplicate uid it runs a separate UPDATE that fills `categories` *only if it's still NULL*, so the existing corpus backfills naturally over the next 24h of sync-feeds cycles (manual immediate backfill: `make refresh-all`). 6 parser specs + 2 store-backfill specs.
+
+**Phase 28.3 — weighted scoring + ubiquity ceiling.** [TopicClusters.recent](app/topic_clusters.rb) was rewritten end-to-end: each article contributes its categories at weight 2.0 and its top-5 body keywords at weight 1.0; for each candidate term we sum contributing weights (deduped per-article — a term hit by both signals on the same article uses the higher weight, not the sum), then drop any term in > 50% of the corpus (only applied when the corpus has ≥ 20 articles, so unit tests don't trigger it accidentally), then drop a small `CATEGORY_STOPWORDS` list (`news`, `article`, `general`, `featured`, etc. — the brand-noise tags many feeds emit on every entry). 6 new TopicClusters specs (noise-token regression, category-only surfacing, weighted ordering, brand-noise filtering, ubiquity ceiling on a 25-article corpus).
+
+**Phase 28.4 — proper-noun phrase detection (e.g. "Jannik Sinner").** User reported that names like `Jannik Sinner` were splitting into two unigram clusters (`jannik` and `sinner`) that never combined. New `Recommendation.top_phrases` extracts adjacent-capitalized bigrams (`[A-Z][a-z]+ [A-Z][a-z]+`) from the original-case text *before* tokenization, downcases them, and filters via a narrow `PHRASE_STOPWORDS` set (articles + pronouns + interrogatives — so "The President" / "What Trump" get filtered as sentence-initial false-positives, but "New York" / "North Dakota" survive because `new`/`north` aren't in the phrase-stopword list even though they ARE in the broader single-word `STOPWORDS`). `TopicClusters.weighted_terms_for` emits phrases at `PHRASE_WEIGHT = 1.5` (between body keywords 1.0 and publisher categories 2.0) and suppresses the unigram components of any phrase emitted for the same article, so `jannik sinner` wins cleanly instead of competing with sibling `jannik`/`sinner` clusters. Bigram-only (not trigram) by design — `String#scan` non-overlapping advance breaks down on tightly-packed mentions otherwise, so `"New York City"` collapses to `"new york"` as a deliberate trade. URL routing + FTS5 already handle multi-word terms (`CGI.escape` in the existing views; FTS5 `MATCH "jannik sinner"` AND-joins the tokens). 7 new `top_phrases` specs + 1 TopicClusters integration spec for the Sinner scenario.
+
+**Phase 28.5 — single home for the stopword lists.** Follow-up to #28.1 below: the three lists (~250 + 24 + 14 words) were scattered across `extractive.rb`, `recommendation.rb`, and `topic_clusters.rb`. Consolidated into a single `app/stopwords.rb` module exposing `Stopwords::GENERAL` / `Stopwords::PHRASE` / `Stopwords::CATEGORY`. All three consumers reference back to it; no behavior change, all 1129 specs still green.
+
+**Suite: 1129 examples, 0 failures** (was 1101; 28 new specs + a zero-cost refactor).
+
+## [x] 28.1: Keywords
+
+Are you storing the keywords in the database, a text file, code, etc.? They probably won't change in a very long time. Where should they be stored and managed?
+
+**Answer + shipped (Phase 28.5).** Before #28.1 was raised, the three stopword lists lived in three different Ruby files (one beside each consumer). Consolidated into a single module at [app/stopwords.rb](app/stopwords.rb) exposing `Stopwords::GENERAL` (~250 words — single-word topic + summary filter), `Stopwords::PHRASE` (24 words — phrase-rejection articles/pronouns), and `Stopwords::CATEGORY` (14 words — publisher-tag brand noise). One greppable home; relationships between lists are now visible (e.g. `PHRASE ⊂ GENERAL` mostly, but intentionally narrower so `new`/`north`/`first` aren't in PHRASE — they ARE legitimate first words of proper-noun phrases). Lists stay in Ruby (not YAML/DB) because (a) they change rarely so a code review is the right gate, (b) zero parse overhead at boot, and (c) a too-broad word here can nuke a legitimate cluster, which is exactly the kind of change that benefits from PR review.
+
+## [ ] 29: A1 and A2
+
+What is left in A1 to do before moving to A2?
+
+## [ ] 30: Add to YouTube List
+
+Can you add the ability on the /youtube page to give a list of channels to add to a user's YouTube channel list?
+

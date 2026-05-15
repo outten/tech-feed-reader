@@ -1,4 +1,5 @@
 require_relative 'spec_helper'
+require 'json'
 require_relative '../app/feeds_store'
 require_relative '../app/articles_store'
 
@@ -42,6 +43,40 @@ RSpec.describe ArticlesStore do
 
     it 'returns 0 on an empty batch without opening a transaction' do
       expect(ArticlesStore.import(feed_id: feed['id'], entries: [])).to eq(0)
+    end
+
+    # STUFF #28 — articles.categories backfill on duplicate uid.
+    # The first import (pre-#28-style) leaves categories NULL; a later
+    # re-import with categories present should fill the column without
+    # touching anything else.
+    describe 'categories backfill' do
+      it 'fills categories on a duplicate-uid re-import when the column is NULL' do
+        ArticlesStore.import(feed_id: feed['id'], entries: [
+          entry(uid: 'a' * 12, title: 'One').merge(categories: nil)
+        ])
+        expect(ArticlesStore.find_by_uid('a' * 12)['categories']).to be_nil
+
+        # Re-import — same uid, now with categories. Returns 0 new rows.
+        n = ArticlesStore.import(feed_id: feed['id'], entries: [
+          entry(uid: 'a' * 12, title: 'One again').merge(categories: JSON.generate(%w[politics tech]))
+        ])
+        expect(n).to eq(0)
+
+        row = ArticlesStore.find_by_uid('a' * 12)
+        expect(JSON.parse(row['categories'])).to contain_exactly('politics', 'tech')
+        expect(row['title']).to eq('One')   # title still NOT overwritten
+      end
+
+      it 'does NOT overwrite an existing non-NULL categories on duplicate-uid re-import' do
+        ArticlesStore.import(feed_id: feed['id'], entries: [
+          entry(uid: 'a' * 12, title: 'One').merge(categories: JSON.generate(%w[original]))
+        ])
+        ArticlesStore.import(feed_id: feed['id'], entries: [
+          entry(uid: 'a' * 12, title: 'One').merge(categories: JSON.generate(%w[different]))
+        ])
+        row = ArticlesStore.find_by_uid('a' * 12)
+        expect(JSON.parse(row['categories'])).to eq(['original'])
+      end
     end
   end
 

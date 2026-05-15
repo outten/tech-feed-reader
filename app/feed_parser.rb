@@ -1,5 +1,6 @@
 require 'feedjira'
 require 'digest'
+require 'json'
 require_relative 'sanitizer'
 
 # Wraps feedjira so the rest of the app sees one normalised shape no
@@ -25,7 +26,12 @@ require_relative 'sanitizer'
 #                                              #   (itunes:image / media:thumbnail / first <img>)
 #         audio_url:              String|nil,  # <enclosure ... type="audio/*">
 #         audio_mime_type:        String|nil,
-#         audio_duration_seconds: Integer|nil  # parsed from itunes:duration
+#         audio_duration_seconds: Integer|nil, # parsed from itunes:duration
+#         categories:             String|nil    # JSON-encoded array of
+#                                              #   publisher tags (RSS
+#                                              #   <category> / Atom
+#                                              #   <category term="...">),
+#                                              #   nil when feed emits none
 #       },
 #       ...
 #     ]
@@ -69,8 +75,31 @@ module FeedParser
         image_url:              extract_entry_image(entry, raw),
         audio_url:              audio_url,
         audio_mime_type:        audio_type,
-        audio_duration_seconds: extract_duration(entry)
+        audio_duration_seconds: extract_duration(entry),
+        categories:             extract_categories(entry)
       }
+    end
+
+    # STUFF #28 — publisher-supplied category tags. feedjira normalises
+    # RSS <category> elements and Atom <category term="…"> attributes
+    # into entry.categories (an array of strings); some podcast feeds
+    # also surface itunes:keywords here. We downcase + strip + dedupe so
+    # the downstream consumer (TopicClusters / topic_clusters_spec) can
+    # treat them as canonical tokens. Returns a JSON-serialized array,
+    # or nil when the feed emits no usable tags — nil is the storage
+    # sentinel for "we don't know yet" so the on-conflict UPSERT path
+    # in ArticlesStore.import can later backfill non-nil values.
+    MAX_CATEGORIES = 10
+
+    def extract_categories(entry)
+      raw = entry.respond_to?(:categories) ? Array(entry.categories) : []
+      norm = raw
+        .flat_map { |c| c.to_s.split(/[,;|]/) } # some feeds pack multiple tags into one element
+        .map { |c| c.strip.downcase }
+        .reject { |c| c.empty? || c.length > 60 } # 60-char cap catches accidental sentence-as-tag
+        .uniq
+        .first(MAX_CATEGORIES)
+      norm.empty? ? nil : JSON.generate(norm)
     end
 
     # Channel-level cover art. iTunes RSS exposes both an <image> block
