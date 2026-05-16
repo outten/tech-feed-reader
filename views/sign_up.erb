@@ -38,10 +38,12 @@
     redirect on the "I've saved these" confirm. %>
 <section class="benchmark-section auth-recovery-card" id="auth-recovery-card" hidden>
   <h3>Save your recovery codes</h3>
-  <p class="subtitle">
-    These ten codes are your only way back in if you lose every device
-    where this passkey lives. Each works once. We won't show them again.
-  </p>
+  <div class="error" role="alert" style="margin-bottom:1rem">
+    <strong>⚠ Save these now — we can't show them again.</strong>
+    If you lose every device where this passkey lives, these ten codes
+    are your only way back in. Each works once. Closing this page
+    without downloading them locks you out permanently.
+  </div>
   <pre class="auth-recovery-codes" id="auth-recovery-codes"></pre>
   <div class="auth-recovery-actions">
     <button type="button" class="btn-primary" id="auth-recovery-download">Download as text</button>

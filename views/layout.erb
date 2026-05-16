@@ -76,7 +76,7 @@
       </div>
 
       <a href="/search" class="nav-search-icon <%= 'active' if request.path_info == '/search' %>"
-         title="Search" aria-label="Search">
+         title="Search (press / from anywhere)" aria-label="Search">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"
              fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -262,5 +262,6 @@
   <script src="/global-player.js?v=<%= asset_mtime('public/global-player.js') %>"></script>
   <script src="/header-refresh.js?v=<%= asset_mtime('public/header-refresh.js') %>"></script>
   <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>
+  <script src="/search-shortcut.js?v=<%= asset_mtime('public/search-shortcut.js') %>"></script>
 </body>
 </html>
