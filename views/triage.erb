@@ -27,6 +27,10 @@
   </div>
 <% end %>
 
+<% if params['error'] == 'llm-quota' %>
+  <div class="error" role="alert"><strong>LLM quota reached.</strong> <%= h(params['msg']) %></div>
+<% end %>
+
 <% if @triage_result.nil? %>
   <%# GET — empty state with a generate button. %>
   <div class="portfolio-add">

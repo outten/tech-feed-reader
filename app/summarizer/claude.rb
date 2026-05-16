@@ -39,7 +39,7 @@ module Summarizer
       straight to the substance.
     PROMPT
 
-    Result = Struct.new(:status, :text, :model, :error, keyword_init: true)
+    Result = Struct.new(:status, :text, :model, :error, :input_tokens, :output_tokens, keyword_init: true)
 
     module_function
 
@@ -98,7 +98,9 @@ module Summarizer
 
       AppLogger.info('claude_summarize_done', model: MODEL, latency_ms: latency, output_length: text.length)
       Metrics::SUMMARIES_GENERATED.increment(labels: { kind: 'llm' })
-      Result.new(status: :ok, text: text, model: MODEL)
+      Result.new(status: :ok, text: text, model: MODEL,
+                 input_tokens:  (response.usage&.input_tokens&.to_i  if response.respond_to?(:usage)),
+                 output_tokens: (response.usage&.output_tokens&.to_i if response.respond_to?(:usage)))
     rescue Anthropic::Errors::APIError => e
       AppLogger.error('claude_summarize', status: :error, class: e.class.name, message: e.message)
       Result.new(status: :error, error: "#{e.class.name}: #{e.message}")
@@ -162,7 +164,9 @@ module Summarizer
 
       AppLogger.info('claude_digest_summarize_done', model: MODEL, latency_ms: latency, output_length: text.length)
       Metrics::SUMMARIES_GENERATED.increment(labels: { kind: 'digest_llm' })
-      Result.new(status: :ok, text: text, model: MODEL)
+      Result.new(status: :ok, text: text, model: MODEL,
+                 input_tokens:  (response.usage&.input_tokens&.to_i  if response.respond_to?(:usage)),
+                 output_tokens: (response.usage&.output_tokens&.to_i if response.respond_to?(:usage)))
     rescue Anthropic::Errors::APIError => e
       AppLogger.error('claude_digest_summarize', status: :error, class: e.class.name, message: e.message)
       Result.new(status: :error, error: "#{e.class.name}: #{e.message}")
