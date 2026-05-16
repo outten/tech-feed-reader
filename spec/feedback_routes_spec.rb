@@ -63,6 +63,17 @@ RSpec.describe 'POST /article/:uid/feedback' do
     post "/article/#{article['uid']}/feedback", { value: '0', return_to: '/articles?state=unread' }
     expect(last_response.headers['Location']).to end_with('/articles?state=unread')
   end
+
+  it 'returns JSON (no redirect) when the request accepts application/json' do
+    article = make_article
+    post "/article/#{article['uid']}/feedback",
+         { value: '1' },
+         { 'HTTP_ACCEPT' => 'application/json' }
+    expect(last_response.status).to eq(200)
+    expect(last_response.headers['Content-Type']).to include('application/json')
+    expect(JSON.parse(last_response.body)).to eq('ok' => true, 'value' => 1)
+    expect(ReadStateStore.get(1, article['id'])['feedback']).to eq(1)
+  end
 end
 
 RSpec.describe 'POST /feeds/:id/feedback' do

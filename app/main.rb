@@ -65,6 +65,7 @@ require_relative 'metrics'
 require_relative 'request_log_middleware'
 require_relative 'pruner'
 require_relative 'metrics_middleware'
+require_relative 'dev_stats'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -2013,6 +2014,10 @@ class TechFeedReader < Sinatra::Base
             end
     ReadStateStore.mark_feedback(current_user_id, article['id'], value: value)
     AppLogger.info('article_feedback', uid: uid, value: value)
+    if request.env['HTTP_ACCEPT'].to_s.include?('application/json')
+      content_type :json
+      return { ok: true, value: value }.to_json
+    end
     redirect to(params['return_to'] || "/article/#{uid}")
   end
 
@@ -2632,6 +2637,15 @@ class TechFeedReader < Sinatra::Base
     end
 
     erb :admin_traces
+  end
+
+  # Claude Code token usage + cost + this-repo productivity (commits,
+  # lines, PRs merged). Re-parses ~/.claude/projects/**/*.jsonl on
+  # every load, plus shells out to git + gh. See app/dev_stats.rb.
+  get '/admin/dev-stats' do
+    @page_title = 'Dev stats'
+    @report     = DevStats.report
+    erb :admin_dev_stats
   end
 
   get '/admin/cache' do
