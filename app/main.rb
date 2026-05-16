@@ -65,6 +65,7 @@ require_relative 'metrics'
 require_relative 'request_log_middleware'
 require_relative 'pruner'
 require_relative 'metrics_middleware'
+require_relative 'rate_limiter'
 require_relative 'dev_stats'
 require_relative 'llm_usage_store'
 require_relative 'llm_guard'
@@ -2793,6 +2794,7 @@ if __FILE__ == $PROGRAM_NAME
     map '/' do
       use RequestLogMiddleware::App
       use MetricsMiddleware
+      use RateLimiter
       run TechFeedReader.new
     end
   end
