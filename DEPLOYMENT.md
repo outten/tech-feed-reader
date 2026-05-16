@@ -224,3 +224,172 @@ slightly more ops burden.
 - **Email.** Currently no email anywhere (passkey-only auth helps).
   Some features eventually want it (digest delivery? account recovery
   outside the recovery-codes flow?). Worth a placeholder decision.
+
+---
+
+# Phased Execution Plan — DigitalOcean
+
+Locked decisions (2026-05-16):
+- **Hosting:** Single DigitalOcean Droplet running Docker Compose
+  (app + Postgres + Redis + Caddy). Target cost ~$11/mo.
+- **DNS / edge:** Cloudflare in front (free DNS + CDN + WAF + DDoS).
+- **TLS:** End-to-end. Cloudflare → origin is Full (strict) with a
+  Let's Encrypt cert minted by Caddy on the Droplet.
+- **Backups:** Daily `pg_dump` to DigitalOcean Spaces with rotation.
+
+Ownership convention: **YOU** = manual steps the user does. **CLAUDE**
+= code/IaC I write into the repo.
+
+## Phase 0 — Account + credential setup (YOU, ~45 min)
+
+These are external accounts and tokens. Nothing in the repo changes.
+
+- [ ] **DigitalOcean account.** Sign up at https://digitalocean.com,
+      add a payment method. (Optional: use a referral link for credit.)
+- [ ] **DO Personal Access Token.** Dashboard → API → Generate New
+      Token, scopes: `read` + `write`. Save it — Terraform needs it.
+- [ ] **DO Spaces access key.** Dashboard → API → Spaces Keys → Generate.
+      Save the access key + secret. Backup script needs it.
+- [ ] **Domain name.** Buy at a registrar of your choice. Cloudflare
+      Registrar is at-cost (no markup, ~$10/yr for `.com`); Porkbun and
+      Namecheap are also fine. Avoid GoDaddy.
+- [ ] **Cloudflare account.** Sign up, add the domain as a site, copy
+      the two nameservers Cloudflare assigns.
+- [ ] **Repoint nameservers.** At your registrar, replace the default
+      nameservers with the two Cloudflare gave you. DNS propagation is
+      a few hours to a day; doesn't block anything else.
+- [ ] **Cloudflare API token.** My Profile → API Tokens → Create
+      Token → template "Edit zone DNS", restricted to the new zone.
+      Save it. Terraform needs it.
+- [ ] **Generate production secrets.** A strong random `SESSION_SECRET`
+      (e.g. `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'`).
+      Confirm your existing `ANTHROPIC_API_KEY` is the one you want
+      production to use (or mint a new one scoped to prod).
+- [ ] **SSH key.** Ensure you have an SSH keypair (`~/.ssh/id_ed25519`)
+      and the public key is in DigitalOcean → Settings → Security →
+      SSH Keys. Terraform will inject it into the Droplet.
+
+When all the above is done, hand me the token values via env vars or
+a local `terraform.tfvars` file (never committed) and I run Phase 2.
+
+## Phase 1 — Codebase prep (CLAUDE)
+
+Make the app deployable + safe to expose. This is the biggest chunk
+of work and lives entirely in PRs.
+
+- [ ] **Postgres support.** Add `pg` gem; refactor `app/database.rb`
+      to switch engines based on `DATABASE_URL` (sqlite for dev/test,
+      postgres for prod). Keep SQLite as the default local backend so
+      the spec suite stays fast.
+- [ ] **SQL audit.** Sweep every `Database.execute` for SQLite-isms:
+      `INSERT OR IGNORE` → `ON CONFLICT … DO NOTHING`, datetime
+      functions, `||` concatenation (works in both), `AUTOINCREMENT` →
+      `BIGSERIAL`/`GENERATED ALWAYS AS IDENTITY`.
+- [ ] **FTS5 → tsvector.** Replace the SQLite FTS5 virtual table with
+      a `tsvector` column on `articles`, a GIN index, and an insert/update
+      trigger to keep it current. Update `ArticlesStore.search` to use
+      `to_tsquery` / `plainto_tsquery`.
+- [ ] **Migration runner.** Make `Database.migrate!` dialect-aware so
+      one migration set works on both backends — or fork into
+      `db/migrations/sqlite/` + `db/migrations/postgres/` if cleaner.
+- [ ] **CI matrix.** Add a Postgres job to the existing RSpec workflow
+      so every PR runs the suite against both engines.
+- [ ] **Secrets from env only.** Strip `.credentials` file loading from
+      production code paths. Document every required env var in
+      `.env.example`.
+- [ ] **WebAuthn env-driven.** `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`
+      pulled from env. Defaults stay local for dev.
+- [ ] **LLM rate limiting.** New `LlmQuotaStore` (per-user daily token
+      cap), enforced in `/triage`, `/article/:uid/summarize/llm`,
+      `/digests/:id/summarize`, `/chat`. Global circuit-breaker
+      (e.g. if spend in last hour exceeds env-configured ceiling, refuse
+      with a clear error). Feature flag `LLM_ENABLED=false` disables
+      all four routes without a redeploy. Add `/admin/llm-quota`
+      page so you can see and adjust per-user quotas.
+- [ ] **rack-attack** (or equivalent) on `/sign-up`, `/sign-in`,
+      `/api/auth/*` to throttle credential-stuffing.
+- [ ] **Dockerfile** (multi-stage: builder → slim runtime). Plus
+      `.dockerignore` (exclude `tmp/`, `db/*.sqlite`, `.env`, etc.).
+- [ ] **docker-compose.yml** at repo root, used for local Postgres
+      parity AND copied to the droplet for production. Services:
+      `app`, `sidekiq`, `postgres`, `redis`, `caddy`. Caddyfile
+      handles TLS + reverse proxy.
+- [ ] **Healthcheck.** `/health` already exists; verify it reports
+      DB + Redis status. Add a `/readiness` distinct from `/health`
+      if needed by docker healthcheck.
+
+## Phase 2 — Terraform (CLAUDE)
+
+A `terraform/` directory at repo root. One-command apply: `terraform
+apply` after `terraform.tfvars` is populated.
+
+- [ ] **`providers.tf`** — `digitalocean` + `cloudflare` providers,
+      pinned versions.
+- [ ] **`variables.tf`** — `do_token`, `cf_token`, `cf_zone_id`,
+      `domain`, `region` (default `nyc3`), `droplet_size`
+      (default `s-1vcpu-2gb`, $12/mo — start here, downsize later if
+      we're idle), `ssh_key_fingerprint`, `allowed_ssh_cidrs`.
+- [ ] **`terraform.tfvars.example`** — committed template; real
+      `terraform.tfvars` is gitignored.
+- [ ] **`droplet.tf`** — Ubuntu 24.04 droplet, cloud-init bootstrap:
+      install Docker + docker-compose, create non-root user, configure
+      unattended-upgrades, clone the repo, create `/opt/app/.env`
+      placeholder. Tagged `app=tech-feed-reader,env=prod`.
+- [ ] **`firewall.tf`** — DO cloud firewall. Inbound: 22 from your IP
+      only, 80 + 443 from anywhere. Outbound: any.
+- [ ] **`spaces.tf`** — DO Space `tech-feed-reader-backups` (private)
+      in the same region. CORS off.
+- [ ] **`dns.tf`** — Cloudflare records: `A` apex → droplet IP,
+      `A` `www` → droplet IP, `CAA` letsencrypt.org, both proxied
+      through Cloudflare orange-cloud.
+- [ ] **`outputs.tf`** — droplet IP, spaces endpoint + bucket name,
+      apex URL.
+- [ ] **`terraform/README.md`** — bootstrap instructions: install
+      terraform, populate `terraform.tfvars`, run `terraform init`
+      then `apply`.
+
+State storage: start with local state in `terraform/terraform.tfstate`
+(gitignored). If we want remote state later, DO Spaces with S3 backend
+is one command away.
+
+## Phase 3 — Deploy + cutover (TOGETHER)
+
+- [ ] **`terraform apply`** — provisions Droplet, firewall, Space,
+      DNS records. Outputs the IP.
+- [ ] **SSH into Droplet**, populate `/opt/app/.env` with production
+      values (the secrets from Phase 0). Don't commit; this file lives
+      only on the host.
+- [ ] **`docker compose up -d`** — pulls images, starts the stack.
+      Caddy auto-mints the Let's Encrypt cert.
+- [ ] **Initialize schema** — `docker compose exec app rake db:migrate`
+      (or the equivalent invocation of `Database.migrate!`).
+- [ ] **Smoke test** — sign up a fresh user, add a feed, refresh it,
+      read an article, mark feedback, run /triage, view /admin/dev-stats.
+- [ ] **Cloudflare proxy on** — orange-cloud the A records (already
+      configured in terraform, but verify in the dashboard).
+- [ ] **HSTS** — once you've verified HTTPS works, turn on Cloudflare
+      HSTS with a short max-age first (e.g. 6 hours), bump to 1 year
+      after a week of stability.
+
+## Phase 4 — Operations (CLAUDE)
+
+- [ ] **Backup cron** on the Droplet: nightly `pg_dump` piped to `s3cmd`
+      (or `restic`) targeting the DO Space. 7-day retention, weekly
+      kept for 4 weeks, monthly kept for 12.
+- [ ] **Restore-test script.** Pulls the latest dump into a sandbox
+      container and runs migrations + a smoke query. Run quarterly.
+- [ ] **Uptime monitor.** UptimeRobot (free) pointed at `/health`.
+      Alert via email.
+- [ ] **Caddy access logs** rotated daily, kept 14 days.
+- [ ] **Runbook in `docs/runbook.md`** — common ops: deploy a new
+      version, rotate a secret, restore from backup, restart a
+      misbehaving service, SSH access, log inspection.
+
+## Out of scope for v1 deploy (revisit later)
+
+- Multi-region / failover (you have one Droplet, one region)
+- Blue/green deploy (just `docker compose pull && up -d` for now)
+- Remote terraform state (local state fine for solo dev)
+- Per-user object storage (no user uploads exist)
+- CI/CD auto-deploy on push to main (manual `git pull && docker
+  compose up -d` is fine until traffic justifies the automation)
