@@ -272,85 +272,76 @@ These are external accounts and tokens. Nothing in the repo changes.
 When all the above is done, hand me the token values via env vars or
 a local `terraform.tfvars` file (never committed) and I run Phase 2.
 
-## Phase 1 — Codebase prep (CLAUDE)
+## Phase 1 — Codebase prep (CLAUDE) ✅ COMPLETE
 
-Make the app deployable + safe to expose. This is the biggest chunk
-of work and lives entirely in PRs.
+Make the app deployable + safe to expose. **Done — three PRs landed:**
 
-- [ ] **Postgres support.** Add `pg` gem; refactor `app/database.rb`
-      to switch engines based on `DATABASE_URL` (sqlite for dev/test,
-      postgres for prod). Keep SQLite as the default local backend so
-      the spec suite stays fast.
-- [ ] **SQL audit.** Sweep every `Database.execute` for SQLite-isms:
-      `INSERT OR IGNORE` → `ON CONFLICT … DO NOTHING`, datetime
-      functions, `||` concatenation (works in both), `AUTOINCREMENT` →
-      `BIGSERIAL`/`GENERATED ALWAYS AS IDENTITY`.
-- [ ] **FTS5 → tsvector.** Replace the SQLite FTS5 virtual table with
-      a `tsvector` column on `articles`, a GIN index, and an insert/update
-      trigger to keep it current. Update `ArticlesStore.search` to use
-      `to_tsquery` / `plainto_tsquery`.
-- [ ] **Migration runner.** Make `Database.migrate!` dialect-aware so
-      one migration set works on both backends — or fork into
-      `db/migrations/sqlite/` + `db/migrations/postgres/` if cleaner.
-- [ ] **CI matrix.** Add a Postgres job to the existing RSpec workflow
-      so every PR runs the suite against both engines.
-- [ ] **Secrets from env only.** Strip `.credentials` file loading from
-      production code paths. Document every required env var in
-      `.env.example`.
-- [ ] **WebAuthn env-driven.** `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`
-      pulled from env. Defaults stay local for dev.
-- [ ] **LLM rate limiting.** New `LlmQuotaStore` (per-user daily token
-      cap), enforced in `/triage`, `/article/:uid/summarize/llm`,
-      `/digests/:id/summarize`, `/chat`. Global circuit-breaker
-      (e.g. if spend in last hour exceeds env-configured ceiling, refuse
-      with a clear error). Feature flag `LLM_ENABLED=false` disables
-      all four routes without a redeploy. Add `/admin/llm-quota`
-      page so you can see and adjust per-user quotas.
-- [ ] **rack-attack** (or equivalent) on `/sign-up`, `/sign-in`,
-      `/api/auth/*` to throttle credential-stuffing.
-- [ ] **Dockerfile** (multi-stage: builder → slim runtime). Plus
-      `.dockerignore` (exclude `tmp/`, `db/*.sqlite`, `.env`, etc.).
-- [ ] **docker-compose.yml** at repo root, used for local Postgres
-      parity AND copied to the droplet for production. Services:
-      `app`, `sidekiq`, `postgres`, `redis`, `caddy`. Caddyfile
-      handles TLS + reverse proxy.
-- [ ] **Healthcheck.** `/health` already exists; verify it reports
-      DB + Redis status. Add a `/readiness` distinct from `/health`
-      if needed by docker healthcheck.
+- [x] **LLM rate limiting** (PR #103). `LlmGuard` enforces a per-user
+      24h token quota + global hourly token/cost circuit-breaker +
+      `LLM_ENABLED` kill switch. `/admin/llm-quota` surfaces budgets
+      and usage. All four routes (`/triage`, `/chat`, `/article/:uid/summarize/llm`,
+      `/digests/:id/summarize`) wrapped.
+- [x] **Dockerfile + docker-compose + Caddyfile** (PR #104). Multi-stage
+      Ruby image, non-root user. Compose runs `app` + `sidekiq` + `redis`
+      + `caddy` services. Caddy auto-mints Let's Encrypt cert end-to-end.
+- [x] **Per-IP RateLimiter** (PR #105). In-process middleware throttling
+      `/sign-in`, `/sign-up`, `/api/auth/*`, `/chat`. Returns 429 + JSON +
+      `Retry-After`. Defense-in-depth on top of WebAuthn + LlmGuard.
 
-## Phase 2 — Terraform (CLAUDE)
+### Confirmed already correct (no PR needed)
 
-A `terraform/` directory at repo root. One-command apply: `terraform
-apply` after `terraform.tfvars` is populated.
+- **WebAuthn env-driven** — `app/auth.rb` already reads `WEBAUTHN_RP_NAME/RP_ID/ORIGIN`
+  from ENV with localhost defaults.
+- **Secrets env-driven** — `app/credentials.rb` calls `Dotenv.load` which
+  silently no-ops when `.credentials` is missing (the production case).
+  The `.dockerignore` keeps `.credentials` out of the image entirely.
+- **Healthcheck** — `/health` already reports DB + Redis status. The
+  Dockerfile uses it as the container healthcheck.
 
-- [ ] **`providers.tf`** — `digitalocean` + `cloudflare` providers,
+### Deferred to v1.1 (decision: ship 1.0 on SQLite first)
+
+- ~~Postgres support, SQL audit, FTS5 → tsvector, dialect-aware
+  migration runner, CI matrix~~. SQLite WAL mode handles a single-process
+  Sinatra + Sidekiq fine at hobby scale. Migrate to Postgres when
+  traffic or concurrency makes it warranted — until then, the saved
+  engineering effort funds other work. Persistence is via the
+  `app_data` Docker volume, backed up nightly to a DO Space.
+
+## Phase 2 — Terraform (CLAUDE) ✅ SCAFFOLDED
+
+`terraform/` directory checked in. One-command apply: `terraform apply`
+after `terraform.tfvars` is populated.
+
+- [x] **`providers.tf`** — `digitalocean` + `cloudflare` providers,
       pinned versions.
-- [ ] **`variables.tf`** — `do_token`, `cf_token`, `cf_zone_id`,
-      `domain`, `region` (default `nyc3`), `droplet_size`
-      (default `s-1vcpu-2gb`, $12/mo — start here, downsize later if
-      we're idle), `ssh_key_fingerprint`, `allowed_ssh_cidrs`.
-- [ ] **`terraform.tfvars.example`** — committed template; real
+- [x] **`variables.tf`** — `do_token`, `do_spaces_*`, `cf_token`,
+      `cf_zone_id`, `domain`, `region` (default `nyc3`), `droplet_size`
+      (default `s-1vcpu-2gb`, $12/mo), `ssh_key_fingerprint`,
+      `ssh_public_key_path` (defaults to `~/.ssh/id_ed25519.pub`),
+      `allowed_ssh_cidrs`, `backups_bucket_name`.
+- [x] **`terraform.tfvars.example`** — committed template; real
       `terraform.tfvars` is gitignored.
-- [ ] **`droplet.tf`** — Ubuntu 24.04 droplet, cloud-init bootstrap:
-      install Docker + docker-compose, create non-root user, configure
-      unattended-upgrades, clone the repo, create `/opt/app/.env`
-      placeholder. Tagged `app=tech-feed-reader,env=prod`.
-- [ ] **`firewall.tf`** — DO cloud firewall. Inbound: 22 from your IP
-      only, 80 + 443 from anywhere. Outbound: any.
-- [ ] **`spaces.tf`** — DO Space `tech-feed-reader-backups` (private)
-      in the same region. CORS off.
-- [ ] **`dns.tf`** — Cloudflare records: `A` apex → droplet IP,
-      `A` `www` → droplet IP, `CAA` letsencrypt.org, both proxied
-      through Cloudflare orange-cloud.
-- [ ] **`outputs.tf`** — droplet IP, spaces endpoint + bucket name,
-      apex URL.
-- [ ] **`terraform/README.md`** — bootstrap instructions: install
-      terraform, populate `terraform.tfvars`, run `terraform init`
-      then `apply`.
+- [x] **`droplet.tf`** — Ubuntu 24.04 droplet, cloud-init bootstrap:
+      installs Docker + compose plugin, creates `deploy` user with
+      SSH key (no password), enables unattended-upgrades, hardens SSH
+      (key-only, no root password login). Tagged `app:tech-feed-reader,env:prod`.
+- [x] **`firewall.tf`** — DO cloud firewall. Inbound: 22 from your
+      `allowed_ssh_cidrs` only, 80 + 443 + ICMP from anywhere.
+- [x] **`spaces.tf`** — DO Space `tech-feed-reader-backups` (private)
+      with lifecycle rules (14d daily, 60d weekly, 400d monthly).
+- [x] **`dns.tf`** — Cloudflare A records for apex + www (proxied),
+      plus CAA records pinning issuance to Let's Encrypt.
+- [x] **`outputs.tf`** — droplet IPv4 + ID, backups bucket name +
+      endpoint, public URL, ready-to-paste SSH command.
+- [x] **`terraform/README.md`** — bootstrap instructions.
+- [x] **`terraform/.gitignore`** — keeps `terraform.tfvars`, `.terraform/`,
+      state files out of git.
 
-State storage: start with local state in `terraform/terraform.tfstate`
+State storage: starts with local state in `terraform/terraform.tfstate`
 (gitignored). If we want remote state later, DO Spaces with S3 backend
-is one command away.
+is one config-block away.
+
+**Total provisioned monthly cost: ~$12 Droplet + ~$5 Spaces = ~$17/mo.**
 
 ## Phase 3 — Deploy + cutover (TOGETHER)
 
@@ -373,11 +364,15 @@ is one command away.
 
 ## Phase 4 — Operations (CLAUDE)
 
-- [ ] **Backup cron** on the Droplet: nightly `pg_dump` piped to `s3cmd`
-      (or `restic`) targeting the DO Space. 7-day retention, weekly
-      kept for 4 weeks, monthly kept for 12.
+- [ ] **Backup cron** on the Droplet: nightly `sqlite3 .backup` of
+      `/var/lib/docker/volumes/app_data/_data/app.db` (use the SQLite
+      online backup API so a writer doesn't get blocked), then `s3cmd
+      put` to the DO Space. Daily into `daily/`, weekly tag into
+      `weekly/`, monthly tag into `monthly/`. Retention is enforced by
+      the bucket's lifecycle rules (see `terraform/spaces.tf`).
 - [ ] **Restore-test script.** Pulls the latest dump into a sandbox
-      container and runs migrations + a smoke query. Run quarterly.
+      container, runs `Database.migrate!` (idempotent), checks
+      `SELECT COUNT(*) FROM articles`. Run quarterly.
 - [ ] **Uptime monitor.** UptimeRobot (free) pointed at `/health`.
       Alert via email.
 - [ ] **Caddy access logs** rotated daily, kept 14 days.

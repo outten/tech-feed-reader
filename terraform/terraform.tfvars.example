@@ -1,0 +1,34 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Don't commit
+# terraform.tfvars — it contains the API tokens and would let anyone
+# with read access to the repo provision/destroy your infrastructure.
+
+# ---- DigitalOcean -----------------------------------------------------------
+# Dashboard → API → Generate New Token (read + write scopes).
+do_token = "dop_v1_REPLACE_ME"
+
+# Dashboard → API → Spaces Keys → Generate New Key. Both halves needed.
+do_spaces_access_id  = "REPLACE_ME"
+do_spaces_secret_key = "REPLACE_ME"
+
+# ---- Cloudflare -------------------------------------------------------------
+# https://dash.cloudflare.com/profile/api-tokens → Create Token →
+# template "Edit zone DNS", restricted to this domain's zone.
+cf_token   = "REPLACE_ME"
+
+# Found in the Cloudflare dashboard sidebar of the domain — bottom
+# of the "API" section on the overview page.
+cf_zone_id = "REPLACE_ME"
+
+# ---- Domain + droplet -------------------------------------------------------
+domain              = "tfr.example.com"
+region              = "nyc3"
+droplet_size        = "s-1vcpu-2gb"
+ssh_key_fingerprint = "REPLACE_ME"  # ssh-keygen -lf ~/.ssh/id_ed25519.pub | awk '{print $2}'
+
+# Your public IP / CIDRs for SSH access. Find via: curl ifconfig.me
+# Append /32 to make it a single-IP rule. Add additional entries if
+# you SSH from multiple locations (home, office, etc).
+allowed_ssh_cidrs = ["203.0.113.42/32"]
+
+# Optional override (default is "tech-feed-reader-backups").
+# backups_bucket_name = "tfr-backups-prod"
