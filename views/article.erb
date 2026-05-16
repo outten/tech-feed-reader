@@ -184,7 +184,11 @@
           </button>
         </form>
         <% if @claude_available %>
-          <form method="post" action="/article/<%= @article['uid'] %>/summarize/llm">
+          <%# js-article-summarize: public/article-summarize-form.js swaps
+              the label to "Summarizing… (5–15s)" on submit so the user
+              sees progress during the synchronous Claude call. %>
+          <form method="post" action="/article/<%= @article['uid'] %>/summarize/llm"
+                class="js-article-summarize">
             <button type="submit" class="refresh-btn"
                     title="Send the article to Claude and replace the LLM summary">
               <%= @summary['llm'].to_s.empty? ? 'Summarize with Claude' : 'Re-summarize with Claude' %>
@@ -340,3 +344,5 @@
     });
   })();
 </script>
+
+<script src="/article-summarize-form.js?v=<%= asset_mtime('public/article-summarize-form.js') %>"></script>
