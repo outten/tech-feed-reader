@@ -1,0 +1,37 @@
+# Caddy reverse proxy + auto Let's Encrypt for the Droplet.
+# DOMAIN + CADDY_EMAIL come from docker-compose env (which reads /opt/app/.env).
+#
+# Cloudflare sits in front of this in Full (strict) mode — Cloudflare
+# terminates the user's TLS, then re-encrypts to this origin using the
+# Let's Encrypt cert Caddy mints below. End-to-end TLS, no plaintext
+# anywhere on the wire.
+
+{
+	# Use the email from env so cert-expiry notifications go to the operator.
+	email {$CADDY_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	# App container exposes 4567 on the internal compose network.
+	reverse_proxy app:4567
+
+	# Security headers. HSTS starts at 6h while we verify TLS works end-to-end;
+	# bump to 1y (31536000) after a week of stability.
+	header {
+		Strict-Transport-Security "max-age=21600"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		# Don't leak the upstream server header.
+		-Server
+	}
+
+	# Health probe — let UptimeRobot hit /health unauthenticated; nothing
+	# else changes about routing.
+	log {
+		output stdout
+		format console
+	}
+}

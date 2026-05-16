@@ -1,0 +1,92 @@
+# Production stack for the Droplet — app + sidekiq worker + redis +
+# caddy reverse-proxy. Run as:
+#
+#   docker compose up -d        # start
+#   docker compose pull && docker compose up -d  # deploy a new version
+#   docker compose logs -f app  # follow app logs
+#
+# Required env vars (set in /opt/app/.env on the Droplet, never committed):
+#   DOMAIN, CADDY_EMAIL, SESSION_SECRET, WEBAUTHN_RP_ID, WEBAUTHN_ORIGIN,
+#   ANTHROPIC_API_KEY. LLM_* and WEBAUTHN_RP_NAME are optional (have
+#   defaults). See .env.example for the full list.
+#
+# Postgres is not in this stack yet — the app still uses SQLite via the
+# app_data volume. Switching to Postgres is a follow-up PR (DEPLOYMENT.md
+# Phase 1 / Postgres section).
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  app:
+    build: .
+    image: tech-feed-reader:latest
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      RACK_ENV: production
+      REDIS_URL: redis://redis:6379/0
+      SESSION_SECRET: ${SESSION_SECRET}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Tech Feed Reader}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LLM_ENABLED: ${LLM_ENABLED:-true}
+      LLM_USER_DAILY_TOKEN_BUDGET: ${LLM_USER_DAILY_TOKEN_BUDGET:-200000}
+      LLM_GLOBAL_HOURLY_TOKEN_BUDGET: ${LLM_GLOBAL_HOURLY_TOKEN_BUDGET:-2000000}
+      LLM_GLOBAL_HOURLY_COST_BUDGET: ${LLM_GLOBAL_HOURLY_COST_BUDGET:-5.00}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - app_data:/app/data
+    expose:
+      - "4567"
+
+  sidekiq:
+    image: tech-feed-reader:latest
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_started
+    environment:
+      RACK_ENV: production
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LLM_ENABLED: ${LLM_ENABLED:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - app_data:/app/data
+    command: ["bundle", "exec", "sidekiq", "-r", "./app/sidekiq_boot.rb", "-c", "5"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      CADDY_EMAIL: ${CADDY_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  app_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

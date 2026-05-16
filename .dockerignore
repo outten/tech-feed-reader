@@ -1,0 +1,39 @@
+# Keep the build context small + don't ship secrets or local DBs.
+.git
+.github
+.gitignore
+.rspec
+.rerun
+.ruby-version
+.DS_Store
+
+# Secrets — never bake into image.
+.env
+.env.local
+.credentials
+
+# Local data files — production uses a mounted volume.
+data/
+db/*.sqlite
+db/*.sqlite3
+db/*.db
+db/*-wal
+db/*-shm
+tmp/
+log/
+*.log
+
+# Tests + dev-only docs (image only needs runtime code).
+spec/
+DEPLOYMENT.md
+STUFF.md
+TODO.md
+CONTRIBUTING.md
+DEVELOPER.md
+
+# Editor / OS noise.
+.idea/
+.vscode/
+*.swp
+*.swo
+node_modules/
