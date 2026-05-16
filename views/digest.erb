@@ -19,6 +19,8 @@
   <div class="error">This digest has no text body to summarise.</div>
 <% elsif params['error'] == 'llm-failed' %>
   <div class="error">Claude call failed: <code><%= h(params['msg']) %></code>.</div>
+<% elsif params['error'] == 'llm-quota' %>
+  <div class="error" role="alert"><strong>LLM quota reached.</strong> <%= h(params['msg']) %></div>
 <% end %>
 
 <%# Cached Claude summary block. One-shot — once stored, the

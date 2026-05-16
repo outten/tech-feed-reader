@@ -66,6 +66,8 @@ require_relative 'request_log_middleware'
 require_relative 'pruner'
 require_relative 'metrics_middleware'
 require_relative 'dev_stats'
+require_relative 'llm_usage_store'
+require_relative 'llm_guard'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -1784,6 +1786,12 @@ class TechFeedReader < Sinatra::Base
       redirect to("/digests/#{id}?notice=already-summarized")
     end
 
+    guard = LlmGuard.check(user_id: current_user_id)
+    if guard.denied?
+      AppLogger.warn('llm_denied', route: '/digests/:id/summarize', reason: guard.reason, user_id: current_user_id)
+      redirect to("/digests/#{id}?error=llm-quota&msg=#{CGI.escape(guard.message)}")
+    end
+
     result = Summarizer::Claude.summarize_digest(
       subject:   digest['subject'],
       text_body: digest['text_body']
@@ -1791,6 +1799,8 @@ class TechFeedReader < Sinatra::Base
     case result.status
     when :ok
       DigestStore.update_llm_summary(current_user_id, id, summary: result.text, model: result.model)
+      LlmUsageStore.record!(user_id: current_user_id, route: '/digests/:id/summarize',
+                            model: result.model, input_tokens: result.input_tokens, output_tokens: result.output_tokens)
       AppLogger.info('digest_summarize', id: id, status: :ok, model: result.model)
       redirect to("/digests/#{id}?notice=llm-summarized&model=#{CGI.escape(result.model.to_s)}")
     when :unavailable
@@ -1834,7 +1844,19 @@ class TechFeedReader < Sinatra::Base
     @page_title       = 'Triage'
     @claude_available = Triage::Claude.available?
     @triage_topic     = sanitize_topic_filter(params['topic'])
+
+    guard = LlmGuard.check(user_id: current_user_id)
+    if guard.denied?
+      AppLogger.warn('llm_denied', route: '/triage', reason: guard.reason, user_id: current_user_id)
+      redirect to("/triage?error=llm-quota&msg=#{CGI.escape(guard.message)}")
+    end
+
     @triage_result    = Triage::Claude.run(current_user_id, topic: @triage_topic)
+    if @triage_result.status == :ok && @triage_result.input_tokens
+      LlmUsageStore.record!(user_id: current_user_id, route: '/triage',
+                            model: @triage_result.model, input_tokens: @triage_result.input_tokens,
+                            output_tokens: @triage_result.output_tokens)
+    end
     AppLogger.info('triage_manual_trigger',
                    status:        @triage_result.status,
                    topic:         @triage_topic,
@@ -1925,6 +1947,13 @@ class TechFeedReader < Sinatra::Base
     payload = parse_json_body
     halt 400, { status: 'error', error: 'invalid JSON body' }.to_json unless payload
 
+    guard = LlmGuard.check(user_id: current_user_id)
+    if guard.denied?
+      AppLogger.warn('llm_denied', route: '/chat', reason: guard.reason, user_id: current_user_id)
+      status 429
+      return { status: 'denied', reason: guard.reason.to_s, error: guard.message }.to_json
+    end
+
     result = Chat::Claude.respond(
       message: payload['message'].to_s,
       history: payload['history'] || [],
@@ -1937,6 +1966,12 @@ class TechFeedReader < Sinatra::Base
 
     case result.status
     when :ok
+      if result.usage
+        LlmUsageStore.record!(user_id: current_user_id, route: '/chat',
+                              model: result.model,
+                              input_tokens:  result.usage[:input_tokens]  || result.usage['input_tokens'],
+                              output_tokens: result.usage[:output_tokens] || result.usage['output_tokens'])
+      end
       { status: 'ok', reply: result.text, model: result.model, usage: result.usage }.to_json
     when :unavailable
       status 503
@@ -1961,6 +1996,12 @@ class TechFeedReader < Sinatra::Base
     article = ArticlesStore.find_by_uid(uid)
     halt 404 unless article
 
+    guard = LlmGuard.check(user_id: current_user_id)
+    if guard.denied?
+      AppLogger.warn('llm_denied', route: '/article/:uid/summarize/llm', reason: guard.reason, user_id: current_user_id)
+      redirect to("/article/#{uid}?error=llm-quota&msg=#{CGI.escape(guard.message)}")
+    end
+
     result = Summarizer::Claude.summarize(
       title:        article['title'].to_s,
       content_text: article['content_text'].to_s
@@ -1969,6 +2010,8 @@ class TechFeedReader < Sinatra::Base
     case result.status
     when :ok
       SummaryStore.upsert(article['id'], llm: result.text, llm_model: result.model)
+      LlmUsageStore.record!(user_id: current_user_id, route: '/article/:uid/summarize/llm',
+                            model: result.model, input_tokens: result.input_tokens, output_tokens: result.output_tokens)
       redirect to("/article/#{uid}?notice=llm-summarized&model=#{CGI.escape(result.model)}")
     when :unavailable then redirect to("/article/#{uid}?error=llm-unavailable")
     when :empty       then redirect to("/article/#{uid}?error=empty-content")
@@ -2637,6 +2680,22 @@ class TechFeedReader < Sinatra::Base
     end
 
     erb :admin_traces
+  end
+
+  # LLM rate-limit dashboard. Shows the active env-driven budgets
+  # (feature flag, per-user daily tokens, global hourly tokens/cost)
+  # alongside actual usage in the last hour + 24h per user. Read-only;
+  # quotas are controlled by env vars set on the host.
+  get '/admin/llm-quota' do
+    @page_title = 'LLM quota'
+    @enabled            = LlmGuard.enabled?
+    @user_daily_budget  = LlmGuard.user_daily_token_budget
+    @global_hour_tokens = LlmGuard.global_hourly_token_budget
+    @global_hour_cost   = LlmGuard.global_hourly_cost_budget
+    @tokens_last_hour   = LlmUsageStore.tokens_last_hour_global
+    @cost_last_hour     = LlmUsageStore.cost_last_hour_global
+    @usage_by_user      = LlmUsageStore.usage_last_24h_by_user
+    erb :admin_llm_quota
   end
 
   # Claude Code token usage + cost + this-repo productivity (commits,

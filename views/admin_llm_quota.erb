@@ -1,0 +1,124 @@
+<%
+  fmt_tokens = ->(n) {
+    n = n.to_i
+    if n >= 1_000_000
+      format('%.2fM', n / 1_000_000.0)
+    elsif n >= 1_000
+      format('%.1fk', n / 1_000.0)
+    else
+      n.to_s
+    end
+  }
+  fmt_cost = ->(c) { format('$%.4f', c.to_f) }
+%>
+
+<div class="page-header">
+  <div>
+    <h2>LLM quota</h2>
+    <p class="subtitle">
+      Cost containment on the four user-facing Claude routes
+      (<code>/triage</code>, <code>/chat</code>,
+      <code>/article/:uid/summarize/llm</code>,
+      <code>/digests/:id/summarize</code>). Quotas are env-driven;
+      change them on the host and restart.
+    </p>
+  </div>
+</div>
+
+<section class="benchmark-section">
+  <h3>Active budgets</h3>
+  <div class="stat-cards">
+    <div class="summary-card">
+      <span class="summary-label">Feature flag</span>
+      <span class="summary-value">
+        <% if @enabled %>
+          <span class="badge bookmarked">enabled</span>
+        <% else %>
+          <span class="badge">disabled</span>
+        <% end %>
+      </span>
+      <span class="summary-sub">set <code>LLM_ENABLED=false</code> to kill-switch all four routes</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Per-user daily budget</span>
+      <span class="summary-value"><%= fmt_tokens.(@user_daily_budget) %></span>
+      <span class="summary-sub">
+        tokens · rolling 24h ·
+        <code>LLM_USER_DAILY_TOKEN_BUDGET</code>
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Global hourly budget</span>
+      <span class="summary-value"><%= fmt_tokens.(@global_hour_tokens) %></span>
+      <span class="summary-sub">
+        tokens · all users last hour ·
+        <code>LLM_GLOBAL_HOURLY_TOKEN_BUDGET</code>
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Global hourly cost cap</span>
+      <span class="summary-value"><%= fmt_cost.(@global_hour_cost) %></span>
+      <span class="summary-sub">
+        API-equivalent · all users last hour ·
+        <code>LLM_GLOBAL_HOURLY_COST_BUDGET</code>
+      </span>
+    </div>
+  </div>
+</section>
+
+<section class="benchmark-section">
+  <h3>Last hour (global)</h3>
+  <div class="stat-cards">
+    <div class="summary-card">
+      <span class="summary-label">Tokens used</span>
+      <span class="summary-value"><%= fmt_tokens.(@tokens_last_hour) %></span>
+      <span class="summary-sub">
+        of <%= fmt_tokens.(@global_hour_tokens) %> ·
+        <%= @global_hour_tokens.zero? ? 0 : (100.0 * @tokens_last_hour / @global_hour_tokens).round(1) %>%
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Cost (API equiv.)</span>
+      <span class="summary-value"><%= fmt_cost.(@cost_last_hour) %></span>
+      <span class="summary-sub">
+        of <%= fmt_cost.(@global_hour_cost) %> ·
+        <%= @global_hour_cost.zero? ? 0 : (100.0 * @cost_last_hour / @global_hour_cost).round(1) %>%
+      </span>
+    </div>
+  </div>
+</section>
+
+<section class="benchmark-section">
+  <h3>Per-user (last 24h)</h3>
+  <% if @usage_by_user.empty? %>
+    <p><em>No LLM calls in the last 24 hours.</em></p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th class="num">Calls</th>
+          <th class="num">Input</th>
+          <th class="num">Output</th>
+          <th class="num">Total tokens</th>
+          <th class="num">% of daily budget</th>
+          <th class="num">API equiv.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @usage_by_user.each do |row| %>
+          <% pct = @user_daily_budget.zero? ? 0 : (100.0 * row['total_tokens'].to_i / @user_daily_budget).round(1) %>
+          <tr>
+            <td class="mono"><%= row['user_id'] %></td>
+            <td class="num mono"><%= row['calls'] %></td>
+            <td class="num mono"><%= fmt_tokens.(row['input_tokens']) %></td>
+            <td class="num mono"><%= fmt_tokens.(row['output_tokens']) %></td>
+            <td class="num mono"><%= fmt_tokens.(row['total_tokens']) %></td>
+            <td class="num mono"><%= pct %>%</td>
+            <td class="num mono"><%= fmt_cost.(row['cost_usd']) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
