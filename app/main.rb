@@ -840,15 +840,21 @@ class TechFeedReader < Sinatra::Base
   end
 
   # STUFF.md #13 / #14 / #17 — / is the canonical home.
-  # Two modes, branched on ReadStateStore.any_activity?:
-  #   • Anonymous (no read_state rows) → marketing pitch + feature cards.
+  # Three modes:
+  #   • Anonymous (not signed in) → marketing pitch + feature cards.
+  #   • Signed-in but no feed subscriptions (brand-new signup) → 302
+  #     to /welcome so onboarding picks topic chips for them. Without
+  #     this branch a fresh signup lands on the marketing pitch and
+  #     re-prompts for sign-up, which is awkward.
   #   • Returning user → What's On Today (matches / reads / listens /
-  #     watch) personalized by follows + For You ranker. The Dashboard
-  #     (operational stats + Activity chart) moved to /admin/dashboard
-  #     since it's an ops view, not a daily-use surface.
-  # Single DB probe decides the path; no cookie. Once auth ships in
-  # Phase A1, the probe becomes "is the current user signed in?".
+  #     watch) personalized by follows + For You ranker.
+  # The Dashboard (operational stats + Activity chart) moved to
+  # /admin/dashboard since it's an ops view, not a daily-use surface.
   get '/' do
+    if signed_in? && FeedsStore.count_for_user(current_user_id).zero?
+      redirect to('/welcome')
+    end
+
     @page_title  = 'Tech Feed Reader'
     @public_page = true
     @returning_user = signed_in? &&
@@ -1199,6 +1205,56 @@ class TechFeedReader < Sinatra::Base
     AppLogger.info('account_deleted', user_id: uid, username: expected)
     sign_out!
     redirect to('/?notice=account-deleted')
+  end
+
+  # ===================================================================
+  # First-time-user onboarding (/welcome)
+  # ===================================================================
+  # A signed-in user who has zero feed subscriptions lands here from
+  # GET / instead of the marketing pitch. Picks a subset of topic
+  # chips → POST /welcome/subscribe seeds 4-6 curated catalog feeds
+  # per selected topic → redirects to /articles with a notice.
+
+  get '/welcome' do
+    require_signed_in!
+    @page_title = 'Welcome'
+    if FeedsStore.count_for_user(current_user_id).positive?
+      redirect to('/')
+    end
+    @account_user = current_user
+    @chips        = FeedCatalog::ONBOARDING_CHIPS
+    erb :welcome
+  end
+
+  post '/welcome/subscribe' do
+    require_signed_in!
+    requested = Array(params['topics']).map(&:to_sym)
+    selected  = requested & FeedCatalog::ONBOARDING_CHIPS.keys
+    redirect to('/welcome') if selected.empty?
+
+    inserted_count = 0
+    selected.each do |topic|
+      FeedCatalog.starters_for_topic(topic).each do |entry|
+        feed, inserted = FeedsStore.add_for_user(
+          user_id: current_user_id,
+          url:     entry[:url],
+          title:   entry[:title],
+          fetch_interval_seconds: entry[:interval],
+          topic:   FeedCatalog.topic_for(entry).to_s
+        )
+        next unless inserted
+        inserted_count += 1
+        # Same logic as /youtube/subscribe-bulk: only enqueue a
+        # background fetch when the feed has never been fetched
+        # before. Feeds another user already subscribed to (content
+        # already imported) skip the refresh.
+        FeedRefreshWorker.perform_async(feed['id']) if feed['last_fetched_at'].nil?
+      end
+    end
+
+    AppLogger.info('onboarding_complete', user_id: current_user_id,
+                                          topics: selected, inserted: inserted_count)
+    redirect to("/articles?notice=onboarded&count=#{inserted_count}")
   end
 
   # /whats-on → / 301-redirect for backwards compatibility with old

@@ -471,6 +471,58 @@ module FeedCatalog
     CATALOG.select { |e| e[:seed] }
   end
 
+  # First-time onboarding starter sets per topic chip. Maintained
+  # as URL lookups (not category-globs) so we curate the exact mix —
+  # rebalancing one topic doesn't have to mean adding/removing
+  # `seed: true` flags across CATALOG. URLs that don't resolve in
+  # CATALOG (renamed or dropped) are silently skipped so a future
+  # drift doesn't 500 the /welcome flow.
+  ONBOARDING_STARTERS = {
+    technology: %w[
+      https://news.ycombinator.com/rss
+      https://lobste.rs/rss
+      https://www.theverge.com/rss/index.xml
+      https://feeds.arstechnica.com/arstechnica/index
+      https://simonwillison.net/atom/everything/
+      https://blog.cloudflare.com/rss/
+    ].freeze,
+    sports: %w[
+      https://www.bleedinggreennation.com/rss/index.xml
+      https://www.libertyballers.com/rss/index.xml
+      https://phillysoccerpage.net/feed/
+      https://feeds.bbci.co.uk/sport/rugby-union/rss.xml
+      https://www.espn.com/espn/rss/tennis/news
+    ].freeze,
+    nature: %w[
+      https://www.youtube.com/feeds/videos.xml?channel_id=UCwmZiChSryoWQCZMIQezgTg
+      https://www.youtube.com/feeds/videos.xml?channel_id=UCpVm7bg6pXKo1Pr6k5kxG9A
+      https://www.youtube.com/feeds/videos.xml?channel_id=UCkzTTu69cSxxab41OHrBfvQ
+      https://www.youtube.com/feeds/videos.xml?channel_id=UCQtW2oz8ec8pHjjxawujNjg
+    ].freeze,
+    podcasts: %w[
+      https://changelog.com/podcast/feed
+      https://lexfridman.com/feed/podcast/
+      https://feeds.simplecast.com/l2i9YnTd
+      https://feeds.simplecast.com/BqbsxVfO
+      https://feeds.simplecast.com/Sl5CSM3S
+    ].freeze
+  }.freeze
+
+  # Onboarding-chip labels. Surfaces in views/welcome.erb so the
+  # label + the catalog-driven feed list are pulled from the same
+  # place — adding a chip is a CATALOG-only change.
+  ONBOARDING_CHIPS = {
+    technology: { label: 'Technology',  blurb: 'Tech news + engineering blogs + AI commentary.', emoji: '💻' },
+    sports:     { label: 'Sports',      blurb: 'NFL / NBA / soccer / rugby / tennis news.',       emoji: '🏟' },
+    nature:     { label: 'Nature',      blurb: 'BBC Earth, Nat Geo, PBS Nature documentaries.',   emoji: '📺' },
+    podcasts:   { label: 'Podcasts',    blurb: 'Long-form audio: Changelog, Lex Fridman, more.',  emoji: '🎧' }
+  }.freeze
+
+  def starters_for_topic(topic)
+    urls = ONBOARDING_STARTERS[topic.to_sym] || []
+    urls.filter_map { |url| find_by_url(url) }
+  end
+
   def find_by_url(url)
     CATALOG.find { |e| e[:url] == url }
   end

@@ -4078,3 +4078,88 @@ html.dark .account-recovery-codes { background: #1c1c1e; color: #f5f5f7; border-
 .account-delete-form input { padding: 0.5rem; border: 1px solid #d2d2d7; border-radius: 6px; max-width: 360px; }
 html.dark .account-delete-form input { background: #1c1c1e; color: #f5f5f7; border-color: #3a3a3c; }
 .account-delete-btn { align-self: flex-start; }
+
+/* First-time-user onboarding (/welcome). 4 topic chips as labeled
+   checkbox cards; checked state highlights with a tinted background.
+   Reuses .btn-primary for the submit button. */
+.welcome-hero {
+  text-align: center;
+  margin: 2rem auto 2.5rem;
+  max-width: 720px;
+}
+.welcome-hero h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem;
+  color: #1d1d1f;
+}
+html.dark .welcome-hero h1 { color: #f5f5f7; }
+.welcome-hero .subtitle { font-size: 1.05rem; line-height: 1.5; }
+
+.welcome-form {
+  max-width: 880px;
+  margin: 0 auto;
+}
+.welcome-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.welcome-chip {
+  display: block;
+  border: 2px solid #d2d2d7;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 120ms ease, background 120ms ease;
+  position: relative;
+}
+.welcome-chip:hover { border-color: #007aff; }
+.welcome-chip input[type="checkbox"] {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  width: 18px;
+  height: 18px;
+  accent-color: #007aff;
+  cursor: pointer;
+}
+.welcome-chip:has(input:checked) {
+  border-color: #007aff;
+  background: #e6f1ff;
+}
+html.dark .welcome-chip { background: #1c1c1e; border-color: #3a3a3c; }
+html.dark .welcome-chip:hover { border-color: #4dabff; }
+html.dark .welcome-chip:has(input:checked) { background: #102a44; border-color: #4dabff; }
+
+.welcome-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-right: 1.6rem; /* room for the absolute-positioned checkbox */
+}
+.welcome-chip-emoji { font-size: 1.8rem; }
+.welcome-chip-label { font-weight: 600; font-size: 1.05rem; color: #1d1d1f; }
+html.dark .welcome-chip-label { color: #f5f5f7; }
+.welcome-chip-blurb { font-size: 0.88rem; color: #3a3a3c; }
+html.dark .welcome-chip-blurb { color: #c7c7cc; }
+.welcome-chip-count { font-size: 0.78rem; }
+
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.welcome-submit { padding: 0.7rem 1.4rem; font-size: 1rem; }
+.welcome-skip-link {
+  color: #007aff;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.welcome-skip-link:hover { text-decoration: underline; }
+html.dark .welcome-skip-link { color: #4dabff; }
+
+.welcome-fineprint { font-size: 0.85rem; }
