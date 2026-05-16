@@ -1,0 +1,264 @@
+<%
+  # Sinatra/Tilt compiles this template into a method, so `def` here
+  # wouldn't land on the right receiver. Lambdas stay in local scope.
+  fmt_tokens = ->(n) {
+    if n >= 1_000_000
+      format('%.2fM', n / 1_000_000.0)
+    elsif n >= 1_000
+      format('%.1fk', n / 1_000.0)
+    else
+      n.to_s
+    end
+  }
+  fmt_cost = ->(c) { format('$%.2f', c.to_f) }
+  total_tokens = ->(b) { b[:input] + b[:output] + b[:cache_read] + b[:cache_write] }
+%>
+
+<div class="page-header">
+  <div>
+    <h2>Dev stats</h2>
+    <p class="subtitle">Claude Code token usage, value derived, and shipped work. Refreshes on every load.</p>
+  </div>
+</div>
+
+<%
+  sub = @report[:subscription]
+%>
+<section class="benchmark-section">
+  <h3>Subscription</h3>
+  <div class="stat-cards">
+    <div class="summary-card">
+      <span class="summary-label">Plan</span>
+      <span class="summary-value"><%= h(sub[:label]) %></span>
+      <span class="summary-sub">
+        <%= fmt_cost.(sub[:monthly_usd]) %> / month flat &middot;
+        override with <code>CLAUDE_SUBSCRIPTION_TIER</code> (<%= sub[:available_tiers].join(', ') %>)
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">This month (API equiv.)</span>
+      <span class="summary-value"><%= fmt_cost.(sub[:month_api_equiv_cost]) %></span>
+      <span class="summary-sub">what this would cost billed at API rates</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Effective value</span>
+      <span class="summary-value"><%= format('%.0f×', sub[:value_multiple]) %></span>
+      <span class="summary-sub">
+        <%= fmt_cost.(sub[:savings]) %> saved vs API this month
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Sessions (all time)</span>
+      <span class="summary-value"><%= @report[:session_count] %></span>
+      <span class="summary-sub">across all Claude Code projects</span>
+    </div>
+  </div>
+  <p class="subtitle">
+    You pay the flat subscription fee, not the API-equivalent. The numbers below show what each
+    day/project/model <em>would</em> cost at API rates — useful as a trend signal for where
+    development cost is concentrated, not as a bill.
+  </p>
+</section>
+
+<section class="benchmark-section">
+  <h3>Today</h3>
+  <div class="stat-cards">
+    <div class="summary-card">
+      <span class="summary-label">API equiv.</span>
+      <span class="summary-value"><%= fmt_cost.(@report[:totals][:today][:cost]) %></span>
+      <span class="summary-sub"><%= @report[:totals][:today][:messages] %> assistant messages</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Tokens (in/out)</span>
+      <span class="summary-value"><%= fmt_tokens.(@report[:totals][:today][:input] + @report[:totals][:today][:output]) %></span>
+      <span class="summary-sub">
+        <%= fmt_tokens.(@report[:totals][:today][:input]) %> in &middot;
+        <%= fmt_tokens.(@report[:totals][:today][:output]) %> out
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Cache tokens</span>
+      <span class="summary-value"><%= fmt_tokens.(@report[:totals][:today][:cache_read] + @report[:totals][:today][:cache_write]) %></span>
+      <span class="summary-sub">
+        <%= fmt_tokens.(@report[:totals][:today][:cache_read]) %> read &middot;
+        <%= fmt_tokens.(@report[:totals][:today][:cache_write]) %> write
+      </span>
+    </div>
+  </div>
+</section>
+
+<section class="benchmark-section">
+  <h3>Rollups</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Window</th>
+        <th class="num">API equiv.</th>
+        <th class="num">Input</th>
+        <th class="num">Output</th>
+        <th class="num">Cache read</th>
+        <th class="num">Cache write</th>
+        <th class="num">Messages</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% [[:today, 'Today'], [:last_7, 'Last 7 days'], [:last_30, 'Last 30 days'], [:all_time, 'All time']].each do |key, label| %>
+        <% t = @report[:totals][key] %>
+        <tr>
+          <td><%= label %></td>
+          <td class="num mono"><%= fmt_cost.(t[:cost]) %></td>
+          <td class="num mono"><%= fmt_tokens.(t[:input]) %></td>
+          <td class="num mono"><%= fmt_tokens.(t[:output]) %></td>
+          <td class="num mono"><%= fmt_tokens.(t[:cache_read]) %></td>
+          <td class="num mono"><%= fmt_tokens.(t[:cache_write]) %></td>
+          <td class="num mono"><%= t[:messages] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<section class="benchmark-section">
+  <h3>Per-day (last 30, with productivity)</h3>
+  <p class="subtitle">Tokens/cost is across all projects. Commits/lines/PRs are this repo only.</p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th class="num">API equiv.</th>
+        <th class="num">Tokens</th>
+        <th class="num">Msgs</th>
+        <th class="num">Commits</th>
+        <th class="num">+lines</th>
+        <th class="num">-lines</th>
+        <th class="num">PRs merged</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%
+        prs_by_day = @report[:prs].group_by { |pr| pr[:merged_day] }
+        # Union of dates from tokens, git, and PRs — sorted newest first.
+        all_days = (@report[:by_day].keys + @report[:git].keys + prs_by_day.keys).compact.uniq.sort.reverse.first(30)
+      %>
+      <% all_days.each do |day| %>
+        <% b = @report[:by_day][day] || DevStats.empty_bucket %>
+        <% g = @report[:git][day] || { commits: 0, insertions: 0, deletions: 0 } %>
+        <% prs = prs_by_day[day] || [] %>
+        <tr>
+          <td class="mono"><%= day %></td>
+          <td class="num mono"><%= fmt_cost.(b[:cost]) %></td>
+          <td class="num mono"><%= fmt_tokens.(total_tokens.(b)) %></td>
+          <td class="num mono"><%= b[:messages] %></td>
+          <td class="num mono"><%= g[:commits] %></td>
+          <td class="num mono"><%= g[:insertions] %></td>
+          <td class="num mono"><%= g[:deletions] %></td>
+          <td class="num mono">
+            <% if prs.empty? %>
+              0
+            <% else %>
+              <%= prs.length %>
+              <span class="summary-sub">
+                <% prs.each do |pr| %>
+                  &middot; #<%= pr[:number] %>
+                <% end %>
+              </span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+      <% if all_days.empty? %>
+        <tr><td colspan="8"><em>No activity in the last 30 days.</em></td></tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<section class="benchmark-section">
+  <h3>By project (all time)</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Project</th>
+        <th class="num">API equiv.</th>
+        <th class="num">Tokens</th>
+        <th class="num">Messages</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @report[:by_project].each do |project, b| %>
+        <tr>
+          <td class="mono"><%= h(project) %></td>
+          <td class="num mono"><%= fmt_cost.(b[:cost]) %></td>
+          <td class="num mono"><%= fmt_tokens.(total_tokens.(b)) %></td>
+          <td class="num mono"><%= b[:messages] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<section class="benchmark-section">
+  <h3>By model (all time)</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Model bucket</th>
+        <th class="num">API equiv.</th>
+        <th class="num">Input</th>
+        <th class="num">Output</th>
+        <th class="num">Cache read</th>
+        <th class="num">Cache write</th>
+        <th class="num">Messages</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @report[:by_model].each do |model, b| %>
+        <tr>
+          <td class="mono"><%= h(model) %></td>
+          <td class="num mono"><%= fmt_cost.(b[:cost]) %></td>
+          <td class="num mono"><%= fmt_tokens.(b[:input]) %></td>
+          <td class="num mono"><%= fmt_tokens.(b[:output]) %></td>
+          <td class="num mono"><%= fmt_tokens.(b[:cache_read]) %></td>
+          <td class="num mono"><%= fmt_tokens.(b[:cache_write]) %></td>
+          <td class="num mono"><%= b[:messages] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <p class="subtitle">
+    Pricing per 1M tokens (USD): opus $15/$75 in/out, sonnet $3/$15, haiku $1/$5.
+    Cache reads ~10% of input; cache writes (1h) ~125%. Update <code>DevStats::PRICING</code> if rates change.
+  </p>
+</section>
+
+<section class="benchmark-section">
+  <h3>Recent merged PRs (this repo, last 30 days)</h3>
+  <% if @report[:prs].empty? %>
+    <p><em>No merged PRs in the window (or <code>gh</code> isn't authed for this repo).</em></p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Merged</th>
+          <th>Title</th>
+          <th class="num">+</th>
+          <th class="num">-</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @report[:prs].each do |pr| %>
+          <tr>
+            <td class="mono">#<%= pr[:number] %></td>
+            <td class="mono"><%= pr[:merged_day] %></td>
+            <td><%= h(pr[:title]) %></td>
+            <td class="num mono"><%= pr[:additions] %></td>
+            <td class="num mono"><%= pr[:deletions] %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
+
+<p class="subtitle">Generated at <%= @report[:generated_at] %></p>
