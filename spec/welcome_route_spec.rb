@@ -13,6 +13,12 @@ RSpec.describe 'Welcome onboarding flow' do
   include Rack::Test::Methods
   def app; TechFeedReader; end
 
+  # CI has no Redis, so the route's `FeedRefreshWorker.perform_async`
+  # call would raise RedisClient::CannotConnectError on every new
+  # subscription. Stub it globally — tests that care about the
+  # enqueue assert on it explicitly.
+  before { allow(FeedRefreshWorker).to receive(:perform_async) }
+
   describe 'GET / redirect for new signed-in users' do
     it 'redirects to /welcome when signed-in user has zero subscriptions' do
       get '/'
