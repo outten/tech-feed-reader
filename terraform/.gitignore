@@ -1,0 +1,11 @@
+# Never commit the real tfvars — it contains API tokens.
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform working files + state.
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfplan
+crash.log
