@@ -189,6 +189,8 @@ Per-store wrapper classes (`FeedsStore`, `ArticlesStore`, etc.) sit on top of th
 
 **`/account` page** — manages display name, registered passkeys (list / + Add this device / Revoke per row), recovery-code regeneration (one-shot reveal), and account deletion (typed-username confirmation gate; cascade deletes via the FK chain in migration 022 wipe every per-user row). Lockout protection: refuses to revoke the user's last passkey when zero unused recovery codes remain.
 
+**`/welcome` first-time onboarding** — `GET /` redirects signed-in users with zero feed subscriptions to `/welcome`. The page shows four topic chips (Technology / Sports / Nature / Podcasts); each selection seeds 4-6 curated starter feeds from `FeedCatalog::ONBOARDING_STARTERS` via the existing `FeedsStore.add_for_user` path, then `POST /welcome/subscribe` redirects to `/articles?notice=onboarded`. Brand-new feeds (no prior subscriber → `last_fetched_at` is nil) get a `FeedRefreshWorker` enqueued so content shows up within ~30s. Existing feeds (another user is already subscribed) skip the fetch — content is already imported.
+
 ## Article id
 
 Each article has both a SQLite rowid (`articles.id`, used internally for joins and FTS5 linkage) and a stable `uid` = `SHA1(feed_url + article_url)[0,12]` used in URLs (`/article/abc123def456`). The uid is stable across re-fetches; the rowid is internal.

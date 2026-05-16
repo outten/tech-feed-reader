@@ -1,0 +1,40 @@
+<%# First-time onboarding. Fires when a signed-in user has zero feed
+    subscriptions. Picking one or more topic chips seeds 4-6 curated
+    catalog feeds per pick (FeedCatalog::ONBOARDING_STARTERS); the
+    POST handler then redirects to /articles. %>
+<div class="welcome-hero">
+  <h1>Welcome, <%= h(@account_user['display_name'] || @account_user['username']) %>.</h1>
+  <p class="subtitle">
+    Let's set up your reader. Pick the topics you're into — we'll subscribe you
+    to a small curated set of feeds in each, and you can manage / add / remove
+    them any time from <a href="/feeds">/feeds</a>.
+  </p>
+</div>
+
+<form method="post" action="/welcome/subscribe" class="welcome-form">
+  <div class="welcome-chips">
+    <% @chips.each do |topic_key, meta| %>
+      <label class="welcome-chip">
+        <input type="checkbox" name="topics[]" value="<%= h(topic_key) %>">
+        <span class="welcome-chip-body">
+          <span class="welcome-chip-emoji"><%= meta[:emoji] %></span>
+          <span class="welcome-chip-label"><%= h(meta[:label]) %></span>
+          <span class="welcome-chip-blurb"><%= h(meta[:blurb]) %></span>
+          <span class="welcome-chip-count muted">
+            <%= FeedCatalog.starters_for_topic(topic_key).length %> starter feeds
+          </span>
+        </span>
+      </label>
+    <% end %>
+  </div>
+
+  <div class="welcome-actions">
+    <button type="submit" class="btn-primary welcome-submit">Subscribe to selected topics</button>
+    <a href="/feeds" class="welcome-skip-link" title="Skip the picker and browse the full catalog yourself">Skip — I'll pick feeds myself →</a>
+  </div>
+
+  <p class="subtitle welcome-fineprint">
+    No commitment. Each topic is just a handful of well-known feeds to get you
+    started; muting / unsubscribing is one click on <a href="/feeds">/feeds</a>.
+  </p>
+</form>

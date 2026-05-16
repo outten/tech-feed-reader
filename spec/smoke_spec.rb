@@ -8,8 +8,11 @@ RSpec.describe 'TechFeedReader smoke' do
     TechFeedReader
   end
 
-  # STUFF.md #13 — / always renders the public home page.
+  # STUFF.md #13 — / renders the public home page when the (test-mode)
+  # auto-signed-in user has at least one subscription. With zero
+  # subscriptions the welcome-onboarding redirect fires instead.
   it '/ renders the public home page for everyone' do
+    FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
     get '/'
     expect(last_response.status).to eq(200)
     expect(last_response.body).to include('Stop swivel-chairing')

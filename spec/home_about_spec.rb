@@ -15,6 +15,13 @@ RSpec.describe 'GET / — anonymous' do
   include Rack::Test::Methods
   def app; TechFeedReader; end
 
+  # Seed one subscription so the new welcome-onboarding redirect
+  # (signed-in + zero subscriptions → /welcome) doesn't fire and the
+  # marketing-pitch branch can render. The marketing path runs when
+  # signed_in? is true but any_activity? is false — having a feed
+  # subscription with no read_state still hits the marketing branch.
+  before { FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example') }
+
   it 'renders the marketing pitch when there is no read_state activity' do
     get '/'
     expect(last_response.status).to eq(200)

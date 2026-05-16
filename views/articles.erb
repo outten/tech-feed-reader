@@ -1,3 +1,12 @@
+<% if params['notice'] == 'onboarded' %>
+  <%# /welcome → /welcome/subscribe lands here. params[:count] is the
+      number of newly-subscribed feeds (rounded for display). %>
+  <div class="notice welcome-arrived-notice">
+    🎉 You're set up. Subscribed to <strong><%= params['count'].to_s.match?(/\A\d+\z/) ? params['count'] : 'a few' %></strong> feeds.
+    New articles will appear here as they're fetched — give it ~30 seconds.
+  </div>
+<% end %>
+
 <div class="page-header">
   <div>
     <h2>

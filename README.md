@@ -40,6 +40,7 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | Bus mode | `/bus` | Podcast episodes ≤15 min — pick something for the commute |
 | Sign up | `/sign-up` | Passkey registration ceremony; receive 10 single-use recovery codes (shown once) |
 | Sign in | `/sign-in` | Passkey authentication; "Use a recovery code" fallback |
+| Welcome | `/welcome` | First-time-user onboarding — pick topic chips (Tech / Sports / Nature / Podcasts) and one-click-subscribe to curated starter feeds. Fires automatically when a signed-in user has zero subscriptions |
 | Account | `/account` | Manage display name, list / add / revoke passkeys, regenerate recovery codes, delete account (typed-confirmation gate) |
 | Admin | `/admin` | System overview, integration status, sub-page links |
 | Admin dashboard | `/admin/dashboard` | Article counts, 7-day Activity chart, top feeds + tags |
