@@ -155,12 +155,11 @@ module Database
     # which is wrong; D-PG-2 fixes this when the PG dialect migrations
     # exist).
     def open_postgres!(url)
-      conn = PG::Connection.new(url)
-      # Mute the noisy NOTICEs that DROP SCHEMA CASCADE / similar emit
-      # during test-mode schema resets. PG defaults to NOTICE; we only
-      # want WARNING + ERROR on the wire.
-      conn.exec('SET client_min_messages = WARNING')
-      Database::PgAdapter.new(conn)
+      # PgAdapter owns the socket lifecycle when handed a URL string:
+      # it opens the connection, runs `SET client_min_messages =
+      # WARNING` + installs the type map, and reconnects-on-disconnect
+      # if a Puma thread later trips over an idle-reaped socket.
+      Database::PgAdapter.new(url)
     end
   end
 end
