@@ -28,9 +28,14 @@ RSpec.describe 'GET /health' do
       expect(body['status']).to eq('ok')
     end
 
-    it 'includes version, started_at, uptime, and current_time (TOD)' do
+    it 'includes version, git_sha, started_at, uptime, and current_time (TOD)' do
       get '/health'
-      expect(body['version']).to be_a(String)
+      # STUFF #33A — `version` is the semver from /VERSION (e.g. 0.9.0);
+      # `git_sha` is the commit hash from CI / `git rev-parse`.
+      # Both surface so a deploy can be identified by semver in the
+      # footer + by SHA in tracing.
+      expect(body['version']).to match(/\A(\d+\.\d+\.\d+|unknown)\z/)
+      expect(body['git_sha']).to be_a(String)
       expect(body['started_at']).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
       expect(body['uptime_seconds']).to be >= 0
       expect(body['current_time']).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)

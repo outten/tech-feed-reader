@@ -807,7 +807,8 @@ class TechFeedReader < Sinatra::Base
 
     {
       status:         overall,
-      version:        AppVersion::GIT_SHA,
+      version:        AppVersion::SEMVER,
+      git_sha:        AppVersion::GIT_SHA,
       started_at:     AppVersion::STARTED_AT.iso8601,
       uptime_seconds: AppVersion.uptime_seconds,
       current_time:   Time.now.utc.iso8601,

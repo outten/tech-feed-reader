@@ -28,7 +28,17 @@ services:
       retries: 3
 
   app:
-    build: .
+    build:
+      context: .
+      # APP_VERSION drives the OCI image label and the AppVersion::SEMVER
+      # constant in the running container. `make deploy` exports
+      # APP_VERSION=$(cat VERSION) before invoking compose so the new
+      # image is tagged correctly; manual `docker compose build` without
+      # the env var defaults to 'unknown', which the runtime fallback
+      # (reading /app/VERSION from the COPYed source) corrects for the
+      # in-app footer — only the OCI label stays 'unknown' in that case.
+      args:
+        APP_VERSION: ${APP_VERSION:-unknown}
     image: tech-feed-reader:latest
     restart: unless-stopped
     depends_on:
