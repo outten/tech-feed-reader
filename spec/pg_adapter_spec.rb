@@ -67,34 +67,36 @@ RSpec.describe Database::PgAdapter do
     end
   end
 
-  describe '.execute — INSERT auto-RETURNING' do
-    it 'appends RETURNING id to bare INSERTs and surfaces the id via last_insert_row_id' do
+  describe '.execute — INSERT RETURNING (opt-in)' do
+    it 'appends RETURNING id when auto_return: true is passed (canonical insert path)' do
       result = FakePgResult.new([{ 'id' => 42 }], 1)
       conn   = FakePgConn.new('INSERT INTO feeds' => result)
       adapter = described_class.new(conn)
-      adapter.execute('INSERT INTO feeds(url, title) VALUES (?, ?)', ['https://x.com', 'X'])
+      adapter.execute('INSERT INTO feeds(url, title) VALUES (?, ?)',
+                      ['https://x.com', 'X'], auto_return: true)
       _, sent_sql, _ = conn.calls.last
       expect(sent_sql).to end_with('RETURNING id')
       expect(adapter.last_insert_row_id).to eq(42)
       expect(adapter.changes).to eq(1)
     end
 
-    it 'leaves a user-supplied RETURNING clause alone' do
+    it 'leaves a user-supplied RETURNING clause alone (no double-append)' do
       result = FakePgResult.new([{ 'id' => 9 }], 1)
       conn   = FakePgConn.new('RETURNING id, url' => result)
       adapter = described_class.new(conn)
-      adapter.execute('INSERT INTO feeds(url) VALUES (?) RETURNING id, url', ['x'])
+      adapter.execute('INSERT INTO feeds(url) VALUES (?) RETURNING id, url',
+                      ['x'], auto_return: true)
       _, sent_sql, _ = conn.calls.last
       expect(sent_sql).to match(/RETURNING id, url\z/)
       expect(sent_sql).not_to match(/RETURNING id\s+RETURNING/)
       expect(adapter.last_insert_row_id).to eq(9)
     end
 
-    it 'is opt-out via auto_return: false (composite-PK tables)' do
+    it 'defaults to no RETURNING (safe for composite-PK tables)' do
       conn    = FakePgConn.new
       adapter = described_class.new(conn)
       adapter.execute('INSERT INTO read_state(user_id, article_id, read) VALUES (?, ?, ?)',
-                      [1, 2, 1], auto_return: false)
+                      [1, 2, 1])
       _, sent_sql, _ = conn.calls.last
       expect(sent_sql).not_to include('RETURNING')
     end

@@ -5,12 +5,25 @@ ENV['RACK_ENV'] = 'test'
 
 # Phase A1 (consumer auth). Set the env vars the app boot needs
 # BEFORE any app file requires them. Tests don't read .env (the
-# dotenv branch in main.rb skips loading in test env), so we must
-# inject deterministic values here.
+# dotenv branch in Credentials.load! now actually skips in test
+# env), so we must inject deterministic values here.
 ENV['SESSION_SECRET']    ||= '0' * 128
 ENV['WEBAUTHN_RP_NAME']  ||= 'Tech Feed Reader (test)'
 ENV['WEBAUTHN_RP_ID']    ||= 'localhost'
 ENV['WEBAUTHN_ORIGIN']   ||= 'http://localhost:4567'
+
+# Phase 5 / D-PG-2. The test suite defaults to SQLite :memory: so
+# `bundle exec rspec` works on any laptop without a running PG
+# server. Opt into the PG path by setting TEST_DATABASE_URL — used
+# by the CI matrix's postgres job. Any DATABASE_URL inherited from
+# the developer's shell/.env is explicitly cleared so a stray
+# postgres://... pointing at a personal DB doesn't quietly hijack
+# the suite.
+if (test_url = ENV['TEST_DATABASE_URL'])
+  ENV['DATABASE_URL'] = test_url
+else
+  ENV.delete('DATABASE_URL')
+end
 
 require_relative '../app/database'
 require_relative '../app/health_registry'
