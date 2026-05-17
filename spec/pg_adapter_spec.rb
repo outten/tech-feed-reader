@@ -158,6 +158,71 @@ RSpec.describe Database::PgAdapter do
     end
   end
 
+  # D-PG-5 production hardening. These only run on the PG leg because
+  # they need a real PG::Connection to disconnect/reconnect against.
+  describe 'thread safety + reconnect (PG leg only)' do
+    before(:each) do
+      skip 'Needs a real PG connection' unless Database.adapter == :postgres
+    end
+
+    it 'serialises concurrent execute calls across 10 threads without protocol desync' do
+      # Pre-D-PG-5, 10 threads sharing one PG::Connection would
+      # interleave exec_params on the socket and tip libpq into
+      # PG::UnableToSend. Monitor serialises them; all 10 should
+      # complete + their inserts should land.
+      db = Database.connection
+      db.execute('INSERT INTO feeds(url, title) VALUES (?, ?)',
+                 ['https://example.com/parent', 'Parent'])
+      feed_id = db.last_insert_row_id
+
+      threads = 10.times.map do |i|
+        Thread.new do
+          db.execute(<<~SQL, ["uid-thread-#{i.to_s.rjust(3, '0')}", feed_id, "T#{i}", "https://example.com/t/#{i}"])
+            INSERT INTO articles(uid, feed_id, title, url) VALUES (?, ?, ?, ?)
+          SQL
+        end
+      end
+      threads.each(&:join)
+
+      count = db.execute('SELECT COUNT(*) AS c FROM articles WHERE feed_id = ?', [feed_id]).first['c'].to_i
+      expect(count).to eq(10)
+    end
+
+    it 'reconnects after the underlying socket dies (idle-timeout simulation)' do
+      db = Database.connection
+
+      # Reach inside to slam the socket shut, mimicking DO's idle reaper.
+      conn = db.instance_variable_get(:@conn)
+      conn.close
+
+      # Next query should not raise — adapter catches PG::UnableToSend,
+      # re-opens a connection from the saved URL, retries the query.
+      expect {
+        rows = db.execute('SELECT 1 AS one')
+        expect(rows.first['one']).to eq(1)
+      }.not_to raise_error
+    end
+
+    it 'does NOT reconnect mid-transaction (would silently auto-commit subsequent statements)' do
+      db = Database.connection
+
+      expect {
+        db.transaction do
+          db.execute('INSERT INTO feeds(url, title) VALUES (?, ?)',
+                     ['https://example.com/tx', 'Tx'])
+          # Kill the socket from under the live transaction.
+          db.instance_variable_get(:@conn).close
+          db.execute('SELECT 1')   # this is the one that surfaces the death
+        end
+      }.to raise_error(PG::Error)
+
+      # Adapter is still usable for new (autocommit) work after the dead
+      # transaction unwinds — reconnect kicks in for the next execute.
+      rows = db.execute('SELECT 1 AS one')
+      expect(rows.first['one']).to eq(1)
+    end
+  end
+
   describe 'Database.connection switch' do
     it 'returns SQLite3::Database when DATABASE_URL is unset' do
       skip 'TEST_DATABASE_URL active — the suite is running against PG' if ENV['TEST_DATABASE_URL']

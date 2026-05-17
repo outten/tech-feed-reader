@@ -1,4 +1,5 @@
 require 'pg'
+require 'monitor'
 
 # Phase 5 / D-PG-1. Thin wrapper around PG::Connection that exposes
 # the same surface SQLite3::Database does, so the rest of the app
@@ -28,11 +29,40 @@ require 'pg'
 # `id` column). Stores that today read `db.last_insert_row_id`
 # after a bare INSERT get audited in D-PG-3 and switched to
 # `execute(..., auto_return: true)`.
+#
+# Thread safety + resilience (D-PG-5 production fix): every @conn
+# call is wrapped in a `Monitor` so the Puma worker's 5 threads
+# don't desync the libpq protocol by interleaving exec_params on
+# the same socket. (Sqlite3-ruby has its own per-connection mutex,
+# which is why the SQLite era never tripped this; the pg gem does
+# not.) Single-statement queries also reconnect-once on a closed
+# socket — DO managed PG drops idle connections after ~10 min, so
+# the first query after a quiet stretch would otherwise throw
+# `PG::UnableToSend` forever until the process restarted. Inside a
+# transaction we deliberately don't retry — the BEGIN that opened
+# the tx died on the dead socket, so transparently retrying on a
+# fresh connection would silently turn a tx into a sequence of
+# autocommit statements.
 module Database
   class PgAdapter
-    def initialize(conn)
-      @conn = conn
-      @conn.type_map_for_results = PG::BasicTypeMapForResults.new(@conn)
+    RECOVERABLE = [PG::UnableToSend, PG::ConnectionBad].freeze
+
+    # Accepts either a connection-string URL (production path —
+    # adapter owns the socket lifecycle and can reconnect) or a
+    # pre-built PG::Connection (the test-suite path — specs hand in
+    # a fake; reconnect-on-disconnect is disabled there because we
+    # have nowhere to reconnect to).
+    def initialize(url_or_conn)
+      if url_or_conn.is_a?(String)
+        @url  = url_or_conn
+        @conn = open_conn
+      else
+        @url  = nil
+        @conn = url_or_conn
+        configure_conn(@conn)
+      end
+      @monitor = Monitor.new
+      @in_tx   = false
       @last_insert_row_id = nil
       @changes            = 0
     end
@@ -48,7 +78,7 @@ module Database
         pg_sql = "#{pg_sql.sub(/\s*;\s*\z/, '')} RETURNING id"
       end
 
-      result = @conn.exec_params(pg_sql, Array(args))
+      result = run_with_reconnect { |c| c.exec_params(pg_sql, Array(args)) }
       @changes = result.cmd_tuples
       rows = result.to_a
 
@@ -67,21 +97,28 @@ module Database
     # Used by Database.migrate! to run the .sql migration files; D-PG-2
     # ships a Postgres-side migrations directory.
     def execute_batch(sql)
-      @conn.exec(sql)
+      run_with_reconnect { |c| c.exec(sql) }
       nil
     end
 
     # Same shape as SQLite3::Database#transaction. Re-raises after
-    # ROLLBACK so the caller sees the original error.
+    # ROLLBACK so the caller sees the original error. Monitor is
+    # re-entrant, so nested .execute calls inside the block re-acquire
+    # the same lock without deadlocking.
     def transaction
-      @conn.exec('BEGIN')
-      begin
-        yield self
-      rescue StandardError
-        @conn.exec('ROLLBACK')
-        raise
-      else
-        @conn.exec('COMMIT')
+      @monitor.synchronize do
+        @conn.exec('BEGIN')
+        @in_tx = true
+        begin
+          yield self
+        rescue StandardError
+          (@conn.exec('ROLLBACK') rescue nil)
+          raise
+        else
+          @conn.exec('COMMIT')
+        ensure
+          @in_tx = false
+        end
       end
     end
 
@@ -95,10 +132,45 @@ module Database
 
     # `Database.reset!` calls this in tests. Mirrors SQLite3::Database#close.
     def close
-      @conn&.close
+      @monitor.synchronize { @conn&.close }
     end
 
     private
+
+    # Send a single statement under the connection monitor. If the
+    # socket is dead and we're not in a transaction, close + re-open
+    # + retry once. Inside a transaction we re-raise: the BEGIN died
+    # with the socket, so retrying would silently auto-commit each
+    # subsequent statement on the fresh connection. Adapters built
+    # without a URL (specs with FakePgConn) can't reconnect — also
+    # re-raise.
+    def run_with_reconnect
+      @monitor.synchronize do
+        begin
+          yield @conn
+        rescue *RECOVERABLE
+          raise if @in_tx || @url.nil?
+          (@conn.close rescue nil)
+          @conn = open_conn
+          yield @conn
+        end
+      end
+    end
+
+    def open_conn
+      conn = PG::Connection.new(@url)
+      configure_conn(conn)
+      conn
+    end
+
+    def configure_conn(conn)
+      # Mute NOTICE-level chatter (`SET client_min_messages = WARNING`)
+      # and install the type map so result columns come back as the
+      # right Ruby types (Integer for int8, etc.) without a per-row
+      # decode pass in callers.
+      conn.exec('SET client_min_messages = WARNING')
+      conn.type_map_for_results = PG::BasicTypeMapForResults.new(conn)
+    end
 
     # Convert SQLite-style `?` placeholders to PG-style `$1, $2, …`.
     # Walks the string once; toggles `in_string` whenever a single
