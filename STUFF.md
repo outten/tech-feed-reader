@@ -386,21 +386,78 @@ Can you add the ability on the /youtube page to give a list of channels to add t
 
 **Specs**: 15 resolver examples (every input shape, network-failure, HTML-without-channelId, entity decoding) in [spec/providers/youtube_channel_resolver_spec.rb](spec/providers/youtube_channel_resolver_spec.rb); 5 route examples (subscribe-with-pending-fetch / subscribe-skipping-fetch-when-content-exists / cap-truncation / empty-input / error-path) appended to [spec/youtube_routes_spec.rb](spec/youtube_routes_spec.rb). **Suite: 1151/0** (was 1129; 22 new examples).
 
-## [ ] 31. Digital Ocean
+## [x] 31. Digital Ocean
 
 Let's prepare to deploy application to Digital Ocean.
 
 - terraform as infrastructure as code
-- Digital Ocean Managed PostgreSQL 
+- Digital Ocean Managed PostgreSQL
 - Digital Ocean service for running a containerized application
 
-So, we'll need to:
+**Shipped 2026-05-17.** The full Digital Ocean stack is live at https://feeder.tmoneystuff.com:
 
-- containerize the application
-  - test it in development
-- dump our current DB and import into new PostgreSQL
-- domain name registration
-- FQDN with SSL Certificate
-  - application should use SSL in production mode
+- **Terraform** (`terraform/`): Droplet (s-1vcpu-2gb, ~$12/mo), cloud firewall, DO Space for backups (~$5/mo), DNS A record on DO-managed domain, and Phase 5's Managed PostgreSQL cluster (db-s-1vcpu-1gb, ~$15/mo) with database-firewall trust-list. Total ~$32/mo. PRs #102 (scaffold) → #109 (DO DNS rewrite from Cloudflare) → #110 (variable-description escapes) → #115 (PG cluster).
+- **Containerized app**: multi-stage Dockerfile + docker-compose (app + sidekiq + redis + caddy reverse-proxy). PRs #104 (compose + Caddy) → #117 (DATABASE_URL plumbing).
+- **PostgreSQL cutover**: SQLite → managed PG via the dump script + thread-safe adapter hotfix. PRs #111–#118 (Phase 5: D-PG-1 through D-PG-5).
+- **TLS**: Caddy auto-mints Let's Encrypt cert on first HTTPS hit. HSTS at 6h (bump to 1y after a week of stability).
+- **CLI**: just `terraform` + `gh` + `ssh`. No `doctl` needed yet — that joins the stack in #33 (DOCR + image publish pipeline).
 
-Let me know what applications I need to install, for example Digital Ocean CLI.
+## [x] 32. Update Homepage and About for logged out user
+
+As the application is no longer single user, can you update the copy of the welcome / home page?
+
+**Shipped on PR #120.** `/` (anonymous branch) and `/about` rewritten for the hosted multi-user / managed-PG era: drops "self-hosted, single-user," reframes data-on-disk → per-account row scoping, retargets anonymous CTAs at `/sign-up` (they were silently 302-ing to `/sign-in` from `/articles`), and refreshes the About "How it works" + "Tech stack" sections (SQLite → PostgreSQL with tsvector + GIN, cron → Sidekiq, WebAuthn added). Two specs in `spec/home_about_spec.rb` updated to lock the new CTA hrefs.
+
+## [ ] 33. VERSION AND DOCKER IMAGE
+
+When deploying, I'd like to have three directives in the makefile:
+
+- deploy-major: update the major version in VERSION
+- deploy-minor: update the minor version in VERSION
+- deploy-patch: update the patch version in VERSION
+
+Write a script to do this.
+
+All the deploys should do tests. IF the tests pass, then deploy to Digital Ocean.
+
+The VERSION can be used to tage the Docker image.
+
+I reinstalled Colima locally. This will allow us to make docker images locally for development and testing. Should we change our deployment process to:
+
+- build the container locally
+- run tests ... if tests pass
+- push it to Digital Ocean's docker image registry
+- trigger a redeploy of the application
+
+Also, I've added the CLAUDE credentials to the .env file?
+
+BTW. We should have VERSION in the footer and health endpoint so we know what we are looking at.
+
+---
+
+**Status: in progress.** Sliced into two phases. Decided 2026-05-17 after trade-off analysis.
+
+- **33A — versioning + visibility (next PR)**: `scripts/bump_version.rb major|minor|patch` + Makefile targets (`deploy-major / -minor / -patch`) that run tests → bump VERSION → git tag → push. Read `VERSION` at boot into `App::VERSION`; render in the global footer + add to `GET /health` JSON. Bake into the Docker image via `ARG VERSION` + OCI label. No new infra.
+- **33B — registry pipeline (follow-up PR)**: DigitalOcean Container Registry via Terraform (+$5/mo Basic tier), `docker buildx` cross-compile (laptop arm64 → Droplet amd64), `make publish-image` that builds + pushes a versioned tag, and a remote-redeploy step that swaps the running image via `docker compose pull && up -d` on the Droplet. Trade-off: cheap rollback (`pull tech-feed-reader:0.9.3 && up -d`) at the cost of new ops surface — only worth it once there are users beyond me.
+
+PR #119 (`make deploy` on the Droplet, currently open) is the foundation 33A/33B both build on.
+
+## [x] 35. PostgreSQL
+
+- when do we plan to update the database to Digital Ocean Managed PostgreSQL
+
+**Shipped 2026-05-17 as Phase 5 (5 PRs + manual cutover).**
+
+- **D-PG-1** (#112): `pg` gem + `Database::PgAdapter` (thin wrapper around `PG::Connection` exposing the same surface as `SQLite3::Database`). SQLite stays the default; PG opt-in via `DATABASE_URL`.
+- **D-PG-2** (#113): consolidated PG-dialect baseline migration in `db/migrations-postgres/001_init.sql` — BIGSERIAL ids, tsvector + GIN replacing FTS5, ANSI `ON CONFLICT` everywhere. `Database.migrate!` is adapter-aware.
+- **D-PG-3** (#114): store SQL audit + CI matrix. `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING`, `datetime('now')` → `now()`, dialect branches in `ArticlesStore.search` / `for_topic`, `Recommendation.for_article`, `SportsEntityArticlesStore.fts_search`. CI runs both legs.
+- **D-PG-4** (#115): Terraform `digitalocean_database_cluster` + `database_db` + `database_firewall`. Plan-only; no apply.
+- **D-PG-4.5** (#116): `scripts/dump_sqlite_to_postgres.rb` round-trip migration tool + spec.
+- **D-PG-5** (manual cutover): `terraform apply` created the cluster; dump script copied prod data; `/opt/app/.env` got `DATABASE_URL=…`; redeploy on the Droplet flipped the app to PG.
+- **D-PG-5 hotfix** (#118): adapter wrapped in a `Monitor` + reconnect-on-disconnect. Caught immediately post-cutover when Puma's threads desynced libpq.
+
+## [x] 36. PostgreSQL for Development Environment
+
+PostgreSQL is running locally on my system. Do you want to switch to it for development environment so that we can run tests locally?
+
+**Shipped 2026-05-17.** Local cutover during D-PG-5 prep: `createdb tfr_dev` → `DATABASE_URL=postgres://localhost/tfr_dev ruby scripts/migrate.rb` → dump script copied the full SQLite dev corpus (2 users / 82 feeds / 19,398 articles / 18,693 summaries) into PG. `.env` already pointed at `tfr_dev`, so `make run` boots against PG with no further change. The test suite gates on `TEST_DATABASE_URL` (defaults to `postgres:///tfr_test`) so CI's matrix runs both legs; `bundle exec rspec` against the laptop SQLite path remains the unchanged default for anyone who doesn't have PG installed.
