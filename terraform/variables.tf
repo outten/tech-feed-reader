@@ -20,12 +20,12 @@ variable "do_spaces_secret_key" {
 }
 
 variable "domain" {
-  description = "Bare apex zone hosted in DO DNS (e.g. tmoneystuff.com). The app actually serves at `${app_subdomain}.${domain}`; the apex itself is left alone so other apps on the same zone aren't disturbed."
+  description = "Bare apex zone hosted in DO DNS (e.g. tmoneystuff.com). The app actually serves at <app_subdomain>.<domain>; the apex itself is left alone so other apps on the same zone aren't disturbed."
   type        = string
 }
 
 variable "app_subdomain" {
-  description = "Subdomain of `domain` where this app serves. The DNS A record is created at `${app_subdomain}.${domain}` and Caddy mints its Let's Encrypt cert for that hostname. Also used as WebAuthn RP ID on the Droplet."
+  description = "Subdomain of `domain` where this app serves. The DNS A record is created at <app_subdomain>.<domain> and Caddy mints its Let's Encrypt cert for that hostname. Also used as WebAuthn RP ID on the Droplet."
   type        = string
   default     = "feeder"
 }
