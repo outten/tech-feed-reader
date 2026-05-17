@@ -31,6 +31,31 @@ output "app_hostname" {
   value       = "${var.app_subdomain}.${var.domain}"
 }
 
+# Phase 5 / D-PG-4 — Managed PostgreSQL connection string. Sensitive
+# (carries the doadmin password). After `terraform apply` of the
+# database stack, copy this into /opt/app/.env on the Droplet as
+# DATABASE_URL=… ; the app's adapter routes to PG when this is set.
+# We build the URI ourselves rather than use private_uri so it points
+# at the `tfr` database we created (DO's private_uri targets the
+# default `defaultdb`).
+output "db_connection_string" {
+  description = "postgresql:// URI for the managed cluster's `tfr` database. Sensitive — paste into /opt/app/.env as DATABASE_URL on the Droplet."
+  value = format(
+    "postgresql://%s:%s@%s:%d/%s?sslmode=require",
+    digitalocean_database_cluster.pg.user,
+    digitalocean_database_cluster.pg.password,
+    digitalocean_database_cluster.pg.private_host,
+    digitalocean_database_cluster.pg.port,
+    digitalocean_database_db.tfr.name
+  )
+  sensitive = true
+}
+
+output "db_host" {
+  description = "Private VPC host the Droplet reaches the cluster on (no port)."
+  value       = digitalocean_database_cluster.pg.private_host
+}
+
 output "ssh_command" {
   description = "Convenience: copy/paste to SSH into the Droplet."
   value       = "ssh deploy@${digitalocean_droplet.app.ipv4_address}"
