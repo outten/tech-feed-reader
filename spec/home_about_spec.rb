@@ -29,11 +29,15 @@ RSpec.describe 'GET / — anonymous' do
     expect(last_response.body).to include('Ranked for you')
   end
 
-  it "no longer points the anonymous CTA at /dashboard (it points at /articles)" do
+  it 'points the anonymous hero CTA at /sign-up (multi-user era)' do
     get '/'
-    expect(last_response.body).to match(%r{<a class="btn-primary"[^>]*href="/articles\?sort=relevance})
-    # And no stale "Open dashboard" CTA on the marketing hero.
+    # STUFF.md #32 — anonymous CTAs are sign-up/sign-in, NOT /articles
+    # (which silently 302's a logged-out visitor to /sign-in, leaving
+    # them confused about where they ended up). And the original
+    # pre-A2 "Open dashboard" CTA stayed dead.
+    expect(last_response.body).to match(%r{<a class="btn-primary"[^>]*href="/sign-up"})
     expect(last_response.body).not_to match(%r{href="/dashboard"})
+    expect(last_response.body).not_to match(%r{class="btn-primary"[^>]*href="/articles})
   end
 
   it 'does not set a tfr_seen cookie (cookie-redirect was removed)' do
@@ -99,10 +103,15 @@ RSpec.describe 'GET /about' do
     expect(last_response.body).to match(%r{<a href="/about"})
   end
 
-  it 'CTAs point at the new homes: / for the queue, /admin/dashboard for ops' do
+  it 'Get-started CTAs point at /sign-up + /sign-in (multi-user era)' do
     get '/about'
-    expect(last_response.body).to include('href="/admin/dashboard"')
-    expect(last_response.body).to include('What\'s on today')
+    # STUFF.md #32 — the About page's bottom CTA used to send visitors
+    # at /admin/dashboard ("Operational dashboard") because the app was
+    # single-user; on a hosted multi-user box that's both wrong (admins
+    # only) and useless to a curious anonymous visitor. New CTAs aim at
+    # account creation.
+    expect(last_response.body).to match(%r{<a class="btn-primary"[^>]*href="/sign-up"})
+    expect(last_response.body).to match(%r{href="/sign-in"})
   end
 end
 
