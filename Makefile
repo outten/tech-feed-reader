@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy
 
 install:
 	bundle install
@@ -255,3 +255,27 @@ publish-image:
 	@echo ''
 	@echo "Published $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_VERSION)"
 	@echo "Deploy with: ssh deploy@<droplet-ip> 'cd /opt/app && make deploy'"
+
+# ---- Production deploy (run on the Droplet, not the laptop) -----------------
+# One-liner deploy after `make publish-image` from the laptop. SSH into
+# the Droplet and `cd /opt/app && make deploy` — pulls main (for any
+# Caddyfile / compose changes), pulls the new image from DOCR, force-
+# recreates ONLY app + sidekiq containers (caddy + redis stay up the
+# whole time — no TLS-cert blip, no Redis queue flush), then tails
+# app logs. Ctrl-C out of the tail once boot looks healthy.
+#
+# Rollback: set IMAGE_TAG=0.9.3 in /opt/app/.env, then `make deploy`.
+# IMAGE_TAG defaults to `latest` (always points at the most recent
+# publish); pinning to a specific version is the rollback escape
+# hatch from the registry pipeline.
+#
+# First-time setup (one-time per Droplet) is documented in
+# DEPLOYMENT.md Phase 6: install doctl + `doctl registry login` so
+# the deploy account can pull from registry.digitalocean.com/tfr.
+deploy:
+	git pull origin main
+	docker compose pull app sidekiq
+	docker compose up -d --force-recreate --no-deps app sidekiq
+	@echo ''
+	@echo '--- tailing app logs (Ctrl-C to exit) ---'
+	docker compose logs -f --tail=50 app
