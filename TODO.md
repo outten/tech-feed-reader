@@ -464,11 +464,12 @@ Phase A1 + A2 deferrals + production gating. Not blockers for the auth/data spli
 
 **Status at a glance** (read DEPLOYMENT.md for the detail):
 
+- ✅ **Phase 0** — manual setup (DO account, tokens, domain, NS, SSH, Spaces keys, zone in DO panel). Done 2026-05-17.
 - ✅ **Phase 1** (codebase prep) — LLM rate limiting (#103), Dockerfile + docker-compose + Caddyfile (#104), per-IP RateLimiter (#105). Merged.
-- ✅ **Phase 2** (Terraform scaffold) — `terraform/` directory provisioning a single Droplet + firewall + DO Spaces for backups (#106). Plans clean; not yet applied.
-- ⏳ **Phase 0** — manual: register a domain, generate DO API token, generate SSH key, drop it in DO. Mostly done in this session (see *Decisions locked* below); API token + SSH-key drop still pending.
-- ⏳ **Phase 3** — `terraform apply` + cutover (together).
-- ⏳ **Phase 4** — operations (nightly SQLite `.backup` to Spaces).
+- ✅ **Phase 2** (Terraform scaffold) — `terraform/` directory provisioning a single Droplet + firewall + DO Spaces for backups (#106). Rewritten to DO DNS + feeder subdomain (#109/#110).
+- ✅ **Phase 3** — `terraform apply` + cutover. Live at https://feeder.tmoneystuff.com (2026-05-17).
+- ❌ **Phase 4** (SQLite backups) — **skipped**. User opted to do the PG migration instead of building SQLite backup tooling that becomes throwaway. Data-loss window between now and Phase 5 cutover is accepted.
+- ⏳ **Phase 5** — PostgreSQL migration (5 PRs + manual cutover). See DEPLOYMENT.md → "Phase 5" for sub-phase plan (D-PG-1 adapter → D-PG-2 migrations + CI matrix → D-PG-3 store audit → D-PG-4 Terraform cluster → D-PG-4.5 data dump script → D-PG-5 cutover).
 
 **Architecture (per DEPLOYMENT.md):** single DigitalOcean Droplet running Docker Compose (web + sidekiq + redis); **Caddy** in front for HTTPS via Let's Encrypt; **SQLite for v1.0** (Postgres deferred to v1.1 — DEPLOYMENT.md "Database" section has the full migration scope). Total provisioned cost ≈ **~$17/mo** (Droplet + Spaces).
 
