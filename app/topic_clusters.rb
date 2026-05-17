@@ -64,10 +64,11 @@ module TopicClusters
   # Articles are the 3 most recent of each cluster.
   def recent(days: WINDOW_DAYS_DEFAULT, min_articles: MIN_ARTICLES_DEFAULT, limit: TOP_TOPICS_DEFAULT)
     cutoff = (Date.today - days + 1).to_s
+    date_expr = Database.date_sql('published_at')
     rows = Database.connection.execute(<<~SQL, [cutoff, RECENT_LIMIT])
       SELECT id, uid, title, content_text, feed_id, published_at, categories
       FROM articles
-      WHERE DATE(published_at) >= ?
+      WHERE #{date_expr} >= ?
       ORDER BY published_at DESC
       LIMIT ?
     SQL

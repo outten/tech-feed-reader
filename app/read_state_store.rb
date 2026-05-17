@@ -95,8 +95,15 @@ module ReadStateStore
       }
 
       sql = <<~SQL
-        INSERT OR REPLACE INTO read_state(user_id, article_id, read, bookmarked, archived, feedback, passive_feedback, opened_at)
+        INSERT INTO read_state(user_id, article_id, read, bookmarked, archived, feedback, passive_feedback, opened_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (user_id, article_id) DO UPDATE SET
+          read             = excluded.read,
+          bookmarked       = excluded.bookmarked,
+          archived         = excluded.archived,
+          feedback         = excluded.feedback,
+          passive_feedback = excluded.passive_feedback,
+          opened_at        = excluded.opened_at
       SQL
       db.execute(sql, [
         user_id, article_id, next_row[:read], next_row[:bookmarked],

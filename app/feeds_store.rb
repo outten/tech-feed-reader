@@ -121,7 +121,7 @@ module FeedsStore
 
   def subscribe(user_id, feed_id)
     db.execute(
-      'INSERT OR IGNORE INTO user_feed_subscriptions(user_id, feed_id) VALUES (?, ?)',
+      'INSERT INTO user_feed_subscriptions(user_id, feed_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
       [user_id.to_i, feed_id.to_i]
     )
     db.changes.positive?

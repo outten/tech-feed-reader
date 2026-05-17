@@ -52,7 +52,7 @@ module SportsEntityArticlesStore
     db.transaction do
       hits.each do |article_id|
         db.execute(
-          'INSERT OR IGNORE INTO sports_entity_articles(kind, entity_id, article_id) VALUES (?, ?, ?)',
+          'INSERT INTO sports_entity_articles(kind, entity_id, article_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
           [kind.to_s, entity_id, article_id]
         )
         inserted += 1 if db.changes.positive?
@@ -81,19 +81,30 @@ module SportsEntityArticlesStore
     db.execute("UPDATE #{table} SET articles_indexed_at = NULL WHERE id = ?", [entity_id])
   end
 
-  # FTS5 phrase MATCH on the entity's name. Returns article ids,
-  # most-relevant first. Returns [] on FTS5 syntax errors (defensive
+  # Full-text phrase search on the entity's name. Returns article ids,
+  # most-relevant first. SQLite uses FTS5 with a quoted phrase MATCH;
+  # Postgres uses phraseto_tsquery which builds an exact-order phrase
+  # tsquery from the raw name. Returns [] on syntax errors (defensive
   # — unlikely with a quoted phrase, but the cost is zero).
   def fts_search(name)
-    phrase = %("#{name.gsub('"', '')}")
-    db.execute(<<~SQL, [phrase]).map { |r| r['id'] }
-      SELECT a.id
-      FROM articles_fts f
-      JOIN articles a ON a.id = f.rowid
-      WHERE articles_fts MATCH ?
-      ORDER BY rank
-    SQL
-  rescue SQLite3::SQLException
+    if Database.adapter == :postgres
+      db.execute(<<~SQL, [name, name]).map { |r| r['id'] }
+        SELECT a.id, ts_rank(a.tsv, phraseto_tsquery('english', ?)) AS rank
+        FROM articles a
+        WHERE a.tsv @@ phraseto_tsquery('english', ?)
+        ORDER BY rank DESC
+      SQL
+    else
+      phrase = %("#{name.gsub('"', '')}")
+      db.execute(<<~SQL, [phrase]).map { |r| r['id'] }
+        SELECT a.id
+        FROM articles_fts f
+        JOIN articles a ON a.id = f.rowid
+        WHERE articles_fts MATCH ?
+        ORDER BY rank
+      SQL
+    end
+  rescue SQLite3::SQLException, PG::Error
     []
   end
 

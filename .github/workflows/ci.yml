@@ -15,11 +15,39 @@ concurrency:
 
 jobs:
   test:
-    name: RSpec
+    name: RSpec (${{ matrix.database }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       RACK_ENV: test
+      # Phase 5 / D-PG-3: the suite runs against both backends. The
+      # sqlite job leaves TEST_DATABASE_URL empty (spec_helper.rb
+      # falls back to SQLite :memory:); the postgres job points it
+      # at the service container below.
+      TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgres://postgres:postgres@localhost:5432/tfr_test' || '' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+
+    services:
+      postgres:
+        # Spun up for both matrix entries (GH Actions doesn't support
+        # conditional `services`), but the sqlite job simply ignores
+        # it. Negligible overhead.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER:     postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB:       tfr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

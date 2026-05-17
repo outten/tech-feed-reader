@@ -31,23 +31,43 @@ module Recommendation
     keywords = top_keywords(article['content_text'].to_s)
     return [] if keywords.empty?
 
+    # SQLite FTS5 accepts `kw1 OR kw2`; Postgres uses websearch_to_tsquery
+    # which understands the same `OR` keyword. Both produce an OR-joined
+    # term query. websearch_to_tsquery is gentler than plain to_tsquery
+    # on unusual tokens (won't error on stray punctuation).
     query = keywords.join(' OR ')
-    Database.connection.execute(<<~SQL, [query, article['id'], user_id.to_i, limit])
-      SELECT a.*, rank
-      FROM articles a
-      JOIN articles_fts f ON a.id = f.rowid
-      WHERE articles_fts MATCH ?
-        AND a.id != ?
-        AND EXISTS (
-          SELECT 1 FROM user_feed_subscriptions ufs
-          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-        )
-      ORDER BY rank
-      LIMIT ?
-    SQL
-  rescue SQLite3::SQLException
-    # FTS5 can reject synthesized queries on rare token shapes — fall
-    # back to no recommendations rather than erroring the article view.
+    if Database.adapter == :postgres
+      Database.connection.execute(<<~SQL, [query, query, article['id'], user_id.to_i, limit])
+        SELECT a.*, ts_rank(a.tsv, websearch_to_tsquery('english', ?)) AS rank
+        FROM articles a
+        WHERE a.tsv @@ websearch_to_tsquery('english', ?)
+          AND a.id != ?
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY rank DESC
+        LIMIT ?
+      SQL
+    else
+      Database.connection.execute(<<~SQL, [query, article['id'], user_id.to_i, limit])
+        SELECT a.*, rank
+        FROM articles a
+        JOIN articles_fts f ON a.id = f.rowid
+        WHERE articles_fts MATCH ?
+          AND a.id != ?
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY rank
+        LIMIT ?
+      SQL
+    end
+  rescue SQLite3::SQLException, PG::Error
+    # FTS5 / tsquery can reject synthesized queries on rare token shapes
+    # — fall back to no recommendations rather than erroring the
+    # article view.
     []
   end
 

@@ -41,15 +41,16 @@ module ArticlesStore
   def daily_counts(user_id, days: 30)
     today  = Date.today
     cutoff = (today - days + 1).to_s
-    rows = db.execute(<<~SQL, [user_id.to_i, cutoff]).each_with_object({}) { |r, h| h[r['day']] = r['c'] }
-      SELECT DATE(a.published_at) AS day, COUNT(*) AS c
+    date_expr = Database.date_sql('a.published_at')
+    rows = db.execute(<<~SQL, [user_id.to_i, cutoff]).each_with_object({}) { |r, h| h[r['day'].to_s] = r['c'] }
+      SELECT #{date_expr} AS day, COUNT(*) AS c
       FROM articles a
       WHERE EXISTS (
         SELECT 1 FROM user_feed_subscriptions ufs
         WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
       )
-      AND DATE(a.published_at) >= ?
-      GROUP BY DATE(a.published_at)
+      AND #{date_expr} >= ?
+      GROUP BY #{date_expr}
     SQL
 
     (0...days).map do |i|
@@ -170,43 +171,85 @@ module ArticlesStore
   end
 
   # FTS hits filtered to the user's subscriptions, with cached
-  # extractive summaries inline.
+  # extractive summaries inline. SQLite uses the articles_fts virtual
+  # table + FTS5's auto `rank` ordering; Postgres uses a generated
+  # `tsv` tsvector column on articles + ts_rank (note PG ORDER BY
+  # ts_rank DESC because higher = better; SQLite FTS5's rank is more
+  # negative = better, hence plain ASC).
   def for_topic(user_id, term, limit: 30)
     return [] if term.to_s.strip.empty?
-    db.execute(<<~SQL, [term.to_s.strip, user_id.to_i, limit])
-      SELECT a.*, s.extractive AS summary, rank
-      FROM articles a
-      JOIN articles_fts f ON a.id = f.rowid
-      LEFT JOIN summaries s ON s.article_id = a.id
-      WHERE articles_fts MATCH ?
-        AND EXISTS (
-          SELECT 1 FROM user_feed_subscriptions ufs
-          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-        )
-      ORDER BY rank
-      LIMIT ?
-    SQL
-  rescue SQLite3::SQLException
+    q = term.to_s.strip
+    if Database.adapter == :postgres
+      db.execute(<<~SQL, [q, q, user_id.to_i, limit])
+        SELECT a.*, s.extractive AS summary,
+               ts_rank(a.tsv, plainto_tsquery('english', ?)) AS rank
+        FROM articles a
+        LEFT JOIN summaries s ON s.article_id = a.id
+        WHERE a.tsv @@ plainto_tsquery('english', ?)
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY rank DESC
+        LIMIT ?
+      SQL
+    else
+      db.execute(<<~SQL, [q, user_id.to_i, limit])
+        SELECT a.*, s.extractive AS summary, rank
+        FROM articles a
+        JOIN articles_fts f ON a.id = f.rowid
+        LEFT JOIN summaries s ON s.article_id = a.id
+        WHERE articles_fts MATCH ?
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY rank
+        LIMIT ?
+      SQL
+    end
+  rescue SQLite3::SQLException, PG::Error
     []
   end
 
-  # Full-text search filtered to the user's subscriptions.
+  # Full-text search filtered to the user's subscriptions. Snippet is
+  # generated server-side so the view can render `<mark>`-wrapped
+  # excerpts uniformly across backends.
   def search(user_id, query, limit: DEFAULT_LIMIT, offset: 0)
     return [] if query.to_s.strip.empty?
+    q = query.to_s.strip
 
-    db.execute(<<~SQL, [query.to_s.strip, user_id.to_i, limit, offset])
-      SELECT a.*,
-             snippet(articles_fts, 1, '<mark>', '</mark>', '…', 16) AS excerpt
-      FROM articles a
-      JOIN articles_fts f ON a.id = f.rowid
-      WHERE articles_fts MATCH ?
-        AND EXISTS (
-          SELECT 1 FROM user_feed_subscriptions ufs
-          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-        )
-      ORDER BY rank
-      LIMIT ? OFFSET ?
-    SQL
+    if Database.adapter == :postgres
+      db.execute(<<~SQL, [q, q, q, user_id.to_i, limit, offset])
+        SELECT a.*,
+               ts_headline('english', a.content_text,
+                           plainto_tsquery('english', ?),
+                           'StartSel=<mark>, StopSel=</mark>, MaxWords=16, MinWords=8') AS excerpt,
+               ts_rank(a.tsv, plainto_tsquery('english', ?)) AS rank
+        FROM articles a
+        WHERE a.tsv @@ plainto_tsquery('english', ?)
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY rank DESC
+        LIMIT ? OFFSET ?
+      SQL
+    else
+      db.execute(<<~SQL, [q, user_id.to_i, limit, offset])
+        SELECT a.*,
+               snippet(articles_fts, 1, '<mark>', '</mark>', '…', 16) AS excerpt
+        FROM articles a
+        JOIN articles_fts f ON a.id = f.rowid
+        WHERE articles_fts MATCH ?
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY rank
+        LIMIT ? OFFSET ?
+      SQL
+    end
   end
 
   # Bulk-insert a batch of FeedParser-shaped entries for a given feed.
@@ -218,10 +261,11 @@ module ArticlesStore
     return 0 if entries.empty?
 
     sql = <<~SQL
-      INSERT OR IGNORE INTO articles
+      INSERT INTO articles
         (uid, feed_id, title, url, author, published_at, content_html, content_text,
          audio_url, audio_mime_type, audio_duration_seconds, image_url, categories)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT DO NOTHING
     SQL
 
     # STUFF #28 — when a duplicate uid causes the INSERT to no-op, fill
@@ -374,11 +418,14 @@ module ArticlesStore
       end
 
       # Phase 5 — hide articles matching the user's mute_rules.
+      # `LIKE` is case-insensitive on ASCII in SQLite by default, but
+      # case-sensitive in Postgres. Force lower-case on both sides so
+      # the behaviour matches across backends.
       where_clauses << <<~SQL.strip
         NOT EXISTS (
           SELECT 1 FROM mute_rules mr
           WHERE mr.user_id = ? AND (
-              (mr.kind = 'keyword' AND (a.title LIKE '%' || mr.value || '%' OR a.content_text LIKE '%' || mr.value || '%'))
+              (mr.kind = 'keyword' AND (LOWER(a.title) LIKE '%' || LOWER(mr.value) || '%' OR LOWER(a.content_text) LIKE '%' || LOWER(mr.value) || '%'))
            OR (mr.kind = 'author'  AND a.author = mr.value)
            OR (mr.kind = 'feed'    AND a.feed_id = CAST(mr.value AS INTEGER))
           )

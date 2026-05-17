@@ -3,8 +3,17 @@ require_relative '../app/database'
 
 # Database is a singleton — each spec resets the connection so the
 # in-memory DB starts empty.
+#
+# This file tests SQLite-specific implementation details (sqlite_master
+# table introspection, FTS5 triggers, SQLite3::ConstraintException
+# rescue paths). Skip the whole file in PG mode — the equivalent
+# behaviours are exercised through the store specs, which run against
+# both backends in the CI matrix.
 RSpec.describe Database do
-  before(:each) { Database.reset! }
+  before(:each) do
+    skip 'SQLite-specific implementation tests' if Database.adapter == :postgres
+    Database.reset!
+  end
   after(:each)  { Database.reset! }
 
   describe '.migrate!' do

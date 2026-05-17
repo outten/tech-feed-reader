@@ -95,7 +95,10 @@ module Database
       sql     = File.read(file)
       db.transaction do
         db.execute_batch(sql)
-        db.execute('INSERT INTO schema_migrations(version) VALUES (?)', [version])
+        # ON CONFLICT DO NOTHING — schema_migrations has no `id` column,
+        # so the PG adapter's on_conflict? check skips its auto-RETURNING
+        # append. Defensive against concurrent migrate! calls too.
+        db.execute('INSERT INTO schema_migrations(version) VALUES (?) ON CONFLICT DO NOTHING', [version])
       end
     end
 
@@ -107,6 +110,17 @@ module Database
   # baseline in db/migrations-postgres/.
   def migrations_dir
     adapter == :postgres ? MIGRATIONS_DIR_POSTGRES : MIGRATIONS_DIR_SQLITE
+  end
+
+  # Date-part of a TEXT ISO8601 column. SQLite's DATE() works on TEXT
+  # values like '2026-05-17T12:00:00Z'; PG's DATE() needs a real
+  # TIMESTAMP, so we cast the text first. Used by:
+  #   ArticlesStore.daily_counts
+  #   ArticlesStore.state_query (topic-filtered windows)
+  #   TopicClusters.recent (window cutoff)
+  #   TagsStore.top_in_window
+  def date_sql(column)
+    adapter == :postgres ? "(#{column})::date" : "DATE(#{column})"
   end
 
   class << self
@@ -141,7 +155,12 @@ module Database
     # which is wrong; D-PG-2 fixes this when the PG dialect migrations
     # exist).
     def open_postgres!(url)
-      Database::PgAdapter.new(PG::Connection.new(url))
+      conn = PG::Connection.new(url)
+      # Mute the noisy NOTICEs that DROP SCHEMA CASCADE / similar emit
+      # during test-mode schema resets. PG defaults to NOTICE; we only
+      # want WARNING + ERROR on the wire.
+      conn.exec('SET client_min_messages = WARNING')
+      Database::PgAdapter.new(conn)
     end
   end
 end

@@ -46,7 +46,7 @@ module SportsFollowsStore
     raise ArgumentError, 'value must be non-empty'        if value.to_s.strip.empty?
 
     db.execute(
-      'INSERT OR IGNORE INTO sports_follows(user_id, kind, value) VALUES (?, ?, ?)',
+      'INSERT INTO sports_follows(user_id, kind, value) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
       [user_id.to_i, kind.to_s, value.to_s]
     )
     db.changes.positive?

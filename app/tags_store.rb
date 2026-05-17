@@ -52,7 +52,7 @@ module TagsStore
 
   def tag_article(article_id, tag_id)
     db.execute(<<~SQL, [article_id, tag_id])
-      INSERT OR IGNORE INTO article_tags(article_id, tag_id) VALUES (?, ?)
+      INSERT INTO article_tags(article_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING
     SQL
     db.changes.positive?
   end
@@ -105,13 +105,14 @@ module TagsStore
 
   def top_in_window(user_id, days: 7, limit: 10)
     cutoff = (Date.today - days + 1).to_s
+    date_expr = Database.date_sql('a.published_at')
     db.execute(<<~SQL, [user_id.to_i, cutoff, limit])
       SELECT t.id, t.name, COUNT(*) AS count
       FROM tags t
       JOIN article_tags at ON at.tag_id = t.id
       JOIN articles a      ON a.id      = at.article_id
-      WHERE t.user_id = ? AND DATE(a.published_at) >= ?
-      GROUP BY t.id
+      WHERE t.user_id = ? AND #{date_expr} >= ?
+      GROUP BY t.id, t.name
       ORDER BY count DESC, t.name ASC
       LIMIT ?
     SQL

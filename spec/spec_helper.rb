@@ -45,14 +45,35 @@ RSpec.configure do |c|
   c.formatter = :documentation
 
   c.before(:each) do
-    Database.reset!
+    if Database.adapter == :postgres
+      # PG keeps schema across reconnects, so reset+migrate isn't
+      # enough to give each spec a fresh slate. Drop + recreate the
+      # `public` schema to wipe every table. Slower than SQLite
+      # :memory: but hermetic.
+      Database.connection.execute_batch('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
+      Database.reset!
+    else
+      Database.reset!
+    end
     Database.migrate!
     HealthRegistry.reset!
-    # Migration 022 already seeds (1, 't-money'); OR IGNORE keeps this
-    # safe across "fresh schema" + "migrations already ran" specs.
+    # Migration 022 seeds (1, 't-money') on SQLite via INSERT OR IGNORE.
+    # The PG consolidated migration doesn't seed it (the migration
+    # itself shouldn't know about test fixtures); seed here for both
+    # backends using ANSI ON CONFLICT (works under SQLite 3.24+ too).
     Database.connection.execute(
-      "INSERT OR IGNORE INTO users(id, username, display_name) VALUES (1, 't-money', 't-money')"
+      "INSERT INTO users(id, username, display_name) VALUES (1, 't-money', 't-money') ON CONFLICT DO NOTHING"
     )
+    if Database.adapter == :postgres
+      # BIGSERIAL sequences are independent of explicit-id inserts —
+      # the seed above doesn't advance users_id_seq, so the next
+      # UsersStore.create would collide on id=1. Bump the sequence
+      # past the highest explicit id. Same fixup needed for any other
+      # table the suite seeds with explicit ids (none today).
+      Database.connection.execute(
+        "SELECT setval('users_id_seq', GREATEST(1, (SELECT MAX(id) FROM users)))"
+      )
+    end
   end
 
   c.after(:each) do

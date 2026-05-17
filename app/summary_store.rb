@@ -41,8 +41,12 @@ module SummaryStore
     next_model      = llm_model.nil?  ? (current && current['llm_model'])  : llm_model
 
     db.execute(<<~SQL, [article_id, next_extractive, next_llm, next_model])
-      INSERT OR REPLACE INTO summaries(article_id, extractive, llm, llm_model)
+      INSERT INTO summaries(article_id, extractive, llm, llm_model)
       VALUES (?, ?, ?, ?)
+      ON CONFLICT (article_id) DO UPDATE SET
+        extractive = excluded.extractive,
+        llm        = excluded.llm,
+        llm_model  = excluded.llm_model
     SQL
     find(article_id)
   end

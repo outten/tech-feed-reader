@@ -53,7 +53,7 @@ module UsersStore
   end
 
   def touch_last_seen!(id)
-    db.execute('UPDATE users SET last_seen_at = datetime(?) WHERE id = ?',
+    db.execute('UPDATE users SET last_seen_at = ? WHERE id = ?',
                [Time.now.utc.strftime('%Y-%m-%d %H:%M:%S'), id.to_i])
   end
 
