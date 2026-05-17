@@ -10,9 +10,10 @@
 #   ANTHROPIC_API_KEY. LLM_* and WEBAUTHN_RP_NAME are optional (have
 #   defaults). See .env.example for the full list.
 #
-# Postgres is not in this stack yet — the app still uses SQLite via the
-# app_data volume. Switching to Postgres is a follow-up PR (DEPLOYMENT.md
-# Phase 1 / Postgres section).
+# DATABASE_URL is optional. Unset → app uses SQLite at /app/data/app.db
+# in the app_data volume (default). Set → app routes to that
+# Postgres (Phase 5 / D-PG-5 cutover). Either backend is hot-swappable
+# by editing /opt/app/.env and running `docker compose up -d`.
 
 services:
   redis:
@@ -36,6 +37,7 @@ services:
     environment:
       RACK_ENV: production
       REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL:-}
       SESSION_SECRET: ${SESSION_SECRET}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Tech Feed Reader}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
@@ -62,6 +64,7 @@ services:
     environment:
       RACK_ENV: production
       REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       LLM_ENABLED: ${LLM_ENABLED:-true}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
