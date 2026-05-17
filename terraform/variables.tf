@@ -63,3 +63,9 @@ variable "backups_bucket_name" {
   type        = string
   default     = "tech-feed-reader-backups"
 }
+
+variable "registry_name" {
+  description = "Name for the DigitalOcean Container Registry (STUFF #33B). Globally unique across all DO accounts; collisions are common, so pick something distinctive. Becomes the second path segment in image URLs: registry.digitalocean.com/<registry_name>/<image>. Basic tier (~$5/mo, 5 GB storage, 1 free repo)."
+  type        = string
+  default     = "tfr"
+}

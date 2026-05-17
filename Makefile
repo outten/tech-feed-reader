@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image
 
 install:
 	bundle install
@@ -211,3 +211,47 @@ _release_bump:
 	  git tag "v$$new_version" && \
 	  git push --follow-tags origin main && \
 	  echo "Released v$$new_version."
+
+# ---- Container registry publishing (STUFF #33B) -----------------------------
+# Build the production image on the operator's laptop, tag with the
+# current VERSION + :latest, push to DigitalOcean Container Registry.
+# The Droplet's `make deploy` pulls these tags rather than rebuilding
+# locally — gives us tag-pinned rollback (set IMAGE_TAG=0.9.3 in
+# /opt/app/.env and `docker compose up -d`).
+#
+# Cross-architecture: Apple Silicon Macs are arm64; the Droplet is
+# amd64. `docker buildx build --platform linux/amd64` does the cross-
+# compile in one command (slow first run while QEMU emulates the
+# linker; subsequent builds reuse the buildx cache). Buildx ships with
+# modern Docker Desktop / Colima by default; if you see
+# "buildx not found", run `docker buildx create --use` once.
+#
+# Auth: `doctl registry login` (one-time on the laptop; uses your DO
+# API token + sets up docker creds at ~/.docker/config.json). The
+# Droplet's one-time setup is documented in DEPLOYMENT.md Phase 6.
+#
+# Tagging: every publish stamps TWO tags onto the same image —
+# the exact semver (immutable, audit/rollback target) and :latest
+# (mutable, points at most recent publish). The Droplet's compose
+# file uses IMAGE_TAG (env-controlled, defaults to "latest"); set
+# IMAGE_TAG=0.9.3 in /opt/app/.env to pin a rollback.
+
+REGISTRY      ?= registry.digitalocean.com/tfr
+IMAGE_NAME    ?= tech-feed-reader
+IMAGE_VERSION = $(shell cat VERSION 2>/dev/null)
+
+publish-image:
+	@if [ -z "$(IMAGE_VERSION)" ] || [ "$(IMAGE_VERSION)" = "unknown" ]; then \
+	  echo 'publish-image: VERSION missing or "unknown"; run `make release-*` first.'; exit 1; \
+	fi
+	@echo "Building $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_VERSION) for linux/amd64..."
+	docker buildx build \
+	  --platform linux/amd64 \
+	  --build-arg APP_VERSION=$(IMAGE_VERSION) \
+	  --tag $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_VERSION) \
+	  --tag $(REGISTRY)/$(IMAGE_NAME):latest \
+	  --push \
+	  .
+	@echo ''
+	@echo "Published $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_VERSION)"
+	@echo "Deploy with: ssh deploy@<droplet-ip> 'cd /opt/app && make deploy'"
