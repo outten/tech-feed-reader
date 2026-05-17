@@ -28,18 +28,20 @@ services:
       retries: 3
 
   app:
+    # Primary path (production): pull a versioned image from
+    # DigitalOcean Container Registry. IMAGE_TAG defaults to 'latest';
+    # set IMAGE_TAG=0.9.3 in /opt/app/.env for a tag-pinned rollback.
+    # IMAGE_REGISTRY can be overridden if the registry name ever moves.
+    image: ${IMAGE_REGISTRY:-registry.digitalocean.com/tfr}/tech-feed-reader:${IMAGE_TAG:-latest}
+    # Escape hatch: `docker compose build app` still works locally
+    # (Colima dev, the pre-DOCR Droplet fallback) and produces an
+    # image tagged with the same name, so `up -d` afterwards uses
+    # the local build without going to the registry. APP_VERSION
+    # threads through to the OCI label + AppVersion::SEMVER constant.
     build:
       context: .
-      # APP_VERSION drives the OCI image label and the AppVersion::SEMVER
-      # constant in the running container. `make deploy` exports
-      # APP_VERSION=$(cat VERSION) before invoking compose so the new
-      # image is tagged correctly; manual `docker compose build` without
-      # the env var defaults to 'unknown', which the runtime fallback
-      # (reading /app/VERSION from the COPYed source) corrects for the
-      # in-app footer — only the OCI label stays 'unknown' in that case.
       args:
         APP_VERSION: ${APP_VERSION:-unknown}
-    image: tech-feed-reader:latest
     restart: unless-stopped
     depends_on:
       redis:
@@ -64,7 +66,11 @@ services:
       - "4567"
 
   sidekiq:
-    image: tech-feed-reader:latest
+    # Same image as `app` (one container, two entrypoints — Sidekiq
+    # uses the `command:` override below). Pulled from DOCR or built
+    # locally; either way `app`'s build step ran first so the image is
+    # already cached by the time compose creates this service.
+    image: ${IMAGE_REGISTRY:-registry.digitalocean.com/tfr}/tech-feed-reader:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       redis:

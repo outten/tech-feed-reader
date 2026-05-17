@@ -34,3 +34,8 @@ allowed_ssh_cidrs = ["203.0.113.42/32"]
 
 # Optional override (default is "tech-feed-reader-backups").
 # backups_bucket_name = "tfr-backups-prod"
+
+# Container registry name (STUFF #33B). DigitalOcean global namespace,
+# so collisions are common — if `terraform apply` fails creating the
+# registry, pick a less generic name and retry. Default is "tfr".
+# registry_name = "tfr"

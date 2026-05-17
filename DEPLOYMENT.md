@@ -461,11 +461,69 @@ Goal: `scripts/dump_sqlite_to_postgres.rb` reads the live Droplet SQLite into a 
 - Smoke test sign-in (passkey still works because RP_ID didn't change), verify feeds and read-state survived, verify search returns results, verify a /chat round-trip.
 - Update DEPLOYMENT.md to mark Phase 5 complete; note the SQLite volume is now unused (can `docker volume rm app_app_data` after a few days of stability).
 
+## Phase 6 — Container registry + image-publish pipeline (STUFF #33B)
+
+**Status: `next`** — paired with the semver tooling shipped in #33A.
+
+Goal: build the production image on the operator's laptop, push to a versioned registry, pull on the Droplet. Removes the build-on-Droplet bottleneck, gives us tag-pinned rollback, and decouples "what code main holds" from "what image is running."
+
+### One-time setup
+
+1. **Apply Terraform**: `cd terraform && terraform apply`. Creates `digitalocean_container_registry.main` (Basic tier, ~$5/mo, 5 GB storage). The registry's globally-unique name comes from `var.registry_name` (default `tfr`).
+
+2. **Laptop docker auth**: `doctl registry login` (uses your DO API token to drop credentials into `~/.docker/config.json`). Run once; lasts until your DO token rotates.
+
+3. **Droplet docker auth**: SSH in once and authenticate the deploy account against the registry:
+   ```
+   ssh deploy@<droplet-ip>
+   # Install doctl (one-time):
+   sudo snap install doctl   # or download the static binary
+   sudo snap connect doctl:dot-docker  # so doctl can write to ~/.docker
+   doctl auth init --access-token <YOUR_DO_API_TOKEN>
+   doctl registry login
+   ```
+   This drops creds into `~deploy/.docker/config.json` so `docker compose pull` works. Same token rotation cadence as the laptop.
+
+4. **Confirm the compose `image:` lines point at the registry**: in `/opt/app/docker-compose.yml`, both `app` and `sidekiq` services should reference `${IMAGE_REGISTRY:-registry.digitalocean.com/tfr}/tech-feed-reader:${IMAGE_TAG:-latest}`. The repo's compose file already does this — `git pull` on the Droplet picks it up.
+
+### Per-release workflow
+
+```
+# On the laptop, sitting on a clean main:
+make release-patch          # bumps VERSION, tags vX.Y.Z, pushes to origin (STUFF #33A)
+make publish-image          # buildx → cross-compile amd64 → push :X.Y.Z + :latest to DOCR
+
+# On the Droplet:
+ssh deploy@<droplet-ip> 'cd /opt/app && make deploy'
+# (deploy = git pull + docker compose pull + docker compose up -d --force-recreate --no-deps app sidekiq)
+```
+
+`make deploy` defaults to the floating `:latest` tag, which always points at the most recent `publish-image`. The Droplet downtime is just the container swap window (~2-3s).
+
+### Rollback (when something regresses)
+
+```
+# On the Droplet:
+ssh deploy@<droplet-ip>
+cd /opt/app
+# Pin to a specific older tag by editing /opt/app/.env:
+echo 'IMAGE_TAG=0.9.3' >> .env   # or sed the existing line
+docker compose pull              # fetches the pinned tag if not already cached
+docker compose up -d --force-recreate --no-deps app sidekiq
+```
+
+Forward path after a fix lands: bump `IMAGE_TAG=0.9.5` (or remove the line to follow `:latest` again), `make deploy`.
+
+### Image retention
+
+DOCR Basic tier holds 5 GB. Each image is ~150-200 MB. That's ~25-30 tags before we hit the ceiling. Once we get there, `doctl registry repository delete-tag` cleans up old releases. No automation in this phase — manual sweep when the dashboard shows pressure.
+
 ## Out of scope for v1 deploy (revisit later)
 
 - Multi-region / failover (you have one Droplet, one region)
 - Blue/green deploy (just `docker compose pull && up -d` for now)
 - Remote terraform state (local state fine for solo dev)
 - Per-user object storage (no user uploads exist)
-- CI/CD auto-deploy on push to main (manual `git pull && docker
-  compose up -d` is fine until traffic justifies the automation)
+- CI/CD auto-deploy on push to main (manual `make release-* && make
+  publish-image && ssh deploy@<droplet> 'make deploy'` is fine until
+  traffic justifies the automation)

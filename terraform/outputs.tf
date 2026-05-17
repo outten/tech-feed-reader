@@ -60,3 +60,17 @@ output "ssh_command" {
   description = "Convenience: copy/paste to SSH into the Droplet."
   value       = "ssh deploy@${digitalocean_droplet.app.ipv4_address}"
 }
+
+# STUFF #33B — Container Registry. The endpoint + image-name are
+# composed into IMAGE_REGISTRY in the project Makefile so that
+# `make publish-image` and `docker compose pull` resolve to the
+# same URL without operator-side string-pasting.
+output "registry_endpoint" {
+  description = "Server URL for the DigitalOcean Container Registry. Always registry.digitalocean.com today, but stored as an output in case DO ever regionalises it. Use this as the second path segment for image URLs."
+  value       = digitalocean_container_registry.main.server_url
+}
+
+output "registry_name" {
+  description = "The configured DOCR name. Image URLs follow registry.digitalocean.com/<registry_name>/<image>:<tag>. Drop into Makefile.local or pass via `make publish-image REGISTRY=…` if you ever rename."
+  value       = digitalocean_container_registry.main.name
+}
