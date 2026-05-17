@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump
 
 install:
 	bundle install
@@ -170,3 +170,44 @@ sync-sports:
 # (~$0.02–0.04). Browse stored runs at /triage; detail at /triage/:id.
 triage:
 	bundle exec ruby scripts/generate_triage.rb
+
+# ---- Release / version bump (STUFF #33A) ------------------------------------
+# Three semver-bump targets that gate on a clean working tree + a green
+# test suite, then bump VERSION, commit the bump, tag vX.Y.Z, and push
+# with --follow-tags. Use one of:
+#
+#   make release-patch     # bug-fix bump   (0.9.0 → 0.9.1)
+#   make release-minor     # new-feature    (0.9.1 → 0.10.0)
+#   make release-major     # breaking       (0.10.0 → 1.0.0)
+#
+# Picks up wherever main is — run from a clean main checkout. The
+# Droplet's `make deploy` (run via SSH) is the actual ship step;
+# `make release-*` only produces the tagged commit that `make deploy`
+# will pull. Keeping the two concerns separate means a failed deploy
+# doesn't leave you with a "version was bumped but never reached prod"
+# inconsistency.
+release-major: BUMP_KIND := major
+release-minor: BUMP_KIND := minor
+release-patch: BUMP_KIND := patch
+release-major release-minor release-patch: _release_guard test _release_bump
+
+# Internal: refuses to start a release if the working tree is dirty or
+# the branch isn't `main`. Catches the common foot-gun of accidentally
+# bumping from a feature branch.
+_release_guard:
+	@if [ -n "$$(git status --porcelain)" ]; then \
+	  echo 'release: working tree is dirty; commit or stash first.'; exit 1; \
+	fi
+	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then \
+	  echo 'release: must be on main (got $$(git rev-parse --abbrev-ref HEAD)).'; exit 1; \
+	fi
+
+# Internal: bump VERSION, commit, tag, push. Reads BUMP_KIND from the
+# release-major / -minor / -patch parent target.
+_release_bump:
+	@new_version=$$(bundle exec ruby scripts/bump_version.rb $(BUMP_KIND)) && \
+	  git add VERSION && \
+	  git commit -m "chore: release v$$new_version" && \
+	  git tag "v$$new_version" && \
+	  git push --follow-tags origin main && \
+	  echo "Released v$$new_version."
