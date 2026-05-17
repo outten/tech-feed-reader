@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune deploy
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump
 
 install:
 	bundle install
@@ -171,24 +171,43 @@ sync-sports:
 triage:
 	bundle exec ruby scripts/generate_triage.rb
 
-# ---- Production deploy (run on the Droplet, not your laptop) ----------------
-# Manual redeploy after a PR merges to main. SSH in and run from /opt/app:
-#   ssh deploy@<droplet-ip>
-#   cd /opt/app && make deploy
+# ---- Release / version bump (STUFF #33A) ------------------------------------
+# Three semver-bump targets that gate on a clean working tree + a green
+# test suite, then bump VERSION, commit the bump, tag vX.Y.Z, and push
+# with --follow-tags. Use one of:
 #
-# Pulls main, rebuilds the app + sidekiq images, force-recreates ONLY
-# those two services (caddy + redis keep running so there's no TLS
-# cert blip or Redis queue flush), then tails app logs so you can
-# watch the boot. Ctrl-C out of the tail once it looks healthy.
+#   make release-patch     # bug-fix bump   (0.9.0 → 0.9.1)
+#   make release-minor     # new-feature    (0.9.1 → 0.10.0)
+#   make release-major     # breaking       (0.10.0 → 1.0.0)
 #
-# If `git pull` reports a merge conflict on /opt/app/.env, that's
-# expected the first time — the deploy account has local edits there
-# (production secrets). The .env file is gitignored, so the conflict
-# is on whatever else was edited. Resolve and re-run.
-deploy:
-	git pull origin main
-	docker compose build app sidekiq
-	docker compose up -d --force-recreate --no-deps app sidekiq
-	@echo ''
-	@echo '--- tailing app logs (Ctrl-C to exit) ---'
-	docker compose logs -f --tail=50 app
+# Picks up wherever main is — run from a clean main checkout. The
+# Droplet's `make deploy` (run via SSH) is the actual ship step;
+# `make release-*` only produces the tagged commit that `make deploy`
+# will pull. Keeping the two concerns separate means a failed deploy
+# doesn't leave you with a "version was bumped but never reached prod"
+# inconsistency.
+release-major: BUMP_KIND := major
+release-minor: BUMP_KIND := minor
+release-patch: BUMP_KIND := patch
+release-major release-minor release-patch: _release_guard test _release_bump
+
+# Internal: refuses to start a release if the working tree is dirty or
+# the branch isn't `main`. Catches the common foot-gun of accidentally
+# bumping from a feature branch.
+_release_guard:
+	@if [ -n "$$(git status --porcelain)" ]; then \
+	  echo 'release: working tree is dirty; commit or stash first.'; exit 1; \
+	fi
+	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then \
+	  echo 'release: must be on main (got $$(git rev-parse --abbrev-ref HEAD)).'; exit 1; \
+	fi
+
+# Internal: bump VERSION, commit, tag, push. Reads BUMP_KIND from the
+# release-major / -minor / -patch parent target.
+_release_bump:
+	@new_version=$$(bundle exec ruby scripts/bump_version.rb $(BUMP_KIND)) && \
+	  git add VERSION && \
+	  git commit -m "chore: release v$$new_version" && \
+	  git tag "v$$new_version" && \
+	  git push --follow-tags origin main && \
+	  echo "Released v$$new_version."

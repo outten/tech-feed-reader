@@ -4,8 +4,9 @@
   <div>
     <h2>About Tech Feed Reader</h2>
     <p class="subtitle">
-      A self-hosted RSS reader that ranks, summarizes, and triages your
-      feed for you — built single-user-first.
+      A hosted RSS reader that ranks, summarizes, and triages your
+      feed for you — passkey-only sign-in, your subscriptions and reading
+      state scoped to your account.
     </p>
   </div>
 </div>
@@ -75,8 +76,8 @@
 <section class="about-section">
   <h3>How it works</h3>
   <ul>
-    <li><strong>Ingest:</strong> a 10-minute cron pulls every subscribed feed via Ruby's <code>FeedParser</code>; HN/Lobsters teasers fall back to a readability fetch.</li>
-    <li><strong>Storage:</strong> SQLite with FTS5 for full-text search, WAL mode for concurrent reads. One file at <code>data/app.db</code>. No external services required.</li>
+    <li><strong>Ingest:</strong> Sidekiq workers pull every subscribed feed every 10 minutes via Ruby's <code>FeedParser</code>; HN/Lobsters teasers fall back to a readability fetch.</li>
+    <li><strong>Storage:</strong> PostgreSQL with a <code>tsvector</code> column + GIN index for full-text search. Per-account row scoping on every read/write.</li>
     <li><strong>Ranking:</strong> a simple cosine-overlap score against your positive/negative corpus, plus a recency factor and per-feed weight that adapts from your engagement.</li>
     <li><strong>Summaries:</strong> extractive (TextRank) at import, optional Claude (Sonnet 4.6) on demand. Cached so re-visits don't re-spend tokens.</li>
     <li><strong>Triage:</strong> Claude reads up to 30 unread + 20 corpus exemplars per topic. Three runs nightly (cross-topic, technology-only, sports-only). Browse history at <a href="/triage">/triage</a>.</li>
@@ -88,9 +89,9 @@
 <section class="about-section">
   <h3>What's different</h3>
   <ul>
-    <li><strong>Single-user-first.</strong> No signup, no accounts, no auth boundary. The whole app trusts whoever opens it. (Multi-user is on the roadmap, but the simplicity comes first.)</li>
+    <li><strong>Passkey sign-in. No passwords.</strong> No email collection, no recovery questions, no shared-secret to leak. The WebAuthn credential lives on your device and never crosses the wire; the server only stores its public key.</li>
     <li><strong>No analytics, no tracking, no third-party JS.</strong> The only outbound calls are the feeds you subscribed to + Claude's API for the summaries you opt into.</li>
-    <li><strong>Your data on your disk.</strong> Bookmark a backup of <code>data/app.db</code> and you're portable. <a href="/admin/backgrounds">Even the rotating background images</a> are yours to swap.</li>
+    <li><strong>Your data is scoped to your account.</strong> Subscriptions, bookmarks, read state, mute rules, triages — all keyed to <code>user_id</code> on every row. Other accounts can't see your feeds or your reading history.</li>
     <li><strong>AI as a tool, not the master.</strong> Claude summarises and triages. It doesn't decide what you read, what's "for you," or what gets boosted.</li>
   </ul>
 </section>
@@ -99,24 +100,23 @@
   <h3>Tech stack</h3>
   <ul>
     <li>Ruby 3.4.1 / Sinatra / ERB / RSpec</li>
-    <li>SQLite (FTS5, WAL mode)</li>
+    <li>PostgreSQL with <code>tsvector</code> + GIN for search</li>
+    <li>Sidekiq + Redis for the background queue (feed refreshes, summaries, sports sync)</li>
+    <li>WebAuthn passkeys for sign-in (FIDO2 / Apple / Google / hardware keys)</li>
     <li>Anthropic Claude Sonnet 4.6 for triage + summaries; Opus 4.7 for chat widget</li>
     <li>Hotwired Turbo for SPA-style navigation; Chart.js for the Activity chart</li>
-    <li>Cron-driven background jobs via Make targets (<code>make refresh-feeds</code>, <code>make triage</code>, <code>make digest</code>, <code>make sync-sports</code>)</li>
   </ul>
 </section>
 
 <section class="about-section">
   <h3>Get started</h3>
   <p>
-    Already running? Head to <a href="/">today's queue</a> or browse
-    feeds at <a href="/feeds">/feeds</a>. Ops stats live at
-    <a href="/admin/dashboard" data-turbo="false">/admin/dashboard</a>.
-    New here? The README in the repository covers <code>make install</code>
-    and the seed-feed flow.
+    New here? Create an account (30 seconds, passkey-only) and you'll
+    land on a starter feed catalog. Already have an account? Sign in and
+    head to <a href="/">today's queue</a>.
   </p>
   <div class="home-cta" style="margin-top:1rem">
-    <a class="btn-primary" href="/">What's on today &rarr;</a>
-    <a class="home-cta-secondary" href="/admin/dashboard" data-turbo="false">Operational dashboard &rarr;</a>
+    <a class="btn-primary" href="/sign-up">Create an account &rarr;</a>
+    <a class="home-cta-secondary" href="/sign-in">Sign in &rarr;</a>
   </div>
 </section>

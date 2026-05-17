@@ -10,6 +10,13 @@
 
 ARG RUBY_VERSION=3.4.1
 
+# ---- VERSION (read by image labels + the runtime AppVersion module) -------
+# Defaults to 'unknown' so a hand-rolled `docker build` from a working
+# tree still produces a runnable image. Production builds pass
+# --build-arg APP_VERSION=$(cat VERSION) so the OCI label + the in-app
+# AppVersion::SEMVER pick up the real semver from the tagged commit.
+ARG APP_VERSION=unknown
+
 # ---- builder: install gems with build deps available -----------------------
 FROM ruby:${RUBY_VERSION}-slim AS builder
 
@@ -59,7 +66,17 @@ ENV RACK_ENV=production \
     BUNDLE_DEPLOYMENT=true \
     BUNDLE_PATH=vendor/bundle \
     BUNDLE_WITHOUT="development:test" \
-    PORT=4567
+    PORT=4567 \
+    APP_VERSION=${APP_VERSION}
+
+# OCI image labels — `docker inspect <image> | jq '.[0].Config.Labels'`
+# is the supported way to ask "what version is this image?". The
+# title + description are conventional; the version label matches
+# AppVersion::SEMVER inside the running container.
+LABEL org.opencontainers.image.title="Tech Feed Reader" \
+      org.opencontainers.image.description="Personal RSS reader with ranking, AI triage, and per-account passkey auth." \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.source="https://github.com/outten/tech-feed-reader"
 
 EXPOSE 4567
 
