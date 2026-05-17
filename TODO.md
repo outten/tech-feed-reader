@@ -450,10 +450,150 @@ Cross-user isolation regression suite in [spec/cross_user_isolation_spec.rb](spe
 Phase A1 + A2 deferrals + production gating. Not blockers for the auth/data split themselves; ordered by user-visible value.
 
 1. ✅ **Account management page** — `/account` with profile + passkey list / add / revoke + recovery-codes regenerate + account deletion (STUFF #29 follow-up; landed alongside this TODO refresh).
-2. **Production `WEBAUTHN_RP_ID`** — still `localhost` in dev. Tied to picking a deploy target (overlaps with STUFF #11's SQLite-on-EBS-with-Litestream sketch).
-3. **Admin user list** — small admin-namespace page showing signed-up accounts with last-seen-at, useful when signups open up.
-4. **Per-user data export** — GDPR-style "download my data" endpoint. Only matters at scale.
-5. **Open-signups rate limit** — per-day signup-rate cap or invite codes; only needed if abuse appears.
+2. ✅ **First-time onboarding** — `/welcome` topic-chip picker for new signups (PR #100).
+3. **Production `WEBAUTHN_RP_ID`** — locked to `tmoneystuff.com`. Wired in **Phase D6** of the deploy plan below.
+4. **Admin user list** — small admin-namespace page showing signed-up accounts with last-seen-at, useful when signups open up.
+5. **Per-user data export** — GDPR-style "download my data" endpoint. Only matters at scale.
+6. **Open-signups rate limit** — per-day signup-rate cap or invite codes; only needed if abuse appears.
+
+---
+
+## Deploy — Phase D: Digital Ocean (STUFF #31)
+
+**Status: `proposed`** — awaiting user sign-off on the phase plan + tool install list. Supersedes STUFF #11's SQLite-on-EBS-with-Litestream sketch (user explicitly picked DO managed Postgres + a DO container service).
+
+The goal: take the app from "runs on localhost with SQLite" to "live on a real domain over HTTPS with managed Postgres on Digital Ocean," with all infrastructure expressed as Terraform. Phased so each PR is reviewable on its own and we can pause between phases.
+
+### Prerequisites — install before D1
+
+| Tool | Why | Install |
+|---|---|---|
+| [`doctl`](https://docs.digitalocean.com/reference/doctl/how-to/install/) | Digital Ocean CLI — auth, registry login, app inspection, log tailing | `brew install doctl` |
+| [`terraform`](https://developer.hashicorp.com/terraform/install) | IaC for every DO resource we'll create | `brew install terraform` |
+| Docker Desktop | Local container builds + compose for dev | already installed if `docker --version` works |
+| DO account + Personal Access Token | Required for `doctl auth init` and the Terraform DO provider. Generate at cloud.digitalocean.com → API → Tokens, scopes: `read + write` | manual |
+| DO container registry | Hosts the built image; App Platform pulls from it on deploy. Free tier = 1 repo, 500 MB | created by Terraform in D5; `doctl registry login` afterwards |
+| Domain | DNS + cert target. Cloudflare DNS is cheapest + easiest; Namecheap / Hover work too | manual purchase ~$10-15/yr |
+
+**Hosting target (locked):** DO **App Platform** for the web + worker services (managed PaaS — auto-scaling, automatic Let's Encrypt cert, zero ops on the runtime). DO **Managed PostgreSQL** for the DB. DO **Managed Redis** for Sidekiq (or bundle a single-node Redis into the container for $0 v1 — see D7 cost note).
+
+### Phase D1 — Containerize the app (PR 1)
+
+Goal: app runs in a Docker container locally with SQLite. Zero production changes; proves the runtime story.
+
+- `Dockerfile` (multi-stage: build → slim Ruby 3.4.1 runtime; non-root user; HEALTHCHECK)
+- `docker-compose.dev.yml` with services: `web`, `sidekiq`, `redis`. SQLite DB mounted as a volume.
+- Makefile: `make docker-build`, `make docker-up`, `make docker-down`
+- `make test` runs inside the container too
+- Smoke: hit `http://localhost:4567` from the container, sign up, basic CRUD, podcast play
+- **No PostgreSQL yet** — D2 handles that.
+
+### Phase D2 — PostgreSQL adapter (PR 2, biggest phase, may split to PR 2+3)
+
+Goal: app supports both SQLite (dev/test default) and PostgreSQL (opt-in via `DATABASE_URL`).
+
+**D2.1 — adapter abstraction**
+- `Gemfile`: add `pg`
+- [`app/database.rb`](app/database.rb): detect `DATABASE_URL` → return a PG connection; otherwise return SQLite as today
+- Stores that use SQLite-specific syntax (`datetime(?)`, `INSERT OR IGNORE`, `last_insert_row_id`, `LIKE` with no PG-collation, etc.) get a thin adapter layer
+- CI matrix: existing SQLite job + new Postgres job (uses GitHub Actions service container)
+
+**D2.2 — Postgres migrations**
+- Migrations today are SQLite SQL files. Two paths:
+  - **(a)** Maintain dual schemas under `db/migrations/sqlite/` + `db/migrations/postgres/` — simple, some duplication.
+  - **(b)** Adopt a real migration tool (Sequel migrations, the `pg-migrations` gem) — generates both dialects from one source.
+- **Recommendation (a)** for now; bias toward simple until the duplication actually hurts.
+- FTS5 doesn't exist in Postgres → replace with `tsvector` column + GIN index. Triggers that keep `articles_fts` in sync get rewritten as a generated `tsvector` column.
+
+**D2.3 — search rewrite**
+- [`ArticlesStore.search`](app/articles_store.rb) gets two paths: PG → `tsvector @@ plainto_tsquery`, SQLite → existing `articles_fts MATCH`.
+- Snippet highlighting: PG `ts_headline` vs SQLite `snippet()`. View handles both shapes uniformly.
+
+### Phase D3 — Local Postgres via docker-compose (PR 4)
+
+Goal: `docker-compose up` brings the full stack (Postgres + Redis + web + sidekiq).
+
+- `docker-compose.dev.yml` gains a `postgres` service (official image, 16-alpine).
+- `DATABASE_URL=postgres://tfr:tfr@postgres:5432/tfr_dev` in the compose env
+- `make docker-fresh` drops + recreates the DB
+- Smoke against PG locally
+- `make run` (no Docker) keeps using SQLite for fast iteration — no Docker dependency for hacking on a route.
+
+### Phase D4 — Data migration script (PR 5)
+
+Goal: import the existing SQLite corpus into PG (one-shot, scripted).
+
+- `scripts/dump_sqlite_to_postgres.rb` — reads `data/app.db`, writes INSERT statements against `$DATABASE_URL`. Preserves IDs where the PG sequence allows; resets sequence to MAX(id)+1 after.
+- Covers every table in the schema: `feeds`, `articles`, `user_feed_subscriptions`, `read_state`, `feed_feedback`, `mute_rules`, `tags`, `article_tags`, `summaries`, `digests`, `triages`, all sports tables, `users`, `webauthn_credentials`, `recovery_codes`, `background_pool`.
+- Spec: round-trip a tiny SQLite fixture into a Postgres fixture and diff row counts per table.
+
+### Phase D5 — Terraform skeleton (PR 6)
+
+Goal: `terraform/` directory plans cleanly against DO. **No `apply` yet** — review only.
+
+- `terraform/main.tf`: DO provider + state backend (local for v1; can migrate to DO Spaces later)
+- `terraform/database.tf`: `digitalocean_database_cluster` (smallest Postgres tier, region = NYC3)
+- `terraform/registry.tf`: `digitalocean_container_registry`
+- `terraform/app.tf`: `digitalocean_app` spec with two components — `web` (port 4567) and `worker` (Sidekiq), both pulling from the registry
+- `terraform/dns.tf`: `digitalocean_domain` + A/CNAME records (initially with a placeholder; real domain wired in D7)
+- `terraform/project.tf`: `digitalocean_project` to group everything
+- Outputs: `db_connection_string`, `app_default_ingress` (the auto-generated app URL before custom domain)
+- **CI:** add a `terraform validate` check on every PR that touches `terraform/`
+
+### Phase D6 — HTTPS + production hardening (PR 7)
+
+Goal: app is safe to expose on a public URL.
+
+- HTTPS redirect middleware when `RACK_ENV=production` (rack-ssl-enforcer or hand-rolled `before` filter)
+- HSTS header in production (`Strict-Transport-Security`)
+- Trust proxy: read `X-Forwarded-Proto` from the App Platform LB so `request.ssl?` is accurate
+- Session cookie `secure: true` in production (verify the current `secure: ENV['RACK_ENV'] == 'production'` line in [`app/main.rb`](app/main.rb) is correct)
+- CSP header — start permissive (`default-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net`), tighten later
+- `/health` returns 503 when DB is unreachable (already does; add a spec)
+- `RACK_ENV=production` boots: skip auto-migrate (run `make migrate` in the release step instead) so a dying boot doesn't half-apply schema
+
+### Phase D7 — First deploy (manual operations, no PR)
+
+- `doctl auth init` (pastes the API token)
+- `terraform apply` — creates DB cluster + registry + app shell + DNS records
+- `terraform output db_connection_string` → already wired into the App Platform component's env var via the spec
+- Push container: `doctl registry login && docker push registry.digitalocean.com/<reg>/tech-feed-reader:v1`
+- App Platform pulls the new image → runs migrations → serves
+- DNS: point your domain's NS records at DO or use Cloudflare with CNAME to App Platform's `*.ondigitalocean.app`
+- App Platform provisions Let's Encrypt cert automatically for the custom domain
+- Smoke: sign up the first real user, verify auth + feed ingest + sync-feeds cron + Claude summaries
+- **Cost estimate** (smallest tiers, monthly):
+  - App Platform: `basic-s` web + `basic-xs` worker ≈ $12 + $5 = **$17**
+  - Managed Postgres: 1 GB / 1 vCPU ≈ **$15**
+  - Redis: **bundled in the worker container** (decision locked above), $0
+  - Container registry: free tier
+  - Domain: $10–15/year — **`tmoneystuff.com` (Namecheap)** already paid
+  - **Total v1**: ~**$32/mo** (App + PG)
+
+### Phase D8 — CI/CD (PR 8)
+
+Goal: merging to main builds + pushes a container; App Platform auto-redeploys.
+
+- `.github/workflows/deploy.yml` — on push to `main`: build the container, tag with the commit SHA, push to DO registry
+- App Platform's "deploy on push" feature watches the registry and rolls the new image
+- Smoke check post-deploy: GET /health from the deploy workflow; fail the workflow if it's not 200
+- Rollback: `doctl apps update <id> --spec ...` to roll back to a previous image tag
+
+### Decisions (locked)
+
+- **Domain**: **`tmoneystuff.com`** registered at **Namecheap**. NS records already pointed at `ns1.digitalocean.com` / `ns2.digitalocean.com` / `ns3.digitalocean.com` — DO DNS is the source of truth. Terraform's `digitalocean_domain "tmoneystuff.com"` + `digitalocean_record` resources manage A/CNAME records as code.
+- **Production `WEBAUTHN_RP_ID`**: **`tmoneystuff.com`** (the bare apex — passkeys registered against the apex also work on any subdomain we ever add). Closes follow-up #3 in "Multi-user — open follow-ups" above.
+- **App serving**: apex `tmoneystuff.com` (App Platform `domain.type = PRIMARY`). No subdomain by default — revisit if we ever park marketing at apex and want the app at `app.`.
+- **Redis**: **bundled** in the worker container ($0 v1; single-node, ephemeral; OK because Sidekiq job loss on a restart is acceptable for our cadence — feeds re-fetch on the next scheduler tick). Switch to DO Managed Redis if loss becomes real.
+- **Region**: **NYC3** (closest to Philly per STUFF #25's Bus Mode). FRA1 / SFO3 only if latency turns out to matter.
+- **Backups**: DO managed PG ships with 7-day point-in-time recovery on the $15 tier by default — no extra config.
+
+### Explicitly NOT in this plan
+
+- Multi-region failover, read replicas, autoscaling beyond what App Platform does by default
+- Kubernetes (DOKS) — overkill for a single-process app
+- Self-hosted PG on a Droplet — fights the user's "managed Postgres" requirement
+- Container-image scanning / vulnerability scanning beyond what DO ships
 
 ---
 
