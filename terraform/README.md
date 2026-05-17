@@ -13,9 +13,14 @@ README is just the operator's runbook for the apply step.
   CIDRs, HTTP/HTTPS from anywhere.
 - **1× DigitalOcean Space** (private) for nightly SQLite backups,
   with lifecycle rules (14d daily, 60d weekly, 400d monthly).
-- **Cloudflare DNS records** for the apex + `www`, proxied through
-  Cloudflare (orange cloud), plus CAA records pinning cert issuance
-  to Let's Encrypt.
+- **1× DigitalOcean DNS A record** at `${app_subdomain}.${domain}`
+  (default `feeder.tmoneystuff.com`) pointing at the Droplet's
+  IPv4. The zone itself is read-only via `data` — the user added
+  the domain to DO control panel before `apply`. Other subdomains
+  (apex, www, future apps) stay outside this Terraform's scope.
+
+Caddy on the Droplet mints its own Let's Encrypt cert via HTTP-01
+on first request — no CDN / WAF in front for v1.
 
 Total monthly cost: roughly **$12 Droplet + $5 Spaces = $17/mo**.
 
