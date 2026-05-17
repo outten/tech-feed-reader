@@ -308,11 +308,14 @@ Make the app deployable + safe to expose. **Done — three PRs landed:**
 ### Deferred to v1.1 (decision: ship 1.0 on SQLite first)
 
 - ~~Postgres support, SQL audit, FTS5 → tsvector, dialect-aware
-  migration runner, CI matrix~~. SQLite WAL mode handles a single-process
-  Sinatra + Sidekiq fine at hobby scale. Migrate to Postgres when
-  traffic or concurrency makes it warranted — until then, the saved
-  engineering effort funds other work. Persistence is via the
-  `app_data` Docker volume, backed up nightly to a DO Space.
+  migration runner, CI matrix~~. **Re-prioritised 2026-05-17 once
+  v1.0 was live — moved into Phase 5 below.** The original reasoning
+  (saved engineering effort funds other work) held up through Phase
+  0-3; now that we're live with real signups, the user decided to do
+  the migration **next** rather than build SQLite backup tooling
+  that becomes throwaway when PG lands. SQLite is fine in the
+  meantime (single user; data loss between now and Phase 5 cutover
+  is explicitly accepted).
 
 ## Phase 2 — Terraform (CLAUDE) ✅ SCAFFOLDED
 
@@ -389,6 +392,74 @@ is one config-block away.
 - [ ] **Runbook in `docs/runbook.md`** — common ops: deploy a new
       version, rotate a secret, restore from backup, restart a
       misbehaving service, SSH access, log inspection.
+
+## Phase 5 — PostgreSQL migration (CLAUDE)
+
+**Status: `next`** — decided 2026-05-17. The "Deferred to v1.1" note in Phase 1 above is now obsolete: rather than build nightly SQLite backup tooling that becomes throwaway when PG lands, ship PG and let DO managed PG handle backups (free 7-day point-in-time recovery on the $15 tier). Data-loss window between v1.0 and Phase 5 cutover is accepted; only ~1 day of usage at decision time and the user picked "migrate the data" so we'll preserve what's there.
+
+5 PRs + 1 manual cutover step. Each PR is independently green; the cutover happens after all five land.
+
+### D-PG-1 — `pg` gem + Database adapter abstraction (PR)
+
+Goal: app supports both SQLite and Postgres at the connection layer. SQLite stays the default for `make run` / `make test`; PG is opt-in via `DATABASE_URL`.
+
+- `Gemfile`: add `pg`
+- [`app/database.rb`](app/database.rb): detect `DATABASE_URL` → return a wrapper around `PG::Connection`; else SQLite as today
+- Thin **adapter** wraps the dialect differences the stores rely on:
+  - `.execute(sql, args)` — args interpolated as `?` (SQLite) or `$1, $2…` (PG)
+  - `.transaction { ... }` — same in both
+  - `.last_insert_row_id` → in PG this consults `RETURNING id` from the last `execute`
+  - `.changes` → `cmd_tuples` on the last PG result
+- Spec suite stays green in SQLite mode; nothing observable yet to the user.
+
+### D-PG-2 — Postgres migrations + CI matrix (PR)
+
+Goal: `make migrate` produces an identical schema in both modes.
+
+- New `db/migrations-postgres/` directory with PG-dialect versions of every migration (001–023+).
+- Big piece: **FTS5 → `tsvector` + GIN index** on `articles`. The `articles_fts` virtual table goes away in PG mode; a generated `tsvector` column (`title || ' ' || coalesce(content_text, '')`) + a `GIN` index on it replaces it. Search queries route through the dialect-aware path landing in D-PG-3.
+- `Database.migrate!` reads from `db/migrations/` (SQLite) or `db/migrations-postgres/` based on detected dialect.
+- CI matrix: existing SQLite job + new Postgres job using `postgres:16-alpine` GitHub Actions service container, `DATABASE_URL` set, full RSpec.
+
+### D-PG-3 — SQL audit + dialect-aware stores (PR)
+
+Goal: hand-rolled SQL in stores works against both backends. Specs pass in CI matrix on both.
+
+Hot spots, by store:
+- `ArticlesStore` — `INSERT OR IGNORE` (import), `INSERT OR REPLACE` (categories backfill), `articles_fts MATCH` (search, for_topic), `datetime('now')` (a few places), `last_insert_row_id`.
+- `FeedsStore` — `INSERT OR IGNORE` (catalog), `last_insert_row_id` (add_to_catalog).
+- `ReadStateStore` — `INSERT ... ON CONFLICT(user_id, article_id) DO UPDATE ...` (SQLite supports this; PG too). Verify.
+- `Recommendation` + `TopicClusters` — search hot path via FTS5; switch to `tsvector @@ plainto_tsquery` in PG mode.
+- `Database.adapter` accessor lets each store branch when needed; goal is to push branching into the adapter where possible, not into the store.
+
+### D-PG-4 — Provision PG cluster in Terraform (PR)
+
+Goal: `terraform plan` cleanly proposes a PG cluster + firewall update. **No `apply` yet** — that happens in D-PG-5.
+
+- New `terraform/database.tf`: `digitalocean_database_cluster` (engine `pg`, version `16`, smallest tier `db-s-1vcpu-1gb` = $15/mo, NYC3, 1 node).
+- `terraform/firewall.tf`: tighten — only the Droplet's reserved IP can reach the cluster's 25060 port (DO managed PG runs on its own private network anyway, but defense in depth).
+- New output: `db_connection_string` (sensitive). Includes `?sslmode=require` since DO managed PG requires TLS.
+- No new variables; cluster name derived from `var.app_subdomain` + `-pg`.
+
+### D-PG-4.5 — Data-migration script (PR)
+
+Goal: `scripts/dump_sqlite_to_postgres.rb` reads the live Droplet SQLite into a freshly-migrated PG database, preserving IDs.
+
+- One-shot script; reads `data/app.db`, writes via `pg` gem against `$DATABASE_URL`.
+- Tables in FK-safe order: `users` → `feeds` → `articles` → `user_feed_subscriptions` → `read_state` → `feed_feedback` → `mute_rules` → `tags` → `article_tags` → `summaries` → `digests` → `triages` → all sports tables → `webauthn_credentials` → `recovery_codes` → `background_pool`.
+- After insert, bump every PG sequence to `MAX(id) + 1` so the next AUTOINCREMENT doesn't collide.
+- Spec: round-trip a tiny SQLite fixture into a Postgres fixture and `diff` row counts per table.
+
+### D-PG-5 — Cutover (manual operations, no PR)
+
+- Bring up the cluster: `terraform apply` in `terraform/` (creates the DB, ~5–10 min).
+- `terraform output -raw db_connection_string` → drop into the Droplet's `/opt/app/.env` as `DATABASE_URL=...`.
+- SSH to Droplet, **pull the latest image with PG support**: `cd /opt/app && git pull && docker compose build app sidekiq && docker compose up -d` (which auto-runs migrations against PG via `Database.migrate!` on boot).
+- Verify PG has the empty schema: `docker compose exec app ruby -e "require_relative 'app/database'; p Database.connection.execute('SELECT COUNT(*) FROM users')"`
+- Stop the app (`docker compose stop app sidekiq`), run the migration: `docker compose run --rm app ruby scripts/dump_sqlite_to_postgres.rb`
+- Start back up: `docker compose up -d`
+- Smoke test sign-in (passkey still works because RP_ID didn't change), verify feeds and read-state survived, verify search returns results, verify a /chat round-trip.
+- Update DEPLOYMENT.md to mark Phase 5 complete; note the SQLite volume is now unused (can `docker volume rm app_app_data` after a few days of stability).
 
 ## Out of scope for v1 deploy (revisit later)
 
