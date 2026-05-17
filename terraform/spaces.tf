@@ -14,6 +14,11 @@ resource "digitalocean_spaces_bucket" "backups" {
     enabled = false
   }
 
+  # Block order here matches the order DO returns them in (alphabetical
+  # by id, as of the provider version we're on). The provider compares
+  # lifecycle_rule blocks positionally, so a mismatched order shows up
+  # as a perpetual in-place "update" on every plan even though the
+  # rules themselves are identical.
   lifecycle_rule {
     id      = "expire-daily-backups"
     enabled = true
@@ -24,20 +29,20 @@ resource "digitalocean_spaces_bucket" "backups" {
   }
 
   lifecycle_rule {
-    id      = "expire-weekly-backups"
-    enabled = true
-    prefix  = "weekly/"
-    expiration {
-      days = 60
-    }
-  }
-
-  lifecycle_rule {
     id      = "expire-monthly-backups"
     enabled = true
     prefix  = "monthly/"
     expiration {
       days = 400
+    }
+  }
+
+  lifecycle_rule {
+    id      = "expire-weekly-backups"
+    enabled = true
+    prefix  = "weekly/"
+    expiration {
+      days = 60
     }
   }
 }
