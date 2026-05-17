@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune deploy
 
 install:
 	bundle install
@@ -170,3 +170,25 @@ sync-sports:
 # (~$0.02–0.04). Browse stored runs at /triage; detail at /triage/:id.
 triage:
 	bundle exec ruby scripts/generate_triage.rb
+
+# ---- Production deploy (run on the Droplet, not your laptop) ----------------
+# Manual redeploy after a PR merges to main. SSH in and run from /opt/app:
+#   ssh deploy@<droplet-ip>
+#   cd /opt/app && make deploy
+#
+# Pulls main, rebuilds the app + sidekiq images, force-recreates ONLY
+# those two services (caddy + redis keep running so there's no TLS
+# cert blip or Redis queue flush), then tails app logs so you can
+# watch the boot. Ctrl-C out of the tail once it looks healthy.
+#
+# If `git pull` reports a merge conflict on /opt/app/.env, that's
+# expected the first time — the deploy account has local edits there
+# (production secrets). The .env file is gitignored, so the conflict
+# is on whatever else was edited. Resolve and re-run.
+deploy:
+	git pull origin main
+	docker compose build app sidekiq
+	docker compose up -d --force-recreate --no-deps app sidekiq
+	@echo ''
+	@echo '--- tailing app logs (Ctrl-C to exit) ---'
+	docker compose logs -f --tail=50 app
