@@ -19,20 +19,15 @@ variable "do_spaces_secret_key" {
   sensitive   = true
 }
 
-variable "cf_token" {
-  description = "Cloudflare API token scoped to the zone (template: Edit zone DNS)."
-  type        = string
-  sensitive   = true
-}
-
-variable "cf_zone_id" {
-  description = "Cloudflare zone ID for the domain. Found in the Cloudflare dashboard sidebar of the domain."
-  type        = string
-}
-
 variable "domain" {
-  description = "Bare domain (e.g. tfr.example.com). Used for DNS records, Caddy TLS, and WebAuthn RP ID."
+  description = "Bare apex zone hosted in DO DNS (e.g. tmoneystuff.com). The app actually serves at `${app_subdomain}.${domain}`; the apex itself is left alone so other apps on the same zone aren't disturbed."
   type        = string
+}
+
+variable "app_subdomain" {
+  description = "Subdomain of `domain` where this app serves. The DNS A record is created at `${app_subdomain}.${domain}` and Caddy mints its Let's Encrypt cert for that hostname. Also used as WebAuthn RP ID on the Droplet."
+  type        = string
+  default     = "feeder"
 }
 
 variable "region" {

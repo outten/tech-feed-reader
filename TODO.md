@@ -474,13 +474,15 @@ Phase A1 + A2 deferrals + production gating. Not blockers for the auth/data spli
 
 ### Decisions locked during this session
 
-These don't appear in DEPLOYMENT.md yet — captured here as a session log so they don't get lost. Move into DEPLOYMENT.md if/when they need to live closer to the deploy code.
+These now also live in DEPLOYMENT.md's "Locked decisions" block — duplicated here for the TODO reader.
 
-- **Domain**: **`tmoneystuff.com`** registered at **Namecheap**. NS records already pointed at `ns1.digitalocean.com` / `ns2.digitalocean.com` / `ns3.digitalocean.com` — DO DNS is source of truth.
-- **Production `WEBAUTHN_RP_ID`**: **`tmoneystuff.com`** (bare apex — passkeys registered against the apex also work on any subdomain we ever add). Closes follow-up #3 in "Multi-user — open follow-ups" above.
-- **App serving**: apex `tmoneystuff.com`. No subdomain by default — revisit if we ever park marketing at apex and want the app at `app.`.
+- **Domain**: **`tmoneystuff.com`** registered at **Namecheap**. NS records pointed at `ns1.digitalocean.com` / `ns2.digitalocean.com` / `ns3.digitalocean.com` — **DigitalOcean DNS** is source of truth. The user plans to host multiple apps on this zone, so the apex is intentionally left untouched by this app's Terraform.
+- **App serving**: **`feeder.tmoneystuff.com`** (subdomain). Terraform manages a single A record at `feeder.${var.domain}` → Droplet IP. The apex and any other subdomains belong to other apps.
+- **Production `WEBAUTHN_RP_ID`**: **`feeder.tmoneystuff.com`** — bound to the subdomain where this app actually serves, so passkeys for this app stay separate from any future apps on other subdomains of the same zone. Closes follow-up #3 in "Multi-user — open follow-ups" above.
+- **DNS provider**: **DigitalOcean** (not Cloudflare). The Terraform was rewritten away from `cloudflare_record` to `digitalocean_record` in the same PR that pinned the subdomain.
 - **Region**: **NYC3** (closest to Philly per STUFF #25's Bus Mode).
 - **Redis**: **bundled** in docker-compose (already the case in #104; single-node ephemeral; OK because Sidekiq job loss on a restart is acceptable — feeds re-fetch on the next scheduler tick).
+- **TLS**: Caddy on the Droplet mints a Let's Encrypt cert directly via HTTP-01. No CDN / WAF in front for v1.
 
 ---
 

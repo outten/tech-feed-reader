@@ -1,60 +1,29 @@
-# Cloudflare DNS pointing the domain at the Droplet. Proxied through
-# Cloudflare (orange cloud) for CDN + WAF + DDoS protection.
+# DigitalOcean DNS records for the app.
 #
-# CAA records pin certificate issuance to Let's Encrypt only — both
-# CF (which has its own internal cert for the proxied edge) and Caddy
-# (which mints the origin cert via Let's Encrypt). Without these,
-# anyone with a compromised CA could issue a cert for the domain.
+# The domain (tmoneystuff.com) is hosted in DO — the user pointed
+# the registrar's NS records at ns{1,2,3}.digitalocean.com and added
+# the zone in the DO control panel. We reference it via `data` (not
+# `resource`) so Terraform doesn't try to re-create the zone, and so
+# we leave the apex / other-app records the user manages outside
+# this app's Terraform alone (the user plans to deploy additional
+# apps to other subdomains of the same zone).
 #
-# IMPORTANT: with Cloudflare proxy on, Caddy's HTTP-01 challenge has
-# to traverse CF. CF passes /.well-known/acme-challenge/* through to
-# the origin, so HTTP-01 still works — but if it fails, fall back to
-# DNS-01 via the caddy-dns/cloudflare plugin (requires a custom Caddy
-# build; see DEPLOYMENT.md Phase 3 notes).
+# This app serves at `${var.app_subdomain}.${var.domain}` (default
+# `feeder.tmoneystuff.com`). Only one record is managed here: an A
+# record for the subdomain pointing at the Droplet's IPv4.
+#
+# TLS: Caddy on the Droplet mints a Let's Encrypt cert directly via
+# the HTTP-01 challenge. Firewall opens port 80 + 443 to the world.
+# No CDN / WAF in front for v1 — could add one later as a follow-up.
 
-resource "cloudflare_record" "apex" {
-  zone_id = var.cf_zone_id
-  name    = var.domain
-  type    = "A"
-  value   = digitalocean_droplet.app.ipv4_address
-  ttl     = 1       # 1 = "Auto" when proxied
-  proxied = true
+data "digitalocean_domain" "zone" {
+  name = var.domain
 }
 
-resource "cloudflare_record" "www" {
-  zone_id = var.cf_zone_id
-  name    = "www.${var.domain}"
-  type    = "A"
-  value   = digitalocean_droplet.app.ipv4_address
-  ttl     = 1
-  proxied = true
-}
-
-# Pin certificate issuance to Let's Encrypt for both regular and
-# wildcard certs. issuewild "letsencrypt.org" covers any future
-# subdomains we might want under Caddy.
-resource "cloudflare_record" "caa_issue" {
-  zone_id = var.cf_zone_id
-  name    = var.domain
-  type    = "CAA"
-  ttl     = 3600
-
-  data {
-    flags = "0"
-    tag   = "issue"
-    value = "letsencrypt.org"
-  }
-}
-
-resource "cloudflare_record" "caa_issuewild" {
-  zone_id = var.cf_zone_id
-  name    = var.domain
-  type    = "CAA"
-  ttl     = 3600
-
-  data {
-    flags = "0"
-    tag   = "issuewild"
-    value = "letsencrypt.org"
-  }
+resource "digitalocean_record" "app" {
+  domain = data.digitalocean_domain.zone.name
+  type   = "A"
+  name   = var.app_subdomain
+  value  = digitalocean_droplet.app.ipv4_address
+  ttl    = 300
 }

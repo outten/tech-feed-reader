@@ -23,7 +23,12 @@ output "backups_endpoint" {
 
 output "public_url" {
   description = "The HTTPS URL the app will serve from once docker compose is up + Caddy has minted a cert."
-  value       = "https://${var.domain}"
+  value       = "https://${var.app_subdomain}.${var.domain}"
+}
+
+output "app_hostname" {
+  description = "Bare hostname the app serves at. Drop into /opt/app/.env on the Droplet as DOMAIN= for Caddy and as WEBAUTHN_RP_ID for the app."
+  value       = "${var.app_subdomain}.${var.domain}"
 }
 
 output "ssh_command" {

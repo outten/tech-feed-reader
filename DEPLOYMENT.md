@@ -231,11 +231,20 @@ slightly more ops burden.
 
 Locked decisions (2026-05-16):
 - **Hosting:** Single DigitalOcean Droplet running Docker Compose
-  (app + Postgres + Redis + Caddy). Target cost ~$11/mo.
-- **DNS / edge:** Cloudflare in front (free DNS + CDN + WAF + DDoS).
-- **TLS:** End-to-end. Cloudflare → origin is Full (strict) with a
-  Let's Encrypt cert minted by Caddy on the Droplet.
-- **Backups:** Daily `pg_dump` to DigitalOcean Spaces with rotation.
+  (app + Redis + Caddy). SQLite v1.0 (Postgres deferred to v1.1
+  per Phase 1 below). Target cost ~$17/mo.
+- **Domain:** `tmoneystuff.com` registered at Namecheap. Apex stays
+  free for other apps the user plans to deploy on the same zone;
+  **this app serves at `feeder.tmoneystuff.com`**.
+- **DNS:** DigitalOcean DNS (NS records at the registrar point at
+  `ns{1,2,3}.digitalocean.com`). Terraform manages the single A
+  record `feeder` → Droplet IP; the zone itself is `data`-block
+  read-only so Terraform doesn't disturb the apex / other apps.
+- **TLS:** Caddy on the Droplet mints a Let's Encrypt cert
+  directly via HTTP-01. No CDN / WAF in front for v1; can add
+  later if abuse appears.
+- **Backups:** Nightly SQLite `.backup` to DigitalOcean Spaces
+  with rotation (14d daily / 60d weekly / 400d monthly).
 
 Ownership convention: **YOU** = manual steps the user does. **CLAUDE**
 = code/IaC I write into the repo.
@@ -250,17 +259,15 @@ These are external accounts and tokens. Nothing in the repo changes.
       Token, scopes: `read` + `write`. Save it — Terraform needs it.
 - [ ] **DO Spaces access key.** Dashboard → API → Spaces Keys → Generate.
       Save the access key + secret. Backup script needs it.
-- [ ] **Domain name.** Buy at a registrar of your choice. Cloudflare
-      Registrar is at-cost (no markup, ~$10/yr for `.com`); Porkbun and
-      Namecheap are also fine. Avoid GoDaddy.
-- [ ] **Cloudflare account.** Sign up, add the domain as a site, copy
-      the two nameservers Cloudflare assigns.
-- [ ] **Repoint nameservers.** At your registrar, replace the default
-      nameservers with the two Cloudflare gave you. DNS propagation is
-      a few hours to a day; doesn't block anything else.
-- [ ] **Cloudflare API token.** My Profile → API Tokens → Create
-      Token → template "Edit zone DNS", restricted to the new zone.
-      Save it. Terraform needs it.
+- [x] **Domain name.** `tmoneystuff.com` registered at Namecheap.
+- [x] **Repoint nameservers.** At Namecheap, replaced the default
+      nameservers with `ns1.digitalocean.com` / `ns2.digitalocean.com` /
+      `ns3.digitalocean.com`. DNS propagation a few hours to a day.
+- [ ] **Add the zone in DO control panel.** Networking → Domains →
+      Add Domain → enter `tmoneystuff.com`. This is what
+      Terraform's `data "digitalocean_domain" "zone"` reads — it
+      will NOT create the zone for you. The apex stays alone; this
+      app's A record lives at `feeder.tmoneystuff.com`.
 - [ ] **Generate production secrets.** A strong random `SESSION_SECRET`
       (e.g. `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'`).
       Confirm your existing `ANTHROPIC_API_KEY` is the one you want
@@ -312,11 +319,12 @@ Make the app deployable + safe to expose. **Done — three PRs landed:**
 `terraform/` directory checked in. One-command apply: `terraform apply`
 after `terraform.tfvars` is populated.
 
-- [x] **`providers.tf`** — `digitalocean` + `cloudflare` providers,
-      pinned versions.
-- [x] **`variables.tf`** — `do_token`, `do_spaces_*`, `cf_token`,
-      `cf_zone_id`, `domain`, `region` (default `nyc3`), `droplet_size`
-      (default `s-1vcpu-2gb`, $12/mo), `ssh_key_fingerprint`,
+- [x] **`providers.tf`** — `digitalocean` provider only (pinned).
+      Cloudflare was dropped when the DNS authority moved to DO.
+- [x] **`variables.tf`** — `do_token`, `do_spaces_*`, `domain` (apex,
+      e.g. `tmoneystuff.com`), `app_subdomain` (default `feeder`),
+      `region` (default `nyc3`), `droplet_size` (default
+      `s-1vcpu-2gb`, $12/mo), `ssh_key_fingerprint`,
       `ssh_public_key_path` (defaults to `~/.ssh/id_ed25519.pub`),
       `allowed_ssh_cidrs`, `backups_bucket_name`.
 - [x] **`terraform.tfvars.example`** — committed template; real
@@ -329,8 +337,11 @@ after `terraform.tfvars` is populated.
       `allowed_ssh_cidrs` only, 80 + 443 + ICMP from anywhere.
 - [x] **`spaces.tf`** — DO Space `tech-feed-reader-backups` (private)
       with lifecycle rules (14d daily, 60d weekly, 400d monthly).
-- [x] **`dns.tf`** — Cloudflare A records for apex + www (proxied),
-      plus CAA records pinning issuance to Let's Encrypt.
+- [x] **`dns.tf`** — DigitalOcean DNS. References the zone via
+      `data "digitalocean_domain"` (read-only) and creates ONE
+      `digitalocean_record` A record at `${app_subdomain}.${domain}`
+      → Droplet IP. The apex / other subdomains stay untouched so
+      the user can park additional apps on the same zone.
 - [x] **`outputs.tf`** — droplet IPv4 + ID, backups bucket name +
       endpoint, public URL, ready-to-paste SSH command.
 - [x] **`terraform/README.md`** — bootstrap instructions.
@@ -356,11 +367,10 @@ is one config-block away.
       (or the equivalent invocation of `Database.migrate!`).
 - [ ] **Smoke test** — sign up a fresh user, add a feed, refresh it,
       read an article, mark feedback, run /triage, view /admin/dev-stats.
-- [ ] **Cloudflare proxy on** — orange-cloud the A records (already
-      configured in terraform, but verify in the dashboard).
-- [ ] **HSTS** — once you've verified HTTPS works, turn on Cloudflare
-      HSTS with a short max-age first (e.g. 6 hours), bump to 1 year
-      after a week of stability.
+- [ ] **HSTS** — Caddyfile already sets `Strict-Transport-Security:
+      max-age=21600` (6h) while we verify TLS works end-to-end.
+      Bump to `max-age=31536000` (1y) in Caddyfile after a week of
+      stability + redeploy.
 
 ## Phase 4 — Operations (CLAUDE)
 

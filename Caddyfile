@@ -1,10 +1,11 @@
 # Caddy reverse proxy + auto Let's Encrypt for the Droplet.
 # DOMAIN + CADDY_EMAIL come from docker-compose env (which reads /opt/app/.env).
 #
-# Cloudflare sits in front of this in Full (strict) mode — Cloudflare
-# terminates the user's TLS, then re-encrypts to this origin using the
-# Let's Encrypt cert Caddy mints below. End-to-end TLS, no plaintext
-# anywhere on the wire.
+# DNS is hosted in DigitalOcean (the registrar's NS records point at
+# ns{1,2,3}.digitalocean.com). Caddy mints the Let's Encrypt cert
+# directly via HTTP-01 on first request — no CDN / WAF in front for
+# v1. Firewall must allow port 80 + 443 from the world for the
+# ACME challenge to succeed.
 
 {
 	# Use the email from env so cert-expiry notifications go to the operator.
