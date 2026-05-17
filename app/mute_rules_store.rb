@@ -45,7 +45,7 @@ module MuteRulesStore
     raise ArgumentError, 'value must be non-empty'      if value.empty?
 
     db.execute(
-      'INSERT OR IGNORE INTO mute_rules(user_id, kind, value) VALUES (?, ?, ?)',
+      'INSERT INTO mute_rules(user_id, kind, value) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
       [user_id.to_i, kind, value]
     )
     db.changes.positive?

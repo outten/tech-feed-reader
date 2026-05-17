@@ -42,9 +42,9 @@ module Database
     # non-SELECTs (callers that care about result rows check this
     # length; callers that just want side-effect Hold .execute and
     # ignore the return value).
-    def execute(sql, args = [], auto_return: false)
+    def execute(sql, args = [], auto_return: true)
       pg_sql = translate_placeholders(sql)
-      if auto_return && insert_without_returning?(pg_sql)
+      if auto_return && insert_without_returning?(pg_sql) && insert_target_has_id?(pg_sql)
         pg_sql = "#{pg_sql.sub(/\s*;\s*\z/, '')} RETURNING id"
       end
 
@@ -129,9 +129,36 @@ module Database
     # leading INSERT keyword with no RETURNING anywhere downstream.
     INSERT_RX            = /\A\s*INSERT\b/i
     HAS_RETURNING_RX     = /\bRETURNING\b/i
+    INSERT_TARGET_RX     = /\A\s*INSERT\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)/i
+
+    # Tables that lack an `id` column: composite-PK + a few PK-on-
+    # another-column tables. Auto-appending `RETURNING id` to inserts
+    # against these errors with `column "id" does not exist`.
+    # Stores that need a returned key on these tables use SELECT
+    # afterward — none today rely on last_insert_row_id for them.
+    NO_ID_TABLES = %w[
+      schema_migrations
+      background_pool
+      read_state
+      mute_rules
+      feed_feedback
+      article_tags
+      sports_entity_articles
+      summaries
+    ].to_set.freeze
 
     def insert_without_returning?(sql)
       sql.match?(INSERT_RX) && !sql.match?(HAS_RETURNING_RX)
+    end
+
+    # Look at the target table name; skip auto-RETURN for no-id
+    # tables. Conservative: if we can't extract a table name, assume
+    # `id` exists (matches SQLite3's silent-no-op-on-missing-column
+    # behaviour upon last_insert_row_id access).
+    def insert_target_has_id?(sql)
+      m = sql.match(INSERT_TARGET_RX)
+      return true unless m
+      !NO_ID_TABLES.include?(m[1].downcase)
     end
   end
 end

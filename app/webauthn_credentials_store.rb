@@ -48,7 +48,7 @@ module WebauthnCredentialsStore
   # we get here; we just persist the bump.
   def bump_sign_count!(credential_id, new_count)
     db.execute(
-      'UPDATE webauthn_credentials SET sign_count = ?, last_used_at = datetime(?) WHERE credential_id = ?',
+      'UPDATE webauthn_credentials SET sign_count = ?, last_used_at = ? WHERE credential_id = ?',
       [new_count.to_i, Time.now.utc.strftime('%Y-%m-%d %H:%M:%S'), credential_id.to_s]
     )
   end

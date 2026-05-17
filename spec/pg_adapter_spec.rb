@@ -67,13 +67,13 @@ RSpec.describe Database::PgAdapter do
     end
   end
 
-  describe '.execute — INSERT RETURNING (opt-in)' do
-    it 'appends RETURNING id when auto_return: true is passed (canonical insert path)' do
+  describe '.execute — INSERT auto-RETURNING' do
+    it 'auto-appends RETURNING id to bare INSERTs (preserves SQLite3#last_insert_row_id surface)' do
       result = FakePgResult.new([{ 'id' => 42 }], 1)
       conn   = FakePgConn.new('INSERT INTO feeds' => result)
       adapter = described_class.new(conn)
       adapter.execute('INSERT INTO feeds(url, title) VALUES (?, ?)',
-                      ['https://x.com', 'X'], auto_return: true)
+                      ['https://x.com', 'X'])
       _, sent_sql, _ = conn.calls.last
       expect(sent_sql).to end_with('RETURNING id')
       expect(adapter.last_insert_row_id).to eq(42)
@@ -84,19 +84,37 @@ RSpec.describe Database::PgAdapter do
       result = FakePgResult.new([{ 'id' => 9 }], 1)
       conn   = FakePgConn.new('RETURNING id, url' => result)
       adapter = described_class.new(conn)
-      adapter.execute('INSERT INTO feeds(url) VALUES (?) RETURNING id, url',
-                      ['x'], auto_return: true)
+      adapter.execute('INSERT INTO feeds(url) VALUES (?) RETURNING id, url', ['x'])
       _, sent_sql, _ = conn.calls.last
       expect(sent_sql).to match(/RETURNING id, url\z/)
       expect(sent_sql).not_to match(/RETURNING id\s+RETURNING/)
       expect(adapter.last_insert_row_id).to eq(9)
     end
 
-    it 'defaults to no RETURNING (safe for composite-PK tables)' do
+    it 'does NOT auto-append to no-id tables (read_state / mute_rules / etc.)' do
       conn    = FakePgConn.new
       adapter = described_class.new(conn)
-      adapter.execute('INSERT INTO read_state(user_id, article_id, read) VALUES (?, ?, ?)',
+      adapter.execute('INSERT INTO read_state(user_id, article_id, read) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
                       [1, 2, 1])
+      _, sent_sql, _ = conn.calls.last
+      expect(sent_sql).not_to include('RETURNING')
+    end
+
+    it 'DOES auto-append to id-bearing tables even when ON CONFLICT is present' do
+      result = FakePgResult.new([{ 'id' => 99 }], 1)
+      conn   = FakePgConn.new('INSERT INTO articles' => result)
+      adapter = described_class.new(conn)
+      adapter.execute('INSERT INTO articles(uid, feed_id, title, url) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+                      ['abc', 1, 'x', 'http://x'])
+      _, sent_sql, _ = conn.calls.last
+      expect(sent_sql).to end_with('RETURNING id')
+      expect(adapter.last_insert_row_id).to eq(99)
+    end
+
+    it 'opt-out via auto_return: false (for any caller that wants the old behaviour)' do
+      conn    = FakePgConn.new
+      adapter = described_class.new(conn)
+      adapter.execute('INSERT INTO feeds(url) VALUES (?)', ['x'], auto_return: false)
       _, sent_sql, _ = conn.calls.last
       expect(sent_sql).not_to include('RETURNING')
     end
@@ -142,7 +160,7 @@ RSpec.describe Database::PgAdapter do
 
   describe 'Database.connection switch' do
     it 'returns SQLite3::Database when DATABASE_URL is unset' do
-      # spec_helper resets ENV between tests; reaffirm the default.
+      skip 'TEST_DATABASE_URL active — the suite is running against PG' if ENV['TEST_DATABASE_URL']
       expect(ENV['DATABASE_URL'].to_s).to eq('')
       expect(Database.connection).to be_a(SQLite3::Database)
       expect(Database.adapter).to eq(:sqlite)

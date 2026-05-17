@@ -72,7 +72,7 @@ module RecoveryCodesStore
     return nil if row['consumed_at']  # already used — pretend it doesn't exist
 
     db.execute(
-      'UPDATE recovery_codes SET consumed_at = datetime(?) WHERE id = ?',
+      'UPDATE recovery_codes SET consumed_at = ? WHERE id = ?',
       [Time.now.utc.strftime('%Y-%m-%d %H:%M:%S'), row['id']]
     )
     row['user_id']
