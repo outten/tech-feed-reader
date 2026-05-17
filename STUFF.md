@@ -386,4 +386,21 @@ Can you add the ability on the /youtube page to give a list of channels to add t
 
 **Specs**: 15 resolver examples (every input shape, network-failure, HTML-without-channelId, entity decoding) in [spec/providers/youtube_channel_resolver_spec.rb](spec/providers/youtube_channel_resolver_spec.rb); 5 route examples (subscribe-with-pending-fetch / subscribe-skipping-fetch-when-content-exists / cap-truncation / empty-input / error-path) appended to [spec/youtube_routes_spec.rb](spec/youtube_routes_spec.rb). **Suite: 1151/0** (was 1129; 22 new examples).
 
-## [ ] 31. ...
+## [ ] 31. Digital Ocean
+
+Let's prepare to deploy application to Digital Ocean.
+
+- terraform as infrastructure as code
+- Digital Ocean Managed PostgreSQL 
+- Digital Ocean service for running a containerized application
+
+So, we'll need to:
+
+- containerize the application
+  - test it in development
+- dump our current DB and import into new PostgreSQL
+- domain name registration
+- FQDN with SSL Certificate
+  - application should use SSL in production mode
+
+Let me know what applications I need to install, for example Digital Ocean CLI.
