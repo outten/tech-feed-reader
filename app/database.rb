@@ -1,8 +1,15 @@
 require 'sqlite3'
 require 'fileutils'
 require 'set'
+require_relative 'database/pg_adapter'
 
-# Single shared SQLite handle for the app.
+# Single shared DB handle for the app.
+#
+# Two backends: SQLite (default, dev + test + the current production
+# Droplet) and PostgreSQL (opt-in via DATABASE_URL — Phase 5). The
+# stores reach the DB via Database.connection, so the adapter
+# abstraction lives in one place; stores stay backend-agnostic for
+# the SQL we run.
 #
 # Replaces t-money's file-per-store pattern: instead of N JSON files each
 # guarded by a per-store mutex + atomic-rename writes, we get one DB file
@@ -11,12 +18,14 @@ require 'set'
 #
 # Usage:
 #   Database.migrate!            # idempotent; safe to call on app boot
-#   Database.connection          # returns the shared SQLite3::Database
+#   Database.connection          # SQLite3::Database OR Database::PgAdapter
+#   Database.adapter             # :sqlite or :postgres
 #   Database.reset!              # closes the handle (test teardown only)
 #
 # Migrations live in db/migrations/NNN_*.sql and are applied in filename
 # order. Each migration runs in its own transaction so a half-failed run
-# doesn't leave the DB in a wedged state.
+# doesn't leave the DB in a wedged state. PG-dialect migrations land in
+# db/migrations-postgres/ in D-PG-2.
 module Database
   MUTEX = Mutex.new
 
@@ -35,6 +44,13 @@ module Database
     end
   end
 
+  # :sqlite (default) or :postgres (when DATABASE_URL is set).
+  # Memoised so callers can branch without re-parsing the env on every
+  # access. Computed once per process (or once per Database.reset!).
+  def adapter
+    MUTEX.synchronize { @adapter ||= ENV['DATABASE_URL'].to_s.empty? ? :sqlite : :postgres }
+  end
+
   def connection
     MUTEX.synchronize { @connection ||= open! }
   end
@@ -45,6 +61,7 @@ module Database
     MUTEX.synchronize do
       @connection&.close
       @connection = nil
+      @adapter    = nil
     end
   end
 
@@ -86,6 +103,13 @@ module Database
     private
 
     def open!
+      url = ENV['DATABASE_URL'].to_s
+      return open_postgres!(url) unless url.empty?
+
+      open_sqlite!
+    end
+
+    def open_sqlite!
       target = path
       unless target == ':memory:'
         FileUtils.mkdir_p(File.dirname(target))
@@ -97,6 +121,17 @@ module Database
       db.execute('PRAGMA foreign_keys = ON')
       db.execute('PRAGMA synchronous = NORMAL')
       db
+    end
+
+    # Phase 5 / D-PG-1. Opens a PG::Connection from DATABASE_URL,
+    # wraps it in our adapter so the rest of the app sees the same
+    # surface it gets from SQLite3::Database. Migrations against PG
+    # land in D-PG-2 (this PR doesn't ship the migration runner's PG
+    # path yet — boot against PG will run the SQLite migration files,
+    # which is wrong; D-PG-2 fixes this when the PG dialect migrations
+    # exist).
+    def open_postgres!(url)
+      Database::PgAdapter.new(PG::Connection.new(url))
     end
   end
 end

@@ -42,6 +42,12 @@ gem 'csv'
 # process serves reads without blocking.
 gem 'sqlite3'
 
+# PostgreSQL — Phase 5 / D-PG-1. SQLite stays the default for dev/test;
+# Postgres is opt-in via DATABASE_URL. Database adapter in
+# app/database.rb routes calls to either backend. Production cutover
+# lives in DEPLOYMENT.md Phase 5 → D-PG-5.
+gem 'pg', '~> 1.5'
+
 # Anthropic SDK — powers the Tier 2-K LLM summary on /article/:uid.
 # Optional at boot — if ANTHROPIC_API_KEY is unset the "Summarize with
 # Claude" button stays hidden and the existing pure-Ruby extractive
