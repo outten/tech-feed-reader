@@ -29,8 +29,11 @@ require_relative 'database/pg_adapter'
 module Database
   MUTEX = Mutex.new
 
-  ROOT           = File.expand_path('../..', __FILE__)
-  MIGRATIONS_DIR = File.join(ROOT, 'db', 'migrations')
+  ROOT                    = File.expand_path('../..', __FILE__)
+  MIGRATIONS_DIR_SQLITE   = File.join(ROOT, 'db', 'migrations')
+  MIGRATIONS_DIR_POSTGRES = File.join(ROOT, 'db', 'migrations-postgres')
+  # Kept for back-compat — some existing specs touch this constant.
+  MIGRATIONS_DIR          = MIGRATIONS_DIR_SQLITE
 
   module_function
 
@@ -71,7 +74,7 @@ module Database
   # so it's always present before we read it.
   def migrate!
     db = connection
-    db.execute_batch2(<<~SQL)
+    db.execute_batch(<<~SQL)
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version    TEXT PRIMARY KEY,
         applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -83,7 +86,7 @@ module Database
       .map { |r| r['version'] }
       .to_set
 
-    pending = Dir[File.join(MIGRATIONS_DIR, '*.sql')].sort.reject do |f|
+    pending = Dir[File.join(migrations_dir, '*.sql')].sort.reject do |f|
       applied.include?(File.basename(f, '.sql'))
     end
 
@@ -91,12 +94,19 @@ module Database
       version = File.basename(file, '.sql')
       sql     = File.read(file)
       db.transaction do
-        db.execute_batch2(sql)
+        db.execute_batch(sql)
         db.execute('INSERT INTO schema_migrations(version) VALUES (?)', [version])
       end
     end
 
     pending.length
+  end
+
+  # Adapter-aware migrations directory. SQLite reads the incremental
+  # 001-024 sequence in db/migrations/; Postgres reads the consolidated
+  # baseline in db/migrations-postgres/.
+  def migrations_dir
+    adapter == :postgres ? MIGRATIONS_DIR_POSTGRES : MIGRATIONS_DIR_SQLITE
   end
 
   class << self

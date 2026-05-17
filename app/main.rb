@@ -39,16 +39,18 @@ require_relative 'providers/itunes_lookup'
 require_relative 'providers/youtube_channel_resolver'
 require_relative 'auth'
 
-# Phase A1 (consumer auth) — load .env in dev/test for SESSION_SECRET
+# Phase A1 (consumer auth) — load .env in dev for SESSION_SECRET
 # + WEBAUTHN_* config. Production reads from real env vars (host's
-# launchd/systemd unit), no .env loaded.
-if %w[development test].include?(ENV['RACK_ENV'].to_s) || ENV['RACK_ENV'].to_s.empty?
+# launchd/systemd unit), no .env loaded. Test mode is also excluded
+# now (Phase 5 / D-PG-2) so a developer's local DATABASE_URL doesn't
+# hijack the suite — spec_helper.rb sets the needed test env vars
+# explicitly and opts into PG via TEST_DATABASE_URL.
+if ENV['RACK_ENV'].to_s == 'development' || ENV['RACK_ENV'].to_s.empty?
   begin
     require 'dotenv'
     Dotenv.load(File.expand_path('../../.env', __FILE__))
   rescue LoadError
-    # dotenv isn't strictly required in test runs; the spec helper
-    # sets the needed env vars directly.
+    # dotenv isn't strictly required in dev either.
   end
 end
 require_relative 'sports_teams'

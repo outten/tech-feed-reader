@@ -20,6 +20,14 @@ module Credentials
   module_function
 
   def load!
+    # In test mode, leave ENV alone so a developer's local `.env`
+    # (notably DATABASE_URL after Phase 5 / D-PG-2) doesn't quietly
+    # point the suite at a real Postgres database. spec_helper.rb
+    # opts into PG explicitly via TEST_DATABASE_URL — see comment
+    # there. This matches the long-stated intent in spec_helper's
+    # comment block ("Tests don't read .env").
+    return if ENV['RACK_ENV'] == 'test'
+
     Dotenv.load(File.join(ROOT, '.credentials'))
     Dotenv.load(File.join(ROOT, '.env'))
     ENV['ANTHROPIC_API_KEY'] ||= ENV['CLAUDE_API_KEY'] if ENV['CLAUDE_API_KEY']

@@ -19,14 +19,15 @@ require 'pg'
 #
 # Returning IDs: PG doesn't expose a "last insert id" on the
 # connection; the canonical pattern is `RETURNING id`. To preserve
-# the SQLite3::Database surface, this adapter auto-appends
-# `RETURNING id` to any INSERT that doesn't already have a
-# RETURNING clause, stashes the returned id, and surfaces it from
-# `last_insert_row_id`. Tables with composite PKs (no `id` column)
-# would break under auto-append — those tables (read_state,
-# feed_feedback, etc.) never call last_insert_row_id today, so
-# this is safe; D-PG-3 audits to confirm. If a future table
-# without `id` needs INSERT, pass `auto_return: false` to skip.
+# the SQLite3::Database surface, this adapter accepts an opt-in
+# `auto_return: true` keyword on .execute that appends `RETURNING
+# id` if the SQL doesn't already have a RETURNING clause, stashes
+# the returned id, and surfaces it from `last_insert_row_id`.
+# Default is `false` (safe for composite-PK tables like
+# schema_migrations / read_state / mute_rules where there is no
+# `id` column). Stores that today read `db.last_insert_row_id`
+# after a bare INSERT get audited in D-PG-3 and switched to
+# `execute(..., auto_return: true)`.
 module Database
   class PgAdapter
     def initialize(conn)
@@ -41,7 +42,7 @@ module Database
     # non-SELECTs (callers that care about result rows check this
     # length; callers that just want side-effect Hold .execute and
     # ignore the return value).
-    def execute(sql, args = [], auto_return: true)
+    def execute(sql, args = [], auto_return: false)
       pg_sql = translate_placeholders(sql)
       if auto_return && insert_without_returning?(pg_sql)
         pg_sql = "#{pg_sql.sub(/\s*;\s*\z/, '')} RETURNING id"
