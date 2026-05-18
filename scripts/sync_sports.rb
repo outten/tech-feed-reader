@@ -35,14 +35,9 @@ require_relative '../app/sports_follows_store'
 require_relative '../app/providers/espn'
 require_relative '../app/logger'
 
-# slugify a tennis player display name. "Iga Świątek" → "iga-swiatek".
-# Strips diacritics by best-effort using ASCII transliteration via
-# Unicode decomposition.
-def tennis_player_slug(full_name)
-  s = full_name.to_s.unicode_normalize(:nfd).gsub(/[^\x00-\x7F]/, '')
-  s = s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/(^-|-$)/, '')
-  s.empty? ? nil : s
-end
+# tennis_player_slug + the per-entry upsert logic moved to
+# SportsPlayersStore.refresh!/tennis_player_slug in STUFF #46 so the
+# /sports/tennis route can share the same path on page load.
 
 Database.migrate!
 
@@ -213,33 +208,16 @@ end
 # Phase S7 — tennis rankings (ATP + WTA top 150 each). Cheap (one
 # HTTP per tour). Runs unconditionally; rankings are globally
 # interesting and don't require a follow.
+#
+# As of STUFF #46 the refresh logic lives on SportsPlayersStore so
+# the /sports/tennis route can also call it on page load. This
+# cron pass forces a refresh (no TTL check) so the nightly run
+# always reflects the latest ESPN state.
 puts
 puts "Syncing tennis rankings…"
-tennis_count = 0
 %w[atp wta].each do |tour|
-  entries = Providers::ESPN.tennis_rankings(tour: tour)
-  entries.each do |e|
-    slug = tennis_player_slug(e.full_name)
-    next unless slug && e.athlete_external_id && !e.athlete_external_id.empty?
-    SportsPlayersStore.upsert(
-      sport:           'tennis',
-      slug:            slug,
-      full_name:       e.full_name,
-      country:         e.country,
-      image_url:       e.headshot_url,
-      tour:            e.tour,
-      current_rank:    e.current_rank,
-      previous_rank:   e.previous_rank,
-      points:          e.points,
-      trend:           e.trend,
-      headshot_url:    e.headshot_url,
-      flag_url:        e.flag_url,
-      source_provider: 'espn',
-      external_id:     e.athlete_external_id
-    )
-    tennis_count += 1
-  end
-  puts "  tour:#{tour.upcase.ljust(12)} ranked=#{entries.length}"
+  count = SportsPlayersStore.refresh!(tour: tour)
+  puts "  tour:#{tour.upcase.ljust(12)} ranked=#{count}"
 end
 
 puts

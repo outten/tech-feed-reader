@@ -35,7 +35,12 @@
 
 <% if @atp.empty? && @wta.empty? %>
   <div class="empty-state">
-    <p>No tennis rankings synced yet. Run <code>make sync-sports</code> to populate (ESPN ATP + WTA endpoints).</p>
+    <p><strong>No tennis rankings yet.</strong></p>
+    <p class="muted">
+      ESPN's rankings endpoint may have timed out or returned no
+      entries. Reload to retry — every page load triggers a refresh
+      if the cached data is older than 12 hours.
+    </p>
   </div>
 <% else %>
   <div class="sports-tennis-grid">
