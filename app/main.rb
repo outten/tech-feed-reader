@@ -2536,7 +2536,11 @@ class TechFeedReader < Sinatra::Base
       tag    = TagsStore.add(user_id: current_user_id, name: name, match_kind: kind, match_value: val)
       tagged = TagsApplier.apply_to_existing(tag)
       redirect to("/tags?notice=added&tagged=#{tagged}")
-    rescue SQLite3::ConstraintException
+    rescue SQLite3::ConstraintException, PG::UniqueViolation
+      # Both backends enforce the UNIQUE(user_id, name) index; only the
+      # exception class differs. PG's UniqueViolation descends from
+      # PG::IntegrityConstraintViolation but we name it explicitly here
+      # to avoid swallowing unrelated PG errors.
       redirect to('/tags?error=duplicate-name')
     end
   end
