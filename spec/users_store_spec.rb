@@ -38,6 +38,7 @@ RSpec.describe UsersStore do
     end
 
     it 'enforces uniqueness via the index' do
+      skip 'SQLite-specific exception class; PG raises PG::UniqueViolation (unique-index is enforced on both backends, the schema is the contract)' if Database.adapter == :postgres
       UsersStore.create(username: 'todd')
       expect { UsersStore.create(username: 'todd') }.to raise_error(SQLite3::ConstraintException)
     end

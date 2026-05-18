@@ -492,14 +492,24 @@ Goal: build the production image on the operator's laptop, push to a versioned r
 
 ### Per-release workflow
 
+**One-liner (recommended):**
+
 ```
 # On the laptop, sitting on a clean main:
-make release-patch          # bumps VERSION, tags vX.Y.Z, pushes to origin (STUFF #33A)
-make publish-image          # buildx → cross-compile amd64 → push :X.Y.Z + :latest to DOCR
+make deploy-patch     # or deploy-minor / deploy-major
+```
 
-# On the Droplet:
+Chains: `release-*` (test gate → bump VERSION → commit → tag → push) → `publish-image` (buildx → push to DOCR) → SSH the Droplet (IP from `terraform output -raw droplet_ipv4`) and trigger `make deploy` there. Bails on the first failure — red tests don't bump, broken build doesn't ship.
+
+**Three-step (when you want manual gates):**
+
+```
+# Laptop:
+make release-patch    # bump + tag + push only
+make publish-image    # push image to DOCR only
+
+# Droplet:
 ssh deploy@<droplet-ip> 'cd /opt/app && make deploy'
-# (deploy = git pull + docker compose pull + docker compose up -d --force-recreate --no-deps app sidekiq)
 ```
 
 `make deploy` defaults to the floating `:latest` tag, which always points at the most recent `publish-image`. The Droplet downtime is just the container swap window (~2-3s).

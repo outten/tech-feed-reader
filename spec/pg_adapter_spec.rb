@@ -232,11 +232,23 @@ RSpec.describe Database::PgAdapter do
     end
 
     it 'reports :postgres when DATABASE_URL is set' do
+      prior = ENV['DATABASE_URL']
       Database.reset!
       ENV['DATABASE_URL'] = 'postgres://fake/db'
       expect(Database.adapter).to eq(:postgres)
     ensure
-      ENV.delete('DATABASE_URL')
+      # Restore the prior DATABASE_URL (set by spec_helper from
+      # TEST_DATABASE_URL on the PG leg) so the next spec's
+      # before(:each) reconnects to the real test PG, not the
+      # fake URL we just set. Required since the spec_helper's
+      # TRUNCATE optimization keeps the adapter alive across
+      # examples — it can't fall back to SQLite if DATABASE_URL
+      # is silently cleared.
+      if prior
+        ENV['DATABASE_URL'] = prior
+      else
+        ENV.delete('DATABASE_URL')
+      end
       Database.reset!
     end
   end

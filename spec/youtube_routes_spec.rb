@@ -192,8 +192,11 @@ RSpec.describe 'YouTube routes' do
       )
       feed_url = 'https://www.youtube.com/feeds/videos.xml?channel_id=UCnp2WgGyc4VyB9HZeUjjeUw'
       # Use subscriber_id: 2 so user 1 is NOT subscribed yet.
-      Database.connection.execute('INSERT OR IGNORE INTO users (id, username, display_name) VALUES (2, ?, ?)',
-                                  ['otheruser', 'Other'])
+      # ANSI ON CONFLICT works on both backends (SQLite >= 3.24; PG always).
+      Database.connection.execute(
+        'INSERT INTO users (id, username, display_name) VALUES (2, ?, ?) ON CONFLICT DO NOTHING',
+        ['otheruser', 'Other']
+      )
       feed = FeedsStore.add(url: feed_url, title: 'PBS NewsHour', subscriber_id: 2)
       FeedsStore.update(feed['id'], last_fetched_at: '2026-05-14T10:00:00Z')
 

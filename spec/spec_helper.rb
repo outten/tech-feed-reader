@@ -44,18 +44,42 @@ RSpec.configure do |c|
   c.color = true
   c.formatter = :documentation
 
+  # Per-run schema bootstrap. Migrate once at suite startup so the
+  # per-spec hook can stay cheap (TRUNCATE on PG, in-memory rebuild
+  # on SQLite). The before(:each) hook still checks for schema
+  # existence so re-runs after `Database.reset!` (e.g. the adapter-
+  # switch test in pg_adapter_spec) automatically remigrate.
+  c.before(:suite) do
+    if Database.adapter == :postgres
+      # Hermetic across runs: drop + recreate so we never inherit
+      # cruft from a prior failed run.
+      Database.connection.execute_batch('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
+      Database.migrate!
+    end
+  end
+
   c.before(:each) do
     if Database.adapter == :postgres
-      # PG keeps schema across reconnects, so reset+migrate isn't
-      # enough to give each spec a fresh slate. Drop + recreate the
-      # `public` schema to wipe every table. Slower than SQLite
-      # :memory: but hermetic.
-      Database.connection.execute_batch('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
-      Database.reset!
+      # Fast reset path: TRUNCATE every public table except
+      # schema_migrations, RESTART IDENTITY to reset BIGSERIAL
+      # sequences, CASCADE through FKs. ~100x cheaper than rerunning
+      # the full 372-line 001_init.sql migration on every example
+      # (was ~45s of the prior 57s PG suite runtime).
+      tables = Database.connection
+        .execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations'")
+        .map { |r| r['tablename'] }
+      if tables.empty?
+        # Schema got nuked (e.g. by the adapter-switch test that
+        # resets the connection); reapply.
+        Database.migrate!
+      else
+        quoted = tables.map { |t| %("#{t}") }.join(', ')
+        Database.connection.execute("TRUNCATE TABLE #{quoted} RESTART IDENTITY CASCADE")
+      end
     else
       Database.reset!
+      Database.migrate!
     end
-    Database.migrate!
     HealthRegistry.reset!
     # Migration 022 seeds (1, 't-money') on SQLite via INSERT OR IGNORE.
     # The PG consolidated migration doesn't seed it (the migration
@@ -65,11 +89,10 @@ RSpec.configure do |c|
       "INSERT INTO users(id, username, display_name) VALUES (1, 't-money', 't-money') ON CONFLICT DO NOTHING"
     )
     if Database.adapter == :postgres
-      # BIGSERIAL sequences are independent of explicit-id inserts —
-      # the seed above doesn't advance users_id_seq, so the next
-      # UsersStore.create would collide on id=1. Bump the sequence
-      # past the highest explicit id. Same fixup needed for any other
-      # table the suite seeds with explicit ids (none today).
+      # TRUNCATE … RESTART IDENTITY already reset users_id_seq to 1,
+      # but the t-money seed above inserted id=1 with explicit value
+      # without consuming the sequence — bump past it so the next
+      # UsersStore.create doesn't collide.
       Database.connection.execute(
         "SELECT setval('users_id_seq', GREATEST(1, (SELECT MAX(id) FROM users)))"
       )
@@ -77,7 +100,12 @@ RSpec.configure do |c|
   end
 
   c.after(:each) do
-    Database.reset!
+    # SQLite uses an in-memory DB; reset! drops the handle and the
+    # next before(:each)'s migrate! rebuilds from scratch. Cheap.
+    # PG keeps the connection — the next before(:each)'s TRUNCATE
+    # handles state, no reset! needed (and the reset+reconnect was
+    # most of the prior per-spec cost).
+    Database.reset! if Database.adapter == :sqlite
     HealthRegistry.reset!
   end
 end

@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy
 
 install:
 	bundle install
@@ -258,7 +258,7 @@ publish-image:
 
 # ---- Production deploy (run on the Droplet, not the laptop) -----------------
 # One-liner deploy after `make publish-image` from the laptop. SSH into
-# the Droplet and `cd /opt/app && make deploy` — pulls main (for any
+# the Droplet an`	d `cd /opt/app && make deploy` — pulls main (for any
 # Caddyfile / compose changes), pulls the new image from DOCR, force-
 # recreates ONLY app + sidekiq containers (caddy + redis stay up the
 # whole time — no TLS-cert blip, no Redis queue flush), then tails
@@ -279,3 +279,36 @@ deploy:
 	@echo ''
 	@echo '--- tailing app logs (Ctrl-C to exit) ---'
 	docker compose logs -f --tail=50 app
+
+# ---- One-shot release + deploy (laptop) -------------------------------------
+# Full ship cycle in one command. `make deploy-patch` does:
+#   1. release-patch gate: clean tree, on main, full test suite green.
+#   2. Bump VERSION, commit, tag, push to origin (--follow-tags).
+#   3. publish-image: buildx cross-compile linux/amd64, push :ver +
+#      :latest to DOCR.
+#   4. SSH the Droplet (IP from `terraform output -raw droplet_ipv4`)
+#      and trigger `make deploy` there.
+# Bails on the first failure — tests red → no bump, no publish, no
+# remote.
+#
+# DROPLET_USER + DROPLET_IP can be overridden on the command line:
+#   make deploy-patch DROPLET_IP=1.2.3.4
+# The terraform-output lookup runs in a subshell every invocation —
+# adds ~150ms, but means a fresh `terraform apply` immediately
+# propagates without operator-side coordination.
+
+DROPLET_USER ?= deploy
+DROPLET_IP   ?= $(shell cd terraform && terraform output -raw droplet_ipv4 2>/dev/null)
+
+deploy-major: release-major publish-image _remote_deploy
+deploy-minor: release-minor publish-image _remote_deploy
+deploy-patch: release-patch publish-image _remote_deploy
+
+_remote_deploy:
+	@if [ -z "$(DROPLET_IP)" ]; then \
+	  echo 'deploy: DROPLET_IP empty (terraform output -raw droplet_ipv4 failed).'; \
+	  echo '         Set DROPLET_IP=... on the command line, or `cd terraform && terraform init`.'; \
+	  exit 1; \
+	fi
+	@echo "Triggering remote deploy on $(DROPLET_USER)@$(DROPLET_IP)..."
+	ssh $(DROPLET_USER)@$(DROPLET_IP) 'cd /opt/app && make deploy'
