@@ -488,7 +488,7 @@ Have fun and make the player more productive and excitive. Make the site more re
 
 Nice roundable buttons like Apple.
 
-## [x] 39. Header
+## [ ] 39. Header
 
-Can you change the eader to only show the optioms when logged in / out
+Can you change the eader to only show the optioms when owned / not to ownned
 
