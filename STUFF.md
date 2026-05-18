@@ -404,11 +404,12 @@ Let's prepare to deploy application to Digital Ocean.
 
 ## [x] 32. Update Homepage and About for logged out user
 
+
 As the application is no longer single user, can you update the copy of the welcome / home page?
 
 **Shipped on PR #120.** `/` (anonymous branch) and `/about` rewritten for the hosted multi-user / managed-PG era: drops "self-hosted, single-user," reframes data-on-disk → per-account row scoping, retargets anonymous CTAs at `/sign-up` (they were silently 302-ing to `/sign-in` from `/articles`), and refreshes the About "How it works" + "Tech stack" sections (SQLite → PostgreSQL with tsvector + GIN, cron → Sidekiq, WebAuthn added). Two specs in `spec/home_about_spec.rb` updated to lock the new CTA hrefs.
 
-## [ ] 33. VERSION AND DOCKER IMAGE
+## [x] 33. VERSION AND DOCKER IMAGE
 
 When deploying, I'd like to have three directives in the makefile:
 
@@ -435,12 +436,25 @@ BTW. We should have VERSION in the footer and health endpoint so we know what we
 
 ---
 
-**Status: in progress.** Sliced into two phases. Decided 2026-05-17 after trade-off analysis.
+**Shipped 2026-05-18 as v0.9.0 — the first registry-versioned release.** Five PRs, sliced into 33A (versioning + visibility) and 33B (DOCR + image-publish pipeline) with three small follow-ups.
 
-- **33A — versioning + visibility (next PR)**: `scripts/bump_version.rb major|minor|patch` + Makefile targets (`deploy-major / -minor / -patch`) that run tests → bump VERSION → git tag → push. Read `VERSION` at boot into `App::VERSION`; render in the global footer + add to `GET /health` JSON. Bake into the Docker image via `ARG VERSION` + OCI label. No new infra.
-- **33B — registry pipeline (follow-up PR)**: DigitalOcean Container Registry via Terraform (+$5/mo Basic tier), `docker buildx` cross-compile (laptop arm64 → Droplet amd64), `make publish-image` that builds + pushes a versioned tag, and a remote-redeploy step that swaps the running image via `docker compose pull && up -d` on the Droplet. Trade-off: cheap rollback (`pull tech-feed-reader:0.9.3 && up -d`) at the cost of new ops surface — only worth it once there are users beyond me.
+- **PR #119** — `make deploy` on the Droplet (one-liner: `git pull` + `docker compose pull/up`).
+- **PR #122 — 33A**: `scripts/bump_version.rb major|minor|patch` (10 specs), Makefile `release-major/-minor/-patch` targets (test-gated + tag + push), `AppVersion::SEMVER` constant reading `/VERSION`, footer renders `v0.9.0` next to "shuffle background", `/health` JSON now exposes both `version` (semver) and `git_sha`, Dockerfile `ARG APP_VERSION` + OCI `org.opencontainers.image.*` labels.
+- **PR #123 — 33B**: `terraform/registry.tf` provisions `digitalocean_container_registry.main` (Basic tier, ~$5/mo, name `tfr`). `make publish-image` uses `docker buildx build --platform linux/amd64` to cross-compile from arm64 Mac → amd64 Droplet, tags both `:<version>` + `:latest`, pushes to DOCR. Compose `image:` for `app` + `sidekiq` resolves to `${IMAGE_REGISTRY}/tech-feed-reader:${IMAGE_TAG:-latest}`; pin `IMAGE_TAG=0.9.3` in `/opt/app/.env` for tag-pinned rollback.
+- **PR #124** — restored `make deploy` (squash-merge of #119 dropped its Makefile change during the main-merge conflict resolution) AND wired the runtime-stage `ARG APP_VERSION=unknown` re-declare so BuildKit stops warning about UndefinedVar.
+- **PR #125** — defensive AppVersion fix after the first publish exposed Ruby's `||`-treats-empty-string-as-truthy trap (the pre-#124 image had `APP_VERSION=""` baked in, so the footer rendered `v` with no number). `AppVersion.resolve_semver` now explicitly empty-checks ENV before the file fallback. Same PR added `sudo apt install -y make` to the DEPLOYMENT.md Phase 6 Droplet bootstrap.
 
-PR #119 (`make deploy` on the Droplet, currently open) is the foundation 33A/33B both build on.
+Per-release workflow (steady state, ~3 minutes total):
+```
+# Laptop:
+make release-patch        # tests pass → bump VERSION → tag → push
+make publish-image        # buildx amd64 → push :X.Y.Z + :latest to DOCR
+
+# Droplet:
+ssh deploy@<ip> 'cd /opt/app && make deploy'
+```
+
+The DOCR pipeline costs $5/mo. Deferred to a later phase (only worth it if/when CI/CD auto-publish becomes valuable): build-on-merge via GitHub Actions.
 
 ## [x] 35. PostgreSQL
 
@@ -461,3 +475,7 @@ PR #119 (`make deploy` on the Droplet, currently open) is the foundation 33A/33B
 PostgreSQL is running locally on my system. Do you want to switch to it for development environment so that we can run tests locally?
 
 **Shipped 2026-05-17.** Local cutover during D-PG-5 prep: `createdb tfr_dev` → `DATABASE_URL=postgres://localhost/tfr_dev ruby scripts/migrate.rb` → dump script copied the full SQLite dev corpus (2 users / 82 feeds / 19,398 articles / 18,693 summaries) into PG. `.env` already pointed at `tfr_dev`, so `make run` boots against PG with no further change. The test suite gates on `TEST_DATABASE_URL` (defaults to `postgres:///tfr_test`) so CI's matrix runs both legs; `bundle exec rspec` against the laptop SQLite path remains the unchanged default for anyone who doesn't have PG installed.
+
+## [ ] 36. Drop SQLite3
+
+Now that we are on PostgreSQL, let's drop SQLite3 testing.
