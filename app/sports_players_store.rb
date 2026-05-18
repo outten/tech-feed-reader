@@ -76,6 +76,73 @@ module SportsPlayersStore
     SQL
   end
 
+  # STUFF #46 — opportunistic on-page-load refresh for /sports/tennis.
+  # When the last sync for this tour is older than TENNIS_SYNC_TTL_SECONDS
+  # (or there's no data at all), call ESPN and upsert. Returns :refreshed
+  # or :fresh so callers can log + smoke-test.
+  #
+  # Adds ~500ms-1s to the first request after the TTL expires; cached
+  # for everyone after that. Two concurrent first-request users could
+  # both fire the ESPN call — harmless duplication, upsert is idempotent.
+  TENNIS_SYNC_TTL_SECONDS = 60 * 60 * 12 # 12h — ATP/WTA rankings update weekly
+
+  def refresh_if_stale!(tour:)
+    tour = tour.to_s
+    last = newest_sync_at(tour: tour)
+    if last && (Time.now.utc - Time.parse(last)) < TENNIS_SYNC_TTL_SECONDS
+      return :fresh
+    end
+    refresh!(tour: tour)
+    :refreshed
+  end
+
+  def newest_sync_at(tour:)
+    db.execute(
+      'SELECT MAX(last_synced_at) AS m FROM sports_players WHERE tour = ?',
+      [tour.to_s]
+    ).first['m']
+  end
+
+  # Pull ESPN rankings for a single tour and upsert every entry.
+  # Returns the count upserted. Extracted from scripts/sync_sports.rb
+  # so the /sports/tennis route can call it directly on page load.
+  def refresh!(tour:)
+    require_relative 'providers/espn'
+    entries = Providers::ESPN.tennis_rankings(tour: tour.to_s)
+    return 0 if entries.empty?
+
+    entries.each do |e|
+      slug = tennis_player_slug(e.full_name)
+      next unless slug && e.athlete_external_id && !e.athlete_external_id.to_s.empty?
+
+      upsert(
+        sport:           'tennis',
+        slug:            slug,
+        full_name:       e.full_name,
+        country:         e.country,
+        image_url:       e.headshot_url,
+        tour:            e.tour,
+        current_rank:    e.current_rank,
+        previous_rank:   e.previous_rank,
+        points:          e.points,
+        trend:           e.trend,
+        headshot_url:    e.headshot_url,
+        flag_url:        e.flag_url,
+        source_provider: 'espn',
+        external_id:     e.athlete_external_id
+      )
+    end
+    entries.length
+  end
+
+  # slugify a tennis player display name. "Iga Świątek" → "iga-swiatek".
+  # Strips diacritics via Unicode decomposition (NFD then ASCII filter).
+  def tennis_player_slug(full_name)
+    s = full_name.to_s.unicode_normalize(:nfd).gsub(/[^\x00-\x7F]/, '')
+    s = s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/(^-|-$)/, '')
+    s.empty? ? nil : s
+  end
+
   def count
     db.execute('SELECT COUNT(*) AS c FROM sports_players').first['c']
   end

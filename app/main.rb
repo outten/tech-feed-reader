@@ -1608,6 +1608,18 @@ class TechFeedReader < Sinatra::Base
     @page_title = 'Tennis rankings'
     limit_raw   = params['limit'].to_s
     @limit      = (limit_raw.match?(/\A\d+\z/) ? limit_raw.to_i : 50).clamp(1, 150)
+    # STUFF #46 — opportunistic ESPN refresh on page load. If the
+    # last sync per-tour is > 12h ago (or never), pull fresh
+    # rankings inline. Adds ~1s to the first request after the
+    # TTL window; cached for everyone after. Bypass with
+    # ?skip_refresh=1 (for debugging the empty-state path).
+    unless params['skip_refresh'] == '1'
+      %w[atp wta].each do |tour|
+        SportsPlayersStore.refresh_if_stale!(tour: tour)
+      rescue StandardError => e
+        AppLogger.warn('tennis_autosync', tour: tour, status: :error, message: e.message)
+      end
+    end
     @atp        = SportsPlayersStore.top_ranked(tour: 'atp', limit: @limit)
     @wta        = SportsPlayersStore.top_ranked(tour: 'wta', limit: @limit)
     # Phase S7 follow-up — followed-player slugs (so view can mark

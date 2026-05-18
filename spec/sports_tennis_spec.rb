@@ -160,9 +160,12 @@ RSpec.describe '/sports/tennis' do
   def app; TechFeedReader; end
 
   it 'renders the empty state when no rankings synced' do
-    get '/sports/tennis'
+    # STUFF #46 added on-page-load autosync — bypass via ?skip_refresh=1
+    # so this spec stays focused on the empty-state copy, not on
+    # whether ESPN happens to be reachable from the test runner.
+    get '/sports/tennis?skip_refresh=1'
     expect(last_response.status).to eq(200)
-    expect(last_response.body).to include('No tennis rankings synced yet')
+    expect(last_response.body).to include('No tennis rankings yet')
   end
 
   it 'renders ATP + WTA top tables when rankings exist' do
