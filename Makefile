@@ -257,12 +257,21 @@ publish-image:
 	@echo "Deploy with: ssh deploy@<droplet-ip> 'cd /opt/app && make deploy'"
 
 # ---- Production deploy (run on the Droplet, not the laptop) -----------------
-# One-liner deploy after `make publish-image` from the laptop. SSH into
-# the Droplet an`	d `cd /opt/app && make deploy` — pulls main (for any
-# Caddyfile / compose changes), pulls the new image from DOCR, force-
-# recreates ONLY app + sidekiq containers (caddy + redis stay up the
-# whole time — no TLS-cert blip, no Redis queue flush), then tails
-# app logs. Ctrl-C out of the tail once boot looks healthy.
+# One-liner deploy after `make publish-image` from the laptop. Pulls
+# main (for Caddyfile / compose changes), pulls the new image from
+# DOCR, force-recreates ONLY app + sidekiq containers (caddy + redis
+# stay up the whole time — no TLS-cert blip, no Redis queue flush),
+# then prints the last 50 log lines and exits.
+#
+# Behaviour modes:
+#   make deploy             # default — prints recent logs ONCE and exits
+#                           # (lets `make deploy-patch` from the laptop
+#                           # return cleanly without hanging on the SSH
+#                           # session's tail).
+#   make deploy SHIP_TAIL=1 # follow logs continuously (-f). Useful when
+#                           # SSH'd in interactively and you want to
+#                           # watch the boot in real time; Ctrl-C out
+#                           # when satisfied.
 #
 # Rollback: set IMAGE_TAG=0.9.3 in /opt/app/.env, then `make deploy`.
 # IMAGE_TAG defaults to `latest` (always points at the most recent
@@ -277,8 +286,15 @@ deploy:
 	docker compose pull app sidekiq
 	docker compose up -d --force-recreate --no-deps app sidekiq
 	@echo ''
-	@echo '--- tailing app logs (Ctrl-C to exit) ---'
-	docker compose logs -f --tail=50 app
+	@if [ -n "$(SHIP_TAIL)" ]; then \
+	  echo '--- tailing app logs (Ctrl-C to exit) ---'; \
+	  docker compose logs -f --tail=50 app; \
+	else \
+	  echo '--- recent app logs ---'; \
+	  docker compose logs --tail=50 --no-color app; \
+	  echo ''; \
+	  echo "Tail live with: docker compose logs -f --tail=30 app"; \
+	fi
 
 # ---- One-shot release + deploy (laptop) -------------------------------------
 # Full ship cycle in one command. `make deploy-patch` does:
