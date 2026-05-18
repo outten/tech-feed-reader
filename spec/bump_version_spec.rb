@@ -69,15 +69,52 @@ RSpec.describe BumpVersion do
     end
   end
 
-  # The AppVersion module reads the VERSION file at load time and
-  # freezes the result. We can't easily re-exercise that without
-  # reloading the file, but we CAN sanity-check that the constant is
-  # populated and looks semver-shaped (or is 'unknown' in a context
-  # where the file isn't present).
-  describe 'AppVersion::SEMVER' do
-    it 'is either semver-shaped or the literal "unknown" sentinel' do
-      require_relative '../app/version'
+  # The AppVersion::SEMVER constant freezes one resolve_semver call at
+  # module load; the resolution logic itself (refactored to a class
+  # method for testability) is exercised directly below across all
+  # three branches.
+  describe 'AppVersion' do
+    before { require_relative '../app/version' }
+
+    it 'SEMVER is either semver-shaped or the literal "unknown" sentinel' do
       expect(AppVersion::SEMVER).to match(/\A(\d+\.\d+\.\d+|unknown)\z/)
+    end
+
+    describe '.resolve_semver' do
+      around do |ex|
+        prior = ENV.fetch('APP_VERSION', nil)
+        ex.run
+      ensure
+        ENV['APP_VERSION'] = prior
+      end
+
+      it 'returns ENV[APP_VERSION] when set to a non-empty value' do
+        ENV['APP_VERSION'] = '1.2.3'
+        expect(AppVersion.resolve_semver).to eq('1.2.3')
+      end
+
+      it 'falls through to the VERSION file when ENV is empty string' do
+        # The bug that motivated the refactor: Docker's `ENV X=${X}`
+        # bakes APP_VERSION="" when no build-arg is in scope.
+        ENV['APP_VERSION'] = ''
+        expect(AppVersion.resolve_semver).to match(/\A\d+\.\d+\.\d+\z/)
+      end
+
+      it 'falls through to the VERSION file when ENV is unset' do
+        ENV.delete('APP_VERSION')
+        expect(AppVersion.resolve_semver).to match(/\A\d+\.\d+\.\d+\z/)
+      end
+
+      it 'returns "unknown" when ENV is empty AND the file read raises' do
+        ENV['APP_VERSION'] = ''
+        allow(File).to receive(:read).with(AppVersion::VERSION_FILE).and_raise(Errno::ENOENT)
+        expect(AppVersion.resolve_semver).to eq('unknown')
+      end
+
+      it 'strips whitespace from both ENV and file contents' do
+        ENV['APP_VERSION'] = "  2.0.0\n"
+        expect(AppVersion.resolve_semver).to eq('2.0.0')
+      end
     end
   end
 end
