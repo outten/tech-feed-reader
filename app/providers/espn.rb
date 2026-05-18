@@ -362,6 +362,56 @@ module Providers
       []
     end
 
+    # STUFF #43 — full roster for a league. Used by seed_sports_data
+    # (and the management UI) to populate sports_teams with every
+    # team in a league so users can browse + follow beyond the
+    # 4 pre-seeded teams.
+    #
+    # Returns array of Hash { external_id:, slug:, name:, short_name:,
+    # location:, image_url: } — same shape as SportsTeamsStore.upsert
+    # expects (minus league_id, which the caller knows from context).
+    # Empty array on HTTP/parse failure (consistent with other
+    # provider methods).
+    def teams_for_league(sport_path:, http_get: nil)
+      url = "#{BASE}/#{sport_path}/teams"
+      AppLogger.debug('espn_teams_for_league_start', sport_path: sport_path)
+      response = (http_get || method(:default_http_get)).call(url)
+      return [] unless response.code.to_s == '200'
+
+      data = JSON.parse(response.body)
+      # ESPN nests: sports[0].leagues[0].teams[].team. Pull the
+      # team objects out of that path defensively.
+      teams_node = data.dig('sports', 0, 'leagues', 0, 'teams') || []
+      out = teams_node.flat_map { |t| normalize_team(t['team']) }.compact
+      AppLogger.info('espn_teams_for_league_done', sport_path: sport_path, count: out.length)
+      out
+    rescue JSON::ParserError => e
+      AppLogger.error('espn_teams_for_league', status: :parse_error, message: e.message)
+      []
+    rescue StandardError => e
+      AppLogger.error('espn_teams_for_league', status: :error, class: e.class.name, message: e.message)
+      []
+    end
+
+    # ESPN team JSON → Hash for SportsTeamsStore.upsert. Rescues
+    # per-team so one weird row doesn't poison the batch.
+    def normalize_team(team)
+      return [] unless team.is_a?(Hash)
+      return [] if team['id'].to_s.empty?
+      logo = (team['logos'] || []).first
+      {
+        external_id: team['id'].to_s,
+        slug:        team['slug'].to_s,
+        name:        team['displayName'].to_s,
+        short_name:  team['shortDisplayName'] || team['abbreviation'],
+        location:    team['location'],
+        image_url:   logo && logo['href']
+      }
+    rescue StandardError => e
+      AppLogger.warn('espn_team_normalize_skip', message: e.message, team_id: team && team['id'])
+      []
+    end
+
     class << self
       private
 

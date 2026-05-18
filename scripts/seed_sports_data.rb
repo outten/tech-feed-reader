@@ -114,6 +114,50 @@ TEAMS.each do |spec|
   puts "  team    #{spec[:slug].ljust(12)} → id=#{team['id']} league=#{spec[:league_slug]}"
 end
 
+# STUFF #43 — populate the full team catalog per league so users
+# can browse + follow beyond the 4 pre-seeded teams. ESPN's
+# /<sport_path>/teams returns the full league roster. Skipped when
+# SEED_FULL_CATALOG=0 (e.g. dev/test where the network call is noise);
+# the `seed-sports-data` make target leaves it on.
+#
+# Rugby/FIFA leagues are skipped because their /teams endpoints
+# either 500 or return participating-tournament-roster shape that
+# doesn't match the NFL/NBA/MLS layout. Their existing 4 hardcoded
+# teams above are enough for the followed-team UX today.
+if ENV['SEED_FULL_CATALOG'] != '0'
+  require_relative '../app/providers/espn'
+
+  CATALOG_LEAGUES = %w[nfl nba mls].freeze
+  CATALOG_LEAGUES.each do |league_slug|
+    league = leagues_by_slug.fetch(league_slug)
+    teams  = Providers::ESPN.teams_for_league(sport_path: league['external_id'])
+    next if teams.empty?
+
+    added = 0
+    teams.each do |t|
+      slug = t[:slug].to_s.empty? ? t[:name].downcase.gsub(/[^a-z0-9]+/, '-') : t[:slug]
+      # ESPN's slugs collide across leagues (NFL Giants vs MLB Giants),
+      # so namespace by league-slug to keep our slug column unique.
+      qualified_slug = "#{league_slug}-#{slug}"
+      existing = SportsTeamsStore.find_by_external('espn', t[:external_id], league_id: league['id'])
+      next if existing  # already seeded above (Eagles/Sixers/Union)
+
+      SportsTeamsStore.upsert(
+        league_id:       league['id'],
+        slug:            qualified_slug,
+        name:            t[:name],
+        short_name:      t[:short_name],
+        location:        t[:location],
+        image_url:       t[:image_url],
+        source_provider: 'espn',
+        external_id:     t[:external_id]
+      )
+      added += 1
+    end
+    puts "  catalog #{league_slug.ljust(12)} → +#{added} teams (total in league: #{SportsTeamsStore.for_league(league['id']).length})"
+  end
+end
+
 FOLLOWS.each do |spec|
   added = SportsFollowsStore.add(user_id: USER_ID, kind: spec[:kind], value: spec[:value])
   puts "  follow  #{spec[:kind]}:#{spec[:value].ljust(12)} #{added ? '(new)' : '(already followed)'}"

@@ -542,3 +542,27 @@ Constraint: the homepage tagline is "no tracking, no algorithmic agenda" — pro
 - **Required paywall for AI features** at the free tier — the "magic" needs to be reachable to drive sign-ups.
 - **Data licensing** of reading trends — too small to be valuable, and even anonymized it smells off.
 
+## [ ] 43. Filter Feeds
+
+Filter Feeds on the /filter page doesn't work. Please fix.
+
+## [ ] 44. ...
+
+## [ ] 45. Sports team follow management
+
+Surfaced during the prod cutover: a freshly-signed-up user can't follow Eagles / Sixers / Union etc through the UI. The 4 hardcoded follows in `seed_sports_data.rb` were for user 1 only; new users see no scores at all on /sports.
+
+Need: a management page (under Manage ▾) where users browse the team catalog grouped by league and toggle follow/unfollow per team. After follow, the team's recent schedule + results should sync within ~30s (not "next nightly run" — which itself isn't scheduled yet, see follow-up gap below).
+
+**Shipped together (one PR):**
+
+- `Providers::ESPN.teams_for_league(sport_path:)` — fetches the full roster from ESPN's `/<sport>/teams` endpoint and normalises to the `SportsTeamsStore.upsert` shape. Defensive empty-on-failure pattern like the other ESPN methods.
+- `scripts/seed_sports_data.rb` extended to bulk-fetch NFL / NBA / MLS rosters when `SEED_FULL_CATALOG=1` (default). Rugby + FIFA skipped — their `/teams` endpoints return tournament-roster shape that doesn't match.
+- `SportsTeamFetchWorker` (Sidekiq) — pulls a single team's schedule from ESPN and upserts into `sports_matches`. Enqueued from the new follow route so scores appear within ~30s of clicking "+ Follow".
+- `GET /sports/manage` page — team grid per league with follow/unfollow toggle. Green accent + "✓ Following" outline pill on currently-followed teams; "+ Follow" solid pill on unfollowed.
+- `POST /sports/teams/follow` + `/unfollow` — mirror the existing player follow/unfollow routes.
+- "Sports" entry added to the Manage ▾ dropdown alongside Feeds + Tags.
+
+**Operator step after merge + deploy**: SSH the Droplet and run `docker compose run --rm app make seed-sports-data` to populate the full catalog. Existing user 1's follows survive (idempotent upsert).
+
+**Follow-up gap (separate task)**: recurring sport-sync isn't scheduled on the Droplet. Today the user sees fresh data only when (a) they newly follow a team — eager sync covers that — or (b) the operator manually runs `make sync-sports`. Proper fix: sidekiq-cron or a recurring tick worker.

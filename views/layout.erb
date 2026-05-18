@@ -47,7 +47,7 @@
     <% if signed_in? %>
       <%
         ai_paths      = %w[/topics /triage /digests]
-        manage_paths  = %w[/feeds /tags]
+        manage_paths  = %w[/feeds /tags /sports/manage]
         ai_active     = ai_paths.any?     { |p| request.path_info == p || request.path_info.start_with?(p + '/') }
         manage_active = manage_paths.any? { |p| request.path_info == p }
       %>
@@ -74,8 +74,9 @@
         <div class="nav-dropdown <%= 'active' if manage_active %>">
           <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">Manage <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>
           <div class="nav-dropdown-menu" role="menu">
-            <a href="/feeds" class="<%= 'active' if request.path_info == '/feeds' %>" role="menuitem">Feeds</a>
-            <a href="/tags"  class="<%= 'active' if request.path_info == '/tags'  %>" role="menuitem">Tags</a>
+            <a href="/feeds"          class="<%= 'active' if request.path_info == '/feeds' %>"          role="menuitem">Feeds</a>
+            <a href="/tags"           class="<%= 'active' if request.path_info == '/tags'  %>"          role="menuitem">Tags</a>
+            <a href="/sports/manage"  class="<%= 'active' if request.path_info == '/sports/manage' %>"  role="menuitem">Sports</a>
           </div>
         </div>
 

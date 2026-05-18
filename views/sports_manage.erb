@@ -1,0 +1,69 @@
+<%# STUFF #43 — sports team management. Browse the full catalog of
+    teams (seeded via `make seed-sports-data` with SEED_FULL_CATALOG=1)
+    grouped by league, with follow/unfollow toggles per row. On
+    follow, the SportsTeamFetchWorker enqueues an eager ESPN
+    schedule fetch so the just-added team's scores show on /sports
+    within ~30s. %>
+
+<div class="page-header">
+  <div>
+    <h2>Manage sports follows</h2>
+    <p class="subtitle">
+      Follow a team to see its scores, fixtures, and recent results on
+      <a href="/sports">/sports</a>. Follows are per-account; unfollow
+      anytime.
+      <% if @followed_slugs.empty? %>
+        <span class="muted">You don't follow any teams yet.</span>
+      <% else %>
+        Currently following <strong><%= @followed_slugs.length %></strong>
+        team<%= 's' if @followed_slugs.length != 1 %>.
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% @leagues.each do |league| %>
+  <% teams = @teams_by_league[league['id']] || [] %>
+  <% next if teams.empty? %>
+  <section class="sports-manage-league">
+    <h3><%= h(league['name']) %> <span class="muted whats-on-count">(<%= teams.length %>)</span></h3>
+    <ul class="sports-manage-grid">
+      <% teams.sort_by { |t| t['name'].to_s }.each do |team| %>
+        <% followed = @followed_slugs.include?(team['slug']) %>
+        <li class="sports-manage-team <%= 'is-followed' if followed %>">
+          <% if team['image_url'] && !team['image_url'].empty? %>
+            <img src="<%= h(team['image_url']) %>" alt="" class="sports-manage-logo" loading="lazy">
+          <% else %>
+            <span class="sports-manage-logo sports-manage-logo-fallback" aria-hidden="true">🏟</span>
+          <% end %>
+          <div class="sports-manage-team-info">
+            <span class="sports-manage-team-name"><%= h(team['short_name'] || team['name']) %></span>
+            <% if team['location'] && !team['location'].empty? && team['location'] != team['name'] %>
+              <span class="muted sports-manage-team-location"><%= h(team['location']) %></span>
+            <% end %>
+          </div>
+          <form method="post" action="/sports/teams/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form">
+            <input type="hidden" name="slug" value="<%= h(team['slug']) %>">
+            <input type="hidden" name="return_to" value="/sports/manage">
+            <% if followed %>
+              <button type="submit" class="btn-secondary sports-manage-toggle" title="Stop following — removes scores + fixtures from /sports">✓ Following</button>
+            <% else %>
+              <button type="submit" class="btn-primary sports-manage-toggle" title="Follow — fetches recent results in the background">+ Follow</button>
+            <% end %>
+          </form>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<% if @leagues.all? { |lg| (@teams_by_league[lg['id']] || []).empty? } %>
+  <div class="empty-state">
+    <p><strong>No teams in the catalog yet.</strong></p>
+    <p class="muted">
+      Run <code>make seed-sports-data</code> on the server (or
+      <code>docker compose run --rm app make seed-sports-data</code>
+      on the Droplet) to populate the league rosters from ESPN.
+    </p>
+  </div>
+<% end %>

@@ -78,6 +78,7 @@ require_relative 'llm_guard'
 # require in test (specs stub perform_async).
 require_relative 'sidekiq_config'
 require_relative 'workers/feed_refresh_worker'
+require_relative 'workers/sports_team_fetch_worker'
 require 'sidekiq/api'
 
 # Auto-migrate on boot for dev / production so `make run` always sees an
@@ -1658,6 +1659,53 @@ class TechFeedReader < Sinatra::Base
     SportsFollowsStore.remove(user_id: current_user_id, kind: 'player', value: slug)
     AppLogger.info('player_unfollow', slug: slug)
     redirect to(params['return_to'] || "/sports/player/#{slug}")
+  end
+
+  # STUFF #43 — team management. /sports/manage lists every team in
+  # the catalog grouped by league, with follow/unfollow buttons. Solves
+  # the prod gap where a freshly-signed-up user can't follow any team
+  # (the 4 hardcoded follows in seed_sports_data.rb were for user 1
+  # only, and even with full-catalog seeds users couldn't toggle them
+  # through the UI).
+  get '/sports/manage' do
+    @page_title = 'Manage sports'
+    @leagues   = SportsLeaguesStore.all
+    @teams_by_league = @leagues.each_with_object({}) do |lg, h|
+      h[lg['id']] = SportsTeamsStore.for_league(lg['id'])
+    end
+    @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
+                                        .map { |f| f['value'] }.to_set
+    erb :sports_manage
+  end
+
+  # POST /sports/teams/follow — add the team to the user's follows
+  # AND enqueue a Sidekiq job to fetch the team's recent schedule +
+  # results from ESPN. Without the eager fetch, a freshly-followed
+  # team's score tiles + recent results would stay empty until the
+  # next nightly sync (not yet scheduled). Idempotent: re-following
+  # a team no-ops on the follows row and re-enqueues a (cheap)
+  # refresh job.
+  post '/sports/teams/follow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    team = SportsTeamsStore.find_by_slug(slug)
+    halt 404, 'team not found' unless team
+    SportsFollowsStore.add(user_id: current_user_id, kind: 'team', value: slug)
+    begin
+      SportsTeamFetchWorker.perform_async(team['id'])
+    rescue StandardError => e
+      AppLogger.warn('team_follow_enqueue_failed', slug: slug, message: e.message)
+    end
+    AppLogger.info('team_follow', slug: slug, team_id: team['id'])
+    redirect to(params['return_to'] || '/sports/manage')
+  end
+
+  post '/sports/teams/unfollow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    SportsFollowsStore.remove(user_id: current_user_id, kind: 'team', value: slug)
+    AppLogger.info('team_unfollow', slug: slug)
+    redirect to(params['return_to'] || '/sports/manage')
   end
 
   # Phase S9 — upcoming-fixtures calendar across followed teams.
