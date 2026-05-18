@@ -488,7 +488,57 @@ Have fun and make the player more productive and excitive. Make the site more re
 
 Nice roundable buttons like Apple.
 
-## [ ] 39. Header
+## [x] 39. Header
 
-Can you change the eader to only show the optioms when owned / not to ownned
+Can you change the eader to only show the optioms when logged in / out
+
+**Shipped on PR #130.** Anonymous header is now logo + Sign in / Sign up + theme toggle; full nav (Articles / Bookmarks / Podcasts / YouTube / Sports / AI ▾ / Manage ▾ / 🔍 / Admin) + Bus icon + Refresh-all only render when signed_in?. 11 examples in `spec/header_signed_in_gate_spec.rb`.
+
+## [ ] 40. Deployment
+
+Is this the most deployment process we can make to make sure:
+
+- no deployment downtown with a new release
+- quick new releaase
+
+As we are have containers, are using Digital Ocean and their managed services, is there a better way? I'm used to AWS ECS which feels cleaner.
+
+Please analyze.
+
+## [ ] 41. AI
+
+AI is the current FAD. Can we have AI things to the users?
+
+## [ ] 42. Money
+
+How do we make a little bit of money for this application? People use it. Advertisers want it. We want it useful and NOT in the user's face.
+
+Constraint: the homepage tagline is "no tracking, no algorithmic agenda" — programmatic ad networks (Adsense, Carbon, pixel-based attribution) are out. Goal is "cover the $32/mo infra + future Anthropic API spend," not "build a business."
+
+### Phased plan (least → most intrusive)
+
+- **42.1 — Voluntary tipping** (now, while user base is small)
+  - Buy Me a Coffee link in the footer; gated on `BMC_HANDLE` env so dev builds don't show it.
+  - Zero UX cost. Covers the $32/mo with even 3 generous fans.
+
+- **42.2 — Free + Pro tier** (when user base hits ~20)
+  - Free: all current features with the existing `LLM_USER_DAILY_TOKEN_BUDGET` (200k tokens/day).
+  - Pro ($3-5/mo): higher LLM budget (1M+ tokens/day), custom Claude triage prompts, Opus instead of Sonnet for chat.
+  - Aligns variable cost (Anthropic API) with variable revenue. No ads needed.
+
+- **42.3 — Curated single-sponsor slots** (at ~100 users)
+  - 1-2 hand-picked "Sponsored" items per day on /feeds, clearly labeled + dismissible.
+  - Sponsor slot in the digest email (when email shipping happens).
+  - Manually negotiated; no programmatic ad networks.
+
+- **42.4 — Podcast 15s pre-roll** (once daily podcast listeners hit ~50)
+  - Single sponsor per week, stitched as a static MP3 ahead of `audio_url` playback in the global player.
+  - Preserve the publisher's own ads — just add one of yours up top.
+
+### Not doing
+
+- **Programmatic display ads** (Adsense / Carbon) — pixel tracking + algorithmic placement contradicts the no-tracking promise on /.
+- **Mid-roll ads inside articles** — too intrusive.
+- **Required paywall for AI features** at the free tier — the "magic" needs to be reachable to drive sign-ups.
+- **Data licensing** of reading trends — too small to be valuable, and even anonymized it smells off.
 
