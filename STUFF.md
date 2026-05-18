@@ -479,3 +479,16 @@ PostgreSQL is running locally on my system. Do you want to switch to it for deve
 ## [ ] 36. Drop SQLite3
 
 Now that we are on PostgreSQL, let's drop SQLite3 testing.
+
+## [ ] 37. Beauty Pass
+
+Can you review the App for beauty? It is awesome, but the UX can be better. For example, buttons are not consistent or round like Steve Jobs would want. Not every link opens a new tab. Not every image shows the correct content in PodCasts. 
+
+Have fun and make the player more productive and excitive. Make the site more readable.
+
+Nice roundable buttons like Apple.
+
+## [ ] 39. Header
+
+Can you change the eader to only show the optioms when owned / not to ownned
+
