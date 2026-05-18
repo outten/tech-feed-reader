@@ -476,6 +476,8 @@ Goal: build the production image on the operator's laptop, push to a versioned r
 3. **Droplet docker auth**: SSH in once and authenticate the deploy account against the registry:
    ```
    ssh deploy@<droplet-ip>
+   # GNU make isn't on the cloud-init base image — install once:
+   sudo apt install -y make
    # Install doctl (one-time):
    sudo snap install doctl   # or download the static binary
    sudo snap connect doctl:dot-docker  # so doctl can write to ~/.docker
@@ -483,6 +485,8 @@ Goal: build the production image on the operator's laptop, push to a versioned r
    doctl registry login
    ```
    This drops creds into `~deploy/.docker/config.json` so `docker compose pull` works. Same token rotation cadence as the laptop.
+
+   **Bootstrap caveat:** the very first `make deploy` on a fresh Droplet won't find a `deploy` target if `/opt/app` is on a commit older than #124 — you'll get `make: *** No rule to make target 'deploy'`. Run `git pull origin main` manually once, then `make deploy` works from there on.
 
 4. **Confirm the compose `image:` lines point at the registry**: in `/opt/app/docker-compose.yml`, both `app` and `sidekiq` services should reference `${IMAGE_REGISTRY:-registry.digitalocean.com/tfr}/tech-feed-reader:${IMAGE_TAG:-latest}`. The repo's compose file already does this — `git pull` on the Droplet picks it up.
 
