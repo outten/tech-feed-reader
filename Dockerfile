@@ -38,6 +38,13 @@ RUN bundle config set --local deployment true \
 # ---- runtime: slim image with just the libs the gems need at runtime -------
 FROM ruby:${RUBY_VERSION}-slim
 
+# Re-declare APP_VERSION in this stage — ARG values from the global
+# scope don't cross `FROM` boundaries, so the runtime stage needs its
+# own declaration to interpolate into ENV/LABEL below. Defaults match
+# the global ARG so omitting --build-arg still produces a runnable
+# (unlabeled) image. (Silences the BuildKit UndefinedVar warning.)
+ARG APP_VERSION=unknown
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libsqlite3-0 \
       libyaml-0-2 \
