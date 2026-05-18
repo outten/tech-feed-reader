@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libyaml-0-2 \
       tzdata \
       curl \
+      make \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 app \
     && useradd  --uid 1000 --gid 1000 --create-home --shell /bin/bash app
