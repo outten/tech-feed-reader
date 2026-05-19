@@ -476,9 +476,11 @@ PostgreSQL is running locally on my system. Do you want to switch to it for deve
 
 **Shipped 2026-05-17.** Local cutover during D-PG-5 prep: `createdb tfr_dev` → `DATABASE_URL=postgres://localhost/tfr_dev ruby scripts/migrate.rb` → dump script copied the full SQLite dev corpus (2 users / 82 feeds / 19,398 articles / 18,693 summaries) into PG. `.env` already pointed at `tfr_dev`, so `make run` boots against PG with no further change. The test suite gates on `TEST_DATABASE_URL` (defaults to `postgres:///tfr_test`) so CI's matrix runs both legs; `bundle exec rspec` against the laptop SQLite path remains the unchanged default for anyone who doesn't have PG installed.
 
-## [ ] 36. Drop SQLite3
+## [ ] 38. Drop SQLite3
 
 Now that we are on PostgreSQL, let's drop SQLite3 testing.
+
+(Renumbered from a duplicate `#36` — original `#36` was the PostgreSQL dev-environment item just above this one.)
 
 ## [ ] 37. Beauty Pass
 
@@ -487,6 +489,13 @@ Can you review the App for beauty? It is awesome, but the UX can be better. For 
 Have fun and make the player more productive and excitive. Make the site more readable.
 
 Nice roundable buttons like Apple.
+
+**Sliced into four sub-PRs.** Progress as of 2026-05-19:
+
+- **37A — Pill-button system** ✅ shipped on PR #128. Apple-style pill `border-radius: 9999px` everywhere, single `.btn-primary` / `.btn-secondary` / `.btn-danger` base rule (was: ~12 distinct radius values across the file), iOS-style `:active { transform: scale(0.97) }` press feedback, 3px coloured focus ring.
+- **37B — Link-target audit** ⏳ pending. External `<a>` → new tab; internal → same tab. Spec already exists from STUFF #19; this slice just enforces it everywhere.
+- **37C — Podcast cover-art correctness** ⏳ pending. Some podcasts show placeholder / wrong art; rerun iTunes Search lookup for misses.
+- **37D — Player + readability** ⏳ pending. Larger play button, speed-preset chips, body-copy line-height + max-width pass.
 
 ## [x] 39. Header
 
@@ -517,9 +526,7 @@ Constraint: the homepage tagline is "no tracking, no algorithmic agenda" — pro
 
 ### Phased plan (least → most intrusive)
 
-- **42.1 — Voluntary tipping** (now, while user base is small)
-  - Buy Me a Coffee link in the footer; gated on `BMC_HANDLE` env so dev builds don't show it.
-  - Zero UX cost. Covers the $32/mo with even 3 generous fans.
+- **42.1 — Voluntary tipping** ✅ shipped on PR #133 (live in v0.9.2+). Buy Me a Coffee footer link gated on `BMC_HANDLE` env var; dev / unconfigured-prod builds omit the link cleanly. Opens in a new tab + `rel="noopener noreferrer"` so the BMC checkout doesn't dump the user out of the app. **Operator step remaining**: sign up at buymeacoffee.com, drop `BMC_HANDLE=your-slug` into `/opt/app/.env`, redeploy — link goes live in prod immediately.
 
 - **42.2 — Free + Pro tier** (when user base hits ~20)
   - Free: all current features with the existing `LLM_USER_DAILY_TOKEN_BUDGET` (200k tokens/day).
@@ -546,7 +553,7 @@ Constraint: the homepage tagline is "no tracking, no algorithmic agenda" — pro
 
 Filter Feeds on the /filter page doesn't work. Please fix.
 
-## [ ] 44. ...
+(Note: there is no `/filter` route — the filter UI lives on `/feeds` via `public/feeds-filter.js` from STUFF #27. The bug investigation paused mid-session; if it still mis-fires in prod, reproduce + capture which input/chip doesn't filter rows.)
 
 ## [ ] 45. Sports team follow management
 
@@ -566,3 +573,15 @@ Need: a management page (under Manage ▾) where users browse the team catalog g
 **Operator step after merge + deploy**: SSH the Droplet and run `docker compose run --rm app make seed-sports-data` to populate the full catalog. Existing user 1's follows survive (idempotent upsert).
 
 **Follow-up gap (separate task)**: recurring sport-sync isn't scheduled on the Droplet. Today the user sees fresh data only when (a) they newly follow a team — eager sync covers that — or (b) the operator manually runs `make sync-sports`. Proper fix: sidekiq-cron or a recurring tick worker.
+
+## [x] 46. /sports/tennis autosyncs on page load
+
+Surfaced from prod (2026-05-18): `/sports/tennis` rendered empty because the `sports_players` table had never been synced on the Droplet. Even after a manual sync, ATP/WTA rankings would go stale within a week.
+
+**Shipped on PR #136 (v0.9.5).** Opportunistic ESPN refresh on page load: when the last sync for a tour is > 12h old (or there's no data at all), the route calls `Providers::ESPN.tennis_rankings` inline and upserts. Adds ~1s to the first request after the TTL window; cached for everyone after. ESPN errors are caught + logged, never raised — the page still renders whatever's in the DB.
+
+The per-tour fetch + slugify + upsert dance moved from `scripts/sync_sports.rb` into `SportsPlayersStore.refresh!(tour:)` + `refresh_if_stale!(tour:)` + `tennis_player_slug(name)` so the route AND the cron share one code path. 9 examples in `spec/sports_tennis_autosync_spec.rb`.
+
+`?skip_refresh=1` bypasses the inline refresh (used by the empty-state spec + manual debugging).
+
+**Related gap that's still open**: a similar autosync for the `/sports` team-score tiles. The eager sync from #45's follow-route covers freshly-followed teams; existing follows still need a recurring tick (or the same on-page-load pattern). Captured under #45's "Follow-up gap" note above.
