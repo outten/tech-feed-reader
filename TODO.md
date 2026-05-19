@@ -451,27 +451,52 @@ Phase A1 + A2 deferrals + production gating. Not blockers for the auth/data spli
 
 1. ✅ **Account management page** — `/account` with profile + passkey list / add / revoke + recovery-codes regenerate + account deletion (STUFF #29 follow-up; landed alongside this TODO refresh).
 2. ✅ **First-time onboarding** — `/welcome` topic-chip picker for new signups (PR #100).
-3. **Production `WEBAUTHN_RP_ID`** — locked to `tmoneystuff.com`. Wired in **Phase D6** of the deploy plan below.
+3. ✅ **Production `WEBAUTHN_RP_ID`** — wired to `feeder.tmoneystuff.com` via Caddy + docker-compose env (Phase 3 cutover, 2026-05-17). Passkeys for this app stay separate from any future app on a different subdomain.
 4. **Admin user list** — small admin-namespace page showing signed-up accounts with last-seen-at, useful when signups open up.
 5. **Per-user data export** — GDPR-style "download my data" endpoint. Only matters at scale.
 6. **Open-signups rate limit** — per-day signup-rate cap or invite codes; only needed if abuse appears.
+7. **Recurring sport-sync on the Droplet** — surfaced from STUFF #45 (sports team mgmt) + #46 (tennis autosync). New-follow events have eager fetch covered (#45); existing follows still need a nightly tick. Options: `sidekiq-cron` gem in the worker container OR a host-level cron firing `docker compose run --rm app make sync-sports`.
 
 ---
 
 ## Deploy — Phase D: Digital Ocean (STUFF #31)
 
-**Source of truth: [DEPLOYMENT.md](DEPLOYMENT.md).** That doc holds the live phased execution plan (Phase 0 / 1 ✅ / 2 ✅ / 3 / 4), the hosting trade-offs, and the pre-deploy blockers (LLM cost containment, WebAuthn domain binding, operational basics). Don't duplicate it here.
+**Source of truth: [DEPLOYMENT.md](DEPLOYMENT.md).** That doc holds the live phased execution plan + the hosting trade-offs + the pre-deploy blockers. Don't duplicate it here.
 
-**Status at a glance** (read DEPLOYMENT.md for the detail):
+**Status at a glance** (as of 2026-05-19):
 
 - ✅ **Phase 0** — manual setup (DO account, tokens, domain, NS, SSH, Spaces keys, zone in DO panel). Done 2026-05-17.
 - ✅ **Phase 1** (codebase prep) — LLM rate limiting (#103), Dockerfile + docker-compose + Caddyfile (#104), per-IP RateLimiter (#105). Merged.
 - ✅ **Phase 2** (Terraform scaffold) — `terraform/` directory provisioning a single Droplet + firewall + DO Spaces for backups (#106). Rewritten to DO DNS + feeder subdomain (#109/#110).
 - ✅ **Phase 3** — `terraform apply` + cutover. Live at https://feeder.tmoneystuff.com (2026-05-17).
-- ❌ **Phase 4** (SQLite backups) — **skipped**. User opted to do the PG migration instead of building SQLite backup tooling that becomes throwaway. Data-loss window between now and Phase 5 cutover is accepted.
-- ⏳ **Phase 5** — PostgreSQL migration (5 PRs + manual cutover). See DEPLOYMENT.md → "Phase 5" for sub-phase plan (D-PG-1 adapter → D-PG-2 migrations + CI matrix → D-PG-3 store audit → D-PG-4 Terraform cluster → D-PG-4.5 data dump script → D-PG-5 cutover).
+- ❌ **Phase 4** (SQLite backups) — **skipped**. User opted for the PG migration instead of building SQLite backup tooling that becomes throwaway. Data-loss window through 2026-05-17 cutover is accepted.
+- ✅ **Phase 5** (PostgreSQL migration) — shipped 2026-05-17/18 as five PRs + manual cutover:
+  - **D-PG-1** (#112) — `pg` gem + `Database::PgAdapter` thin wrapper around `PG::Connection` exposing the SQLite3::Database surface. SQLite stays the default; PG opt-in via `DATABASE_URL`.
+  - **D-PG-2** (#113) — consolidated PG-dialect baseline migration (`db/migrations-postgres/001_init.sql`): BIGSERIAL ids, `tsvector` + GIN replacing FTS5, ANSI `ON CONFLICT` everywhere. Adapter-aware `Database.migrate!`.
+  - **D-PG-3** (#114) — store SQL audit + CI matrix (sqlite + postgres legs). Dialect branches in `ArticlesStore.search`/`for_topic`, `Recommendation.for_article`, `SportsEntityArticlesStore.fts_search`.
+  - **D-PG-4** (#115) — Terraform `digitalocean_database_cluster` + `database_db` + `database_firewall`. Plan-only, no apply.
+  - **D-PG-4.5** (#116) — `scripts/dump_sqlite_to_postgres.rb` data-migration tool + round-trip spec.
+  - **D-PG-5** (manual cutover) — `terraform apply` created the cluster; dump script copied prod data; `/opt/app/.env` got `DATABASE_URL`; redeploy flipped the app to PG. Hot-patched immediately after by **#118** (PgAdapter Monitor + reconnect-on-disconnect) when Puma's threads desynced libpq within 30s of the cutover.
+- ✅ **Phase 6** (image-publish pipeline — STUFF #33A/B) — shipped 2026-05-17/18:
+  - **#119** — `make deploy` target on the Droplet (one-liner: git pull + docker compose pull + up -d --force-recreate).
+  - **#122 (33A)** — semver `VERSION` file, `scripts/bump_version.rb` (major/minor/patch), Makefile `release-major/-minor/-patch` targets, `AppVersion::SEMVER` constant, footer "v0.9.5" + `/health` JSON exposes `version` + `git_sha`, Dockerfile OCI labels.
+  - **#123 (33B)** — `terraform/registry.tf` provisions DigitalOcean Container Registry (`tfr`, Basic tier ~$5/mo). `make publish-image` runs `docker buildx build --platform linux/amd64` (cross-compile arm64 Mac → amd64 Droplet), tags both `:<version>` + `:latest`, pushes to DOCR.
+  - **#124** — restored `make deploy` (squash-merge dropped its Makefile change) + Dockerfile runtime-stage `ARG APP_VERSION` re-declare (silences UndefinedVar warning).
+  - **#125** — defensive `AppVersion.resolve_semver` (empty-string ENV bug) + `apt install make` in DEPLOYMENT.md Phase 6.
+  - **#127** — one-shot `make deploy-{major,minor,patch}` that chains release → publish-image → SSH droplet, plus PG TRUNCATE-based per-spec reset (45s vs 57s on the PG leg), plus eight latent dialect-only test fixes uncovered by closing the silent-fallback-to-SQLite hole.
+  - **#132** — `make deploy` no longer hangs on `logs -f` when chained via SSH (SHIP_TAIL flag).
+  - **#135** — Dockerfile runtime stage installs `make` so `docker compose run --rm app make <target>` works.
 
-**Architecture (per DEPLOYMENT.md):** single DigitalOcean Droplet running Docker Compose (web + sidekiq + redis); **Caddy** in front for HTTPS via Let's Encrypt; **SQLite for v1.0** (Postgres deferred to v1.1 — DEPLOYMENT.md "Database" section has the full migration scope). Total provisioned cost ≈ **~$17/mo** (Droplet + Spaces).
+**Architecture (live as of v0.9.5):** single DigitalOcean Droplet (s-1vcpu-2gb, NYC3, ~$12/mo) running Docker Compose (web + sidekiq + redis + Caddy). **DigitalOcean Managed PostgreSQL** (db-s-1vcpu-1gb, ~$15/mo) over private VPC. **DigitalOcean Container Registry** (Basic tier, ~$5/mo) holds versioned amd64 images. Total ≈ **~$32/mo** (Droplet + Spaces backups + Managed PG + DOCR). Caddy mints Let's Encrypt cert via HTTP-01.
+
+### Per-release workflow (steady state)
+
+```
+# Laptop (after merging a PR to main):
+make deploy-patch     # bump + tag + push + buildx + DOCR push + SSH droplet → make deploy
+```
+
+Rollback: `IMAGE_TAG=0.9.3 docker compose up -d` in `/opt/app/.env`.
 
 ### Decisions locked during this session
 
