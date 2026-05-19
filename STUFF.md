@@ -585,3 +585,17 @@ The per-tour fetch + slugify + upsert dance moved from `scripts/sync_sports.rb` 
 `?skip_refresh=1` bypasses the inline refresh (used by the empty-state spec + manual debugging).
 
 **Related gap that's still open**: a similar autosync for the `/sports` team-score tiles. The eager sync from #45's follow-route covers freshly-followed teams; existing follows still need a recurring tick (or the same on-page-load pattern). Captured under #45's "Follow-up gap" note above.
+
+## [ ] 47. SQLite3
+
+Are we done w SQLite3? If so, can you develop a plan to remove it from the codebase as well as CI.
+
+## [ ] 48. Usage Admin Pages
+
+Make a proposal to add simple analytics to the admin area:
+
+- new users over time
+- last fourteen days of pageviews
+  - aggregted across entire site
+  - by section (articles, podcasts, youtube)
+  - average time in each section
