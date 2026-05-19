@@ -590,12 +590,19 @@ The per-tour fetch + slugify + upsert dance moved from `scripts/sync_sports.rb` 
 
 Are we done w SQLite3? If so, can you develop a plan to remove it from the codebase as well as CI.
 
-## [ ] 48. Usage Admin Pages
+## [ ] 48. Admin Pages
+
+Simple analytics:
 
 Make a proposal to add simple analytics to the admin area:
 
 - new users over time
+  - subpage that lists users
 - last fourteen days of pageviews
   - aggregted across entire site
   - by section (articles, podcasts, youtube)
   - average time in each section
+
+Admin Simple Auth:
+
+For now, let's create the admin page by simple auth. I put credentials in the .env file. Be sure to include in our releases to production.
