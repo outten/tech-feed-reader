@@ -64,7 +64,12 @@ RSpec.describe 'Admin Basic Auth gate (STUFF #49)' do
       end
     end
 
-    %w[/articles /sports /feeds /api/articles /admin-not-really].each do |p|
+    # /refresh/* and /api/refresh/* are USER-facing (header button +
+    # /feeds page buttons) — they previously lived under /admin/* but
+    # got moved out so the fail-closed admin gate doesn't lock normal
+    # users out of refreshing their feeds.
+    %w[/articles /sports /feeds /api/articles /admin-not-really
+       /refresh/all /refresh/42 /api/refresh/all /api/refresh/42].each do |p|
       it "does NOT match #{p}" do
         expect(Auth.admin_path?(p)).to be(false)
       end

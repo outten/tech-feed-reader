@@ -4,7 +4,7 @@ require_relative '../feeds_store'
 require_relative '../logger'
 
 # Background job that refreshes a single feed. Enqueued by the
-# /admin/refresh routes so the web request that triggered the refresh
+# /refresh routes so the web request that triggered the refresh
 # returns immediately while the actual fetch + sanitize + import runs
 # on the worker process.
 #

@@ -133,7 +133,7 @@ Page renders MUST be cache-only.
 
 Network events ONLY happen via:
   - Scheduled poll (make scheduler)
-  - Admin refresh (POST /admin/refresh/{feed,all})
+  - Manual refresh (POST /refresh/{feed,all})
   - Adding a new feed (POST /feeds)
   - User-initiated summarize on /article/:id (Claude API call)
 ```

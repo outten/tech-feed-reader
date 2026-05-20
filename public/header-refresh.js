@@ -1,8 +1,8 @@
 /* Header refresh button — every page renders this in layout.erb. The
- * non-JS form posts to /admin/refresh/all, which redirects to /feeds
- * with a notice. With JS we hijack the submit, call the JSON endpoint,
- * and show a transient toast in #header-flash so the user keeps the
- * page they were on. */
+ * non-JS form posts to /refresh/all, which redirects to /feeds with a
+ * notice. With JS we hijack the submit, call the JSON endpoint, and
+ * show a transient toast in #header-flash so the user keeps the page
+ * they were on. */
 (function () {
   'use strict';
 
@@ -27,7 +27,7 @@
     var btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
 
-    fetch('/api/admin/refresh/all', {
+    fetch('/api/refresh/all', {
       method: 'POST',
       headers: { 'Accept': 'application/json' }
     }).then(function (res) {

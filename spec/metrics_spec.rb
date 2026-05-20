@@ -17,15 +17,15 @@ RSpec.describe Metrics do
       expect(Metrics.normalize_route('/article/abc123/tag/42')).to eq('/article/:uid/tag/42')
     end
 
-    it 'collapses /admin/refresh/:id but keeps /admin/refresh/all' do
-      expect(Metrics.normalize_route('/admin/refresh/42')).to eq('/admin/refresh/:id')
-      expect(Metrics.normalize_route('/admin/refresh/all')).to eq('/admin/refresh/all')
+    it 'collapses /refresh/:id but keeps /refresh/all' do
+      expect(Metrics.normalize_route('/refresh/42')).to eq('/refresh/:id')
+      expect(Metrics.normalize_route('/refresh/all')).to eq('/refresh/all')
     end
 
     it 'collapses the API analogues' do
       expect(Metrics.normalize_route('/api/feeds/7')).to eq('/api/feeds/:id')
-      expect(Metrics.normalize_route('/api/admin/refresh/7')).to eq('/api/admin/refresh/:id')
-      expect(Metrics.normalize_route('/api/admin/refresh/all')).to eq('/api/admin/refresh/all')
+      expect(Metrics.normalize_route('/api/refresh/7')).to eq('/api/refresh/:id')
+      expect(Metrics.normalize_route('/api/refresh/all')).to eq('/api/refresh/all')
     end
 
     it 'collapses /topics/:term and /tags/:id/delete' do
