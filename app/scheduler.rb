@@ -5,7 +5,7 @@ require_relative 'feed_fetcher'
 require_relative 'logger'
 
 # Polling logic shared by the long-running scripts/scheduler.rb, the
-# one-shot scripts/refresh_*.rb scripts, and the admin /admin/refresh
+# one-shot scripts/refresh_*.rb scripts, and the /refresh + /api/refresh
 # routes.
 #
 # Pure functions on top of the existing stores — no global state of its

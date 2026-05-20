@@ -2465,7 +2465,7 @@ html.dark .feeds-filter-count { color: #98989d; }
 
 /* Header refresh button — sits between the nav and the theme toggle on
    every page so the user can trigger a manual refresh from anywhere.
-   POSTs to /admin/refresh/all, which redirects to /feeds with the
+   POSTs to /refresh/all, which redirects to /feeds with the
    per-feed result counts in the flash. Match the theme-toggle pill
    shape so the two icon buttons feel like a set. */
 .header-refresh-form { margin: 0; }

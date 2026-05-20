@@ -102,31 +102,31 @@ RSpec.describe 'TechFeedReader smoke' do
     end
   end
 
-  describe 'POST /admin/refresh/:feed_id' do
+  describe 'POST /refresh/:feed_id' do
     it 'enqueues a FeedRefreshWorker job and redirects with queued notice' do
       feed = FeedsStore.add(url: 'https://example.com/feed.rss')
       expect(FeedRefreshWorker).to receive(:perform_async).with(feed['id'])
 
-      post "/admin/refresh/#{feed['id']}"
+      post "/refresh/#{feed['id']}"
       expect(last_response.status).to eq(302)
       expect(last_response.headers['Location']).to include('notice=queued')
       expect(last_response.headers['Location']).to include("feed_id=#{feed['id']}")
     end
 
     it 'reports not-found for an unknown feed id' do
-      post '/admin/refresh/999'
+      post '/refresh/999'
       expect(last_response.headers['Location']).to include('error=not-found')
     end
   end
 
-  describe 'POST /admin/refresh/all' do
+  describe 'POST /refresh/all' do
     it 'enqueues one job per feed and redirects with the queued count' do
       a = FeedsStore.add(url: 'https://a.example.com/rss')
       b = FeedsStore.add(url: 'https://b.example.com/rss')
       expect(FeedRefreshWorker).to receive(:perform_async).with(a['id'])
       expect(FeedRefreshWorker).to receive(:perform_async).with(b['id'])
 
-      post '/admin/refresh/all'
+      post '/refresh/all'
       expect(last_response.status).to eq(302)
       expect(last_response.headers['Location']).to include('notice=queued-all')
       expect(last_response.headers['Location']).to include('count=2')

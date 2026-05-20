@@ -6,7 +6,7 @@
     </p>
   </div>
   <% if @feeds.any? %>
-    <form method="post" action="/admin/refresh/all" class="js-refresh-all">
+    <form method="post" action="/refresh/all" class="js-refresh-all">
       <button type="submit" class="refresh-btn" title="Enqueue a fetch for every subscribed feed (background)">Refresh all</button>
     </form>
   <% end %>

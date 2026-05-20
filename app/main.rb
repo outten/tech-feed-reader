@@ -2561,7 +2561,13 @@ class TechFeedReader < Sinatra::Base
     end
   end
 
-  post '/api/admin/refresh/all' do
+  # Refresh-feed endpoints. Not admin: the header "refresh" button +
+  # the per-feed buttons on /feeds are user-facing (any signed-in
+  # user can enqueue a fetch). Previously lived under /api/admin/*
+  # but that was historical naming — STUFF #49's fail-closed admin
+  # gate then locked normal users out. Moved to /api/refresh/* so
+  # only the WebAuthn sign-in wall applies.
+  post '/api/refresh/all' do
     content_type :json
     feeds = FeedsStore.all
     feeds.each { |f| FeedRefreshWorker.perform_async(f['id']) }
@@ -2569,7 +2575,7 @@ class TechFeedReader < Sinatra::Base
     { ok: true, queued: feeds.length }.to_json
   end
 
-  post '/api/admin/refresh/:feed_id' do |feed_id|
+  post '/api/refresh/:feed_id' do |feed_id|
     content_type :json
     feed = FeedsStore.find(feed_id.to_i)
     unless feed
@@ -2931,24 +2937,21 @@ class TechFeedReader < Sinatra::Base
     redirect to("/admin/backgrounds?error=refresh-failed&msg=#{CGI.escape(e.message)}")
   end
 
-  # Refresh every feed in FeedsStore. Iterates synchronously; for the
-  # default starter set (5 feeds) this is fine. The scheduler script
-  # (TODO-009) is the right tool once polling cadence matters.
+  # HTML form-submit refresh endpoints (non-JS fallbacks for the
+  # header button + /feeds page). Not admin — see comment on the
+  # /api/refresh/* pair above.
   #
   # NOTE: /all must be declared before the :feed_id variant so Sinatra
   # matches the static path first. Otherwise the URL string "all" gets
   # parsed as a feed_id (= 0) and the request 404s.
-  post '/admin/refresh/all' do
+  post '/refresh/all' do
     feeds = FeedsStore.all
     feeds.each { |f| FeedRefreshWorker.perform_async(f['id']) }
     AppLogger.info('refresh_all_enqueued', count: feeds.length)
     redirect to("/feeds?notice=queued-all&count=#{feeds.length}")
   end
 
-  # Refresh a single feed: enqueue a FeedRefreshWorker job. Returns
-  # immediately; the worker process picks the job off the queue and
-  # does the fetch + sanitize + import.
-  post '/admin/refresh/:feed_id' do |feed_id|
+  post '/refresh/:feed_id' do |feed_id|
     feed = FeedsStore.find(feed_id.to_i)
     redirect to('/feeds?error=not-found') unless feed
 

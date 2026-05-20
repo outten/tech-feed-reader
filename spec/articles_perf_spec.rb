@@ -7,7 +7,7 @@ require_relative '../app/articles_store'
 # Cache-only render contract — mirrors t-money-terminal's
 # spec/portfolio_perf_spec.rb. The /dashboard, /articles, and
 # /article/:id routes MUST NOT trigger a feed fetch on render. Network
-# events only happen via the scheduler, /admin/refresh/*, /feeds POST,
+# events only happen via the scheduler, /refresh/*, /feeds POST,
 # and the user-initiated summarize button (TODO-K).
 #
 # If a future refactor accidentally fires FeedFetcher.fetch_feed during

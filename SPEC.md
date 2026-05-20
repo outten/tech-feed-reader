@@ -87,7 +87,7 @@ Same shape as `t-money-terminal` — see [AGENTS.md](AGENTS.md) for the full pat
 
 - **Ruby 3.4+ / Sinatra / ERB / RSpec / rerun** (auto-reload dev loop).
 - **Single SQLite DB** at `data/app.db` (WAL mode, `foreign_keys=ON`) holds feeds, articles, read state, tags, and summaries. FTS5 backs `/search`. The file-per-store JSON pattern from `t-money` is replaced — SQLite provides atomicity, transactions, and full-text search out of the box.
-- **Cache-only render contract**: `/dashboard` and `/articles` render purely from the DB. The only network events are the background scheduler, the `/admin/refresh/*` buttons, and explicit user-triggered fetches.
+- **Cache-only render contract**: `/dashboard` and `/articles` render purely from the DB. The only network events are the background scheduler, the `/refresh/*` buttons, and explicit user-triggered fetches.
 - **Per-feed TTL** (analogous to `t-money`'s market-aware TTL): the scheduler picks feed-fetch cadence per feed based on observed update frequency. High-volume feeds (HN, Lobsters) poll every 15 min; low-volume blogs every 4–6 h.
 - **HealthRegistry** pattern for feed-fetch observability — bounded ring buffer of `(feed, timestamp, status, latency)` tuples surfaced at `/admin/health`.
 - **`UserAgent` + retry/backoff layer** — single shared HTTP client with cache-friendly headers (`If-Modified-Since`, `If-None-Match`) so feeds that support 304 don't waste bandwidth.
@@ -141,7 +141,7 @@ Page renders MUST be cache-only.
 
 Network events ONLY happen via:
   - Scheduled poll (make scheduler)
-  - Explicit /admin/refresh/{feed,all} button
+  - Explicit /refresh/{feed,all} button
   - Adding a new feed (one-shot fetch + parse)
   - User clicking "summarize" on /article/:id (LLM call)
 ```

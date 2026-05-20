@@ -95,8 +95,8 @@ module Metrics
   def normalize_route(path)
     p = path.to_s
     p = p.sub(%r{\A/article/[^/?]+},          '/article/:uid')
-    p = p.sub(%r{\A/admin/refresh/(?!all\b)[^/?]+}, '/admin/refresh/:id')
-    p = p.sub(%r{\A/api/admin/refresh/(?!all\b)[^/?]+}, '/api/admin/refresh/:id')
+    p = p.sub(%r{\A/refresh/(?!all\b)[^/?]+},     '/refresh/:id')
+    p = p.sub(%r{\A/api/refresh/(?!all\b)[^/?]+}, '/api/refresh/:id')
     p = p.sub(%r{\A/api/feeds/\d+\b},         '/api/feeds/:id')
     p = p.sub(%r{\A/feeds/\d+/delete\b},      '/feeds/:id/delete')
     p = p.sub(%r{\A/topics/[^/?]+},           '/topics/:term')

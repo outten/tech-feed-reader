@@ -178,14 +178,14 @@
     var row = form.closest('tr');
     var id  = row && row.dataset.feedId;
     if (!id) {
-      var m = form.action.match(/\/admin\/refresh\/(\d+)/);
+      var m = form.action.match(/\/refresh\/(\d+)/);
       id = m && m[1];
     }
     if (!id) return;
 
     var btn = form.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Queued'; }
-    postForm('/api/admin/refresh/' + id).then(function (r) {
+    postForm('/api/refresh/' + id).then(function (r) {
       if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
       if (r.ok) {
         showFlash('Queued for refresh. Watch /admin/sidekiq for progress.');
@@ -202,7 +202,7 @@
       e.preventDefault();
       var btn = refreshAll.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
-      postForm('/api/admin/refresh/all').then(function (r) {
+      postForm('/api/refresh/all').then(function (r) {
         if (btn) btn.disabled = false;
         if (r.ok) {
           showFlash('Queued ' + r.data.queued + ' feed' + (r.data.queued === 1 ? '' : 's') + ' for refresh.');

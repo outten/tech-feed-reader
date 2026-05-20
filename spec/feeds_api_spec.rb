@@ -92,31 +92,31 @@ RSpec.describe 'feeds JSON API' do
     end
   end
 
-  describe 'POST /api/admin/refresh/all' do
+  describe 'POST /api/refresh/all' do
     it 'enqueues one job per feed and reports the queued count' do
       a = FeedsStore.add(url: 'https://a.example.com/rss')
       b = FeedsStore.add(url: 'https://b.example.com/rss')
       expect(FeedRefreshWorker).to receive(:perform_async).with(a['id'])
       expect(FeedRefreshWorker).to receive(:perform_async).with(b['id'])
 
-      post '/api/admin/refresh/all'
+      post '/api/refresh/all'
       expect(last_response.status).to eq(200)
       expect(json).to eq('ok' => true, 'queued' => 2)
     end
   end
 
-  describe 'POST /api/admin/refresh/:feed_id' do
+  describe 'POST /api/refresh/:feed_id' do
     it 'enqueues a single job and returns the feed id' do
       feed = FeedsStore.add(url: 'https://example.com/rss')
       expect(FeedRefreshWorker).to receive(:perform_async).with(feed['id'])
 
-      post "/api/admin/refresh/#{feed['id']}"
+      post "/api/refresh/#{feed['id']}"
       expect(last_response.status).to eq(200)
       expect(json).to eq('ok' => true, 'feed_id' => feed['id'])
     end
 
     it 'returns 404 + not-found for an unknown feed id' do
-      post '/api/admin/refresh/9999'
+      post '/api/refresh/9999'
       expect(last_response.status).to eq(404)
       expect(json['error']).to eq('not-found')
     end

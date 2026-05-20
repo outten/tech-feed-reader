@@ -36,7 +36,7 @@
         <button type="submit" class="feed-weight-btn" title="Show me more from this feed (current weight: <%= format('%.2f', w) %>×)" aria-label="Show more">+</button>
       </form>
     </span>
-    <form method="post" action="/admin/refresh/<%= feed['id'] %>" class="js-refresh-feed" style="display:inline">
+    <form method="post" action="/refresh/<%= feed['id'] %>" class="js-refresh-feed" style="display:inline">
       <button type="submit" class="refresh-btn" title="Fetch this feed now (background job)">Refresh</button>
     </form>
     <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed" style="display:inline">
