@@ -14,18 +14,16 @@ RSpec.describe TagsStore do
     end
 
     it 'rejects duplicate names via UNIQUE' do
-      skip 'SQLite-specific exception class; PG raises PG::UniqueViolation' if Database.adapter == :postgres
       TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'ruby')
       expect {
         TagsStore.add(user_id: 1, name: 'ruby', match_kind: 'keyword', match_value: 'rails')
-      }.to raise_error(SQLite3::ConstraintException, /UNIQUE/)
+      }.to raise_error(PG::UniqueViolation)
     end
 
     it 'rejects unknown match_kind via the schema CHECK' do
-      skip 'SQLite-specific exception class; PG raises PG::CheckViolation' if Database.adapter == :postgres
       expect {
         TagsStore.add(user_id: 1, name: 'x', match_kind: 'bogus', match_value: 'x')
-      }.to raise_error(SQLite3::ConstraintException, /CHECK/)
+      }.to raise_error(PG::CheckViolation)
     end
   end
 

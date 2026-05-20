@@ -1,9 +1,8 @@
 require 'pg'
 require 'monitor'
 
-# Phase 5 / D-PG-1. Thin wrapper around PG::Connection that exposes
-# the same surface SQLite3::Database does, so the rest of the app
-# can stay backend-agnostic at the Database.connection layer:
+# Thin wrapper around PG::Connection that exposes a small SQL surface
+# the rest of the app talks to via Database.connection:
 #
 #   db.execute(sql, args = [])       → Array<Hash> (or [])
 #   db.execute_batch(sql)            → run multi-statement script
@@ -12,37 +11,28 @@ require 'monitor'
 #                                      INSERTed row (via RETURNING)
 #   db.changes                       → rows affected by last statement
 #
-# Placeholders: stores use SQLite's `?` style throughout. This
-# adapter rewrites each `?` (outside single-quoted strings) to
-# Postgres's `$1, $2, …` form, left-to-right, before sending the
-# query. None of the existing app SQL has `?` inside string
-# literals so the simple rewriter is safe.
+# Placeholders: app SQL uses `?` throughout. The adapter rewrites each
+# `?` (outside single-quoted strings) to PG's `$1, $2, …` form,
+# left-to-right. No app SQL has `?` inside string literals so the
+# simple rewriter is safe.
 #
 # Returning IDs: PG doesn't expose a "last insert id" on the
-# connection; the canonical pattern is `RETURNING id`. To preserve
-# the SQLite3::Database surface, this adapter accepts an opt-in
-# `auto_return: true` keyword on .execute that appends `RETURNING
-# id` if the SQL doesn't already have a RETURNING clause, stashes
-# the returned id, and surfaces it from `last_insert_row_id`.
-# Default is `false` (safe for composite-PK tables like
-# schema_migrations / read_state / mute_rules where there is no
-# `id` column). Stores that today read `db.last_insert_row_id`
-# after a bare INSERT get audited in D-PG-3 and switched to
-# `execute(..., auto_return: true)`.
+# connection; the canonical pattern is `RETURNING id`. `.execute`
+# auto-appends `RETURNING id` to bare INSERTs (unless the SQL already
+# has RETURNING or targets a no-id table) and exposes the value via
+# `last_insert_row_id`.
 #
-# Thread safety + resilience (D-PG-5 production fix): every @conn
-# call is wrapped in a `Monitor` so the Puma worker's 5 threads
-# don't desync the libpq protocol by interleaving exec_params on
-# the same socket. (Sqlite3-ruby has its own per-connection mutex,
-# which is why the SQLite era never tripped this; the pg gem does
-# not.) Single-statement queries also reconnect-once on a closed
-# socket — DO managed PG drops idle connections after ~10 min, so
-# the first query after a quiet stretch would otherwise throw
-# `PG::UnableToSend` forever until the process restarted. Inside a
-# transaction we deliberately don't retry — the BEGIN that opened
-# the tx died on the dead socket, so transparently retrying on a
-# fresh connection would silently turn a tx into a sequence of
-# autocommit statements.
+# Thread safety + resilience: every @conn call is wrapped in a
+# `Monitor` so the Puma worker's 5 threads don't desync the libpq
+# protocol by interleaving exec_params on the same socket. (The pg
+# gem has no per-connection mutex of its own.) Single-statement
+# queries reconnect-once on a closed socket — DO managed PG drops
+# idle connections after ~10 min, so the first query after a quiet
+# stretch would otherwise throw `PG::UnableToSend` forever until the
+# process restarted. Inside a transaction we deliberately don't
+# retry — the BEGIN that opened the tx died on the dead socket, so
+# transparently retrying on a fresh connection would silently turn a
+# tx into a sequence of autocommit statements.
 module Database
   class PgAdapter
     RECOVERABLE = [PG::UnableToSend, PG::ConnectionBad].freeze
@@ -67,11 +57,8 @@ module Database
       @changes            = 0
     end
 
-    # Run a parameterised query. Returns Array<Hash> for SELECTs
-    # (matches SQLite3::Database with results_as_hash=true), or [] for
-    # non-SELECTs (callers that care about result rows check this
-    # length; callers that just want side-effect Hold .execute and
-    # ignore the return value).
+    # Run a parameterised query. Returns Array<Hash> for SELECTs (rows
+    # as hashes keyed by column name), or [] for non-SELECTs.
     def execute(sql, args = [], auto_return: true)
       pg_sql = translate_placeholders(sql)
       if auto_return && insert_without_returning?(pg_sql) && insert_target_has_id?(pg_sql)
@@ -93,18 +80,17 @@ module Database
       rows
     end
 
-    # Multi-statement helper. Mirrors SQLite3::Database#execute_batch.
-    # Used by Database.migrate! to run the .sql migration files; D-PG-2
-    # ships a Postgres-side migrations directory.
+    # Multi-statement helper. Used by Database.migrate! to run the .sql
+    # migration files in db/migrations-postgres/.
     def execute_batch(sql)
       run_with_reconnect { |c| c.exec(sql) }
       nil
     end
 
-    # Same shape as SQLite3::Database#transaction. Re-raises after
-    # ROLLBACK so the caller sees the original error. Monitor is
-    # re-entrant, so nested .execute calls inside the block re-acquire
-    # the same lock without deadlocking.
+    # BEGIN / COMMIT / ROLLBACK wrapper. Re-raises after ROLLBACK so the
+    # caller sees the original error. Monitor is re-entrant, so nested
+    # .execute calls inside the block re-acquire the same lock without
+    # deadlocking.
     def transaction
       @monitor.synchronize do
         @conn.exec('BEGIN')
@@ -130,7 +116,7 @@ module Database
       @changes
     end
 
-    # `Database.reset!` calls this in tests. Mirrors SQLite3::Database#close.
+    # `Database.reset!` calls this in tests.
     def close
       @monitor.synchronize { @conn&.close }
     end
@@ -172,7 +158,7 @@ module Database
       conn.type_map_for_results = PG::BasicTypeMapForResults.new(conn)
     end
 
-    # Convert SQLite-style `?` placeholders to PG-style `$1, $2, …`.
+    # Convert `?` placeholders to PG-style `$1, $2, …`.
     # Walks the string once; toggles `in_string` whenever a single
     # quote is seen (PG's escape for a literal single quote is `''`
     # which the walker handles naturally — the second quote re-toggles
@@ -225,8 +211,7 @@ module Database
 
     # Look at the target table name; skip auto-RETURN for no-id
     # tables. Conservative: if we can't extract a table name, assume
-    # `id` exists (matches SQLite3's silent-no-op-on-missing-column
-    # behaviour upon last_insert_row_id access).
+    # `id` exists.
     def insert_target_has_id?(sql)
       m = sql.match(INSERT_TARGET_RX)
       return true unless m

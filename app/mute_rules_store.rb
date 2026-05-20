@@ -3,8 +3,8 @@ require_relative 'database'
 # Phase 5 — per-user wrapper around mute_rules.
 #
 # Three kinds of rule, each with a different match shape:
-#   keyword → substring match against title OR content_text (case-insensitive,
-#             via SQLite's default ASCII-LIKE which already lower-cases)
+#   keyword → substring match against title OR content_text (case-insensitive
+#             via LOWER() on both sides of the LIKE)
 #   author  → exact match against articles.author
 #   feed    → match against articles.feed_id (value stored as the id-as-string)
 #

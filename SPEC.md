@@ -50,6 +50,7 @@ The original brief was explicit: "**Single-user**, web-based." That ran its cour
 - **Popular-with-other-readers top charts** (STUFF #24) — `/feeds` shows top-5 per type (📰 News / 🏟 Sports / 🎧 Podcasts / 📺 Nature / 🎬 YouTube) ranked by distinct subscriber count.
 - **/topics quality overhaul** (STUFF #28) — URL-stripping tokenizer + expanded stopwords + publisher-supplied categories (new `articles.categories` column) + weighted scoring + ubiquity ceiling + proper-noun phrase detection (e.g. "Jannik Sinner" stays one cluster). Consolidated stopword module at [app/stopwords.rb](app/stopwords.rb).
 - **Tracing + observability** — OpenTelemetry SDK, `/admin/traces`, optional OTLP exporter. Multiple commits.
+- **PostgreSQL replaces SQLite** (Phase 5 → STUFF #47) — production cut over to a DigitalOcean Managed PG cluster (`tsvector` + `ts_rank` for search). SQLite stayed as the dev/test default during the dual-backend period; STUFF #47 dropped SQLite entirely — the `gem 'sqlite3'` dep, the `data/app.db` file, the `db/migrations/` directory, the adapter abstraction, and the CI sqlite leg are all gone. Tests now require `TEST_DATABASE_URL`.
 
 ### Where to read what
 

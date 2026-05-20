@@ -53,7 +53,7 @@ RSpec.describe 'GET /admin/traces' do
       attrs: { 'feed.id' => 7, 'feed.url' => 'https://example.com/rss' }
     ))
     Tracing::Recorder.record(make_span(
-      name: 'sqlite.query', trace_id: trace_id, span_id: '2' * 16,
+      name: 'pg.query', trace_id: trace_id, span_id: '2' * 16,
       parent_id: '1' * 16,
       start_ns: 5_000_000, end_ns: 8_000_000
     ))
@@ -62,7 +62,7 @@ RSpec.describe 'GET /admin/traces' do
     expect(last_response.status).to eq(200)
     body = last_response.body
     expect(body).to include('feed.fetch')
-    expect(body).to include('sqlite.query')
+    expect(body).to include('pg.query')
     expect(body).to include('https://example.com/rss')
     expect(body).to include('feed.id')
     # Root span has no offset, child should show +5.0ms

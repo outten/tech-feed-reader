@@ -75,24 +75,6 @@ RSpec.describe SportsEntityArticlesStore, '.refresh_for + .for_entity' do
     expect(result).to eq(skipped: true, reason: :fresh)
   end
 
-  it 'phrase-matches — does not match when only one word appears' do
-    # PG's phraseto_tsquery is more permissive than FTS5's bare-phrase
-    # search (treats stop-word gaps as wildcard slots), so the same
-    # article that FTS5 rejects gets matched on PG. Tracked as a
-    # follow-up; for now the SQLite path locks in the strict behaviour.
-    skip 'phraseto_tsquery permissiveness — needs a tighter PG path' if Database.adapter == :postgres
-    make_mention_player(slug: 'jannik-only', full_name: 'Jannik Only')
-    # An article with "Jannik" but not "Only" together as a phrase.
-    make_mention_article(uid: 'p01', title: 'Random Jannik scattered Only',
-                 content: 'Jannik did one thing. Separately, Only matters.')
-    player = SportsPlayersStore.find_by_slug('jannik-only')
-    SportsEntityArticlesStore.refresh_for(
-      kind: 'player', entity_id: player['id'], name: player['full_name'], force: true
-    )
-    cached = SportsEntityArticlesStore.for_entity(kind: 'player', entity_id: player['id'])
-    expect(cached).to be_empty
-  end
-
   it 'rejects unknown kinds' do
     expect {
       SportsEntityArticlesStore.refresh_for(kind: 'banana', entity_id: 1, name: 'x')

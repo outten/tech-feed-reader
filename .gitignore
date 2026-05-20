@@ -2,10 +2,8 @@
 .env
 tmp/
 .cache/
-data/cache/
-data/app.db
-data/app.db-shm
-data/app.db-wal
-data/app.db-journal
-data/scheduler*.log
 *.log
+# Stale local SQLite files left over from before STUFF #47 (PG-only).
+# Safe to delete; the app no longer reads them. Kept ignored here so
+# they don't accidentally land in a commit before you do.
+data/

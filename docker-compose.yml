@@ -7,13 +7,8 @@
 #
 # Required env vars (set in /opt/app/.env on the Droplet, never committed):
 #   DOMAIN, CADDY_EMAIL, SESSION_SECRET, WEBAUTHN_RP_ID, WEBAUTHN_ORIGIN,
-#   ANTHROPIC_API_KEY. LLM_* and WEBAUTHN_RP_NAME are optional (have
-#   defaults). See .env.example for the full list.
-#
-# DATABASE_URL is optional. Unset → app uses SQLite at /app/data/app.db
-# in the app_data volume (default). Set → app routes to that
-# Postgres (Phase 5 / D-PG-5 cutover). Either backend is hot-swappable
-# by editing /opt/app/.env and running `docker compose up -d`.
+#   ANTHROPIC_API_KEY, DATABASE_URL. LLM_* and WEBAUTHN_RP_NAME are
+#   optional (have defaults). See .env.example for the full list.
 
 services:
   redis:
@@ -49,7 +44,7 @@ services:
     environment:
       RACK_ENV: production
       REDIS_URL: redis://redis:6379/0
-      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL: ${DATABASE_URL}
       SESSION_SECRET: ${SESSION_SECRET}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Tech Feed Reader}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
@@ -63,8 +58,6 @@ services:
       BMC_HANDLE: ${BMC_HANDLE:-}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-    volumes:
-      - app_data:/app/data
     expose:
       - "4567"
 
@@ -83,12 +76,10 @@ services:
     environment:
       RACK_ENV: production
       REDIS_URL: redis://redis:6379/0
-      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL: ${DATABASE_URL}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       LLM_ENABLED: ${LLM_ENABLED:-true}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-    volumes:
-      - app_data:/app/data
     command: ["bundle", "exec", "sidekiq", "-r", "./app/sidekiq_boot.rb", "-c", "5"]
 
   caddy:
@@ -108,7 +99,6 @@ services:
       - app
 
 volumes:
-  app_data:
   redis_data:
   caddy_data:
   caddy_config:

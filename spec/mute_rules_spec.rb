@@ -103,7 +103,7 @@ RSpec.describe ArticlesStore, 'mute filter (Phase 5)' do
     expect(ArticlesStore.recent(1).map { |a| a['uid'] }).not_to include('mute00000003')
   end
 
-  it 'is case-insensitive (SQLite default LIKE on ASCII)' do
+  it 'is case-insensitive (LOWER() on both sides of LIKE)' do
     make_mute_article(uid: 'mute00000004', title: 'ALL CAPS CRYPTO PIECE')
     MuteRulesStore.add(user_id: 1, kind: 'keyword', value: 'crypto')
     expect(ArticlesStore.recent(1).map { |a| a['uid'] }).not_to include('mute00000004')

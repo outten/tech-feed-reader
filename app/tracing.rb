@@ -4,7 +4,7 @@ require_relative 'version'
 #
 # What this gives you out of the box:
 #   - Auto-instrumentation for Sinatra, Rack, Net::HTTP, Sidekiq, and
-#     SQLite (via opentelemetry-instrumentation-all). Every HTTP request,
+#     PG (via opentelemetry-instrumentation-all). Every HTTP request,
 #     outbound fetch, job, and SQL query becomes a span automatically.
 #   - Manual spans wrap FeedFetcher#fetch_feed and Summarizer::Claude#summarize
 #     (search for `Tracing.in_span` in those files).
@@ -131,7 +131,7 @@ module Tracing
 
   # Manual-span tracer for the few code paths that warrant explicit
   # instrumentation beyond the auto-instrumented Sinatra / Net::HTTP /
-  # Sidekiq / SQLite spans. See FeedFetcher#fetch_feed and
+  # Sidekiq / PG spans. See FeedFetcher#fetch_feed and
   # Summarizer::Claude#summarize.
   def tracer
     OpenTelemetry.tracer_provider.tracer('tech-feed-reader', AppVersion::GIT_SHA)

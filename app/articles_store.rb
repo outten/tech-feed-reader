@@ -6,13 +6,11 @@ require_relative 'summarizer/extractive'
 require_relative 'providers/readability'
 require_relative 'metrics'
 
-# Wrapper around the `articles` table. Returns hash-rows (matching
-# Database#results_as_hash) so callers can pass them straight into ERB.
+# Wrapper around the `articles` table. Returns hash-rows so callers
+# can pass them straight into ERB.
 #
-# Schema in db/migrations/001_init.sql. The articles_fts virtual table
-# is kept in sync via INSERT/UPDATE/DELETE triggers, so .import simply
-# inserts and the index follows. Search hits articles_fts via JOIN on
-# articles.id (the rowid the FTS5 contentless table is linked to).
+# Schema in db/migrations-postgres/001_init.sql. Full-text search hits
+# the generated `tsv` tsvector column via ts_rank / ts_headline.
 module ArticlesStore
   # Default page size for /articles. Tunable in views if needed.
   DEFAULT_LIMIT = 50
@@ -171,85 +169,50 @@ module ArticlesStore
   end
 
   # FTS hits filtered to the user's subscriptions, with cached
-  # extractive summaries inline. SQLite uses the articles_fts virtual
-  # table + FTS5's auto `rank` ordering; Postgres uses a generated
-  # `tsv` tsvector column on articles + ts_rank (note PG ORDER BY
-  # ts_rank DESC because higher = better; SQLite FTS5's rank is more
-  # negative = better, hence plain ASC).
+  # extractive summaries inline. Uses the generated `tsv` tsvector
+  # column on articles + ts_rank.
   def for_topic(user_id, term, limit: 30)
     return [] if term.to_s.strip.empty?
     q = term.to_s.strip
-    if Database.adapter == :postgres
-      db.execute(<<~SQL, [q, q, user_id.to_i, limit])
-        SELECT a.*, s.extractive AS summary,
-               ts_rank(a.tsv, plainto_tsquery('english', ?)) AS rank
-        FROM articles a
-        LEFT JOIN summaries s ON s.article_id = a.id
-        WHERE a.tsv @@ plainto_tsquery('english', ?)
-          AND EXISTS (
-            SELECT 1 FROM user_feed_subscriptions ufs
-            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-          )
-        ORDER BY rank DESC
-        LIMIT ?
-      SQL
-    else
-      db.execute(<<~SQL, [q, user_id.to_i, limit])
-        SELECT a.*, s.extractive AS summary, rank
-        FROM articles a
-        JOIN articles_fts f ON a.id = f.rowid
-        LEFT JOIN summaries s ON s.article_id = a.id
-        WHERE articles_fts MATCH ?
-          AND EXISTS (
-            SELECT 1 FROM user_feed_subscriptions ufs
-            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-          )
-        ORDER BY rank
-        LIMIT ?
-      SQL
-    end
-  rescue SQLite3::SQLException, PG::Error
+    db.execute(<<~SQL, [q, q, user_id.to_i, limit])
+      SELECT a.*, s.extractive AS summary,
+             ts_rank(a.tsv, plainto_tsquery('english', ?)) AS rank
+      FROM articles a
+      LEFT JOIN summaries s ON s.article_id = a.id
+      WHERE a.tsv @@ plainto_tsquery('english', ?)
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
+      ORDER BY rank DESC
+      LIMIT ?
+    SQL
+  rescue PG::Error
     []
   end
 
   # Full-text search filtered to the user's subscriptions. Snippet is
   # generated server-side so the view can render `<mark>`-wrapped
-  # excerpts uniformly across backends.
+  # excerpts uniformly.
   def search(user_id, query, limit: DEFAULT_LIMIT, offset: 0)
     return [] if query.to_s.strip.empty?
     q = query.to_s.strip
 
-    if Database.adapter == :postgres
-      db.execute(<<~SQL, [q, q, q, user_id.to_i, limit, offset])
-        SELECT a.*,
-               ts_headline('english', a.content_text,
-                           plainto_tsquery('english', ?),
-                           'StartSel=<mark>, StopSel=</mark>, MaxWords=16, MinWords=8') AS excerpt,
-               ts_rank(a.tsv, plainto_tsquery('english', ?)) AS rank
-        FROM articles a
-        WHERE a.tsv @@ plainto_tsquery('english', ?)
-          AND EXISTS (
-            SELECT 1 FROM user_feed_subscriptions ufs
-            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-          )
-        ORDER BY rank DESC
-        LIMIT ? OFFSET ?
-      SQL
-    else
-      db.execute(<<~SQL, [q, user_id.to_i, limit, offset])
-        SELECT a.*,
-               snippet(articles_fts, 1, '<mark>', '</mark>', '…', 16) AS excerpt
-        FROM articles a
-        JOIN articles_fts f ON a.id = f.rowid
-        WHERE articles_fts MATCH ?
-          AND EXISTS (
-            SELECT 1 FROM user_feed_subscriptions ufs
-            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-          )
-        ORDER BY rank
-        LIMIT ? OFFSET ?
-      SQL
-    end
+    db.execute(<<~SQL, [q, q, q, user_id.to_i, limit, offset])
+      SELECT a.*,
+             ts_headline('english', a.content_text,
+                         plainto_tsquery('english', ?),
+                         'StartSel=<mark>, StopSel=</mark>, MaxWords=16, MinWords=8') AS excerpt,
+             ts_rank(a.tsv, plainto_tsquery('english', ?)) AS rank
+      FROM articles a
+      WHERE a.tsv @@ plainto_tsquery('english', ?)
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
+      ORDER BY rank DESC
+      LIMIT ? OFFSET ?
+    SQL
   end
 
   # Bulk-insert a batch of FeedParser-shaped entries for a given feed.
@@ -283,7 +246,7 @@ module ArticlesStore
     rules    = TagsStore.all_across_users
     inserted = 0
     # Run readability OUTSIDE the transaction — readability does HTTP, and
-    # we don't want the SQLite write lock held for the full duration of N
+    # we don't want the DB write lock held for the full duration of N
     # sequential publisher fetches. By the time we open the transaction
     # below every entry is already final.
     upgraded = entries.map { |e| maybe_readability_upgrade(e) }
@@ -418,9 +381,6 @@ module ArticlesStore
       end
 
       # Phase 5 — hide articles matching the user's mute_rules.
-      # `LIKE` is case-insensitive on ASCII in SQLite by default, but
-      # case-sensitive in Postgres. Force lower-case on both sides so
-      # the behaviour matches across backends.
       where_clauses << <<~SQL.strip
         NOT EXISTS (
           SELECT 1 FROM mute_rules mr

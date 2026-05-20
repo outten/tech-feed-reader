@@ -96,21 +96,15 @@ make sidekiq-otel            # same wiring for the Sidekiq worker
 
 ## Storage architecture
 
-**Single SQLite DB** at `data/app.db` is the source of truth for feeds, articles, read state, tags, and summaries. WAL mode lets the scheduler write while web requests read without blocking; `PRAGMA foreign_keys=ON` cascades deletes (drop a feed → its articles + their read_state + summaries + article_tags rows go too).
+**PostgreSQL** is the source of truth for feeds, articles, read state, tags, summaries, sports data, and pageviews. Production runs against a DigitalOcean Managed PG cluster; dev points at a local Postgres via `DATABASE_URL`. Foreign keys cascade on delete (drop a feed → its articles + their read_state + summaries + article_tags rows go too); the `articles` table carries a generated `tsv` tsvector column for `ts_rank` / `ts_headline`-based search.
 
-This replaces `t-money-terminal`'s file-per-store + mutex + atomic-rename pattern. SQLite's transactions handle atomicity; we don't need to roll our own.
+This replaces `t-money-terminal`'s file-per-store + mutex + atomic-rename pattern. PG transactions handle atomicity; we don't need to roll our own.
 
-**Schema lives in [db/migrations/](db/migrations/).** The runner is [app/database.rb](app/database.rb) — `Database.migrate!` is idempotent, applies any pending migration files in filename order, and is called automatically on web-app boot (skipped under `RACK_ENV=test`). `make migrate` is the explicit one-shot entry point.
+**Schema lives in [db/migrations-postgres/](db/migrations-postgres/).** The runner is [app/database.rb](app/database.rb) — `Database.migrate!` is idempotent, applies any pending migration files in filename order, and is called automatically on web-app boot (skipped under `RACK_ENV=test`). `make migrate` is the explicit one-shot entry point.
 
-**Disk cache** at `data/cache/` (separate from the DB) holds raw fetch payloads as a debug aid:
-```
-data/cache/
-└── feeds/<feed_id>.xml   # raw RSS/Atom payload, last successful fetch
-```
+Article bodies, extracted content, and summaries all live in PG.
 
-Article bodies, extracted content, and summaries all live in SQLite — not on disk.
-
-**Retention policy** — articles older than `RETENTION_DAYS` (default 7) get swept by [`Pruner`](app/pruner.rb). Bookmarked articles are always preserved regardless of age; set `PRUNE_KEEP_UNREAD=1` to also preserve unread items past the window. Cascades take care of `read_state`, `summaries`, `article_tags`, and the `articles_fts` index — one DELETE on `articles` is sufficient. Wired in two places:
+**Retention policy** — articles older than `RETENTION_DAYS` (default 7) get swept by [`Pruner`](app/pruner.rb). Bookmarked articles are always preserved regardless of age; set `PRUNE_KEEP_UNREAD=1` to also preserve unread items past the window. Cascades take care of `read_state`, `summaries`, and `article_tags`; the `tsv` column lives on `articles` itself so deletes need no separate index sweep. Wired in two places:
 
 - `scripts/refresh_feeds.rb` runs `Pruner.prune_old` at the end of every refresh-all cycle. Override with `PRUNE_ON_REFRESH=0` to skip the sweep on a given run.
 - `make prune` (= `scripts/prune_articles.rb`) runs the same sweep standalone — useful in cron / launchd if you want a separate retention cadence from the refresh cadence.
@@ -129,7 +123,7 @@ The cutoff is `COALESCE(published_at, fetched_at) < now - retention_days`, so fe
 
 ```
 Page renders MUST be cache-only.
-  /dashboard, /articles, /article/:id → SQLite reads only
+  /dashboard, /articles, /article/:id → PG reads only
 
 Network events ONLY happen via:
   - Scheduled poll (make scheduler)
@@ -149,8 +143,7 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `recovery_codes` | Phase A1: 10 single-use codes per user, hashed with HMAC-SHA256 keyed by `SESSION_SECRET`. consumed_at set on use. FK CASCADE on users. |
 | `feeds` | Subscribed feeds: url, title, fetch_interval_seconds, last_fetched_at, last_etag, last_modified, last_status, topic, image_url. **Shared catalog** — one row per URL across all users; subscriptions live in `user_feed_subscriptions`. |
 | `user_feed_subscriptions` | Phase A2: bridge (user_id, feed_id) unique. One fetch keeps every subscriber up to date. |
-| `articles` | Article history: rowid (`id`), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text, audio_url, audio_mime_type, audio_duration_seconds, image_url, `categories` (JSON-encoded publisher tags, STUFF #28.2) |
-| `articles_fts` | FTS5 virtual table over `articles(title, content_text)`; kept in sync via INSERT/UPDATE/DELETE triggers |
+| `articles` | Article history: id (BIGSERIAL), uid (SHA1 slug), feed_id, title, url, author, published_at, content_html, content_text, audio_url, audio_mime_type, audio_duration_seconds, image_url, `categories` (JSON-encoded publisher tags, STUFF #28.2), generated `tsv tsvector` column for full-text search |
 | `read_state` | Per-article state: read, bookmarked, archived, opened_at, feedback (explicit ±1, Phase 3), passive_feedback (derived from listened-%, Phase 4). Phase A2: composite PK `(user_id, article_id)`. |
 | `feed_feedback` | Per-feed weight (Phase 3): weight REAL DEFAULT 1.0, clamped to [0.25, 3.0] by `FeedFeedbackStore`. Phase A2: composite PK `(user_id, feed_id)`. |
 | `mute_rules` | Hard-hide rules (Phase 5): kind ∈ `{keyword, author, feed}`. Phase A2: composite PK `(user_id, kind, value)`. Applied as a NOT EXISTS sub-query in `ArticlesStore.state_query` |
@@ -166,7 +159,7 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `sports_entity_articles` | Sports Phase S7 follow-up: bridge for "articles mentioning Sinner / Eagles" on per-entity pages. |
 | `background_pool` | Pool of Picsum image IDs powering the per-page background. STUFF #21 doubled the pool to 100. |
 
-**Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (FTS5 BM25, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the FTS5 path when the corpus is cold.
+**Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (PG `ts_rank` over websearch_to_tsquery, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the full-text path when the corpus is cold.
 
 **Triage::Claude** ([app/triage/claude.rb](app/triage/claude.rb), Phase 8) — AI-assisted unread classification. Pulls up to 30 unread + 20 corpus exemplars per side, prompts Claude (Sonnet 4.6, not Opus — cost guard) for structured JSON, parses defensively (strips markdown fences, salvages JSON from prose, falls back to "skip all" on parse failure rather than 500ing). Surfaces at `/triage`; manual POST trigger only — no DB persistence v1.
 | `tags` | User tag rules: name, match_kind (regex/keyword/feed_id), match_value |
@@ -177,7 +170,7 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 
 `HealthRegistry` is in-memory only (bounded ring buffer of feed-fetch observations); surfaces at `/admin/health`, clears on process restart.
 
-Per-store wrapper classes (`FeedsStore`, `ArticlesStore`, etc.) sit on top of the DB and present a higher-level API to the app — but the data lives in SQLite, not in JSON files.
+Per-store wrapper classes (`FeedsStore`, `ArticlesStore`, etc.) sit on top of the DB and present a higher-level API to the app — but the data lives in PG, not in JSON files.
 
 ## Authentication + multi-user (Phases A1 + A2)
 
@@ -185,15 +178,15 @@ Per-store wrapper classes (`FeedsStore`, `ArticlesStore`, etc.) sit on top of th
 
 **Auth wall** — a Sinatra `before` filter on every request enforces sign-in unless the path is in the public allowlist (`/`, `/about`, `/health`, `/metrics`, `/sign-up`, `/sign-in`, `/sign-out`, `/api/auth/*`, plus static assets). The wall is OFF in `RACK_ENV=test` by default so existing specs don't need a sign-in dance; specs that explicitly want to exercise the wall flip `TechFeedReader.enforce_auth_wall = true` in a before/after pair (see [spec/auth_spec.rb](spec/auth_spec.rb)).
 
-**Per-user data split (A2)** — every table that holds user-state carries a `user_id` FK with `ON DELETE CASCADE`, defined in migration `022_a2_per_user_data.sql`. Composite PKs / unique constraints widened to include `user_id`: `read_state(user_id, article_id)`, `feed_feedback(user_id, feed_id)`, `mute_rules(user_id, kind, value)`, `tags UNIQUE(user_id, name)`, `sports_follows UNIQUE(user_id, kind, value)`. `feeds` itself stays a shared catalog so one fetch keeps every subscriber up to date; per-user subscriptions live in `user_feed_subscriptions`. Every store method that touches user-state takes `user_id` explicitly — routes call `current_user_id`, defined in [app/auth.rb](app/auth.rb) as a Sinatra helper. Cross-user isolation is locked by [spec/cross_user_isolation_spec.rb](spec/cross_user_isolation_spec.rb).
+**Per-user data split (A2)** — every table that holds user-state carries a `user_id` FK with `ON DELETE CASCADE`, established in the consolidated PG baseline [db/migrations-postgres/001_init.sql](db/migrations-postgres/001_init.sql). Composite PKs / unique constraints widened to include `user_id`: `read_state(user_id, article_id)`, `feed_feedback(user_id, feed_id)`, `mute_rules(user_id, kind, value)`, `tags UNIQUE(user_id, name)`, `sports_follows UNIQUE(user_id, kind, value)`. `feeds` itself stays a shared catalog so one fetch keeps every subscriber up to date; per-user subscriptions live in `user_feed_subscriptions`. Every store method that touches user-state takes `user_id` explicitly — routes call `current_user_id`, defined in [app/auth.rb](app/auth.rb) as a Sinatra helper. Cross-user isolation is locked by [spec/cross_user_isolation_spec.rb](spec/cross_user_isolation_spec.rb).
 
-**`/account` page** — manages display name, registered passkeys (list / + Add this device / Revoke per row), recovery-code regeneration (one-shot reveal), and account deletion (typed-username confirmation gate; cascade deletes via the FK chain in migration 022 wipe every per-user row). Lockout protection: refuses to revoke the user's last passkey when zero unused recovery codes remain.
+**`/account` page** — manages display name, registered passkeys (list / + Add this device / Revoke per row), recovery-code regeneration (one-shot reveal), and account deletion (typed-username confirmation gate; cascade deletes via the per-user-FK chain wipe every per-user row). Lockout protection: refuses to revoke the user's last passkey when zero unused recovery codes remain.
 
 **`/welcome` first-time onboarding** — `GET /` redirects signed-in users with zero feed subscriptions to `/welcome`. The page shows four topic chips (Technology / Sports / Nature / Podcasts); each selection seeds 4-6 curated starter feeds from `FeedCatalog::ONBOARDING_STARTERS` via the existing `FeedsStore.add_for_user` path, then `POST /welcome/subscribe` redirects to `/articles?notice=onboarded`. Brand-new feeds (no prior subscriber → `last_fetched_at` is nil) get a `FeedRefreshWorker` enqueued so content shows up within ~30s. Existing feeds (another user is already subscribed) skip the fetch — content is already imported.
 
 ## Article id
 
-Each article has both a SQLite rowid (`articles.id`, used internally for joins and FTS5 linkage) and a stable `uid` = `SHA1(feed_url + article_url)[0,12]` used in URLs (`/article/abc123def456`). The uid is stable across re-fetches; the rowid is internal.
+Each article has both a numeric primary key (`articles.id`, used internally for joins) and a stable `uid` = `SHA1(feed_url + article_url)[0,12]` used in URLs (`/article/abc123def456`). The uid is stable across re-fetches; the id is internal.
 
 ## Feed-fetch flow
 
@@ -204,7 +197,7 @@ Each article has both a SQLite rowid (`articles.id`, used internally for joins a
 4. if 200 → parse with feedjira (or rss stdlib), extract entries
 5. for each entry whose uid is not already in articles:
      - run readability extraction on entry[:content] (single shared extractor)
-     - INSERT into articles (FTS5 trigger keeps articles_fts in sync)
+     - INSERT into articles (the generated `tsv` column keeps full-text search in sync)
      - assign tags via tags-rule matcher → INSERT into article_tags
 6. UPDATE feeds SET last_etag, last_modified, last_fetched_at, last_status WHERE id = ?
 7. record HealthRegistry observation
@@ -245,7 +238,7 @@ The chat widget UI lives in [`public/chat-widget.js`](public/chat-widget.js) + t
 
 ## OpenTelemetry tracing
 
-[`app/tracing.rb`](app/tracing.rb) boots the OTel SDK in non-test env. Auto-instrumentation via `opentelemetry-instrumentation-all` covers Sinatra, Rack, Net::HTTP, Sidekiq, and SQLite — every HTTP request, outbound fetch, job, and SQL query becomes a span automatically. Manual spans wrap `FeedFetcher#fetch_feed` (`feed.fetch`) and the two Claude paths (`llm.summarize`, `llm.chat`).
+[`app/tracing.rb`](app/tracing.rb) boots the OTel SDK in non-test env. Auto-instrumentation via `opentelemetry-instrumentation-all` covers Sinatra, Rack, Net::HTTP, Sidekiq, and PG — every HTTP request, outbound fetch, job, and SQL query becomes a span automatically. Manual spans wrap `FeedFetcher#fetch_feed` (`feed.fetch`) and the two Claude paths (`llm.summarize`, `llm.chat`).
 
 **Two span processors run side-by-side**:
 
@@ -283,7 +276,7 @@ The singleton player API lives in [`public/global-player.js`](public/global-play
 app/
   main.rb                          # Sinatra routes; auto-migrates on boot
   credentials.rb                   # loads .credentials/.env; aliases CLAUDE_API_KEY → ANTHROPIC_API_KEY
-  database.rb                      # SQLite handle + migration runner
+  database.rb                      # PG connection handle + migration runner
   logger.rb                        # JSON-line structured logger
   request_log_middleware.rb        # Rack middleware: per-HTTP-request JSON log line (sees static assets too)
   version.rb                       # AppVersion::GIT_SHA + STARTED_AT (used by /health, OTel resource)
@@ -300,7 +293,7 @@ app/
   feed_parser.rb                   # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom; extracts entry.categories
   feed_catalog.rb                  # curated 79-feed catalog + seed_defaults + recommend_for personalisation
   feeds_store.rb                   # feeds + user_feed_subscriptions bridge; popular_by_type for #24 top charts
-  articles_store.rb                # articles + FTS5 + audio + categories backfill; podcast_feeds + youtube_channels
+  articles_store.rb                # articles + tsvector search + audio + categories backfill; podcast_feeds + youtube_channels
   read_state_store.rb              # per-user-per-article read / bookmark / archive / feedback
   feed_feedback_store.rb           # per-user-per-feed weight (Phase 3)
   mute_rules_store.rb              # per-user keyword / author / feed hard-hide rules (Phase 5)
@@ -327,7 +320,7 @@ app/
   triage/claude.rb                 # Phase 8: /triage classifier (Sonnet 4.6)
   triage_store.rb                  # persisted triage runs per user per topic
   digests.rb / digest_store.rb     # daily-digest composer + persistence; LLM summary cached on the row
-  recommendation.rb                # FTS5-overlap "Related" panel + top_keywords + top_phrases (#28.4)
+  recommendation.rb                # ts_rank-overlap "Related" panel + top_keywords + top_phrases (#28.4)
   recommendation/for_you.rb        # personalised ranker for /articles?sort=relevance
   topic_clusters.rb                # /topics weighted-scoring clustering (STUFF #28)
 
@@ -370,8 +363,7 @@ scripts/
   backfill_audio.rb
   run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for one-command dev
 
-spec/                              # RSpec (test env: in-memory SQLite, no real HTTP, auth wall OFF by default)
-data/                              # SQLite DB + raw-feed cache (git-ignored)
+spec/                              # RSpec (test env: PG via TEST_DATABASE_URL, no real HTTP, auth wall OFF by default)
 .github/workflows/ci.yml           # RSpec + scripts syntax check on push to main + every PR
 ```
 
@@ -393,7 +385,7 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 
 2. **Atom vs RSS 2.0 vs RSS 1.0.** Don't write three parsers — pick one library (start with `feedjira`) that normalises all three to a single shape. If you fork the parser, you'll regret it.
 
-3. **Article-content size.** Some entries are 100 KB of inline HTML. SQLite handles big TEXT columns fine, but don't `SELECT *` when you only need the listing fields — index-supported queries that omit `content_html` / `content_text` keep the `/articles` page fast even with thousands of rows.
+3. **Article-content size.** Some entries are 100 KB of inline HTML. PG handles big TEXT columns fine, but don't `SELECT *` when you only need the listing fields — index-supported queries that omit `content_html` / `content_text` keep the `/articles` page fast even with thousands of rows.
 
 4. **De-dup across feeds.** The same article appears in HN front page + the publisher's RSS. Article id is keyed by `feed_url + article_url`, so dedupe is per-article-per-feed, not global. If global dedup matters, add a separate URL-hash index.
 

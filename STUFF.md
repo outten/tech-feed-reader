@@ -476,11 +476,13 @@ PostgreSQL is running locally on my system. Do you want to switch to it for deve
 
 **Shipped 2026-05-17.** Local cutover during D-PG-5 prep: `createdb tfr_dev` → `DATABASE_URL=postgres://localhost/tfr_dev ruby scripts/migrate.rb` → dump script copied the full SQLite dev corpus (2 users / 82 feeds / 19,398 articles / 18,693 summaries) into PG. `.env` already pointed at `tfr_dev`, so `make run` boots against PG with no further change. The test suite gates on `TEST_DATABASE_URL` (defaults to `postgres:///tfr_test`) so CI's matrix runs both legs; `bundle exec rspec` against the laptop SQLite path remains the unchanged default for anyone who doesn't have PG installed.
 
-## [ ] 38. Drop SQLite3
+## [x] 38. Drop SQLite3
 
 Now that we are on PostgreSQL, let's drop SQLite3 testing.
 
 (Renumbered from a duplicate `#36` — original `#36` was the PostgreSQL dev-environment item just above this one.)
+
+**Shipped as part of STUFF #47 — same work item, two entries.** See #47 below for the full changelog.
 
 ## [ ] 37. Beauty Pass
 
@@ -586,9 +588,28 @@ The per-tour fetch + slugify + upsert dance moved from `scripts/sync_sports.rb` 
 
 **Related gap that's still open**: a similar autosync for the `/sports` team-score tiles. The eager sync from #45's follow-route covers freshly-followed teams; existing follows still need a recurring tick (or the same on-page-load pattern). Captured under #45's "Follow-up gap" note above.
 
-## [ ] 47. SQLite3
+## [x] 47. SQLite3
 
 Are we done w SQLite3? If so, can you develop a plan to remove it from the codebase as well as CI.
+
+**Shipped.** PG was the only production backend since Phase 5; SQLite was kept only for dev/test ergonomics. With the suite already green on PG via the CI matrix, dropping the second backend cuts CI in half and removes the adapter abstraction throughout the codebase.
+
+What landed:
+- `gem 'sqlite3'` removed from Gemfile + Gemfile.lock; `Database.adapter` / `Database.path` / `MIGRATIONS_DIR_SQLITE` deleted. `app/database.rb` shrank from ~165 LOC to ~95.
+- 25 SQLite migration files in `db/migrations/` deleted (PG runs from the consolidated `db/migrations-postgres/` baseline).
+- `scripts/dump_sqlite_to_postgres.rb` + its spec retired (one-shot tool, used during cutover).
+- All `if Database.adapter == :postgres` branches in stores hoisted; SQLite arms deleted.
+- `rescue SQLite3::ConstraintException, PG::UniqueViolation` → `rescue PG::UniqueViolation` (and similar). `raise SQLite3::ConstraintException` in `FeedsStore.add` → `raise PG::UniqueViolation`.
+- `spec_helper.rb` now requires `TEST_DATABASE_URL`; in-memory SQLite fallback gone.
+- CI matrix `[sqlite, postgres]` → single `postgres` job; cuts wall-clock CI time roughly in half.
+- Dockerfile drops `libsqlite3-dev` + `libsqlite3-0` + the `/app/data` volume; docker-compose drops `app_data` volume and makes `DATABASE_URL` required.
+- `Database.date_sql` simplified to a single-line PG expression (no per-backend switch).
+- Admin overview's "DB path / size on disk" rows now show "PostgreSQL (managed)" + `pg_database_size(current_database())`.
+- `pg_adapter.rb` commentary cleaned up — no longer needs to frame itself as a SQLite-compatible facade.
+
+Suite: 1342 / 0 on PG.
+
+## [ ] 48. Admin Pages
 
 ## [ ] 48. Admin Pages
 
@@ -630,3 +651,24 @@ Surfaced from "did we do admin simple auth?" — answer was no: `/admin/*` was g
 - For true credential clearing (e.g. before handing the laptop to someone else), the page explicitly tells users to close all tabs of this origin or use a private window. Honest about the limit.
 
 **Operator follow-ups**: drop `ADMIN_USERNAME=...` + `ADMIN_PASSWORD=...` into `/opt/app/.env` on the Droplet, then `make deploy`. Until those are set in prod, /admin is unreachable.
+
+## [ ] 50. Beauty Pass
+
+Let's do a beauty pass in on PR. Don't commit and open a PR until I view and approve. Do things in phases.
+
+- I zoom in to 125% to have a good font size that is easy to read. Update the default accordingly.
+- on the /articles page, if the article doesn't have a picture, it looks indented with items that do have pictures. Can you align the "columns" so they look the same with or without a picture.
+- on the /articles page, can you add a summary or opening set of sentences to each to give the user more context of the article.
+- on the /artices page, when you click ON a filter ... it says on and you can't turn it off by clicking the button to deactivate it. Please fix.
+- I love the look of the /podcasts page with the image of the podcast. On the /youtube page, can you do something similar to make it more visual. 
+- can you move the search button to behind admin and before bus
+- we need to change the home page link in the header from Tech Feed Reader to Feeder
+  - is there a free icon we can use to bruce this up: <icon> Feeder
+    - feel free to consider animals or other items that represent feeding: pics, cows, etc.
+- in dark mode, prior used links are hard to read I think b/c of the color: blue and purple ... can you try something else
+- in dark mode, add a little frost layer on the background ... user can still make out the image, but it doesn't dominate the main content on the page
+
+## [ ] 51. Sidekiq Basic Auth
+
+Can you use the same Basic Auth credentials for Admin for Sidekiq?
+

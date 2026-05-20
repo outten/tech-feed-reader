@@ -2651,9 +2651,8 @@ class TechFeedReader < Sinatra::Base
       tag    = TagsStore.add(user_id: current_user_id, name: name, match_kind: kind, match_value: val)
       tagged = TagsApplier.apply_to_existing(tag)
       redirect to("/tags?notice=added&tagged=#{tagged}")
-    rescue SQLite3::ConstraintException, PG::UniqueViolation
-      # Both backends enforce the UNIQUE(user_id, name) index; only the
-      # exception class differs. PG's UniqueViolation descends from
+    rescue PG::UniqueViolation
+      # UNIQUE(user_id, name) index. UniqueViolation descends from
       # PG::IntegrityConstraintViolation but we name it explicitly here
       # to avoid swallowing unrelated PG errors.
       redirect to('/tags?error=duplicate-name')
@@ -2696,7 +2695,7 @@ class TechFeedReader < Sinatra::Base
       begin
         @results = ArticlesStore.search(current_user_id, @query, limit: @per_page, offset: offset)
         @error   = nil
-      rescue SQLite3::SQLException => e
+      rescue PG::Error => e
         @results = []
         @error   = e.message
       end
@@ -2727,16 +2726,8 @@ class TechFeedReader < Sinatra::Base
       summaries_llm: db.execute("SELECT COUNT(*) AS c FROM summaries WHERE llm IS NOT NULL AND llm != ''").first['c']
     }
 
-    @db_path  = Database.path
-    @db_bytes =
-      if @db_path == ':memory:'
-        0
-      else
-        # Main file + WAL + shared-memory file. Each absent in fresh /
-        # newly-checkpointed databases — guard with File.exist?.
-        %W[#{@db_path} #{@db_path}-wal #{@db_path}-shm]
-          .sum { |f| File.exist?(f) ? File.size(f) : 0 }
-      end
+    # Managed-PG size: pg_database_size returns bytes for the current DB.
+    @db_bytes = db.execute('SELECT pg_database_size(current_database()) AS b').first['b'].to_i
 
     @degraded            = HealthRegistry.degraded?
     @health_enabled      = HealthRegistry.enabled?

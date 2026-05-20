@@ -30,9 +30,9 @@ module TagsStore
     db.execute('SELECT COUNT(*) AS c FROM tags WHERE user_id = ?', [user_id.to_i]).first['c']
   end
 
-  # Raises SQLite3::ConstraintException on a duplicate (user_id, name)
-  # OR on an unsupported match_kind (the schema CHECK enforces
-  # 'regex' | 'keyword' | 'feed_id').
+  # Raises PG::UniqueViolation on a duplicate (user_id, name) or
+  # PG::CheckViolation on an unsupported match_kind (the schema CHECK
+  # enforces 'regex' | 'keyword' | 'feed_id').
   def add(user_id:, name:, match_kind:, match_value:)
     db.execute(<<~SQL, [user_id.to_i, name, match_kind, match_value])
       INSERT INTO tags(user_id, name, match_kind, match_value) VALUES (?, ?, ?, ?)

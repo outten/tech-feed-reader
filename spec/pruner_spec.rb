@@ -103,14 +103,8 @@ RSpec.describe Pruner do
       expect(db.execute('SELECT COUNT(*) AS c FROM read_state    WHERE article_id = ?', [old['id']]).first['c']).to eq(0)
       expect(db.execute('SELECT COUNT(*) AS c FROM summaries     WHERE article_id = ?', [old['id']]).first['c']).to eq(0)
       expect(db.execute('SELECT COUNT(*) AS c FROM article_tags  WHERE article_id = ?', [old['id']]).first['c']).to eq(0)
-      # FTS5 trigger keeps articles_fts in sync — the rowid should be gone too.
-      # SQLite-only: PG uses a tsvector column on articles itself (no
-      # separate index table to sync), so the cascade above already
-      # covers the search-index removal on the PG path.
-      if Database.adapter == :sqlite
-        fts_rows = db.execute('SELECT rowid FROM articles_fts WHERE rowid = ?', [old['id']])
-        expect(fts_rows).to be_empty
-      end
+      # PG uses a tsvector column on articles itself, so the cascade above
+      # already covers the search-index removal.
     end
 
     it 'still deletes archived articles past the window (archived is not a protection signal)' do
