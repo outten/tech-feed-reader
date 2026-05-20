@@ -12,6 +12,15 @@ ENV['WEBAUTHN_RP_NAME']  ||= 'Tech Feed Reader (test)'
 ENV['WEBAUTHN_RP_ID']    ||= 'localhost'
 ENV['WEBAUTHN_ORIGIN']   ||= 'http://localhost:4567'
 
+# STUFF #49 — admin Basic Auth gate is fail-closed in production:
+# an unset ADMIN_USERNAME / ADMIN_PASSWORD pair means nobody can
+# reach /admin/*. Tests need /admin/* to be reachable so existing
+# admin-route specs keep working; spec_helper seeds known creds.
+# Specs that exercise the gate explicitly use Rack::Test's
+# `basic_authorize` (or delete the env vars + assert 401).
+ENV['ADMIN_USERNAME']    ||= 'spec-admin'
+ENV['ADMIN_PASSWORD']    ||= 'spec-password'
+
 # Phase 5 / D-PG-2. The test suite defaults to SQLite :memory: so
 # `bundle exec rspec` works on any laptop without a running PG
 # server. Opt into the PG path by setting TEST_DATABASE_URL — used
@@ -96,6 +105,16 @@ RSpec.configure do |c|
       Database.connection.execute(
         "SELECT setval('users_id_seq', GREATEST(1, (SELECT MAX(id) FROM users)))"
       )
+    end
+
+    # STUFF #49 — auto-set the Basic Auth Authorization header for
+    # specs that include Rack::Test::Methods, so the existing
+    # admin-route specs (10+ files) keep working without per-spec
+    # `basic_authorize` boilerplate. Specs that exercise the gate
+    # itself override this header (or use wrong credentials) inside
+    # their own `before` block.
+    if respond_to?(:basic_authorize)
+      basic_authorize 'spec-admin', 'spec-password'
     end
   end
 

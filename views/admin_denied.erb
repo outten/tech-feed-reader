@@ -1,0 +1,52 @@
+<%# STUFF #49 — rendered when the inbound request lacks valid
+    admin Basic Auth credentials, OR when the user has explicitly
+    logged out via POST /admin/logout (`session[:admin_logged_out]`
+    is then truthy, set by the before-filter into @admin_logged_out).
+    The logged-out variant gets a "Resume admin" link that hits
+    GET /admin/login (the one path exempted from the gate); the
+    plain-401 variant explains the Basic Auth caveat. %>
+
+<div class="page-header">
+  <div>
+    <% if @admin_logged_out %>
+      <h2>👋 Logged out of admin</h2>
+      <p class="subtitle">
+        You explicitly logged out, so this session is ignoring the
+        browser's cached admin credentials. The credentials prompt
+        won't reappear until you click <strong>Resume admin</strong>
+        below — entering credentials anywhere else right now would
+        just loop back here.
+      </p>
+      <p>
+        <%# data-turbo="false" forces a full browser navigation. Without
+            it, Turbo intercepts the click + does an XHR-style fetch, and
+            the 401 we get from /admin (after /admin/login clears the
+            flag and redirects) doesn't trigger the browser's Basic Auth
+            prompt — XHR/fetch 401s don't pop the native prompt. Result
+            without this attribute: user stays on this page, looking
+            like nothing happened, even though the session flag did
+            actually clear. %>
+        <a class="btn-primary" href="/admin/login" data-turbo="false">Resume admin &rarr;</a>
+        &nbsp;
+        <a href="/">Back to home</a>
+      </p>
+      <p class="subtitle">
+        To FULLY clear cached credentials (e.g. before handing the
+        browser to someone else), close every tab of this site or use
+        a private window. HTTP Basic Auth has no protocol-level logout
+        — this is the best browsers offer.
+      </p>
+    <% else %>
+      <h2>🔒 Admin only</h2>
+      <p class="subtitle">
+        The admin area requires the operator password. If your
+        browser didn't show a credentials prompt, your client probably
+        doesn't speak HTTP Basic Auth — try again with
+        <code>curl -u user:pass</code> or a different browser.
+      </p>
+      <p>
+        &larr; <a href="/">Back to home</a>
+      </p>
+    <% end %>
+  </div>
+</div>

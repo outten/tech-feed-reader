@@ -1,4 +1,6 @@
 require 'webauthn'
+require 'base64'
+require 'rack/utils'
 require_relative 'users_store'
 require_relative 'webauthn_credentials_store'
 require_relative 'recovery_codes_store'
@@ -49,6 +51,72 @@ module Auth
     PUBLIC_PREFIXES.any? { |p| path.start_with?(p) }
   end
 
+  # STUFF #49 — admin HTTP Basic Auth gate. /admin/* + /api/admin/*
+  # are additionally protected by Basic Auth credentials (separate
+  # from the WebAuthn sign-in wall — so even a signed-in user must
+  # know the admin password). Credentials come from two env vars:
+  #
+  #   ADMIN_USERNAME=admin
+  #   ADMIN_PASSWORD=<long random string>
+  #
+  # Fail-closed: an unset / empty pair means /admin/* returns 401
+  # for everyone (including the operator). Forces an explicit
+  # opt-in to admin access rather than a missing-env-var bug
+  # silently opening the door.
+  #
+  # Compared to the obvious alternative ("just allowlist a username
+  # from the passkey sign-in"), Basic Auth here:
+  #   - Adds a second factor (the admin password) beyond passkey
+  #     possession.
+  #   - Doesn't require any signed-in user — a stolen passkey alone
+  #     can't reach admin pages without the password too.
+  #   - Lets us protect /admin from prod even before passkey sign-in
+  #     is fully rolled out to a target user.
+  ADMIN_PATH_PREFIXES = ['/admin/', '/api/admin/'].freeze
+  ADMIN_PATHS         = Set.new(%w[/admin]).freeze
+
+  def admin_credentials
+    user = ENV['ADMIN_USERNAME'].to_s
+    pass = ENV['ADMIN_PASSWORD'].to_s
+    return nil if user.empty? || pass.empty?
+    [user, pass]
+  end
+
+  # Parse the inbound Authorization header. Returns [user, pass]
+  # on success, nil on absent / malformed input. Tolerant of
+  # encoding glitches (rescue StandardError) — anything we can't
+  # parse falls through to "no credentials" which fails the
+  # constant-time compare below.
+  def basic_auth_from(env)
+    header = env['HTTP_AUTHORIZATION'].to_s
+    return nil unless header.start_with?('Basic ')
+    decoded = Base64.decode64(header.sub('Basic ', ''))
+    user, pass = decoded.split(':', 2)
+    [user.to_s, pass.to_s]
+  rescue StandardError
+    nil
+  end
+
+  # True iff the request's Authorization header matches the
+  # configured admin credentials. Constant-time compare via
+  # Rack::Utils.secure_compare to thwart timing attacks on the
+  # username + password.
+  def authorized_admin?(env)
+    expected = admin_credentials
+    return false unless expected
+    provided = basic_auth_from(env)
+    return false unless provided
+    Rack::Utils.secure_compare(expected[0], provided[0]) &&
+      Rack::Utils.secure_compare(expected[1], provided[1])
+  end
+
+  # Match /admin, /admin/*, /api/admin/* — kept here (not inlined
+  # in main.rb) so the test surface can exercise it directly.
+  def admin_path?(path)
+    return true if ADMIN_PATHS.include?(path)
+    ADMIN_PATH_PREFIXES.any? { |p| path.start_with?(p) }
+  end
+
   def configure!
     rp_name = ENV.fetch('WEBAUTHN_RP_NAME', 'Tech Feed Reader')
     rp_id   = ENV.fetch('WEBAUTHN_RP_ID',   'localhost')
@@ -95,6 +163,16 @@ module Auth
       return if signed_in?
       session[:return_to] = request.fullpath if request.get?
       redirect to('/sign-in')
+    end
+
+    # STUFF #49 — true when the inbound request carries valid
+    # admin Basic Auth credentials. Independent of the signed-in
+    # user (admin is a separate password, not just an attribute
+    # on the WebAuthn account). Used by the before-filter +
+    # available to views if they want to render admin-only nav
+    # entries to passing-by users.
+    def admin?
+      Auth.authorized_admin?(request.env)
     end
 
     # Sign-in / sign-out helpers. Always rotate the session on

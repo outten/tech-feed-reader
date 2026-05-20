@@ -200,9 +200,10 @@ class TechFeedReader < Sinatra::Base
   before do
     if settings.enforce_auth_wall
       next if Auth.public_path?(request.path_info)
-      next if signed_in?
-      session[:return_to] = request.fullpath if request.get?
-      redirect to('/sign-in')
+      unless signed_in?
+        session[:return_to] = request.fullpath if request.get?
+        redirect to('/sign-in')
+      end
     else
       # Test/dev override: when the wall is off, every request implicitly
       # adopts user 1 (the seeded test user / single-user-mode owner).
@@ -210,15 +211,62 @@ class TechFeedReader < Sinatra::Base
       # existing specs continue to pass without a sign-in dance.
       # Skip auth endpoints themselves — sign-up / sign-in / /api/auth/*
       # need to see the unauthenticated visitor for their own ceremony.
-      next if signed_in?
-      # Skip auth endpoints (need to see the unauth visitor for the
-      # ceremony) + the diagnostic endpoints (/health deliberately
-      # tests an unreachable DB; running UsersStore.find here would
-      # explode before the route returns its expected 503).
-      next if request.path_info.start_with?('/sign-up', '/sign-in', '/sign-out', '/api/auth/')
-      next if request.path_info == '/health' || request.path_info == '/metrics'
-      user = UsersStore.find(1)
-      sign_in!(user) if user
+      unless signed_in?
+        # Skip auth endpoints (need to see the unauth visitor for the
+        # ceremony) + the diagnostic endpoints (/health deliberately
+        # tests an unreachable DB; running UsersStore.find here would
+        # explode before the route returns its expected 503).
+        next if request.path_info.start_with?('/sign-up', '/sign-in', '/sign-out', '/api/auth/')
+        next if request.path_info == '/health' || request.path_info == '/metrics'
+        user = UsersStore.find(1)
+        sign_in!(user) if user
+      end
+    end
+
+    # STUFF #49 — admin Basic Auth gate. /admin/* + /api/admin/*
+    # need additional Basic Auth credentials beyond the existing
+    # WebAuthn sign-in. ADMIN_USERNAME + ADMIN_PASSWORD live in
+    # /opt/app/.env; missing/empty pair means everyone is denied
+    # (fail-closed). 401 + WWW-Authenticate triggers the browser's
+    # built-in credentials prompt.
+    #
+    # Logout flow (`POST /admin/logout` below) sets
+    # `session[:admin_logged_out] = true` and redirects to `/`. While
+    # that flag is set, this gate treats incoming admin requests as
+    # un-authed even when the browser still has cached Basic Auth
+    # credentials — re-entering the password (which clears the flag
+    # in POST /admin/login) is required to get back in. The flag
+    # itself lives in the signed-cookie session, so closing the
+    # browser also clears it (no stuck-logged-out state).
+    # /admin/login is the explicit "resume admin" escape hatch — it
+    # MUST bypass the gate so a logged-out user can clear the flag.
+    # The route handler itself doesn't depend on admin auth (it just
+    # mutates a session flag); if the user lacks credentials, they'll
+    # hit a fresh 401 on the next /admin request.
+    if Auth.admin_path?(request.path_info) && request.path_info != '/admin/login'
+      logged_out  = session[:admin_logged_out]
+      basic_ok    = Auth.authorized_admin?(request.env)
+      if logged_out
+        # CRITICAL: don't send WWW-Authenticate when the user is
+        # logged out via the session flag. The browser would pop a
+        # credentials prompt, but the gate will reject ANY creds
+        # while the flag is set — trapping the user in an infinite
+        # 401-loop with no way out except deep browser-clearing.
+        # Render the admin_denied page (logged-out variant) instead,
+        # which has the "Resume admin" link to clear the flag.
+        AppLogger.info('admin_logout_active',
+                       user_id: signed_in? ? current_user_id : nil,
+                       path:    request.path_info)
+        @admin_logged_out = true
+        halt 401, erb(:admin_denied)
+      elsif !basic_ok
+        # No flag set; standard prompt-for-credentials path.
+        AppLogger.info('admin_basic_auth_denied',
+                       user_id: signed_in? ? current_user_id : nil,
+                       path:    request.path_info)
+        response['WWW-Authenticate'] = 'Basic realm="Admin"'
+        halt 401, erb(:admin_denied)
+      end
     end
   end
 
@@ -2701,6 +2749,30 @@ class TechFeedReader < Sinatra::Base
     @sidekiq = sidekiq_stats
 
     erb :admin
+  end
+
+  # STUFF #49 follow-up — admin logout / re-login. Basic Auth has no
+  # native logout; the browser caches credentials per-origin until the
+  # user closes the tab or clears them manually. We work around that
+  # with a session flag: `session[:admin_logged_out] = true` makes the
+  # before-filter ignore otherwise-valid credentials. `/admin/login`
+  # clears the flag (and is exempt from the gate so a logged-out user
+  # can actually reach it).
+  post '/admin/logout' do
+    session[:admin_logged_out] = true
+    AppLogger.info('admin_logged_out',
+                   user_id: signed_in? ? current_user_id : nil)
+    redirect to('/admin')
+  end
+
+  get '/admin/login' do
+    # session.delete (vs `= false`) — explicit "no key" leaves no
+    # ambiguity between "flag intentionally false" and "flag never set."
+    session.delete(:admin_logged_out)
+    # Cached Basic Auth creds (if any) authenticate the next /admin
+    # hit transparently. If the browser has no cached creds, the gate
+    # will re-prompt via WWW-Authenticate.
+    redirect to('/admin')
   end
 
   get '/admin/health' do

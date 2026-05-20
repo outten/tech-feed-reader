@@ -606,3 +606,27 @@ Make a proposal to add simple analytics to the admin area:
 Admin Simple Auth:
 
 For now, let's create the admin page by simple auth. I put credentials in the .env file. Be sure to include in our releases to production.
+
+## [x] 49. Admin Basic Auth gate
+
+Surfaced from "did we do admin simple auth?" — answer was no: `/admin/*` was gated only by the WebAuthn sign-in wall, so any signed-in user could see other users' usernames + last-seen-at + LLM costs.
+
+**Shipped on PR #141.** HTTP Basic Auth over `/admin/*` + `/api/admin/*`:
+
+- `ADMIN_USERNAME` + `ADMIN_PASSWORD` env vars in `/opt/app/.env`.
+- `Auth.authorized_admin?(env)` parses the `Authorization: Basic <base64>` header + constant-time compares against the configured creds via `Rack::Utils.secure_compare`.
+- Sinatra `before` filter on `Auth.admin_path?(path)` halts 401 + `WWW-Authenticate: Basic realm="Admin"` when credentials are absent / wrong.
+- **Fail-closed**: an unset / empty pair means /admin is 401 for everyone (including the operator). Forces an explicit opt-in rather than letting a missing-env-var bug silently open the admin pages.
+- Stacks on top of the existing WebAuthn sign-in wall — anonymous visitors still bounce to /sign-in first; signed-in users hit the Basic Auth challenge as a second gate.
+- 30 examples in `spec/admin_gate_spec.rb` covering parser edge cases, path-matcher set, gate pass/fail behaviour, and the logout/re-login flow.
+
+**Turbo prefetch gotcha** — the global nav has an `<a href="/admin">` link visible on every page. Turbo 8 hover-prefetches links by default, so mousing over the "Admin" nav link silently issued a GET /admin which 401'd + set `WWW-Authenticate`, causing the browser to pop the Basic Auth prompt on unrelated pages like /articles. Fix: the layout tags that single anchor with `data-turbo-prefetch="false"`. All other admin links live inside admin views (only rendered post-auth), so they're not affected.
+
+**Logout button (`POST /admin/logout`)** — Basic Auth has no protocol-level logout; the browser caches credentials per-origin until the user closes the tab. Workaround via session flag:
+
+- "Log out of admin" button on `/admin` posts to `/admin/logout`, which sets `session[:admin_logged_out] = true` and redirects back to `/admin`.
+- The gate, when it sees the flag set, 401s even when valid cached credentials are present. The `admin_denied.erb` page detects this branch and renders a "Logged out" variant with a "Resume admin" link.
+- `GET /admin/login` is the only path exempt from the gate — clicking "Resume admin" hits it, the route clears the flag, redirects to `/admin`. Cached browser creds then re-authenticate transparently.
+- For true credential clearing (e.g. before handing the laptop to someone else), the page explicitly tells users to close all tabs of this origin or use a private window. Honest about the limit.
+
+**Operator follow-ups**: drop `ADMIN_USERNAME=...` + `ADMIN_PASSWORD=...` into `/opt/app/.env` on the Droplet, then `make deploy`. Until those are set in prod, /admin is unreachable.
