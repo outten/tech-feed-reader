@@ -1096,6 +1096,30 @@ html.dark .refresh-btn:hover { background: #48484a; }
 .data-table .muted { color: #8e8e93; font-size: 0.88rem; }
 .analysis-section > .data-table { margin-left: -0.5rem; margin-right: -0.5rem; width: calc(100% + 1rem); }
 
+/* STUFF #48.1 — /admin/analytics layout. Summary tiles up top
+   then per-section card grids; mirrors the dashboard's tile +
+   chart-wrap idiom so the visual rhythm matches.            */
+.admin-analytics-summary { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.admin-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+.admin-analytics-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+}
+html.dark .admin-analytics-card { background: rgba(28, 28, 30, 0.85); border-color: #2c2c2e; }
+.admin-analytics-card-label { font-size: 0.78rem; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.04em; }
+html.dark .admin-analytics-card-label { color: #aeaeb2; }
+.admin-analytics-card-value { font-size: 1.85rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.admin-analytics-chart-wrap { height: 220px; }
+
 /* TradingView chart (analysis page) */
 .chart-toolbar {
   display: flex;
