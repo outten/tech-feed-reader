@@ -1,8 +1,15 @@
-<div class="page-header">
+<div class="page-header admin-header">
   <div>
     <h2>Admin</h2>
     <p class="subtitle">System overview, counts, database, integrations.</p>
   </div>
+  <%# STUFF #49 follow-up — Basic Auth has no protocol-level logout.
+      This button sets a session flag that makes the gate ignore the
+      browser's cached credentials; the explanatory page that follows
+      offers a "Resume admin" link that clears the flag. %>
+  <form method="post" action="/admin/logout" class="admin-logout-form">
+    <button type="submit" class="btn-secondary" title="Stop honouring this session's admin credentials">Log out of admin</button>
+  </form>
 </div>
 
 <% if @degraded %>

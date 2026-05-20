@@ -89,7 +89,13 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
         </a>
-        <a href="/admin" class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
+        <%# STUFF #49 — disable Turbo's hover-prefetch on the Admin link.
+            Turbo 8 prefetches links on hover by default; without the
+            opt-out, hovering over "Admin" triggers a silent GET /admin
+            which 401s + sets WWW-Authenticate, causing the browser to
+            pop a Basic Auth prompt even on non-admin pages. %>
+        <a href="/admin" data-turbo-prefetch="false"
+           class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
       </nav>
       <a href="/bus" class="header-icon-btn <%= 'active' if request.path_info == '/bus' %>"
          title="Bus mode — recent podcast episodes short enough for the commute"
