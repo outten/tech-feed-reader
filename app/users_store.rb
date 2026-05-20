@@ -62,9 +62,9 @@ module UsersStore
   end
 
   # Creates a row, returning it. Raises InvalidUsername on a bad
-  # username; SQLite3::ConstraintException on a duplicate (callers
-  # render a "taken" message). display_name defaults to the username
-  # itself; the user can leave it blank at signup.
+  # username; PG::UniqueViolation on a duplicate (callers render a
+  # "taken" message). display_name defaults to the username itself;
+  # the user can leave it blank at signup.
   def create(username:, display_name: nil)
     norm = normalize_username(username)
     raise InvalidUsername, USERNAME_RULE unless USERNAME_PATTERN.match?(norm)

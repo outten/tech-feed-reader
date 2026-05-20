@@ -68,7 +68,7 @@ RSpec.describe Database::PgAdapter do
   end
 
   describe '.execute — INSERT auto-RETURNING' do
-    it 'auto-appends RETURNING id to bare INSERTs (preserves SQLite3#last_insert_row_id surface)' do
+    it 'auto-appends RETURNING id to bare INSERTs' do
       result = FakePgResult.new([{ 'id' => 42 }], 1)
       conn   = FakePgConn.new('INSERT INTO feeds' => result)
       adapter = described_class.new(conn)
@@ -158,13 +158,8 @@ RSpec.describe Database::PgAdapter do
     end
   end
 
-  # D-PG-5 production hardening. These only run on the PG leg because
-  # they need a real PG::Connection to disconnect/reconnect against.
-  describe 'thread safety + reconnect (PG leg only)' do
-    before(:each) do
-      skip 'Needs a real PG connection' unless Database.adapter == :postgres
-    end
-
+  # Production hardening. Exercise a real PG::Connection.
+  describe 'thread safety + reconnect' do
     it 'serialises concurrent execute calls across 10 threads without protocol desync' do
       # Pre-D-PG-5, 10 threads sharing one PG::Connection would
       # interleave exec_params on the socket and tip libpq into
@@ -223,33 +218,4 @@ RSpec.describe Database::PgAdapter do
     end
   end
 
-  describe 'Database.connection switch' do
-    it 'returns SQLite3::Database when DATABASE_URL is unset' do
-      skip 'TEST_DATABASE_URL active — the suite is running against PG' if ENV['TEST_DATABASE_URL']
-      expect(ENV['DATABASE_URL'].to_s).to eq('')
-      expect(Database.connection).to be_a(SQLite3::Database)
-      expect(Database.adapter).to eq(:sqlite)
-    end
-
-    it 'reports :postgres when DATABASE_URL is set' do
-      prior = ENV['DATABASE_URL']
-      Database.reset!
-      ENV['DATABASE_URL'] = 'postgres://fake/db'
-      expect(Database.adapter).to eq(:postgres)
-    ensure
-      # Restore the prior DATABASE_URL (set by spec_helper from
-      # TEST_DATABASE_URL on the PG leg) so the next spec's
-      # before(:each) reconnects to the real test PG, not the
-      # fake URL we just set. Required since the spec_helper's
-      # TRUNCATE optimization keeps the adapter alive across
-      # examples — it can't fall back to SQLite if DATABASE_URL
-      # is silently cleared.
-      if prior
-        ENV['DATABASE_URL'] = prior
-      else
-        ENV.delete('DATABASE_URL')
-      end
-      Database.reset!
-    end
-  end
 end

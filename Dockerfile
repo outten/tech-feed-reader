@@ -22,7 +22,7 @@ FROM ruby:${RUBY_VERSION}-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential \
-      libsqlite3-dev \
+      libpq-dev \
       libyaml-dev \
       pkg-config \
       git \
@@ -46,7 +46,7 @@ FROM ruby:${RUBY_VERSION}-slim
 ARG APP_VERSION=unknown
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libsqlite3-0 \
+      libpq5 \
       libyaml-0-2 \
       tzdata \
       curl \
@@ -63,10 +63,9 @@ COPY . .
 # env (set below) to find the vendored gems — no need to copy the
 # builder's .bundle/config.
 
-# data/ holds the SQLite DB; tmp/ holds runtime scratch (logs, pids).
-# Mount data/ as a volume in compose so it persists across container
-# rebuilds. Both must be writable by the non-root user.
-RUN mkdir -p /app/data /app/tmp && chown -R app:app /app
+# tmp/ holds runtime scratch (logs, pids). Must be writable by the
+# non-root user.
+RUN mkdir -p /app/tmp && chown -R app:app /app
 
 USER app
 

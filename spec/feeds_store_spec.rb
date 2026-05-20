@@ -32,7 +32,7 @@ RSpec.describe FeedsStore do
       FeedsStore.add(url: 'https://example.com/rss')
       expect {
         FeedsStore.add(url: 'https://example.com/rss')
-      }.to raise_error(SQLite3::ConstraintException, /UNIQUE/)
+      }.to raise_error(PG::UniqueViolation)
     end
   end
 

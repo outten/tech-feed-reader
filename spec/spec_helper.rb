@@ -21,18 +21,25 @@ ENV['WEBAUTHN_ORIGIN']   ||= 'http://localhost:4567'
 ENV['ADMIN_USERNAME']    ||= 'spec-admin'
 ENV['ADMIN_PASSWORD']    ||= 'spec-password'
 
-# Phase 5 / D-PG-2. The test suite defaults to SQLite :memory: so
-# `bundle exec rspec` works on any laptop without a running PG
-# server. Opt into the PG path by setting TEST_DATABASE_URL — used
-# by the CI matrix's postgres job. Any DATABASE_URL inherited from
-# the developer's shell/.env is explicitly cleared so a stray
-# postgres://... pointing at a personal DB doesn't quietly hijack
-# the suite.
-if (test_url = ENV['TEST_DATABASE_URL'])
-  ENV['DATABASE_URL'] = test_url
-else
-  ENV.delete('DATABASE_URL')
+# PG is the only supported backend (STUFF #47, SQLite removed). The
+# suite requires TEST_DATABASE_URL pointed at a disposable database;
+# the docker-compose `db` service is the local default. Any
+# DATABASE_URL inherited from the developer's shell/.env is replaced
+# by TEST_DATABASE_URL so a stray production-pointing var can't
+# hijack the suite.
+test_url = ENV['TEST_DATABASE_URL']
+if test_url.nil? || test_url.empty?
+  abort <<~MSG
+    spec_helper: TEST_DATABASE_URL is required.
+
+    Local dev: `docker compose up -d db` then export
+      TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tfr_test
+    (or your own throwaway database).
+
+    CI sets this for you.
+  MSG
 end
+ENV['DATABASE_URL'] = test_url
 
 require_relative '../app/database'
 require_relative '../app/health_registry'
@@ -53,59 +60,42 @@ RSpec.configure do |c|
   c.color = true
   c.formatter = :documentation
 
-  # Per-run schema bootstrap. Migrate once at suite startup so the
-  # per-spec hook can stay cheap (TRUNCATE on PG, in-memory rebuild
-  # on SQLite). The before(:each) hook still checks for schema
-  # existence so re-runs after `Database.reset!` (e.g. the adapter-
-  # switch test in pg_adapter_spec) automatically remigrate.
+  # Per-run schema bootstrap: drop + recreate the public schema so
+  # the suite never inherits cruft from a prior failed run, then
+  # apply migrations once. The before(:each) hook reuses the schema
+  # via TRUNCATE; if a spec calls Database.reset! (e.g. the adapter-
+  # boot test), the hook re-migrates automatically.
   c.before(:suite) do
-    if Database.adapter == :postgres
-      # Hermetic across runs: drop + recreate so we never inherit
-      # cruft from a prior failed run.
-      Database.connection.execute_batch('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
-      Database.migrate!
-    end
+    Database.connection.execute_batch('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
+    Database.migrate!
   end
 
   c.before(:each) do
-    if Database.adapter == :postgres
-      # Fast reset path: TRUNCATE every public table except
-      # schema_migrations, RESTART IDENTITY to reset BIGSERIAL
-      # sequences, CASCADE through FKs. ~100x cheaper than rerunning
-      # the full 372-line 001_init.sql migration on every example
-      # (was ~45s of the prior 57s PG suite runtime).
-      tables = Database.connection
-        .execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations'")
-        .map { |r| r['tablename'] }
-      if tables.empty?
-        # Schema got nuked (e.g. by the adapter-switch test that
-        # resets the connection); reapply.
-        Database.migrate!
-      else
-        quoted = tables.map { |t| %("#{t}") }.join(', ')
-        Database.connection.execute("TRUNCATE TABLE #{quoted} RESTART IDENTITY CASCADE")
-      end
-    else
-      Database.reset!
+    # Fast reset path: TRUNCATE every public table except
+    # schema_migrations, RESTART IDENTITY to reset BIGSERIAL
+    # sequences, CASCADE through FKs.
+    tables = Database.connection
+      .execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations'")
+      .map { |r| r['tablename'] }
+    if tables.empty?
+      # Schema got nuked (e.g. by a spec that resets the connection); reapply.
       Database.migrate!
+    else
+      quoted = tables.map { |t| %("#{t}") }.join(', ')
+      Database.connection.execute("TRUNCATE TABLE #{quoted} RESTART IDENTITY CASCADE")
     end
     HealthRegistry.reset!
-    # Migration 022 seeds (1, 't-money') on SQLite via INSERT OR IGNORE.
-    # The PG consolidated migration doesn't seed it (the migration
-    # itself shouldn't know about test fixtures); seed here for both
-    # backends using ANSI ON CONFLICT (works under SQLite 3.24+ too).
+    # Seed the default test user. Routes auto-sign-in (1, 't-money')
+    # when the auth wall is off (the test-env default).
     Database.connection.execute(
       "INSERT INTO users(id, username, display_name) VALUES (1, 't-money', 't-money') ON CONFLICT DO NOTHING"
     )
-    if Database.adapter == :postgres
-      # TRUNCATE … RESTART IDENTITY already reset users_id_seq to 1,
-      # but the t-money seed above inserted id=1 with explicit value
-      # without consuming the sequence — bump past it so the next
-      # UsersStore.create doesn't collide.
-      Database.connection.execute(
-        "SELECT setval('users_id_seq', GREATEST(1, (SELECT MAX(id) FROM users)))"
-      )
-    end
+    # TRUNCATE … RESTART IDENTITY reset users_id_seq to 1, but the
+    # explicit id=1 insert above didn't consume the sequence — bump
+    # past it so the next UsersStore.create doesn't collide.
+    Database.connection.execute(
+      "SELECT setval('users_id_seq', GREATEST(1, (SELECT MAX(id) FROM users)))"
+    )
 
     # STUFF #49 — auto-set the Basic Auth Authorization header for
     # specs that include Rack::Test::Methods, so the existing
@@ -119,12 +109,6 @@ RSpec.configure do |c|
   end
 
   c.after(:each) do
-    # SQLite uses an in-memory DB; reset! drops the handle and the
-    # next before(:each)'s migrate! rebuilds from scratch. Cheap.
-    # PG keeps the connection — the next before(:each)'s TRUNCATE
-    # handles state, no reset! needed (and the reset+reconnect was
-    # most of the prior per-spec cost).
-    Database.reset! if Database.adapter == :sqlite
     HealthRegistry.reset!
   end
 end

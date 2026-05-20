@@ -50,13 +50,6 @@ RSpec.describe '/search' do
     expect(last_response.body).to include('No results')
   end
 
-  it 'renders an error notice for malformed FTS5 queries' do
-    skip 'FTS5-specific syntax error path; PG`s plainto_tsquery normalises bad input' if Database.adapter == :postgres
-    get '/search?q=%22'   # bare quote → unterminated phrase
-    expect(last_response.status).to eq(200)
-    expect(last_response.body).to include('Query syntax error')
-  end
-
   it 'escapes the query in the page (no XSS via reflected ?q)' do
     get '/search?q=%3Cscript%3Ealert%281%29%3C%2Fscript%3E'
     expect(last_response.body).not_to include('<script>alert(1)</script>')

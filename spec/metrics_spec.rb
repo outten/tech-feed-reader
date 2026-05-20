@@ -101,7 +101,7 @@ RSpec.describe 'GET /metrics' do
     expect(last_response.headers['Content-Type']).to include('version=0.0.4')
   end
 
-  it 'exposes the SQLite-derived gauges' do
+  it 'exposes the DB-derived gauges' do
     FeedsStore.add(url: 'https://example.com/feed.rss', title: 'Example')
     get '/metrics'
     expect(last_response.body).to include('tfr_feeds_subscribed 1')

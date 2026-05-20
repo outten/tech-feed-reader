@@ -1,8 +1,7 @@
 require_relative 'database'
-require 'sqlite3'
 
 # Cache of "articles mentioning <player or team>", populated via
-# FTS5 phrase search on the entity's full name.
+# Postgres phraseto_tsquery on the entity's full name.
 #
 # Why caching: the player / team detail page calls refresh_for on
 # every visit, but skips the FTS5 + upsert work if the entity's
@@ -82,29 +81,17 @@ module SportsEntityArticlesStore
   end
 
   # Full-text phrase search on the entity's name. Returns article ids,
-  # most-relevant first. SQLite uses FTS5 with a quoted phrase MATCH;
-  # Postgres uses phraseto_tsquery which builds an exact-order phrase
-  # tsquery from the raw name. Returns [] on syntax errors (defensive
-  # — unlikely with a quoted phrase, but the cost is zero).
+  # most-relevant first. Uses phraseto_tsquery to build an exact-order
+  # phrase tsquery from the raw name. Returns [] on syntax errors
+  # (defensive — unlikely with a quoted phrase, but the cost is zero).
   def fts_search(name)
-    if Database.adapter == :postgres
-      db.execute(<<~SQL, [name, name]).map { |r| r['id'] }
-        SELECT a.id, ts_rank(a.tsv, phraseto_tsquery('english', ?)) AS rank
-        FROM articles a
-        WHERE a.tsv @@ phraseto_tsquery('english', ?)
-        ORDER BY rank DESC
-      SQL
-    else
-      phrase = %("#{name.gsub('"', '')}")
-      db.execute(<<~SQL, [phrase]).map { |r| r['id'] }
-        SELECT a.id
-        FROM articles_fts f
-        JOIN articles a ON a.id = f.rowid
-        WHERE articles_fts MATCH ?
-        ORDER BY rank
-      SQL
-    end
-  rescue SQLite3::SQLException, PG::Error
+    db.execute(<<~SQL, [name, name]).map { |r| r['id'] }
+      SELECT a.id, ts_rank(a.tsv, phraseto_tsquery('english', ?)) AS rank
+      FROM articles a
+      WHERE a.tsv @@ phraseto_tsquery('english', ?)
+      ORDER BY rank DESC
+    SQL
+  rescue PG::Error
     []
   end
 

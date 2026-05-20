@@ -36,16 +36,10 @@ gem 'loofah'
 # add export endpoints. Cheap to ship now so it's there when Tier 3 lands.
 gem 'csv'
 
-# SQLite — single source of truth for feeds, articles, read state, tags,
-# and summaries. FTS5 (built into modern sqlite) backs /search. WAL mode
-# is enabled in app/database.rb so the scheduler can write while the web
-# process serves reads without blocking.
-gem 'sqlite3'
-
-# PostgreSQL — Phase 5 / D-PG-1. SQLite stays the default for dev/test;
-# Postgres is opt-in via DATABASE_URL. Database adapter in
-# app/database.rb routes calls to either backend. Production cutover
-# lives in DEPLOYMENT.md Phase 5 → D-PG-5.
+# PostgreSQL — single source of truth for feeds, articles, read state,
+# tags, summaries, pageviews, and sports data. tsvector + ts_rank back
+# /search. Connection string in DATABASE_URL; adapter in
+# app/database/pg_adapter.rb.
 gem 'pg', '~> 1.5'
 
 # Anthropic SDK — powers the Tier 2-K LLM summary on /article/:uid.

@@ -49,7 +49,7 @@ module BackgroundPool
 
   # Wipe + replace with `count` fresh random picks from Picsum's
   # /v2/list. Atomic — the wipe and the inserts run inside a single
-  # SQLite transaction so a partial fetch failure leaves the existing
+  # DB transaction so a partial fetch failure leaves the existing
   # pool intact.
   #
   # Returns an integer (the number of rows inserted).

@@ -65,7 +65,7 @@ RSpec.describe 'GET /health' do
     end
   end
 
-  describe 'when SQLite is unreachable' do
+  describe 'when the database is unreachable' do
     before do
       allow(Sidekiq).to receive(:redis).and_yield(double('redis').tap { |r| allow(r).to receive(:ping).and_return('PONG') })
       allow(Sidekiq::ProcessSet).to receive(:new).and_return(double('processes', size: 1))
