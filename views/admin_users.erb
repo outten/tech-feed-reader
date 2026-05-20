@@ -1,0 +1,54 @@
+<%# STUFF #48.1 — admin user list. Drilled into from
+    /admin/analytics. Single sorted table: newest signups first.
+    Each row shows the basics + passkey count + recovery codes
+    left (which together signal "can this user actually still
+    sign in?"). %>
+
+<div class="page-header">
+  <div>
+    <h2>👥 Users</h2>
+    <p class="subtitle">
+      <strong><%= @decorated.length %></strong> total.
+      Newest first.
+      &middot; <a href="/admin/analytics">&larr; Analytics</a>
+      &middot; <a href="/admin">Admin</a>
+    </p>
+  </div>
+</div>
+
+<% if @decorated.empty? %>
+  <div class="empty-state">
+    <p>No users yet.</p>
+  </div>
+<% else %>
+  <table class="data-table admin-users-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Display name</th>
+        <th class="num">Passkeys</th>
+        <th class="num">Recovery codes</th>
+        <th>Created</th>
+        <th>Last seen</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @decorated.each do |u| %>
+        <tr>
+          <td><code><%= h(u['username']) %></code></td>
+          <td><%= h(u['display_name']) %></td>
+          <td class="num"><%= u['passkey_count'] %></td>
+          <td class="num"><%= u['recovery_unused'] %></td>
+          <td title="<%= h(u['created_at']) %>"><%= relative_time(u['created_at']) %></td>
+          <td title="<%= h(u['last_seen_at']) %>">
+            <% if u['last_seen_at'] %>
+              <%= relative_time(u['last_seen_at']) %>
+            <% else %>
+              <span class="muted">never</span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

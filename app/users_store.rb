@@ -37,6 +37,30 @@ module UsersStore
     db.execute('SELECT COUNT(*) AS c FROM users').first['c']
   end
 
+  # STUFF #48.1 — admin /admin/users surface. Latest signups first;
+  # caller decorates each row with passkey count + recovery-code count
+  # via the dedicated stores (cheap N+1 at our scale — single-digit
+  # users — but a per-user JOIN would be the obvious next step once
+  # we have hundreds).
+  def all
+    db.execute('SELECT * FROM users ORDER BY created_at DESC')
+  end
+
+  # STUFF #48.1 — new-users-over-time admin chart. Returns
+  # Array<{day, count}> in ascending date order; days with zero
+  # signups aren't padded (the view zero-fills the window).
+  def new_users_per_day(days: 14)
+    sql = <<~SQL
+      SELECT #{Database.date_sql('created_at')} AS day, COUNT(*) AS count
+      FROM users
+      WHERE created_at >= ?
+      GROUP BY day
+      ORDER BY day ASC
+    SQL
+    cutoff = (Time.now.utc - (days.to_i * 86_400)).iso8601
+    db.execute(sql, [cutoff]).map { |r| { 'day' => r['day'].to_s, 'count' => r['count'].to_i } }
+  end
+
   # Creates a row, returning it. Raises InvalidUsername on a bad
   # username; SQLite3::ConstraintException on a duplicate (callers
   # render a "taken" message). display_name defaults to the username

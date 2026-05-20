@@ -65,6 +65,7 @@ require_relative 'version'
 require_relative 'tracing'
 require_relative 'metrics'
 require_relative 'request_log_middleware'
+require_relative 'pageviews_store'
 require_relative 'pruner'
 require_relative 'metrics_middleware'
 require_relative 'rate_limiter'
@@ -2782,6 +2783,58 @@ class TechFeedReader < Sinatra::Base
       .execute('SELECT feed_id, COUNT(*) AS c FROM articles GROUP BY feed_id')
       .each_with_object({}) { |row, h| h[row['feed_id']] = row['c'] }
     erb :admin_cache
+  end
+
+  # STUFF #48.1 — admin usage analytics. New-users-per-day + total
+  # pageviews + per-section breakdown over the last 14 days.
+  # Opportunistically prunes pageviews > 90 days on every visit — no
+  # recurring-job runner needed; admin browsing is the natural
+  # trigger.
+  get '/admin/analytics' do
+    @page_title = 'Analytics'
+    @days       = (params['days'].to_s.match?(/\A\d+\z/) ? params['days'].to_i : 14).clamp(1, 90)
+
+    # Retention sweep (90d). Cheap; logs the count for visibility.
+    pruned = PageviewsStore.prune_older_than!(days: 90)
+    AppLogger.info('pageviews_prune', deleted: pruned) if pruned.positive?
+
+    @total_users        = UsersStore.count
+    @new_users_per_day  = UsersStore.new_users_per_day(days: @days)
+    @new_users_total    = @new_users_per_day.sum { |r| r['count'] }
+
+    @pageviews_total   = PageviewsStore.total(days: @days)
+    @pageviews_per_day = PageviewsStore.daily_totals(days: @days)
+    @section_totals    = PageviewsStore.section_totals(days: @days)
+
+    # Zero-fill the day windows so the chart renders a continuous
+    # axis even when some days had no traffic. Both windows share
+    # the same date range so the bars line up under the sparkline.
+    @day_window = (0...@days).map { |i| (Time.now.utc.to_date - (@days - 1 - i)).iso8601 }
+    align = ->(rows) {
+      by_day = rows.each_with_object({}) { |r, h| h[r['day']] = r['count'] }
+      @day_window.map { |d| by_day[d] || 0 }
+    }
+    @pageviews_series = align.call(@pageviews_per_day)
+    @new_users_series = align.call(@new_users_per_day)
+
+    erb :admin_analytics
+  end
+
+  # STUFF #48.1 — admin user-list subpage. Drills into the
+  # "new users" count on /admin/analytics. Each row carries
+  # passkey-count + recovery-code-count via the dedicated stores
+  # (N+1 across users — fine at single-digit user counts; bake a
+  # LEFT JOIN COUNT(...) query when this grows past ~100 users).
+  get '/admin/users' do
+    @page_title = 'Users'
+    @users      = UsersStore.all
+    @decorated  = @users.map do |u|
+      u.merge(
+        'passkey_count'    => WebauthnCredentialsStore.count_for_user(u['id']),
+        'recovery_unused'  => RecoveryCodesStore.unconsumed_count_for(u['id'])
+      )
+    end
+    erb :admin_users
   end
 
   # Page-background pool admin: shows the Picsum IDs that

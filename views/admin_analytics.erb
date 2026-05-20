@@ -1,0 +1,132 @@
+<%# STUFF #48.1 — admin usage analytics. Three blocks: new users
+    over time + pageviews per day + per-section breakdown. All
+    windowed to ?days=N (default 14, clamped 1..90).
+
+    Retention: rows older than 90 days are pruned on every visit
+    to this page; the route does that before fetching aggregates
+    so the numbers always reflect the live retention window.    %>
+
+<div class="page-header">
+  <div>
+    <h2>📊 Analytics</h2>
+    <p class="subtitle">
+      Usage over the last <strong><%= @days %></strong> days.
+      &middot;
+      <a href="/admin">&larr; Admin</a>
+      &middot;
+      <a href="/admin/users">User list &rarr;</a>
+    </p>
+  </div>
+</div>
+
+<section class="analysis-section admin-analytics-summary">
+  <div class="admin-analytics-grid">
+    <div class="admin-analytics-card">
+      <span class="admin-analytics-card-label">Total users</span>
+      <span class="admin-analytics-card-value"><%= @total_users %></span>
+    </div>
+    <div class="admin-analytics-card">
+      <span class="admin-analytics-card-label">New (<%= @days %>d)</span>
+      <span class="admin-analytics-card-value"><%= @new_users_total %></span>
+    </div>
+    <div class="admin-analytics-card">
+      <span class="admin-analytics-card-label">Pageviews (<%= @days %>d)</span>
+      <span class="admin-analytics-card-value"><%= @pageviews_total %></span>
+    </div>
+  </div>
+</section>
+
+<section class="analysis-section">
+  <h3>New users over time</h3>
+  <p class="subtitle">One bar per day. Click into <a href="/admin/users">User list</a> to drill in.</p>
+  <% if @new_users_total.zero? %>
+    <p class="muted">No new signups in the window.</p>
+  <% else %>
+    <div class="admin-analytics-chart-wrap"><canvas id="newUsersChart"></canvas></div>
+  <% end %>
+</section>
+
+<section class="analysis-section">
+  <h3>Pageviews per day</h3>
+  <% if @pageviews_total.zero? %>
+    <p class="muted">No pageviews recorded yet. The middleware persists rows on every dynamic GET — give it a few requests.</p>
+  <% else %>
+    <div class="admin-analytics-chart-wrap"><canvas id="pageviewsChart"></canvas></div>
+  <% end %>
+</section>
+
+<section class="analysis-section">
+  <h3>By section</h3>
+  <p class="subtitle">Per-section totals over the same <%= @days %>-day window. Paths that don't match a known section bucket fall into <em>other</em>.</p>
+  <% if @section_totals.empty? %>
+    <p class="muted">No data yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr><th>Section</th><th class="num">Pageviews</th><th class="num">Share</th></tr>
+      </thead>
+      <tbody>
+        <% @section_totals.each do |row| %>
+          <tr>
+            <td><%= h(row['section']) %></td>
+            <td class="num"><%= row['count'] %></td>
+            <td class="num">
+              <%= ((row['count'].to_f / @pageviews_total) * 100).round(1) %>%
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
+
+<% if @pageviews_total.positive? || @new_users_total.positive? %>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      const days       = <%= @day_window.to_json %>;
+      const pageviews  = <%= @pageviews_series.to_json %>;
+      const newUsers   = <%= @new_users_series.to_json %>;
+
+      // Same Turbo-safe re-init pattern as views/dashboard.erb —
+      // destroy any prior Chart bound to the canvas before instantiating.
+      function build(canvasId, data, color) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx || !window.Chart) return;
+        const prior = Chart.getChart(ctx);
+        if (prior) prior.destroy();
+        const isDark = document.documentElement.dataset.theme === 'dark';
+        const grid   = isDark ? '#3a3a3c' : '#e5e5ea';
+        const muted  = isDark ? '#aeaeb2' : '#8e8e93';
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: days.map(d => d.slice(5)),
+            datasets: [{
+              data: data,
+              backgroundColor: color,
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+              y: { grid: { color: grid }, ticks: { color: muted, precision: 0 }, beginAtZero: true }
+            }
+          }
+        });
+      }
+
+      function initAll() {
+        if (document.getElementById('newUsersChart'))   build('newUsersChart',   newUsers,  '#34c759');
+        if (document.getElementById('pageviewsChart'))  build('pageviewsChart',  pageviews, '#0071e3');
+      }
+
+      document.addEventListener('DOMContentLoaded', initAll);
+      document.addEventListener('turbo:load',       initAll);
+    })();
+  </script>
+<% end %>

@@ -1,4 +1,6 @@
 require_relative 'logger'
+require_relative 'pageview_section'
+require_relative 'pageviews_store'
 
 # Cosmetics 7 — Rack-level request logger. Sits ahead of Sinatra's
 # static-file handler so it sees EVERY request, including
@@ -18,6 +20,13 @@ require_relative 'logger'
 # filter to DEBUG-only for everything else without dropping
 # request lines. The dev default is DEBUG anyway, so request
 # lines surface either way in development.
+#
+# STUFF #48.1 — also persists one row per dynamic GET request into
+# the `pageviews` table for the admin analytics page. Static-asset
+# noise (/health, /metrics, css/js) is filtered by
+# PageviewSection.ignore?. Persist errors are rescued (we'd rather
+# log + serve the request than 500 because the DB hiccupped on
+# the side-effect insert).
 module RequestLogMiddleware
   class App
     def initialize(app)
@@ -29,9 +38,10 @@ module RequestLogMiddleware
       status, headers, body = @app.call(env)
       latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
 
+      path = env['PATH_INFO']
       payload = {
         method:     env['REQUEST_METHOD'],
-        path:       env['PATH_INFO'],
+        path:       path,
         status:     status,
         latency_ms: latency_ms,
         ip:         env['HTTP_X_FORWARDED_FOR'] || env['REMOTE_ADDR']
@@ -43,7 +53,33 @@ module RequestLogMiddleware
 
       AppLogger.info('http_request', **payload)
 
+      record_pageview(env, path, status)
+
       [status, headers, body]
+    end
+
+    private
+
+    # Skip noise paths + non-GETs (POST/PUT/DELETE aren't pageviews).
+    # Pulls user_id off the Rack session — set by Auth::Helpers#sign_in!
+    # — so signed-in pageviews can be attributed; nil for anonymous.
+    # All errors are swallowed so the persist side-effect can't fail
+    # a request. Real failures (schema not migrated, PG down) still
+    # show up in the structured log via the logger.warn line.
+    def record_pageview(env, path, status)
+      return unless env['REQUEST_METHOD'] == 'GET'
+      return if PageviewSection.ignore?(path)
+
+      session = env['rack.session']
+      user_id = session && session[:user_id]
+      PageviewsStore.record!(
+        user_id: user_id,
+        path:    path,
+        section: PageviewSection.for_path(path),
+        status:  status
+      )
+    rescue StandardError => e
+      AppLogger.warn('pageview_persist_failed', path: path, message: e.message)
     end
   end
 end
