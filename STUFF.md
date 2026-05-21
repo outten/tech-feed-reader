@@ -551,11 +551,15 @@ Constraint: the homepage tagline is "no tracking, no algorithmic agenda" — pro
 - **Required paywall for AI features** at the free tier — the "magic" needs to be reachable to drive sign-ups.
 - **Data licensing** of reading trends — too small to be valuable, and even anonymized it smells off.
 
-## [ ] 43. Filter Feeds
+## [x] 43. Filter Feeds
 
 Filter Feeds on the /filter page doesn't work. Please fix.
 
 (Note: there is no `/filter` route — the filter UI lives on `/feeds` via `public/feeds-filter.js` from STUFF #27. The bug investigation paused mid-session; if it still mis-fires in prod, reproduce + capture which input/chip doesn't filter rows.)
+
+**Shipped.** Root cause was deeper than the original "deactivate doesn't work" report: `init()` was attached to both `DOMContentLoaded` AND `turbo:load`, and Turbo 8 fires *both* on a full page load. That double-wired every chip in [public/feeds-filter.js](public/feeds-filter.js) — each click ran the handler twice, the second pass saw `wasActive=true` and reset the active state back to "All", so clicking any chip appeared visually dead. Fix: a `data-filter-wired` sentinel in `wireBar` makes the wiring idempotent; the chip rows now respond on the first click. Same PR also lands the toggle-off fix originally targeted by this item (clicking the active non-All chip now switches back to "All" instead of being a silent no-op). 5 lockdown specs in [spec/feeds_filter_chip_toggle_spec.rb](spec/feeds_filter_chip_toggle_spec.rb).
+
+The Turbo 8 double-fire is a class of bug worth watching for elsewhere — any `init()` attached to both events without an idempotency guard has the same shape. Other modules in [public/](public/) that wire on both events should be audited next time we touch them.
 
 ## [x] 45. Sports team follow management
 
@@ -574,7 +578,7 @@ Need: a management page (under Manage ▾) where users browse the team catalog g
 
 **Operator step after merge + deploy**: SSH the Droplet and run `docker compose run --rm app make seed-sports-data` to populate the full catalog. Existing user 1's follows survive (idempotent upsert).
 
-**Follow-up gap (separate task)**: recurring sport-sync isn't scheduled on the Droplet. Today the user sees fresh data only when (a) they newly follow a team — eager sync covers that — or (b) the operator manually runs `make sync-sports`. Proper fix: sidekiq-cron or a recurring tick worker.
+**Follow-up gap (closed)**: recurring sport-sync now runs nightly at 04:00 UTC via `SportsSyncWorker` + sidekiq-cron (`config/sidekiq_cron.yml`). Same PR adds hourly `RefreshAllFeedsWorker` so articles / podcasts / YouTube also stay fresh without the operator clicking "Refresh all". The `scripts/sync_sports.rb` body was extracted into [app/sports_sync.rb](app/sports_sync.rb) so the worker and the manual `make sync-sports` entry point share one code path. The header "Refresh all" button stays in place until the hourly cron is verified live on the Droplet — removal will follow.
 
 ## [x] 46. /sports/tennis autosyncs on page load
 
@@ -718,3 +722,9 @@ Sports is not just a US things. It is Global, let's be sure to
 Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 
 **Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
+
+## [ ] 54. Tennis Rankings Page
+
+- can you add a link from the Manage Sports Tennis page to this page to make it easy for users to follow players
+- on the Tennis Rankings page, clicking the Follow / Like button from the player results in the page reloading ... to the top of the page. We did this before, can we make these types of calls AJAX throughout the site to keep the user where they are. Some of our pages are very long. So scrolling is not a good user experience.
+- in general, we should have links from the manage pages to the pages where things happen

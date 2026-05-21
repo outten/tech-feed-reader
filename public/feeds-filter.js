@@ -76,6 +76,15 @@
   }
 
   function wireBar(bar) {
+    // STUFF #43 — guard against double-wiring. init() is attached to
+    // both DOMContentLoaded AND turbo:load, and Turbo 8 fires both on
+    // a full page load. Without this sentinel, every chip got two
+    // listeners and each click ran the handler twice — the second
+    // run saw wasActive=true and switched the active state back to
+    // the "All" chip, so clicks visibly did nothing.
+    if (bar.dataset.filterWired === '1') return;
+    bar.dataset.filterWired = '1';
+
     var input = bar.querySelector('.feeds-filter-search');
     var chips = bar.querySelectorAll('.feeds-filter-chip');
     if (input) {
@@ -83,8 +92,18 @@
     }
     chips.forEach(function (c) {
       c.addEventListener('click', function () {
+        // STUFF #43 — clicking the already-active non-All chip should
+        // turn the filter OFF (fall back to "All"). Without this branch
+        // the active state could never be cleared via the chip row.
+        var wasActive = c.classList.contains('is-active');
+        var isAllChip = c.dataset.topic === '';
         chips.forEach(function (other) { other.classList.remove('is-active'); });
-        c.classList.add('is-active');
+        if (wasActive && !isAllChip) {
+          var allChip = bar.querySelector('.feeds-filter-chip[data-topic=""]');
+          (allChip || c).classList.add('is-active');
+        } else {
+          c.classList.add('is-active');
+        }
         applyFilter(bar);
       });
     });
