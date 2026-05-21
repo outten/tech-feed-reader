@@ -83,33 +83,66 @@ RSpec.describe 'Sports team management (STUFF #45)' do
     end
   end
 
-  describe 'GET /sports/manage' do
-    before do
-      @nfl = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football',
-                                       source_provider: 'espn', external_id: 'football/nfl', country: 'US')
-      @eagles = SportsTeamsStore.upsert(league_id: @nfl['id'], slug: 'eagles',
-                                        name: 'Philadelphia Eagles', short_name: 'Eagles',
-                                        source_provider: 'espn', external_id: '21')
-      @pats = SportsTeamsStore.upsert(league_id: @nfl['id'], slug: 'patriots',
-                                      name: 'New England Patriots', short_name: 'Patriots',
-                                      source_provider: 'espn', external_id: '17')
-    end
-
-    it 'lists every team in the league with a follow toggle' do
+  # STUFF #52 — /sports/manage restructured to sport-first browsing.
+  # Three layered routes: landing → sport → league.
+  describe 'GET /sports/manage (sport-first landing)' do
+    it 'lists every sport in the catalog as a card chip' do
       get '/sports/manage'
       expect(last_response.status).to eq(200)
-      # Cards show short_name in compact layout, full name on hover/title.
-      expect(last_response.body).to include('Eagles', 'Patriots')
+      # Every sport in SportsCatalog::SPORTS gets a card by name.
+      SportsCatalog::SPORTS.each_value do |sport|
+        expect(last_response.body).to include(sport[:name]),
+          "missing sport card for #{sport[:name].inspect}"
+      end
+    end
+
+    it 'shows the follow count when the user has followed at least one team' do
+      SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')
+      get '/sports/manage'
+      expect(last_response.body).to match(/Currently following.*<strong>1<\/strong>/m)
+    end
+  end
+
+  describe 'GET /sports/manage/:sport (leagues within a sport)' do
+    it 'renders the leagues for the requested sport with chips' do
+      get '/sports/manage/basketball'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('NBA')
+      expect(last_response.body).to include('WNBA')
+      # Women's chip surfaces the women's league at this depth.
+      expect(last_response.body).to match(/sports-catalog-chip[^"]*women/)
+    end
+
+    it '404s for an unknown sport' do
+      get '/sports/manage/martian-quidditch'
+      expect(last_response.status).to eq(404)
+    end
+  end
+
+  describe 'GET /sports/manage/:sport/:league (team grid)' do
+    it 'lists every team in the league with a follow toggle' do
+      get '/sports/manage/football/nfl'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('Eagles')
       expect(last_response.body).to include('+ Follow')
     end
 
     it 'renders the active follow state for currently-followed teams' do
       SportsFollowsStore.add(user_id: 1, kind: 'team', value: 'eagles')
-      get '/sports/manage'
+      get '/sports/manage/football/nfl'
       expect(last_response.body).to include('✓ Following')
-      # Match on the followed-card decoration class so a refactor that
-      # silently drops the green-edge accent fails this spec.
       expect(last_response.body).to match(/sports-manage-team[^"]*is-followed/)
+    end
+
+    it '404s for an unknown league' do
+      get '/sports/manage/football/not-a-league'
+      expect(last_response.status).to eq(404)
+    end
+
+    it 'renders an empty-state for tournament-style leagues with no persistent roster' do
+      get '/sports/manage/soccer/fifa-world'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('No teams listed')
     end
   end
 
@@ -140,6 +173,30 @@ RSpec.describe 'Sports team management (STUFF #45)' do
       expect {
         post '/sports/teams/follow', slug: 'sixers'
       }.not_to(change { SportsFollowsStore.for_kind(1, 'team').length })
+    end
+
+    # STUFF #52 — when a team exists in SportsCatalog but hasn't been
+    # seeded into the DB yet, follow upserts league + team on demand.
+    it 'upserts a catalog-only team + its league into the DB on follow' do
+      # 'tennis-sinner' lives in SportsCatalog but is not pre-seeded here.
+      expect(SportsTeamsStore.find_by_slug('tennis-sinner')).to be_nil
+      post '/sports/teams/follow', slug: 'tennis-sinner'
+      expect(last_response).to be_redirect
+      team = SportsTeamsStore.find_by_slug('tennis-sinner')
+      expect(team).not_to be_nil
+      expect(team['name']).to eq('Jannik Sinner')
+      league = SportsLeaguesStore.find(team['league_id'])
+      expect(league['slug']).to eq('atp')
+      expect(SportsFollowsStore.follow?(1, 'team', 'tennis-sinner')).to be(true)
+    end
+
+    it 'skips the ESPN worker enqueue for catalog-only teams (no source_provider=espn)' do
+      # 'real-madrid-bc' is in the catalog (EuroLeague) without an ESPN
+      # external_id — we don't want a perform_async with a bogus team id.
+      expect(SportsTeamFetchWorker).not_to receive(:perform_async)
+      post '/sports/teams/follow', slug: 'real-madrid-bc'
+      expect(last_response).to be_redirect
+      expect(SportsFollowsStore.follow?(1, 'team', 'real-madrid-bc')).to be(true)
     end
   end
 

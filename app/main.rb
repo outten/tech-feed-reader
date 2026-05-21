@@ -54,6 +54,7 @@ if ENV['RACK_ENV'].to_s == 'development' || ENV['RACK_ENV'].to_s.empty?
   end
 end
 require_relative 'sports_teams'
+require_relative 'sports_catalog'
 require_relative 'sports_leagues_store'
 require_relative 'sports_teams_store'
 require_relative 'sports_matches_store'
@@ -498,6 +499,38 @@ class TechFeedReader < Sinatra::Base
         output_tokens: row['output_tokens'],
         unread_count:  row['unread_count'].to_i,
         error:         row['error']
+      )
+    end
+
+    # STUFF #52 — when a user follows a team that exists in the
+    # SportsCatalog but hasn't been seeded into the DB yet, materialise
+    # it (and its parent league) on demand. Idempotent thanks to the
+    # underlying upserts. Returns the team row from sports_teams, or
+    # nil if the slug isn't in the catalog at all.
+    def ensure_catalog_team_in_db(team_slug)
+      catalog_team = SportsCatalog.find_team(team_slug)
+      return nil unless catalog_team
+
+      catalog_league = SportsCatalog.find_league(catalog_team[:sport_slug], catalog_team[:league_slug])
+      return nil unless catalog_league
+
+      league = SportsLeaguesStore.upsert(
+        slug:            catalog_league[:slug],
+        name:            catalog_league[:name],
+        sport:           catalog_league[:sport],
+        source_provider: catalog_league[:source_provider] || 'catalog',
+        external_id:     catalog_league[:external_id]     || catalog_league[:slug],
+        country:         catalog_league[:country]
+      )
+      SportsTeamsStore.upsert(
+        league_id:       league['id'],
+        slug:            catalog_team[:slug],
+        name:            catalog_team[:name],
+        short_name:      catalog_team[:short_name],
+        location:        catalog_team[:location],
+        image_url:       catalog_team[:image_url],
+        source_provider: catalog_team[:source_provider] || 'catalog',
+        external_id:     catalog_team[:external_id]     || catalog_team[:slug]
       )
     end
 
@@ -1735,32 +1768,59 @@ class TechFeedReader < Sinatra::Base
   # (the 4 hardcoded follows in seed_sports_data.rb were for user 1
   # only, and even with full-catalog seeds users couldn't toggle them
   # through the UI).
+  # STUFF #52 — /sports/manage now reads the hand-curated
+  # SportsCatalog. Three views layered top-down:
+  #   /sports/manage                       → sport-first landing (chips)
+  #   /sports/manage/:sport                → leagues in this sport
+  #   /sports/manage/:sport/:league        → teams in this league
+  # Follow actions upsert the catalog entry into sports_leagues +
+  # sports_teams on demand so the live-scores pipeline still finds
+  # what it needs in the DB without bulk-seeding 100s of teams.
   get '/sports/manage' do
-    @page_title = 'Manage sports'
-    @leagues   = SportsLeaguesStore.all
-    @teams_by_league = @leagues.each_with_object({}) do |lg, h|
-      h[lg['id']] = SportsTeamsStore.for_league(lg['id'])
-    end
+    @page_title    = 'Manage sports'
+    # Pass the catalog through as an instance var so the ERB's
+    # constant lookup doesn't resolve to TechFeedReader::SportsCatalog
+    # (where it doesn't live).
+    @sports         = SportsCatalog::SPORTS
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
                                         .map { |f| f['value'] }.to_set
     erb :sports_manage
+  end
+
+  get '/sports/manage/:sport' do |sport_slug|
+    @sport = SportsCatalog.find_sport(sport_slug)
+    halt 404, 'no such sport' unless @sport
+    @page_title    = "#{@sport[:name]} — Manage"
+    @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
+                                        .map { |f| f['value'] }.to_set
+    erb :sports_manage_sport
+  end
+
+  get '/sports/manage/:sport/:league' do |sport_slug, league_slug|
+    @sport  = SportsCatalog.find_sport(sport_slug)
+    @league = SportsCatalog.find_league(sport_slug, league_slug)
+    halt 404, 'no such league' unless @sport && @league
+    @page_title    = "#{@league[:name]} — Manage"
+    @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
+                                        .map { |f| f['value'] }.to_set
+    erb :sports_manage_league
   end
 
   # POST /sports/teams/follow — add the team to the user's follows
   # AND enqueue a Sidekiq job to fetch the team's recent schedule +
   # results from ESPN. Without the eager fetch, a freshly-followed
   # team's score tiles + recent results would stay empty until the
-  # next nightly sync (not yet scheduled). Idempotent: re-following
-  # a team no-ops on the follows row and re-enqueues a (cheap)
-  # refresh job.
+  # next nightly sync. STUFF #52: if the team isn't in the DB yet
+  # (catalog-only), upsert it (and its league) from SportsCatalog
+  # before adding the follow.
   post '/sports/teams/follow' do
     slug = params['slug'].to_s
     halt 400, 'slug required' if slug.empty?
-    team = SportsTeamsStore.find_by_slug(slug)
+    team = SportsTeamsStore.find_by_slug(slug) || ensure_catalog_team_in_db(slug)
     halt 404, 'team not found' unless team
     SportsFollowsStore.add(user_id: current_user_id, kind: 'team', value: slug)
     begin
-      SportsTeamFetchWorker.perform_async(team['id'])
+      SportsTeamFetchWorker.perform_async(team['id']) if team['source_provider'] == 'espn'
     rescue StandardError => e
       AppLogger.warn('team_follow_enqueue_failed', slug: slug, message: e.message)
     end

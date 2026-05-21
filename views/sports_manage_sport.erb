@@ -1,0 +1,47 @@
+<%# STUFF #52 — drill-down: leagues within a sport. Click a league
+    card to drill into its team grid. Women's leagues get a chip
+    badge so they're visually called out at this level. %>
+
+<div class="page-header">
+  <div>
+    <p class="subtitle"><a href="/sports/manage">← All sports</a></p>
+    <h2><span aria-hidden="true"><%= @sport[:emoji] %></span> <%= h(@sport[:name]) %></h2>
+    <% if @sport[:blurb] %>
+      <p class="subtitle"><%= h(@sport[:blurb]) %></p>
+    <% end %>
+  </div>
+</div>
+
+<ul class="sports-catalog-grid">
+  <% @sport[:leagues].each do |league| %>
+    <%
+      team_count = (league[:teams] || []).length
+      followed_in_league = (league[:teams] || []).count { |t| @followed_slugs.include?(t[:slug]) }
+    %>
+    <li class="sports-catalog-card <%= 'is-womens' if league[:women] %>">
+      <a class="sports-catalog-card-link" href="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(league[:slug]) %>">
+        <span class="sports-catalog-name"><%= h(league[:name]) %></span>
+        <span class="sports-catalog-chips">
+          <% if league[:women] %>
+            <span class="sports-catalog-chip women">Women's</span>
+          <% end %>
+          <% if league[:region] && league[:region] != 'global' %>
+            <span class="sports-catalog-chip region"><%= h(league[:region].tr('-', ' ')) %></span>
+          <% end %>
+          <% if league[:source_provider] == 'espn' %>
+            <span class="sports-catalog-chip live" title="Live scores + standings from ESPN">Live</span>
+          <% end %>
+        </span>
+        <span class="sports-catalog-meta">
+          <%= team_count %> team<%= 's' unless team_count == 1 %>
+          <% if followed_in_league.positive? %>
+            &middot; <strong><%= followed_in_league %> followed</strong>
+          <% end %>
+        </span>
+        <% if league[:blurb] %>
+          <span class="sports-catalog-blurb"><%= h(league[:blurb]) %></span>
+        <% end %>
+      </a>
+    </li>
+  <% end %>
+</ul>
