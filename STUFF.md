@@ -683,12 +683,6 @@ Let's do a beauty pass in on PR. Don't commit and open a PR until I view and app
 
 Can you use the same Basic Auth credentials for Admin for Sidekiq?
 
-**Shipped.** `Sidekiq::Web` (mounted at `/admin/sidekiq` via `Rack::Builder`) is now wrapped with `Rack::Auth::Basic` reading the same `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars as #49's Sinatra-level admin gate. Fail-closed: `Auth.admin_credentials` returns nil when either var is unset/empty, so the auth block returns nil and Rack 401s — same posture as the rest of `/admin/*`. Constant-time compare via `Rack::Utils.secure_compare` on both username and password.
-
-**Why at the Rack::Builder level, not inside Sinatra**: `Sidekiq::Web` mounts BEFORE Sinatra in the boot block (`app/main.rb` Rack::Builder chain), so the existing Sinatra `before` filter from #49 never sees `/admin/sidekiq` requests. Wrapping at `Sidekiq::Web.use Rack::Auth::Basic` puts the gate where the requests actually flow.
-
-**Specs**: 12 examples in [spec/sidekiq_admin_gate_spec.rb](spec/sidekiq_admin_gate_spec.rb) — replay the same auth block against a stub inner app (the real boot block is gated on `__FILE__ == $PROGRAM_NAME` and doesn't run under RSpec). Covers fail-closed when env vars are missing, success with correct creds, 401 on wrong password / wrong username, and a mock-based check that `Rack::Utils.secure_compare` is the comparison used.
-
 ## [x] 52. Sports Manage
 
 I just noticed that the sports manage page only has leagues that I care about. Sports is much wider than me, so we need to expand for popular world wide and popular leagues and teams. For example:
@@ -724,21 +718,3 @@ Sports is not just a US things. It is Global, let's be sure to
 Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 
 **Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
-
-## [x] 53. Update the Logged Out Home Page
-
-The home page (welcome page) content appears to be stale. We've added a lot since te last time we updated, like Sports for example.
-
-Can you update it?
-
-And in the future, always review the welcome page after we implement a key, new feature.
-
-**Shipped.** Surgical copy refresh on the anonymous branch of [views/home.erb](views/home.erb) and [views/about.erb](views/about.erb) — no new sections, just bringing stale claims current:
-
-- Browser tab title `'Tech Feed Reader'` → `'Feeder'` ([app/main.rb:948](app/main.rb#L948)) — catches up with the #50 brand rename.
-- "One inbox" card: `25+ feeds` → `90+ curated feeds`, and explicitly names YouTube channels + nature documentaries that have joined the catalog since the original copy was written.
-- "AI-assisted triage" card: `Three runs nightly via cron` → `via Sidekiq` (post #45 / #46 — cron-on-Droplet was retired; Sidekiq is the only runner now).
-- Sports card retitled `🏈 Sports — same engine, different domain` → `🌍 Sports — global, not just US`, body rewritten to surface #45/#52: 12 sports across ~60 leagues, named leagues (NFL/NBA/MLB/EPL/La Liga/IPL/F1/golf), women's leagues equal-weight (WNBA, NWSL, WSL, Frauen-Bundesliga).
-- About → "How it works" → Sports bullet matches the home card: hand-curated catalog (12 sports / ~60 leagues / ~250 teams, global, women's equal-weight) feeds the follow-flow, ESPN supplies the live data.
-
-The standing follow-up from the user ("always review the welcome page after we implement a key, new feature") is captured as a feedback memory so future PRs that ship a user-visible feature get a welcome-page audit automatically.
