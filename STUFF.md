@@ -679,7 +679,7 @@ Let's do a beauty pass in on PR. Don't commit and open a PR until I view and app
 5. Brand renamed "Tech Feed Reader" → "Feeder" everywhere (header logo, document title, footer, `/about` body). Header gets a random animal emoji per page render from a 10-emoji pool (🐦 🦜 🐤 🦉 🦅 🦆 🦢 🐄 🐷 🐝) — bird-feeder pun first, barnyard for variety.
 6. Dark mode polish: background image moved to a fixed `body::before` and gets `filter: blur(10px) saturate(0.75) brightness(0.8)` plus a 0.40-opacity scrim — frosty texture, image still legible, foreground unaffected. Visited-link color set to soft #9ab5d8 (avoids the browser-default purple the user found hard to read).
 
-## [ ] 51. Sidekiq Basic Auth
+## [x] 51. Sidekiq Basic Auth
 
 Can you use the same Basic Auth credentials for Admin for Sidekiq?
 

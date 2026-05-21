@@ -81,7 +81,7 @@
     <li><strong>Ranking:</strong> a simple cosine-overlap score against your positive/negative corpus, plus a recency factor and per-feed weight that adapts from your engagement.</li>
     <li><strong>Summaries:</strong> extractive (TextRank) at import, optional Claude (Sonnet 4.6) on demand. Cached so re-visits don't re-spend tokens.</li>
     <li><strong>Triage:</strong> Claude reads up to 30 unread + 20 corpus exemplars per topic. Three runs nightly (cross-topic, technology-only, sports-only). Browse history at <a href="/triage">/triage</a>.</li>
-    <li><strong>Sports:</strong> ESPN's unofficial API supplies scores, standings, fixtures, tennis rankings. Calendar exports as <code>.ics</code> for Apple/Google Calendar subscription.</li>
+    <li><strong>Sports:</strong> a hand-curated catalog of 12 sports / ~60 leagues / ~250 teams (global, women's leagues equal-weight) feeds the follow-flow; ESPN's unofficial API supplies scores, standings, fixtures, tennis rankings. Calendar exports as <code>.ics</code> for Apple/Google Calendar subscription.</li>
     <li><strong>Audio:</strong> a Hotwire Turbo + <code>data-turbo-permanent</code> mini-player at the bottom of every page survives navigation; podcast episodes share the same article queue with a 🎧 badge.</li>
   </ul>
 </section>

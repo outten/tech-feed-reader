@@ -945,7 +945,7 @@ class TechFeedReader < Sinatra::Base
       redirect to('/welcome')
     end
 
-    @page_title  = 'Tech Feed Reader'
+    @page_title  = 'Feeder'
     @public_page = true
     @returning_user = signed_in? &&
                       ArticlesStore.count.positive? &&
@@ -3057,18 +3057,32 @@ end
 # we wire a cookie session scoped to its mount point so the main app's
 # routes stay session-free.
 #
+# STUFF #51 — Sidekiq::Web mounts BEFORE Sinatra in this Rack::Builder
+# chain, so the Sinatra-level admin Basic Auth gate from #49 never
+# sees these requests. Wrap Sidekiq::Web with Rack::Auth::Basic
+# using the same ADMIN_USERNAME / ADMIN_PASSWORD credentials, fail-
+# closed (admin_credentials returns nil if either env var is unset
+# or empty → block returns nil → Rack::Auth::Basic 401s).
+#
 # In test env we never start the server (rspec uses Rack::Test against
 # TechFeedReader directly), so this whole block is gated on direct
 # script invocation.
 if __FILE__ == $PROGRAM_NAME
   require 'sidekiq/web'
   require 'rack/session/cookie'
+  require 'rack/auth/basic'
   require 'securerandom'
   require 'rackup/handler'
 
   Sidekiq::Web.use Rack::Session::Cookie,
                    secret:    ENV['SIDEKIQ_WEB_SECRET'] || SecureRandom.hex(32),
                    same_site: :lax
+  Sidekiq::Web.use Rack::Auth::Basic, 'Sidekiq' do |user, pass|
+    expected = Auth.admin_credentials
+    expected &&
+      Rack::Utils.secure_compare(expected[0], user.to_s) &&
+      Rack::Utils.secure_compare(expected[1], pass.to_s)
+  end
 
   combined = Rack::Builder.app do
     map '/admin/sidekiq' do
