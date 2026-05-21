@@ -4,23 +4,50 @@
    session, at which point the layered backgrounds below kick in. */
 :root { --page-bg: none; }
 
+/* STUFF #50 — bump the root font size 25% so the default zoom level
+   reads like browser-zoom-at-125%. Every rem-based size below
+   cascades — body text, headings, padding, line-heights. Pixel-sized
+   icons (header SVGs etc.) stay the same so the text:icon balance
+   shifts slightly in text's favour, which is the desired effect. */
+html { font-size: 125%; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   background-color: #f5f5f7;
-  /* Two-layer background: a translucent "scrim" on top so foreground
-     text stays readable, and the nature image on the bottom. The scrim
-     is matched per theme below. background-attachment: fixed pins the
-     image to the viewport — content scrolls over it instead of with
-     it, which gives the parallax-y feel the user asked for. */
-  background-image: linear-gradient(rgba(245, 245, 247, 0.88), rgba(245, 245, 247, 0.88)), var(--page-bg);
-  background-attachment: fixed, fixed;
-  background-size: cover, cover;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
+  /* STUFF #50 — background image + scrim moved off body's own paint
+     and onto two fixed-position pseudo-elements (::before = image,
+     ::after = scrim). isolation: isolate establishes a stacking
+     context so the negative z-index pseudos are clamped behind body
+     content without leaking behind body's bg-color fallback. This
+     restructure lets dark mode apply a `filter:` to the image layer
+     alone (frost effect) without dragging the foreground with it. */
+  isolation: isolate;
   color: #1d1d1f;
   margin: 0;
   padding: 0;
   min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--page-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Light-mode: no filter — image renders at full fidelity behind
+     the scrim. Dark-mode override below softens it. */
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  /* Translucent scrim keeps foreground text readable over any
+     image. Per-theme overrides below. */
+  background: rgba(245, 245, 247, 0.88);
+  pointer-events: none;
 }
 /* ============================================================
    STUFF #37A — Unified pill-button system (Apple-style).
@@ -124,9 +151,20 @@ body > header {
   color: #1d1d1f;
   margin-right: auto;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .logo:hover { color: #0071e3; }
 html.dark .logo:hover { color: #0a84ff; }
+/* STUFF #50 — animal emoji sits slightly larger than the wordmark.
+   Picked at random per page render (see logo block in layout.erb)
+   to keep the brand a little playful. */
+.logo-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.logo-word { letter-spacing: 0.005em; }
 nav a {
   text-decoration: none;
   color: #515154;
@@ -433,14 +471,14 @@ html.dark .search-excerpt mark { background: #3a2f0a; color: #f5f5f7; }
 /* The search-result row doesn't need the bulk-action checkbox column
    that articles.erb reserves; pull the left padding back. */
 .search-results-list .news-item { padding-left: 0.75rem; }
-.search-results-list .news-item.has-thumb {
+.search-results-list .news-item {
   grid-template-areas:
     "thumb main"
     "thumb excerpt"
     "thumb badges"
     "thumb meta";
 }
-.search-results-list .news-item.has-thumb .search-excerpt { grid-area: excerpt; }
+.search-results-list .news-item .search-excerpt { grid-area: excerpt; }
 
 /* Phase 2 polish (2026-05-12) — "Pick up where you left off" tile.
    Rendered above What's On for returning users when at least one
@@ -769,24 +807,54 @@ html.dark .article-hero { background: #2c2c2e; }
 }
 .news-item-thumb-link:hover .news-item-thumb { transform: scale(1.04); }
 html.dark .news-item-thumb-link { background: #2c2c2e; }
-.news-item.has-thumb {
+/* STUFF #50 — every .news-item lays out as the same 3-column grid,
+   whether it has a thumbnail or not. Rows without a thumbnail leave
+   the thumb cell empty so the content column always starts at the
+   same x-position.
+     col 1 (96px)   — thumbnail
+     col 2 (1fr)    — content (title + summary span here)
+     col 3 (auto)   — right-aligned utility column for badges
+   The title + summary span columns 2 + 3 so they get the full
+   remainder of the row. The footer row puts informational meta
+   (source · time · reading time) on the left and action chips
+   (bookmark ★, tags, 👍/👎) on the right. */
+.news-item {
   display: grid;
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 96px 1fr auto;
   grid-template-areas:
-    "thumb main"
-    "thumb badges"
-    "thumb meta";
+    "thumb main    main"
+    "thumb summary summary"
+    "thumb meta    badges";
   column-gap: 0.85rem;
+  row-gap: 0.15rem;
   align-items: start;
 }
-.news-item.has-thumb .news-row-main    { grid-area: main; }
-.news-item.has-thumb .news-row-badges  { grid-area: badges; }
-.news-item.has-thumb .news-meta        { grid-area: meta; }
-.news-item.has-thumb.news-item-podcast .news-item-thumb-link { aspect-ratio: 1 / 1; height: auto; }
+.news-item .news-row-main     { grid-area: main; }
+.news-item .news-item-summary { grid-area: summary; }
+.news-item .news-meta         { grid-area: meta;   align-self: center; }
+.news-item .news-row-badges   { grid-area: badges; align-self: center; justify-self: end; }
+.news-item.news-item-podcast.has-thumb .news-item-thumb-link { aspect-ratio: 1 / 1; height: auto; }
+
+/* Grid handles the left indent now — strip the 2.35rem margin-left
+   that the non-grid fallback used to apply. */
+.news-item .news-row-badges,
+.news-item .news-meta,
+.news-item .news-item-summary { margin-left: 0; }
 
 @media (max-width: 600px) {
   .news-item-thumb-link { width: 72px; height: 54px; }
-  .news-item.has-thumb  { grid-template-columns: 72px 1fr; column-gap: 0.6rem; }
+  /* On narrow screens, drop the right-side badges column so badges
+     wrap below meta and don't squeeze the title to a sliver. */
+  .news-item {
+    grid-template-columns: 72px 1fr;
+    grid-template-areas:
+      "thumb main"
+      "thumb summary"
+      "thumb meta"
+      "thumb badges";
+    column-gap: 0.6rem;
+  }
+  .news-item .news-row-badges { justify-self: start; }
 }
 
 /* STUFF.md follow-up — day-group dividers ("Today" / "Yesterday" /
@@ -892,9 +960,29 @@ html.dark body {
   background-color: #1c1c1e;
   color: #f5f5f7;
 }
-html.dark body {
-  /* Darker scrim so the nature photo doesn't bleach out the dark theme. */
-  background-image: linear-gradient(rgba(28, 28, 30, 0.85), rgba(28, 28, 30, 0.85)), var(--page-bg);
+/* STUFF #50 — dark-mode "frost" effect on the nature backdrop. The
+   image stays visible (lower scrim opacity than before — 0.55 vs the
+   prior 0.85) but the ::before filter blurs + desaturates + dims it
+   so it reads as soft texture rather than competing detail. transform:
+   scale(1.08) overcompensates for the blurred edges that would
+   otherwise reveal the viewport corners. */
+html.dark body::after {
+  background: rgba(28, 28, 30, 0.40);
+}
+html.dark body::before {
+  filter: blur(10px) saturate(0.75) brightness(0.8);
+  transform: scale(1.08);
+}
+/* STUFF #50 — visited-link color in dark mode. Browser default
+   (purple) was hard to read against #1c1c1e. Pick a soft, slightly-
+   faded blue that stays in the link family but distinguishes from
+   the primary #0a84ff. Per the CSS spec, :visited can only set a
+   small whitelist of properties (color, background-color,
+   border-color, text-decoration) to prevent history leaks. */
+html.dark a:visited,
+html.dark a:visited .news-headline,
+html.dark a:visited .news-summary-skim {
+  color: #9ab5d8;
 }
 html.dark header {
   background: rgba(28,28,30,0.9);
@@ -1284,6 +1372,22 @@ html.dark .news-headline { color: #0a84ff; }
 }
 .news-source { font-weight: 500; }
 .news-summary { margin: 0.45rem 0 0 2.35rem; font-size: 0.88rem; line-height: 1.5; color: #3a3a3c; }
+
+/* STUFF #50 — always-on summary preview under every article title
+   in the default /articles view. Two-line clamp keeps the list
+   scannable; skim mode renders the full text via .news-summary-skim
+   instead. */
+.news-item-summary {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #5a5a5e;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.dark .news-item-summary { color: #aeaeb2; }
 
 /* Dark mode extensions */
 html.dark .market-signals-section h3 { color: #f5f5f7; }
@@ -2572,6 +2676,84 @@ html.dark .podcast-show-title { color: #f5f5f7; }
 }
 .youtube-channel-link:hover { text-decoration: underline; }
 html.dark .youtube-channel-link { color: #4dabff; }
+/* STUFF #50 — channel card now exposes two secondary links side-by-
+   side: "All videos →" (channel-detail page) + "↗ Channel" (off-site
+   YouTube). Sit beneath the primary card-link which itself opens the
+   latest video. */
+.youtube-channel-links { display: flex; gap: 0.85rem; flex-wrap: wrap; }
+
+/* STUFF #50 — Recent videos grid on /youtube. Image-first card with a
+   16:9 thumbnail (matches YouTube's native aspect ratio), title +
+   channel + relative-time underneath. Echoes /podcasts' recent-episodes
+   panel so the two sections feel like a set. */
+.youtube-videos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.5rem;
+}
+.youtube-video-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.youtube-video-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
+.youtube-video-card.read { opacity: 0.65; }
+.youtube-video-cover {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #f0f0f5;
+  display: block;
+}
+html.dark .youtube-video-cover { background: #2c2c2e; }
+/* Wrap title + cover so the ▶ overlay sits on the thumbnail only.
+   The card itself remains an <a>, so use a relative container via the
+   ::before trick: cover is the first child, the overlay glyph absolute-
+   positions over it. */
+.youtube-video-card { position: relative; }
+.youtube-video-play {
+  position: absolute;
+  top: calc((100% * 9 / 16) / 2 - 1.6rem);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.youtube-video-card:hover .youtube-video-play { opacity: 1; }
+.youtube-video-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1d1d1f;
+  padding: 0 0.15rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.dark .youtube-video-title { color: #f5f5f7; }
+.youtube-video-meta {
+  font-size: 0.78rem;
+  color: #6e6e73;
+  padding: 0 0.15rem 0.5rem;
+}
 
 /* STUFF #30 — bulk-add channels form + per-line result panel on
    /youtube. Reuses .benchmark-section + .portfolio-form for the base

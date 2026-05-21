@@ -92,7 +92,7 @@ RSpec.describe 'GET /about' do
   it 'renders the about page with the philosophy + tech sections' do
     get '/about'
     expect(last_response.status).to eq(200)
-    expect(last_response.body).to include('About Tech Feed Reader')
+    expect(last_response.body).to include('About Feeder')
     expect(last_response.body).to include('Why this exists')
     expect(last_response.body).to include('How it works')
     expect(last_response.body).to include('Tech stack')
@@ -122,8 +122,10 @@ RSpec.describe 'header title link' do
 
   it 'renders the title as a link to / with data-turbo="false"' do
     get '/admin/dashboard'
+    # STUFF #50 — brand renamed from "Tech Feed Reader" to "Feeder",
+    # with a 🐦 icon span beside the wordmark.
     expect(last_response.body).to match(
-      %r{<a class="logo"[^>]*href="/"[^>]*data-turbo="false"[^>]*>Tech Feed Reader</a>}
+      %r{<a class="logo"[^>]*href="/"[^>]*data-turbo="false"[^>]*>.*?Feeder.*?</a>}m
     )
   end
 end

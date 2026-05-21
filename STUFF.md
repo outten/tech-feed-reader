@@ -652,7 +652,7 @@ Surfaced from "did we do admin simple auth?" — answer was no: `/admin/*` was g
 
 **Operator follow-ups**: drop `ADMIN_USERNAME=...` + `ADMIN_PASSWORD=...` into `/opt/app/.env` on the Droplet, then `make deploy`. Until those are set in prod, /admin is unreachable.
 
-## [ ] 50. Beauty Pass
+## [x] 50. Beauty Pass
 
 Let's do a beauty pass in on PR. Don't commit and open a PR until I view and approve. Do things in phases.
 
@@ -668,7 +668,41 @@ Let's do a beauty pass in on PR. Don't commit and open a PR until I view and app
 - in dark mode, prior used links are hard to read I think b/c of the color: blue and purple ... can you try something else
 - in dark mode, add a little frost layer on the background ... user can still make out the image, but it doesn't dominate the main content on the page
 
+**Shipped.** Sequenced as six phases, each manually verified before moving on:
+
+1. `/articles` state-filter chips toggle off on second click; Search nav moved out of the section-nav to the icon row (Admin → Search → Bus).
+2. `html { font-size: 125% }` baseline — default reading size now lands where you previously had to zoom.
+3. Every `.news-item` shares a 3-column grid (thumb / content / utility) so rows with and without thumbnails line up at the same x-position. Every card gets a 2-line summary preview pulled via `skim_summary_for` (LLM → extractive → content excerpt). Footer row puts source · time · reading-time on the left and ★ / tags / 👍 / 👎 on the right.
+4. `/youtube` gains a Recent-videos grid mirroring `/podcasts`' recent-episodes panel (16:9 hqdefault.jpg thumbnails, ▶ overlay on hover). Subscribed-channel cards now click through to the latest video; cover-art fallback chain is `feed.image_url → latest-video hqdefault`. Secondary links "All videos →" + "↗ Channel" preserve the channel-detail page and the off-site YouTube link.
+5. Brand renamed "Tech Feed Reader" → "Feeder" everywhere (header logo, document title, footer, `/about` body). Header gets a random animal emoji per page render from a 10-emoji pool (🐦 🦜 🐤 🦉 🦅 🦆 🦢 🐄 🐷 🐝) — bird-feeder pun first, barnyard for variety.
+6. Dark mode polish: background image moved to a fixed `body::before` and gets `filter: blur(10px) saturate(0.75) brightness(0.8)` plus a 0.40-opacity scrim — frosty texture, image still legible, foreground unaffected. Visited-link color set to soft #9ab5d8 (avoids the browser-default purple the user found hard to read).
+
 ## [ ] 51. Sidekiq Basic Auth
 
 Can you use the same Basic Auth credentials for Admin for Sidekiq?
 
+## [ ] 52. Sports Manage
+
+I just noticed that the sports manage page only has leagues that I care about. Sports is much wider than me, so we need to expand for popular world wide and popular leagues and teams. For example:
+
+- baseball, including leagues in say Japan
+- WNBA
+- Tennis: WTA, ATA, etc.
+- Cricket
+- Soccer, particularly South America
+- Gold
+- Formula 1
+- NASCAR
+- Badminton
+- Horse Racing
+- etc.
+
+Make it easy to navigate to each area and browse feeds that can be added to a user's account. We may need a drill down. Drill down to add leagues, teams, and players.RTFGApp
+
+Use logos, etc.
+
+I don't know Africa or the Middle East, make sure they are represented.
+
+Women leagues should be highlighted and promoted.
+
+Sports is not just a US things. It is Global, let's be sure to 

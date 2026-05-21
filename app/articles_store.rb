@@ -124,10 +124,20 @@ module ArticlesStore
   YOUTUBE_FEED_URL_PATTERN = '%youtube.com/feeds/videos.xml%'.freeze
 
   def youtube_channels(user_id)
+    # STUFF #50 — also return the latest video's uid + url so /youtube
+    # can link channel cards directly to the most-recent episode.
     db.execute(<<~SQL, [user_id.to_i, YOUTUBE_FEED_URL_PATTERN])
       SELECT f.id, f.title, f.url, f.image_url,
              COUNT(a.id)         AS video_count,
-             MAX(a.published_at) AS latest_at
+             MAX(a.published_at) AS latest_at,
+             (SELECT uid FROM articles
+                WHERE feed_id = f.id
+                ORDER BY published_at DESC NULLS LAST, id DESC
+                LIMIT 1) AS latest_uid,
+             (SELECT url FROM articles
+                WHERE feed_id = f.id
+                ORDER BY published_at DESC NULLS LAST, id DESC
+                LIMIT 1) AS latest_url
       FROM feeds f
       JOIN user_feed_subscriptions ufs ON ufs.feed_id = f.id AND ufs.user_id = ?
       LEFT JOIN articles a ON a.feed_id = f.id
@@ -366,6 +376,7 @@ module ArticlesStore
 
       case kind
       when :podcast then where_clauses << 'a.audio_url IS NOT NULL'
+      when :youtube then where_clauses << "EXISTS (SELECT 1 FROM feeds f WHERE f.id = a.feed_id AND f.url LIKE '%youtube.com/feeds/videos.xml%')"
       when :all     then # no extra clause
       else raise ArgumentError, "Unknown kind filter: #{kind.inspect}"
       end

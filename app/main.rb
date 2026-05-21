@@ -1492,8 +1492,15 @@ class TechFeedReader < Sinatra::Base
   # count, latest-video age, and a small "↗ Channel" link that opens
   # the channel on YouTube in a new tab. Card click → /youtube/:feed_id.
   get '/youtube' do
-    @page_title  = 'YouTube'
-    @channels    = ArticlesStore.youtube_channels(current_user_id)
+    @page_title    = 'YouTube'
+    @channels      = ArticlesStore.youtube_channels(current_user_id)
+    # STUFF #50 — recent-videos grid (mirrors /podcasts' recent-episodes
+    # section). Every YouTube video has a guaranteed hqdefault.jpg
+    # thumbnail derivable from its URL, so this section gives the page
+    # a steady image-led feel even when individual channels lack a
+    # cover image.
+    @recent_videos = ArticlesStore.recent(current_user_id, limit: 12, kind: :youtube)
+    @feeds_by_id   = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :youtube
   end
 

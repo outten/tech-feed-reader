@@ -139,7 +139,12 @@ RSpec.describe '/articles?topic= route (Phase S1)' do
   it 'preserves topic across state-filter chip toggles via filter_url' do
     make_topical_article(uid: 'topicroute04', title: 'X', feed_topic: 'sports')
     get '/articles?topic=sports&state=unread'
-    expect(last_response.body).to include('href="?state=unread&amp;topic=sports"').or include('href="?state=unread&topic=sports"')
+    # The bookmarked chip is currently inactive — clicking it should
+    # preserve topic + apply state=bookmarked.
+    expect(last_response.body).to include('href="?state=bookmarked&amp;topic=sports"').or include('href="?state=bookmarked&topic=sports"')
+    # STUFF #50 — the *active* state chip toggles off: clicking
+    # "unread" while it's already on clears state but preserves topic.
+    expect(last_response.body).to include('href="?topic=sports"')
   end
 end
 

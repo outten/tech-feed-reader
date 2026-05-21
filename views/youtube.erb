@@ -93,6 +93,39 @@ https://www.youtube.com/@bbcnews"><%= h(params['channels']) if params['channels'
     </p>
   </div>
 <% else %>
+  <%# STUFF #50 — recent videos grid (image-led, mirrors /podcasts'
+      recent-episodes panel). YouTube thumbnails come from the
+      /vi/<id>/hqdefault.jpg CDN endpoint so every card gets a cover. %>
+  <% if @recent_videos && @recent_videos.any? %>
+    <section class="benchmark-section">
+      <h3>Recent videos</h3>
+      <div class="youtube-videos">
+        <% @recent_videos.each do |video| %>
+          <%
+            feed_row = (@feeds_by_id || {})[video['feed_id']]
+            thumb    = youtube_thumbnail_url(video)
+          %>
+          <a class="youtube-video-card <%= 'read' if video['read'] == 1 %>"
+             href="/article/<%= video['uid'] %>"
+             title="Open <%= h(video['title']) %>">
+            <% if thumb %>
+              <img class="youtube-video-cover" src="<%= h(thumb) %>" alt="" loading="lazy">
+              <span class="youtube-video-play" aria-hidden="true">▶</span>
+            <% end %>
+            <span class="youtube-video-title"><%= h(video['title']) %></span>
+            <span class="youtube-video-meta">
+              <% if feed_row %><%= h(feed_row['title'] || feed_row['url']) %><% end %>
+              <% if video['published_at'] %>
+                <% if feed_row %> &middot; <% end %>
+                <%= relative_time(video['published_at']) %>
+              <% end %>
+            </span>
+          </a>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
   <section class="benchmark-section">
     <h3>Subscribed channels</h3>
     <div class="podcast-shows">
@@ -103,12 +136,25 @@ https://www.youtube.com/@bbcnews"><%= h(params['channels']) if params['channels'
           new tab so a user can browse there directly. %>
       <% @channels.each do |ch| %>
         <%
-          channel_url = youtube_channel_url_from(ch['url'])
-          cover = ch['image_url'].to_s.empty? ? nil : ch['image_url']
+          channel_url   = youtube_channel_url_from(ch['url'])
+          latest_uid    = ch['latest_uid'].to_s
+          latest_target = latest_uid.empty? ? "/youtube/#{ch['id']}" : "/article/#{latest_uid}"
+          # STUFF #50 — cover fallback chain: per-feed cover image →
+          # latest-video hqdefault thumbnail. The latter is guaranteed
+          # for any subscribed channel that has at least one fetched
+          # video, so empty channel cards are now rare.
+          cover         = ch['image_url'].to_s.empty? ? nil : ch['image_url']
+          if cover.nil? && !ch['latest_url'].to_s.empty?
+            cover = youtube_thumbnail_url('url' => ch['latest_url'])
+          end
         %>
         <div class="podcast-show-card youtube-channel-card">
-          <a class="podcast-show-card-link" href="/youtube/<%= ch['id'] %>"
-             title="See the 10 most recent videos from <%= h(ch['title'] || ch['url']) %>">
+          <%# STUFF #50 — card primary link now goes to the channel's
+              most-recent video. When the channel has no fetched videos
+              yet (brand-new subscription), we fall back to the
+              channel-detail page so the user still lands somewhere. %>
+          <a class="podcast-show-card-link" href="<%= latest_target %>"
+             title="Open the latest video from <%= h(ch['title'] || ch['url']) %>">
             <% if cover %>
               <img class="podcast-show-cover" src="<%= h(cover) %>" alt="" loading="lazy">
             <% end %>
@@ -120,12 +166,16 @@ https://www.youtube.com/@bbcnews"><%= h(params['channels']) if params['channels'
               <% end %>
             </span>
           </a>
-          <% if channel_url %>
-            <a class="youtube-channel-link"
-               href="<%= h(channel_url) %>"
-               target="_blank" rel="noopener noreferrer"
-               title="Open this channel on YouTube">↗ Channel</a>
-          <% end %>
+          <div class="youtube-channel-links">
+            <a class="youtube-channel-link" href="/youtube/<%= ch['id'] %>"
+               title="See the 10 most recent videos from <%= h(ch['title'] || ch['url']) %>">All videos →</a>
+            <% if channel_url %>
+              <a class="youtube-channel-link"
+                 href="<%= h(channel_url) %>"
+                 target="_blank" rel="noopener noreferrer"
+                 title="Open this channel on YouTube">↗ Channel</a>
+            <% end %>
+          </div>
         </div>
       <% end %>
     </div>
