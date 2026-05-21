@@ -557,7 +557,7 @@ Filter Feeds on the /filter page doesn't work. Please fix.
 
 (Note: there is no `/filter` route — the filter UI lives on `/feeds` via `public/feeds-filter.js` from STUFF #27. The bug investigation paused mid-session; if it still mis-fires in prod, reproduce + capture which input/chip doesn't filter rows.)
 
-## [ ] 45. Sports team follow management
+## [x] 45. Sports team follow management
 
 Surfaced during the prod cutover: a freshly-signed-up user can't follow Eagles / Sixers / Union etc through the UI. The 4 hardcoded follows in `seed_sports_data.rb` were for user 1 only; new users see no scores at all on /sports.
 
@@ -609,9 +609,7 @@ What landed:
 
 Suite: 1342 / 0 on PG.
 
-## [ ] 48. Admin Pages
-
-## [ ] 48. Admin Pages
+## [x] 48. Admin Pages
 
 Simple analytics:
 
@@ -627,6 +625,10 @@ Make a proposal to add simple analytics to the admin area:
 Admin Simple Auth:
 
 For now, let's create the admin page by simple auth. I put credentials in the .env file. Be sure to include in our releases to production.
+
+**Shipped across two PRs:**
+- Analytics half — PR #140 (STUFF #48.1): `/admin/analytics` (90-day pageview chart + section breakdown + new-users-per-day) and `/admin/users` (user list with last-seen + LLM cost). Pageviews are recorded server-side by `RequestLogMiddleware`; 90-day retention sweep runs opportunistically.
+- Auth half — spawned its own item as **#49** (admin Basic Auth gate, PR #141). See #49 below for the full changelog.
 
 ## [x] 49. Admin Basic Auth gate
 
@@ -677,11 +679,17 @@ Let's do a beauty pass in on PR. Don't commit and open a PR until I view and app
 5. Brand renamed "Tech Feed Reader" → "Feeder" everywhere (header logo, document title, footer, `/about` body). Header gets a random animal emoji per page render from a 10-emoji pool (🐦 🦜 🐤 🦉 🦅 🦆 🦢 🐄 🐷 🐝) — bird-feeder pun first, barnyard for variety.
 6. Dark mode polish: background image moved to a fixed `body::before` and gets `filter: blur(10px) saturate(0.75) brightness(0.8)` plus a 0.40-opacity scrim — frosty texture, image still legible, foreground unaffected. Visited-link color set to soft #9ab5d8 (avoids the browser-default purple the user found hard to read).
 
-## [ ] 51. Sidekiq Basic Auth
+## [x] 51. Sidekiq Basic Auth
 
 Can you use the same Basic Auth credentials for Admin for Sidekiq?
 
-## [ ] 52. Sports Manage
+**Shipped.** `Sidekiq::Web` (mounted at `/admin/sidekiq` via `Rack::Builder`) is now wrapped with `Rack::Auth::Basic` reading the same `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars as #49's Sinatra-level admin gate. Fail-closed: `Auth.admin_credentials` returns nil when either var is unset/empty, so the auth block returns nil and Rack 401s — same posture as the rest of `/admin/*`. Constant-time compare via `Rack::Utils.secure_compare` on both username and password.
+
+**Why at the Rack::Builder level, not inside Sinatra**: `Sidekiq::Web` mounts BEFORE Sinatra in the boot block (`app/main.rb` Rack::Builder chain), so the existing Sinatra `before` filter from #49 never sees `/admin/sidekiq` requests. Wrapping at `Sidekiq::Web.use Rack::Auth::Basic` puts the gate where the requests actually flow.
+
+**Specs**: 12 examples in [spec/sidekiq_admin_gate_spec.rb](spec/sidekiq_admin_gate_spec.rb) — replay the same auth block against a stub inner app (the real boot block is gated on `__FILE__ == $PROGRAM_NAME` and doesn't run under RSpec). Covers fail-closed when env vars are missing, success with correct creds, 401 on wrong password / wrong username, and a mock-based check that `Rack::Utils.secure_compare` is the comparison used.
+
+## [x] 52. Sports Manage
 
 I just noticed that the sports manage page only has leagues that I care about. Sports is much wider than me, so we need to expand for popular world wide and popular leagues and teams. For example:
 
@@ -706,3 +714,21 @@ I don't know Africa or the Middle East, make sure they are represented.
 Women leagues should be highlighted and promoted.
 
 Sports is not just a US things. It is Global, let's be sure to 
+
+**Shipped across three PRs:**
+
+- **PR1 — Foundation** (#145): new `app/sports_catalog.rb` hand-curated module + sport-first `/sports/manage` browsing (sport → league → team drill-down). Seeded with 7 sports, women's leagues equal-weight (NBA + WNBA, MLS + NWSL, EPL + WSL, etc.), global representation (CAF, Copa Libertadores, AFC Asian Cup, FIFA M + W World Cup). Follow flow upserts catalog teams to the DB on demand so the live-scores pipeline keeps working off the same rows.
+- **PR2 — Breadth** (#146): 5 new sports (🏏 Cricket, ⛳ Golf, 🏸 Badminton, 🐎 Horse Racing, + Motorsport NASCAR/IndyCar/WEC) + soccer global depth (Bundesliga, Serie A, Saudi Pro League, Brasileirão, J1 League, WE League, Egyptian Premier League — plus Frauen-Bundesliga + Serie A Femminile for women's). 16 new leagues; +512 LOC data-only.
+- **PR3 — Feed wiring + player chips** (#147): `SPORTS_LEAGUE_FEEDS` bridge in `app/feed_catalog.rb` binding leagues → curated RSS URLs. New "News + podcasts" panel under each team grid with one-click `POST /sports/feeds/subscribe`. 16 new feed entries in `FeedCatalog::CATALOG` covering cricket / baseball / golf / motorsport / horse-racing / WNBA / women's + European + African soccer. Notable-player chips under top teams (Eagles, Sixers, Real Madrid, Bayern, IPL Mumbai/Chennai, F1 works teams). 6 new feed categories (`:cricket :baseball :golf :motorsport :badminton :horse_racing`).
+
+Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
+
+**Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
+
+## [ ] 53. Update the Logged Out Home Page
+
+The home page (welcome page) content appears to be stale. We've added a lot since te last time we updated, like Sports for example.
+
+Can you update it?
+
+And in the future, always review the welcome page after we implement a key, new feature.
