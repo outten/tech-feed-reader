@@ -557,7 +557,7 @@ Filter Feeds on the /filter page doesn't work. Please fix.
 
 (Note: there is no `/filter` route — the filter UI lives on `/feeds` via `public/feeds-filter.js` from STUFF #27. The bug investigation paused mid-session; if it still mis-fires in prod, reproduce + capture which input/chip doesn't filter rows.)
 
-## [ ] 45. Sports team follow management
+## [x] 45. Sports team follow management
 
 Surfaced during the prod cutover: a freshly-signed-up user can't follow Eagles / Sixers / Union etc through the UI. The 4 hardcoded follows in `seed_sports_data.rb` were for user 1 only; new users see no scores at all on /sports.
 
@@ -609,9 +609,7 @@ What landed:
 
 Suite: 1342 / 0 on PG.
 
-## [ ] 48. Admin Pages
-
-## [ ] 48. Admin Pages
+## [x] 48. Admin Pages
 
 Simple analytics:
 
@@ -627,6 +625,10 @@ Make a proposal to add simple analytics to the admin area:
 Admin Simple Auth:
 
 For now, let's create the admin page by simple auth. I put credentials in the .env file. Be sure to include in our releases to production.
+
+**Shipped across two PRs:**
+- Analytics half — PR #140 (STUFF #48.1): `/admin/analytics` (90-day pageview chart + section breakdown + new-users-per-day) and `/admin/users` (user list with last-seen + LLM cost). Pageviews are recorded server-side by `RequestLogMiddleware`; 90-day retention sweep runs opportunistically.
+- Auth half — spawned its own item as **#49** (admin Basic Auth gate, PR #141). See #49 below for the full changelog.
 
 ## [x] 49. Admin Basic Auth gate
 
@@ -681,7 +683,7 @@ Let's do a beauty pass in on PR. Don't commit and open a PR until I view and app
 
 Can you use the same Basic Auth credentials for Admin for Sidekiq?
 
-## [ ] 52. Sports Manage
+## [x] 52. Sports Manage
 
 I just noticed that the sports manage page only has leagues that I care about. Sports is much wider than me, so we need to expand for popular world wide and popular leagues and teams. For example:
 
@@ -706,3 +708,13 @@ I don't know Africa or the Middle East, make sure they are represented.
 Women leagues should be highlighted and promoted.
 
 Sports is not just a US things. It is Global, let's be sure to 
+
+**Shipped across three PRs:**
+
+- **PR1 — Foundation** (#145): new `app/sports_catalog.rb` hand-curated module + sport-first `/sports/manage` browsing (sport → league → team drill-down). Seeded with 7 sports, women's leagues equal-weight (NBA + WNBA, MLS + NWSL, EPL + WSL, etc.), global representation (CAF, Copa Libertadores, AFC Asian Cup, FIFA M + W World Cup). Follow flow upserts catalog teams to the DB on demand so the live-scores pipeline keeps working off the same rows.
+- **PR2 — Breadth** (#146): 5 new sports (🏏 Cricket, ⛳ Golf, 🏸 Badminton, 🐎 Horse Racing, + Motorsport NASCAR/IndyCar/WEC) + soccer global depth (Bundesliga, Serie A, Saudi Pro League, Brasileirão, J1 League, WE League, Egyptian Premier League — plus Frauen-Bundesliga + Serie A Femminile for women's). 16 new leagues; +512 LOC data-only.
+- **PR3 — Feed wiring + player chips** (#147): `SPORTS_LEAGUE_FEEDS` bridge in `app/feed_catalog.rb` binding leagues → curated RSS URLs. New "News + podcasts" panel under each team grid with one-click `POST /sports/feeds/subscribe`. 16 new feed entries in `FeedCatalog::CATALOG` covering cricket / baseball / golf / motorsport / horse-racing / WNBA / women's + European + African soccer. Notable-player chips under top teams (Eagles, Sixers, Real Madrid, Bayern, IPL Mumbai/Chennai, F1 works teams). 6 new feed categories (`:cricket :baseball :golf :motorsport :badminton :horse_racing`).
+
+Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
+
+**Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
