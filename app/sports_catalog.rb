@@ -216,6 +216,140 @@ module SportsCatalog
           ]
         },
         {
+          slug: 'bundesliga', name: 'Bundesliga', sport: 'soccer', women: false,
+          region: 'europe', country: 'DE',
+          source_provider: 'espn', external_id: 'soccer/ger.1',
+          blurb: 'Germany\'s top men\'s tier.',
+          teams: [
+            { slug: 'bayern',         name: 'Bayern Munich',        short_name: 'Bayern',
+              location: 'Munich' },
+            { slug: 'dortmund',       name: 'Borussia Dortmund',    short_name: 'Dortmund',
+              location: 'Dortmund' },
+            { slug: 'leverkusen',     name: 'Bayer 04 Leverkusen',  short_name: 'Leverkusen',
+              location: 'Leverkusen' },
+            { slug: 'rb-leipzig',     name: 'RB Leipzig',           short_name: 'RB Leipzig',
+              location: 'Leipzig' }
+          ]
+        },
+        {
+          slug: 'bundesliga-frauen', name: 'Frauen-Bundesliga', sport: 'soccer', women: true,
+          region: 'europe', country: 'DE',
+          blurb: 'Germany\'s top women\'s league.',
+          teams: [
+            { slug: 'bundesliga-w-bayern', name: 'Bayern Munich (W)',
+              short_name: 'Bayern', location: 'Munich' },
+            { slug: 'bundesliga-w-wolfsburg', name: 'VfL Wolfsburg (W)',
+              short_name: 'Wolfsburg', location: 'Wolfsburg' },
+            { slug: 'bundesliga-w-frankfurt', name: 'Eintracht Frankfurt (W)',
+              short_name: 'Frankfurt', location: 'Frankfurt' }
+          ]
+        },
+        {
+          slug: 'serie-a', name: 'Serie A', sport: 'soccer', women: false,
+          region: 'europe', country: 'IT',
+          source_provider: 'espn', external_id: 'soccer/ita.1',
+          blurb: 'Italy\'s top men\'s tier.',
+          teams: [
+            { slug: 'inter-milan',    name: 'Inter Milan',          short_name: 'Inter',
+              location: 'Milan' },
+            { slug: 'ac-milan',       name: 'AC Milan',             short_name: 'Milan',
+              location: 'Milan' },
+            { slug: 'juventus',       name: 'Juventus',             short_name: 'Juventus',
+              location: 'Turin' },
+            { slug: 'napoli',         name: 'Napoli',               short_name: 'Napoli',
+              location: 'Naples' },
+            { slug: 'as-roma',        name: 'AS Roma',              short_name: 'Roma',
+              location: 'Rome' }
+          ]
+        },
+        {
+          slug: 'serie-a-femminile', name: 'Serie A Femminile', sport: 'soccer', women: true,
+          region: 'europe', country: 'IT',
+          blurb: 'Italy\'s top women\'s tier.',
+          teams: [
+            { slug: 'serie-a-w-roma', name: 'AS Roma (W)',         short_name: 'Roma',
+              location: 'Rome' },
+            { slug: 'serie-a-w-juve', name: 'Juventus (W)',        short_name: 'Juventus',
+              location: 'Turin' },
+            { slug: 'serie-a-w-fiorentina', name: 'Fiorentina (W)', short_name: 'Fiorentina',
+              location: 'Florence' }
+          ]
+        },
+        {
+          slug: 'saudi-pro-league', name: 'Saudi Pro League', sport: 'soccer', women: false,
+          region: 'middle-east', country: 'SA',
+          blurb: 'Saudi Arabia\'s top flight; rapid global signings since 2023.',
+          teams: [
+            { slug: 'al-nassr',       name: 'Al-Nassr',             short_name: 'Al-Nassr',
+              location: 'Riyadh' },
+            { slug: 'al-hilal',       name: 'Al-Hilal',             short_name: 'Al-Hilal',
+              location: 'Riyadh' },
+            { slug: 'al-ittihad',     name: 'Al-Ittihad',           short_name: 'Al-Ittihad',
+              location: 'Jeddah' },
+            { slug: 'al-ahli-jeddah', name: 'Al-Ahli',              short_name: 'Al-Ahli',
+              location: 'Jeddah' }
+          ]
+        },
+        {
+          slug: 'brasileirao', name: 'Brasileirão Série A', sport: 'soccer', women: false,
+          region: 'south-america', country: 'BR',
+          source_provider: 'espn', external_id: 'soccer/bra.1',
+          blurb: 'Brazil\'s top men\'s tier.',
+          teams: [
+            { slug: 'brasileirao-flamengo', name: 'CR Flamengo',         short_name: 'Flamengo',
+              location: 'Rio de Janeiro' },
+            { slug: 'brasileirao-palmeiras', name: 'Palmeiras',           short_name: 'Palmeiras',
+              location: 'São Paulo' },
+            { slug: 'brasileirao-corinthians', name: 'Corinthians',       short_name: 'Corinthians',
+              location: 'São Paulo' },
+            { slug: 'brasileirao-sao-paulo', name: 'São Paulo FC',        short_name: 'São Paulo',
+              location: 'São Paulo' },
+            { slug: 'brasileirao-fluminense', name: 'Fluminense',         short_name: 'Fluminense',
+              location: 'Rio de Janeiro' }
+          ]
+        },
+        {
+          slug: 'j-league', name: 'J1 League', sport: 'soccer', women: false,
+          region: 'asia', country: 'JP',
+          blurb: 'Japan\'s top men\'s tier.',
+          teams: [
+            { slug: 'j-league-marinos', name: 'Yokohama F. Marinos', short_name: 'F. Marinos',
+              location: 'Yokohama' },
+            { slug: 'j-league-frontale', name: 'Kawasaki Frontale',   short_name: 'Frontale',
+              location: 'Kawasaki' },
+            { slug: 'j-league-vissel',  name: 'Vissel Kobe',          short_name: 'Vissel',
+              location: 'Kobe' },
+            { slug: 'j-league-urawa',   name: 'Urawa Red Diamonds',   short_name: 'Reds',
+              location: 'Saitama' }
+          ]
+        },
+        {
+          slug: 'wel-league', name: 'WE League', sport: 'soccer', women: true,
+          region: 'asia', country: 'JP',
+          blurb: 'Japan\'s first fully professional women\'s league (launched 2021).',
+          teams: [
+            { slug: 'we-league-inac', name: 'INAC Kobe Leonessa',       short_name: 'INAC Kobe',
+              location: 'Kobe' },
+            { slug: 'we-league-urawa', name: 'Mitsubishi Heavy Industries Urawa Reds Ladies',
+              short_name: 'Urawa Reds Ladies', location: 'Saitama' },
+            { slug: 'we-league-tokyo-verdy', name: 'Nippon TV Tokyo Verdy Beleza',
+              short_name: 'Tokyo Verdy Beleza', location: 'Tokyo' }
+          ]
+        },
+        {
+          slug: 'egyptian-premier', name: 'Egyptian Premier League', sport: 'soccer', women: false,
+          region: 'africa', country: 'EG',
+          blurb: 'Egypt\'s top tier; the Cairo derby is one of Africa\'s biggest matches.',
+          teams: [
+            { slug: 'al-ahly',         name: 'Al Ahly SC',          short_name: 'Al Ahly',
+              location: 'Cairo' },
+            { slug: 'zamalek',         name: 'Zamalek SC',          short_name: 'Zamalek',
+              location: 'Cairo' },
+            { slug: 'pyramids',        name: 'Pyramids FC',         short_name: 'Pyramids',
+              location: 'Cairo' }
+          ]
+        },
+        {
           slug: 'caf-afcon', name: 'Africa Cup of Nations', sport: 'soccer', women: false,
           region: 'africa', country: nil,
           blurb: 'CAF Africa Cup of Nations — biennial men\'s national-team championship.',
@@ -434,7 +568,7 @@ module SportsCatalog
       name: 'Motorsport',
       emoji: '🏎️',
       region: 'global',
-      blurb: 'F1 + F1 Academy. NASCAR + IndyCar arrive in PR 2.',
+      blurb: 'F1 + F1 Academy + NASCAR + IndyCar + endurance.',
       leagues: [
         {
           slug: 'formula-1', name: 'Formula 1', sport: 'motorsport', women: false,
@@ -448,7 +582,11 @@ module SportsCatalog
             { slug: 'f1-ferrari',   name: 'Scuderia Ferrari',      short_name: 'Ferrari',
               location: 'Maranello, IT' },
             { slug: 'f1-mclaren',   name: 'McLaren F1 Team',       short_name: 'McLaren',
-              location: 'Woking, UK' }
+              location: 'Woking, UK' },
+            { slug: 'f1-aston-martin', name: 'Aston Martin Aramco F1', short_name: 'Aston Martin',
+              location: 'Silverstone, UK' },
+            { slug: 'f1-williams',  name: 'Williams Racing',       short_name: 'Williams',
+              location: 'Grove, UK' }
           ]
         },
         {
@@ -456,6 +594,378 @@ module SportsCatalog
           region: 'global', country: nil,
           blurb: 'Women-only single-seater championship feeding the F1 pyramid.',
           teams: []  # F1 Academy is driver-focused, not team-focused
+        },
+        {
+          slug: 'nascar-cup', name: 'NASCAR Cup Series', sport: 'motorsport', women: false,
+          region: 'us', country: 'US',
+          blurb: "Top tier of US stock-car racing.",
+          teams: [
+            { slug: 'nascar-hendrick',     name: 'Hendrick Motorsports',
+              short_name: 'Hendrick',         location: 'Concord, NC' },
+            { slug: 'nascar-joe-gibbs',    name: 'Joe Gibbs Racing',
+              short_name: 'JGR',              location: 'Huntersville, NC' },
+            { slug: 'nascar-penske',       name: 'Team Penske',
+              short_name: 'Penske',           location: 'Mooresville, NC' },
+            { slug: 'nascar-stewart-haas', name: 'Stewart-Haas Racing',
+              short_name: 'SHR',              location: 'Kannapolis, NC' }
+          ]
+        },
+        {
+          slug: 'indycar', name: 'IndyCar Series', sport: 'motorsport', women: false,
+          region: 'us', country: 'US',
+          blurb: "US open-wheel; the Indianapolis 500 is the season highlight.",
+          teams: [
+            { slug: 'indy-penske',          name: 'Team Penske',
+              short_name: 'Penske',           location: 'Mooresville, NC' },
+            { slug: 'indy-ganassi',         name: 'Chip Ganassi Racing',
+              short_name: 'Ganassi',          location: 'Indianapolis, IN' },
+            { slug: 'indy-andretti',        name: 'Andretti Global',
+              short_name: 'Andretti',         location: 'Indianapolis, IN' },
+            { slug: 'indy-arrow-mclaren',   name: 'Arrow McLaren',
+              short_name: 'Arrow McLaren',    location: 'Indianapolis, IN' }
+          ]
+        },
+        {
+          slug: 'wec', name: 'FIA World Endurance Championship', sport: 'motorsport', women: false,
+          region: 'global', country: nil,
+          blurb: "Sportscar endurance racing; Le Mans 24 is the crown jewel.",
+          teams: [
+            { slug: 'wec-toyota',   name: 'Toyota Gazoo Racing', short_name: 'Toyota',
+              location: 'Cologne, DE' },
+            { slug: 'wec-ferrari',  name: 'Ferrari AF Corse',    short_name: 'Ferrari',
+              location: 'Maranello, IT' },
+            { slug: 'wec-porsche',  name: 'Porsche Penske Motorsport', short_name: 'Porsche',
+              location: 'Stuttgart, DE' },
+            { slug: 'wec-cadillac', name: 'Cadillac Hertz Team Jota', short_name: 'Cadillac',
+              location: 'Detroit, US / Huntingdon, UK' }
+          ]
+        }
+      ]
+    },
+
+    'cricket' => {
+      name: 'Cricket',
+      emoji: '🏏',
+      region: 'global',
+      blurb: 'Global. Test, ODI, T20. Women\'s competitions equal-weight from the top.',
+      leagues: [
+        {
+          slug: 'icc-mens', name: "ICC Men's Cricket", sport: 'cricket', women: false,
+          region: 'global', country: nil,
+          blurb: 'International men\'s cricket: World Cups, Test Championships, T20 Internationals.',
+          teams: [
+            { slug: 'cricket-india',     name: 'India',     short_name: 'India',     location: 'India' },
+            { slug: 'cricket-australia', name: 'Australia', short_name: 'Australia', location: 'Australia' },
+            { slug: 'cricket-england',   name: 'England',   short_name: 'England',   location: 'England' },
+            { slug: 'cricket-pakistan',  name: 'Pakistan',  short_name: 'Pakistan',  location: 'Pakistan' },
+            { slug: 'cricket-south-africa', name: 'South Africa', short_name: 'South Africa',
+              location: 'South Africa' },
+            { slug: 'cricket-new-zealand', name: 'New Zealand', short_name: 'New Zealand',
+              location: 'New Zealand' },
+            { slug: 'cricket-west-indies', name: 'West Indies', short_name: 'West Indies',
+              location: 'Caribbean' }
+          ]
+        },
+        {
+          slug: 'icc-womens', name: "ICC Women's Cricket", sport: 'cricket', women: true,
+          region: 'global', country: nil,
+          blurb: 'International women\'s cricket — Women\'s World Cup, T20 World Cup.',
+          teams: [
+            { slug: 'wcricket-australia', name: 'Australia', short_name: 'Australia',
+              location: 'Australia' },
+            { slug: 'wcricket-england',   name: 'England',   short_name: 'England',
+              location: 'England' },
+            { slug: 'wcricket-india',     name: 'India',     short_name: 'India',
+              location: 'India' },
+            { slug: 'wcricket-south-africa', name: 'South Africa', short_name: 'South Africa',
+              location: 'South Africa' },
+            { slug: 'wcricket-new-zealand', name: 'New Zealand', short_name: 'New Zealand',
+              location: 'New Zealand' }
+          ]
+        },
+        {
+          slug: 'ipl', name: 'Indian Premier League', sport: 'cricket', women: false,
+          region: 'asia', country: 'IN',
+          blurb: 'Premier men\'s T20 franchise league.',
+          teams: [
+            { slug: 'ipl-mumbai',     name: 'Mumbai Indians',        short_name: 'Mumbai',
+              location: 'Mumbai' },
+            { slug: 'ipl-chennai',    name: 'Chennai Super Kings',   short_name: 'Chennai',
+              location: 'Chennai' },
+            { slug: 'ipl-kolkata',    name: 'Kolkata Knight Riders', short_name: 'Kolkata',
+              location: 'Kolkata' },
+            { slug: 'ipl-rcb',        name: 'Royal Challengers Bengaluru', short_name: 'RCB',
+              location: 'Bengaluru' },
+            { slug: 'ipl-delhi',      name: 'Delhi Capitals',        short_name: 'Delhi',
+              location: 'Delhi' },
+            { slug: 'ipl-rajasthan',  name: 'Rajasthan Royals',      short_name: 'Rajasthan',
+              location: 'Jaipur' }
+          ]
+        },
+        {
+          slug: 'wpl', name: "Women's Premier League", sport: 'cricket', women: true,
+          region: 'asia', country: 'IN',
+          blurb: 'India\'s women\'s T20 franchise league.',
+          teams: [
+            { slug: 'wpl-mumbai',     name: 'Mumbai Indians (W)',       short_name: 'Mumbai',
+              location: 'Mumbai' },
+            { slug: 'wpl-delhi',      name: 'Delhi Capitals (W)',       short_name: 'Delhi',
+              location: 'Delhi' },
+            { slug: 'wpl-rcb',        name: 'Royal Challengers Bengaluru (W)', short_name: 'RCB',
+              location: 'Bengaluru' },
+            { slug: 'wpl-up',         name: 'UP Warriorz',              short_name: 'UP Warriorz',
+              location: 'Uttar Pradesh' },
+            { slug: 'wpl-gujarat',    name: 'Gujarat Giants (W)',       short_name: 'Gujarat',
+              location: 'Gujarat' }
+          ]
+        },
+        {
+          slug: 'bbl', name: 'Big Bash League', sport: 'cricket', women: false,
+          region: 'oceania', country: 'AU',
+          blurb: 'Australian men\'s T20 league.',
+          teams: [
+            { slug: 'bbl-sixers',    name: 'Sydney Sixers',       short_name: 'Sixers',
+              location: 'Sydney' },
+            { slug: 'bbl-thunder',   name: 'Sydney Thunder',      short_name: 'Thunder',
+              location: 'Sydney' },
+            { slug: 'bbl-stars',     name: 'Melbourne Stars',     short_name: 'Stars',
+              location: 'Melbourne' },
+            { slug: 'bbl-renegades', name: 'Melbourne Renegades', short_name: 'Renegades',
+              location: 'Melbourne' },
+            { slug: 'bbl-perth',     name: 'Perth Scorchers',     short_name: 'Scorchers',
+              location: 'Perth' }
+          ]
+        },
+        {
+          slug: 'wbbl', name: "Women's Big Bash League", sport: 'cricket', women: true,
+          region: 'oceania', country: 'AU',
+          blurb: 'Australia\'s women\'s T20 league.',
+          teams: [
+            { slug: 'wbbl-sixers',    name: 'Sydney Sixers (W)',    short_name: 'Sixers',
+              location: 'Sydney' },
+            { slug: 'wbbl-thunder',   name: 'Sydney Thunder (W)',   short_name: 'Thunder',
+              location: 'Sydney' },
+            { slug: 'wbbl-stars',     name: 'Melbourne Stars (W)',  short_name: 'Stars',
+              location: 'Melbourne' },
+            { slug: 'wbbl-perth',     name: 'Perth Scorchers (W)',  short_name: 'Scorchers',
+              location: 'Perth' }
+          ]
+        },
+        {
+          slug: 'the-hundred-men', name: 'The Hundred (Men\'s)', sport: 'cricket', women: false,
+          region: 'europe', country: 'GB',
+          blurb: '100-ball short-format league in England + Wales.',
+          teams: [
+            { slug: 'hundred-trent', name: 'Trent Rockets',        short_name: 'Trent Rockets',
+              location: 'Nottingham' },
+            { slug: 'hundred-oval',  name: 'Oval Invincibles',     short_name: 'Oval',
+              location: 'London' },
+            { slug: 'hundred-spirit', name: 'London Spirit',       short_name: 'Spirit',
+              location: 'London' },
+            { slug: 'hundred-superchargers', name: 'Northern Superchargers',
+              short_name: 'Superchargers', location: 'Leeds' }
+          ]
+        },
+        {
+          slug: 'the-hundred-women', name: 'The Hundred (Women\'s)', sport: 'cricket', women: true,
+          region: 'europe', country: 'GB',
+          blurb: 'The women\'s side of England\'s 100-ball league.',
+          teams: [
+            { slug: 'hundred-w-oval', name: 'Oval Invincibles (W)', short_name: 'Oval',
+              location: 'London' },
+            { slug: 'hundred-w-trent', name: 'Trent Rockets (W)',   short_name: 'Trent Rockets',
+              location: 'Nottingham' },
+            { slug: 'hundred-w-spirit', name: 'London Spirit (W)',  short_name: 'Spirit',
+              location: 'London' }
+          ]
+        }
+      ]
+    },
+
+    'golf' => {
+      name: 'Golf',
+      emoji: '⛳',
+      region: 'global',
+      blurb: 'PGA + LPGA + DP World + LET. Majors run across all tours.',
+      leagues: [
+        {
+          slug: 'pga-tour', name: 'PGA Tour', sport: 'golf', women: false,
+          region: 'us', country: 'US',
+          blurb: 'Top men\'s professional tour.',
+          teams: [
+            { slug: 'golf-scheffler', name: 'Scottie Scheffler', short_name: 'Scheffler',
+              location: 'USA' },
+            { slug: 'golf-mcilroy',   name: 'Rory McIlroy',      short_name: 'McIlroy',
+              location: 'Northern Ireland' },
+            { slug: 'golf-rahm',      name: 'Jon Rahm',          short_name: 'Rahm',
+              location: 'Spain' },
+            { slug: 'golf-schauffele', name: 'Xander Schauffele', short_name: 'Schauffele',
+              location: 'USA' },
+            { slug: 'golf-koepka',    name: 'Brooks Koepka',     short_name: 'Koepka',
+              location: 'USA' }
+          ]
+        },
+        {
+          slug: 'lpga', name: 'LPGA Tour', sport: 'golf', women: true,
+          region: 'us', country: 'US',
+          blurb: 'Top women\'s professional tour.',
+          teams: [
+            { slug: 'lpga-korda',    name: 'Nelly Korda',       short_name: 'Korda',
+              location: 'USA' },
+            { slug: 'lpga-ko',       name: 'Lydia Ko',          short_name: 'Ko',
+              location: 'New Zealand' },
+            { slug: 'lpga-thitikul', name: 'Atthaya Thitikul',  short_name: 'Thitikul',
+              location: 'Thailand' },
+            { slug: 'lpga-zhang',    name: 'Rose Zhang',        short_name: 'Zhang',
+              location: 'USA' },
+            { slug: 'lpga-furue',    name: 'Ayaka Furue',       short_name: 'Furue',
+              location: 'Japan' }
+          ]
+        },
+        {
+          slug: 'dp-world-tour', name: 'DP World Tour', sport: 'golf', women: false,
+          region: 'europe', country: nil,
+          blurb: 'European men\'s tour (formerly European Tour).',
+          teams: [
+            { slug: 'dp-fleetwood', name: 'Tommy Fleetwood', short_name: 'Fleetwood',
+              location: 'England' },
+            { slug: 'dp-hovland',   name: 'Viktor Hovland',  short_name: 'Hovland',
+              location: 'Norway' },
+            { slug: 'dp-rai',       name: 'Aaron Rai',       short_name: 'Rai',
+              location: 'England' }
+          ]
+        },
+        {
+          slug: 'ladies-european', name: 'Ladies European Tour', sport: 'golf', women: true,
+          region: 'europe', country: nil,
+          blurb: "Europe's women's tour.",
+          teams: [
+            { slug: 'let-pedersen', name: 'Emily Kristine Pedersen', short_name: 'Pedersen',
+              location: 'Denmark' },
+            { slug: 'let-hall',     name: 'Georgia Hall',     short_name: 'Hall',
+              location: 'England' },
+            { slug: 'let-grant',    name: 'Linn Grant',       short_name: 'Grant',
+              location: 'Sweden' }
+          ]
+        },
+        {
+          slug: 'liv-golf', name: 'LIV Golf', sport: 'golf', women: false,
+          region: 'global', country: nil,
+          blurb: 'Saudi-backed breakaway league; team-based 54-hole format.',
+          teams: [
+            { slug: 'liv-4aces',     name: '4Aces GC',     short_name: '4Aces',
+              location: 'USA' },
+            { slug: 'liv-rangegoats', name: 'RangeGoats GC', short_name: 'RangeGoats',
+              location: 'USA' },
+            { slug: 'liv-stinger',   name: 'Stinger GC',   short_name: 'Stinger',
+              location: 'South Africa' },
+            { slug: 'liv-fireballs', name: 'Fireballs GC', short_name: 'Fireballs',
+              location: 'Spain' }
+          ]
+        }
+      ]
+    },
+
+    'badminton' => {
+      name: 'Badminton',
+      emoji: '🏸',
+      region: 'global',
+      blurb: 'BWF World Tour. Indonesia, Denmark, China, Japan dominate; talent global.',
+      leagues: [
+        {
+          slug: 'bwf-mens', name: "BWF World Tour — Men's Singles", sport: 'badminton', women: false,
+          region: 'global', country: nil,
+          blurb: 'BWF flagship men\'s singles tour.',
+          teams: [
+            { slug: 'bwf-axelsen',    name: 'Viktor Axelsen',     short_name: 'Axelsen',
+              location: 'Denmark' },
+            { slug: 'bwf-shi-yuqi',   name: 'Shi Yuqi',           short_name: 'Shi Yuqi',
+              location: 'China' },
+            { slug: 'bwf-momota',     name: 'Kento Momota',       short_name: 'Momota',
+              location: 'Japan' },
+            { slug: 'bwf-ginting',    name: 'Anthony Ginting',    short_name: 'Ginting',
+              location: 'Indonesia' },
+            { slug: 'bwf-lakshya-sen', name: 'Lakshya Sen',       short_name: 'Lakshya Sen',
+              location: 'India' }
+          ]
+        },
+        {
+          slug: 'bwf-womens', name: "BWF World Tour — Women's Singles", sport: 'badminton', women: true,
+          region: 'global', country: nil,
+          blurb: 'BWF flagship women\'s singles tour.',
+          teams: [
+            { slug: 'bwf-an-se-young', name: 'An Se-young',       short_name: 'An Se-young',
+              location: 'South Korea' },
+            { slug: 'bwf-yamaguchi',   name: 'Akane Yamaguchi',   short_name: 'Yamaguchi',
+              location: 'Japan' },
+            { slug: 'bwf-chen-yufei',  name: 'Chen Yufei',        short_name: 'Chen Yufei',
+              location: 'China' },
+            { slug: 'bwf-marin',       name: 'Carolina Marín',    short_name: 'Marín',
+              location: 'Spain' },
+            { slug: 'bwf-sindhu',      name: 'P. V. Sindhu',      short_name: 'Sindhu',
+              location: 'India' }
+          ]
+        }
+      ]
+    },
+
+    'horse-racing' => {
+      name: 'Horse Racing',
+      emoji: '🐎',
+      region: 'global',
+      blurb: 'Flat + jumps. Triple Crowns in US + UK; Dubai\'s World Cup is the richest single day.',
+      leagues: [
+        {
+          slug: 'us-triple-crown', name: 'US Triple Crown', sport: 'horse-racing', women: false,
+          region: 'us', country: 'US',
+          blurb: 'Kentucky Derby → Preakness → Belmont. Three races, five weeks.',
+          teams: [
+            { slug: 'race-kentucky-derby', name: 'Kentucky Derby',
+              short_name: 'Kentucky Derby', location: 'Louisville, KY' },
+            { slug: 'race-preakness',      name: 'Preakness Stakes',
+              short_name: 'Preakness',     location: 'Baltimore, MD' },
+            { slug: 'race-belmont',        name: 'Belmont Stakes',
+              short_name: 'Belmont',       location: 'New York, NY' },
+            { slug: 'race-breeders-cup',   name: "Breeders' Cup World Championships",
+              short_name: "Breeders' Cup", location: 'USA' }
+          ]
+        },
+        {
+          slug: 'uk-flat', name: 'UK Flat Racing', sport: 'horse-racing', women: false,
+          region: 'europe', country: 'GB',
+          blurb: 'Royal Ascot, the Derby at Epsom, St Leger — Britain\'s classic flat-racing schedule.',
+          teams: [
+            { slug: 'race-royal-ascot',    name: 'Royal Ascot',          short_name: 'Royal Ascot',
+              location: 'Ascot, England' },
+            { slug: 'race-epsom-derby',    name: 'Epsom Derby',          short_name: 'Epsom Derby',
+              location: 'Epsom, England' },
+            { slug: 'race-st-leger',       name: 'St Leger Stakes',      short_name: 'St Leger',
+              location: 'Doncaster, England' },
+            { slug: 'race-2000-guineas',   name: '2000 Guineas',         short_name: '2000 Guineas',
+              location: 'Newmarket, England' }
+          ]
+        },
+        {
+          slug: 'uk-jumps', name: 'UK Jumps Racing', sport: 'horse-racing', women: false,
+          region: 'europe', country: 'GB',
+          blurb: "Cheltenham Festival + Grand National headline the National Hunt calendar.",
+          teams: [
+            { slug: 'race-cheltenham',     name: 'Cheltenham Festival', short_name: 'Cheltenham',
+              location: 'Cheltenham, England' },
+            { slug: 'race-grand-national', name: 'Grand National',      short_name: 'Grand National',
+              location: 'Aintree, England' }
+          ]
+        },
+        {
+          slug: 'dubai-world-cup', name: 'Dubai World Cup', sport: 'horse-racing', women: false,
+          region: 'middle-east', country: 'AE',
+          blurb: 'The richest single-day card in racing. UAE\'s flagship meeting.',
+          teams: [
+            { slug: 'race-dubai-world-cup', name: 'Dubai World Cup',    short_name: 'Dubai World Cup',
+              location: 'Meydan, UAE' },
+            { slug: 'race-dubai-turf',      name: 'Dubai Turf',         short_name: 'Dubai Turf',
+              location: 'Meydan, UAE' }
+          ]
         }
       ]
     }
