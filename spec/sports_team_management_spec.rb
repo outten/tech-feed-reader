@@ -144,6 +144,54 @@ RSpec.describe 'Sports team management (STUFF #45)' do
       expect(last_response.status).to eq(200)
       expect(last_response.body).to include('No teams listed')
     end
+
+    # STUFF #52 PR3 — News + podcasts panel under the team grid.
+    it "renders the curated feeds panel with a Subscribe button per feed" do
+      get '/sports/manage/football/nfl'
+      expect(last_response.body).to include('News + podcasts')
+      expect(last_response.body).to include('Bleeding Green Nation')
+      expect(last_response.body).to include('+ Subscribe')
+    end
+
+    it "flips Subscribe → ✓ Subscribed when the user already has that feed" do
+      FeedsStore.add_for_user(user_id: 1,
+                              url: 'https://www.bleedinggreennation.com/rss/index.xml',
+                              title: 'Bleeding Green Nation',
+                              fetch_interval_seconds: FeedsStore::PUBLISHER_INTERVAL,
+                              topic: 'sports')
+      get '/sports/manage/football/nfl'
+      expect(last_response.body).to include('✓ Subscribed')
+    end
+
+    # STUFF #52 PR3 — notable-players line on each team card.
+    it "lists notable players under the team name when the catalog has them" do
+      get '/sports/manage/football/nfl'
+      expect(last_response.body).to include('Jalen Hurts')
+      expect(last_response.body).to match(/sports-manage-team-players/)
+    end
+  end
+
+  describe 'POST /sports/feeds/subscribe' do
+    it 'subscribes the user to the URL when it\'s in the FeedCatalog' do
+      url = 'https://www.bleedinggreennation.com/rss/index.xml'
+      expect(FeedsStore.for_user(1).map { |f| f['url'] }).not_to include(url)
+      post '/sports/feeds/subscribe', url: url, return_to: '/sports/manage/football/nfl'
+      expect(last_response).to be_redirect
+      expect(FeedsStore.for_user(1).map { |f| f['url'] }).to include(url)
+    end
+
+    it 'is idempotent on a re-subscribe (still redirects)' do
+      url = 'https://www.bleedinggreennation.com/rss/index.xml'
+      FeedsStore.add_for_user(user_id: 1, url: url, title: 'Bleeding Green Nation',
+                              fetch_interval_seconds: FeedsStore::PUBLISHER_INTERVAL, topic: 'sports')
+      post '/sports/feeds/subscribe', url: url
+      expect(last_response).to be_redirect
+    end
+
+    it '422s when the URL isn\'t in the FeedCatalog (no arbitrary subscribes)' do
+      post '/sports/feeds/subscribe', url: 'https://malicious.example.com/rss'
+      expect(last_response.status).to eq(422)
+    end
   end
 
   describe 'POST /sports/teams/follow' do

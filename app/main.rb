@@ -1803,7 +1803,37 @@ class TechFeedReader < Sinatra::Base
     @page_title    = "#{@league[:name]} — Manage"
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
                                         .map { |f| f['value'] }.to_set
+    # STUFF #52 PR3 — curated RSS feeds for this league + which the
+    # user is already subscribed to (so the button can flip).
+    @league_feeds   = FeedCatalog.feeds_for_sports_league(@league[:slug])
+    @subscribed_urls = FeedsStore.for_user(current_user_id)
+                                 .map { |f| f['url'] }.to_set
     erb :sports_manage_league
+  end
+
+  # STUFF #52 PR3 — one-click subscribe from a sports league page.
+  # Validates the URL is in the catalog (no arbitrary URLs accepted),
+  # subscribes the user (idempotent), and returns to the page they
+  # came from. Mirrors POST /feeds/catalog/add but redirects back to
+  # the league instead of /feeds.
+  post '/sports/feeds/subscribe' do
+    url   = params['url'].to_s.strip
+    entry = FeedCatalog.find_by_url(url)
+    return_to = params['return_to'].to_s
+    return_to = '/sports/manage' if return_to.empty?
+    halt 422, 'not in catalog' unless entry
+
+    _feed, inserted = FeedsStore.add_for_user(
+      user_id: current_user_id,
+      url: entry[:url], title: entry[:title],
+      fetch_interval_seconds: entry[:interval],
+      topic: FeedCatalog.topic_for(entry).to_s
+    )
+    AppLogger.info(
+      inserted ? 'sports_feed_subscribed' : 'sports_feed_already_subscribed',
+      url: entry[:url], title: entry[:title]
+    )
+    redirect to(return_to)
   end
 
   # POST /sports/teams/follow — add the team to the user's follows

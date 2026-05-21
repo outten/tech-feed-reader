@@ -37,12 +37,18 @@ module FeedCatalog
     development: 'Software development',
     personal:    'Personal blogs',
     podcast:     'Podcasts',
-    # Sports (Phase S2)
-    nfl:         'NFL',
-    nba:         'NBA',
-    soccer:      'Soccer (MLS / international)',
-    rugby:       'Rugby',
-    tennis:      'Tennis',
+    # Sports (Phase S2 + STUFF #52)
+    nfl:           'NFL',
+    nba:           'NBA / Basketball',
+    soccer:        'Soccer',
+    rugby:         'Rugby',
+    tennis:        'Tennis',
+    cricket:       'Cricket',
+    baseball:      'Baseball',
+    golf:          'Golf',
+    motorsport:    'Motorsport (F1 / NASCAR / IndyCar)',
+    badminton:     'Badminton',
+    horse_racing:  'Horse Racing',
     # STUFF.md #16 — nature / documentary YouTube channels
     youtube_nature: 'Nature & wildlife (YouTube)',
     # Phase 2 follow-up (2026-05-12) — sports YouTube channels so
@@ -66,11 +72,17 @@ module FeedCatalog
     development: :technology,
     personal:    :technology,
     podcast:     :technology,
-    nfl:         :sports,
-    nba:         :sports,
-    soccer:      :sports,
-    rugby:       :sports,
-    tennis:      :sports,
+    nfl:           :sports,
+    nba:           :sports,
+    soccer:        :sports,
+    rugby:         :sports,
+    tennis:        :sports,
+    cricket:       :sports,
+    baseball:      :sports,
+    golf:          :sports,
+    motorsport:    :sports,
+    badminton:     :sports,
+    horse_racing:  :sports,
     youtube_nature: :nature,
     youtube_sports: :sports,
     mythos:      :technology
@@ -362,6 +374,96 @@ module FeedCatalog
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'David Law (BBC) + Catherine Whitaker (Eurosport) covering ATP, WTA, and all four Grand Slams.' },
 
+    # ============================================================
+    # STUFF #52 PR3 — sports breadth feeds keyed to SportsCatalog
+    # leagues. Each URL is BBC Sport, ESPN, or a league-official
+    # source — long-stable hosts where the per-sport RSS path is
+    # well-known. Bound to SportsCatalog leagues via the
+    # SPORTS_LEAGUE_FEEDS map below.
+    # ============================================================
+
+    # Soccer — global tier
+    { url: 'https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml',
+      title: 'BBC Sport — Premier League', category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC Sport coverage of the English top flight.' },
+    { url: 'https://feeds.bbci.co.uk/sport/football/womens/rss.xml',
+      title: "BBC Sport — Women's Football", category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'WSL, Lionesses, international women\'s football.' },
+    { url: 'https://feeds.bbci.co.uk/sport/football/european/rss.xml',
+      title: 'BBC Sport — European Football', category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'La Liga, Serie A, Bundesliga, Ligue 1 + Champions League.' },
+    { url: 'https://feeds.bbci.co.uk/sport/football/african/rss.xml',
+      title: 'BBC Sport — African Football', category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'CAF Africa Cup of Nations, AFCON, club football across the continent.' },
+
+    # Cricket
+    { url: 'https://feeds.bbci.co.uk/sport/cricket/rss.xml',
+      title: 'BBC Sport — Cricket', category: :cricket,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'England, women\'s cricket, ICC tournaments + The Hundred.' },
+    { url: 'https://www.espn.com/espn/rss/cricinfo/news',
+      title: 'ESPNcricinfo', category: :cricket,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Global cricket coverage — Tests, ODIs, T20s, all major leagues.' },
+
+    # Baseball
+    { url: 'https://www.espn.com/espn/rss/mlb/news',
+      title: 'ESPN MLB', category: :baseball,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Major League Baseball news + analysis from ESPN.' },
+
+    # Golf
+    { url: 'https://www.espn.com/espn/rss/golf/news',
+      title: 'ESPN Golf', category: :golf,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'PGA Tour, LPGA, DP World Tour, majors.' },
+    { url: 'https://feeds.bbci.co.uk/sport/golf/rss.xml',
+      title: 'BBC Sport — Golf', category: :golf,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'UK-side golf coverage; majors and Ryder Cup heavy.' },
+
+    # Motorsport
+    { url: 'https://feeds.bbci.co.uk/sport/formula1/rss.xml',
+      title: 'BBC Sport — Formula 1', category: :motorsport,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'F1 race weekends, driver moves, team news.' },
+    { url: 'https://www.espn.com/espn/rss/rpm/news',
+      title: 'ESPN Motorsport', category: :motorsport,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NASCAR + IndyCar + Formula 1 from ESPN.' },
+
+    # Basketball — WNBA
+    { url: 'https://www.espn.com/espn/rss/wnba/news',
+      title: 'ESPN WNBA', category: :nba,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'WNBA news, game recaps, player moves.' },
+    { url: 'https://www.espn.com/espn/rss/nba/news',
+      title: 'ESPN NBA', category: :nba,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NBA news + columns from ESPN.' },
+
+    # Horse Racing
+    { url: 'https://feeds.bbci.co.uk/sport/horse-racing/rss.xml',
+      title: 'BBC Sport — Horse Racing', category: :horse_racing,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'UK flat + jumps coverage; Royal Ascot, Cheltenham, Grand National.' },
+
+    # NFL (additional general source)
+    { url: 'https://www.espn.com/espn/rss/nfl/news',
+      title: 'ESPN NFL', category: :nfl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NFL news + analysis from ESPN.' },
+
+    # MLS (additional general source)
+    { url: 'https://www.espn.com/espn/rss/soccer/news',
+      title: 'ESPN Soccer', category: :soccer,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Global soccer coverage from ESPN — MLS, EPL, La Liga, international.' },
+
     # ---- Nature & Documentary (YouTube) -------------------------------
     # STUFF.md #16. YouTube exposes a standard Atom feed per channel at
     # /feeds/videos.xml?channel_id=UC... — FeedParser handles this with
@@ -558,5 +660,219 @@ module FeedCatalog
            .sort_by { |(_, s)| -s }
            .first(limit)
            .map(&:first)
+  end
+
+  # STUFF #52 PR3 — bridge from SportsCatalog league slugs to a curated
+  # list of FeedCatalog URLs. Lets /sports/manage/:sport/:league render
+  # a "News + podcasts" subscribe panel without polluting either
+  # catalog with cross-references. Many leagues share feeds (BBC
+  # Cricket covers ICC + WPL + IPL + The Hundred), so this is a
+  # many-to-many: each league lists every URL that meaningfully
+  # covers it.
+  SPORTS_LEAGUE_FEEDS = {
+    # Football
+    'nfl' => %w[
+      https://www.bleedinggreennation.com/rss/index.xml
+      https://www.espn.com/espn/rss/nfl/news
+      https://feeds.megaphone.fm/VMP9406149033
+    ],
+    # Basketball
+    'nba' => %w[
+      https://www.libertyballers.com/rss/index.xml
+      https://www.espn.com/espn/rss/nba/news
+      https://feeds.simplecast.com/jxr32ewl
+    ],
+    'wnba' => %w[
+      https://www.espn.com/espn/rss/wnba/news
+    ],
+    'euroleague' => %w[
+      https://feeds.bbci.co.uk/sport/football/european/rss.xml
+    ],
+    # Soccer
+    'mls' => %w[
+      https://phillysoccerpage.net/feed/
+      https://www.espn.com/espn/rss/soccer/news
+      https://phillysoccerpage.net/category/podcasts/all-three-points/feed/
+    ],
+    'nwsl' => %w[
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'epl' => %w[
+      https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'wsl' => %w[
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+    ],
+    'la-liga' => %w[
+      https://feeds.bbci.co.uk/sport/football/european/rss.xml
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'liga-mx' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'bundesliga' => %w[
+      https://feeds.bbci.co.uk/sport/football/european/rss.xml
+    ],
+    'bundesliga-frauen' => %w[
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+    ],
+    'serie-a' => %w[
+      https://feeds.bbci.co.uk/sport/football/european/rss.xml
+    ],
+    'serie-a-femminile' => %w[
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+    ],
+    'saudi-pro-league' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'brasileirao' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'j-league' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'wel-league' => %w[
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+    ],
+    'egyptian-premier' => %w[
+      https://feeds.bbci.co.uk/sport/football/african/rss.xml
+    ],
+    'caf-afcon' => %w[
+      https://feeds.bbci.co.uk/sport/football/african/rss.xml
+    ],
+    'caf-wafcon' => %w[
+      https://feeds.bbci.co.uk/sport/football/african/rss.xml
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+    ],
+    'copa-libertadores' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'afc-asian-cup' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+    ],
+    'fifa-world' => %w[
+      https://www.espn.com/espn/rss/soccer/news
+      https://feeds.bbci.co.uk/sport/football/european/rss.xml
+    ],
+    'fifa-womens-world' => %w[
+      https://feeds.bbci.co.uk/sport/football/womens/rss.xml
+    ],
+    # Rugby
+    'rugby-championship' => %w[
+      https://feeds.bbci.co.uk/sport/rugby-union/rss.xml
+      https://www.rnz.co.nz/rss/sport.xml
+      https://feeds.acast.com/public/shows/aotearoa-rugby-pod
+      https://feeds.megaphone.fm/GLT9898976502
+    ],
+    'six-nations' => %w[
+      https://feeds.bbci.co.uk/sport/rugby-union/rss.xml
+    ],
+    'womens-rugby-world' => %w[
+      https://feeds.bbci.co.uk/sport/rugby-union/rss.xml
+      https://www.rnz.co.nz/rss/sport.xml
+    ],
+    # Tennis
+    'atp' => %w[
+      https://www.espn.com/espn/rss/tennis/news
+      https://feeds.bbci.co.uk/sport/tennis/rss.xml
+      https://tennis365.com/feed
+      https://feeds.acast.com/public/shows/thetennispodcast
+    ],
+    'wta' => %w[
+      https://www.espn.com/espn/rss/tennis/news
+      https://feeds.bbci.co.uk/sport/tennis/rss.xml
+      https://tennis365.com/feed
+      https://feeds.acast.com/public/shows/thetennispodcast
+    ],
+    # Baseball
+    'mlb' => %w[
+      https://www.espn.com/espn/rss/mlb/news
+    ],
+    # NPB + KBO don't have a stable English-language feed I can
+    # confidently bind here — left empty for a future PR.
+    # Cricket
+    'icc-mens' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+      https://www.espn.com/espn/rss/cricinfo/news
+    ],
+    'icc-womens' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+      https://www.espn.com/espn/rss/cricinfo/news
+    ],
+    'ipl' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+      https://www.espn.com/espn/rss/cricinfo/news
+    ],
+    'wpl' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+      https://www.espn.com/espn/rss/cricinfo/news
+    ],
+    'bbl' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+      https://www.espn.com/espn/rss/cricinfo/news
+    ],
+    'wbbl' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+      https://www.espn.com/espn/rss/cricinfo/news
+    ],
+    'the-hundred-men' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+    ],
+    'the-hundred-women' => %w[
+      https://feeds.bbci.co.uk/sport/cricket/rss.xml
+    ],
+    # Golf
+    'pga-tour' => %w[
+      https://www.espn.com/espn/rss/golf/news
+      https://feeds.bbci.co.uk/sport/golf/rss.xml
+    ],
+    'lpga' => %w[
+      https://www.espn.com/espn/rss/golf/news
+      https://feeds.bbci.co.uk/sport/golf/rss.xml
+    ],
+    'dp-world-tour' => %w[
+      https://www.espn.com/espn/rss/golf/news
+      https://feeds.bbci.co.uk/sport/golf/rss.xml
+    ],
+    'ladies-european' => %w[
+      https://feeds.bbci.co.uk/sport/golf/rss.xml
+    ],
+    'liv-golf' => %w[
+      https://www.espn.com/espn/rss/golf/news
+    ],
+    # Motorsport
+    'formula-1' => %w[
+      https://feeds.bbci.co.uk/sport/formula1/rss.xml
+      https://www.espn.com/espn/rss/rpm/news
+    ],
+    'f1-academy' => %w[
+      https://feeds.bbci.co.uk/sport/formula1/rss.xml
+    ],
+    'nascar-cup' => %w[
+      https://www.espn.com/espn/rss/rpm/news
+    ],
+    'indycar' => %w[
+      https://www.espn.com/espn/rss/rpm/news
+    ],
+    'wec' => %w[
+      https://www.espn.com/espn/rss/rpm/news
+    ],
+    # Badminton — no major English-language RSS we can bind
+    # confidently; left empty for a future PR.
+    # Horse racing
+    'uk-flat'         => %w[https://feeds.bbci.co.uk/sport/horse-racing/rss.xml],
+    'uk-jumps'        => %w[https://feeds.bbci.co.uk/sport/horse-racing/rss.xml],
+    'us-triple-crown' => %w[https://feeds.bbci.co.uk/sport/horse-racing/rss.xml],
+    'dubai-world-cup' => %w[https://feeds.bbci.co.uk/sport/horse-racing/rss.xml]
+  }.freeze
+
+  # Return the catalog entries (full hash with title + blurb + category)
+  # that cover this sports league. Empty array when no URLs are
+  # bound or the bound URL doesn't exist in CATALOG.
+  def feeds_for_sports_league(league_slug)
+    urls = SPORTS_LEAGUE_FEEDS[league_slug.to_s] || []
+    urls.map { |u| find_by_url(u) }.compact
   end
 end

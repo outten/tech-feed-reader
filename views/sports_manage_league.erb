@@ -50,6 +50,15 @@
           <% if team[:location] && !team[:location].empty? && team[:location] != team[:name] %>
             <span class="muted sports-manage-team-location"><%= h(team[:location]) %></span>
           <% end %>
+          <%# STUFF #52 PR3 — notable players. Catalog-curated, no
+              click navigation yet (those land when /sports/player/:slug
+              upserts catalog players to the DB on demand). %>
+          <% if (team[:players] || []).any? %>
+            <span class="sports-manage-team-players">
+              <span class="muted" aria-hidden="true">👤</span>
+              <%= h(team[:players].join(' · ')) %>
+            </span>
+          <% end %>
         </div>
         <form method="post" action="/sports/teams/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form">
           <input type="hidden" name="slug" value="<%= h(team[:slug]) %>">
@@ -63,4 +72,39 @@
       </li>
     <% end %>
   </ul>
+<% end %>
+
+<%# STUFF #52 PR3 — News + podcasts panel. Curated set of RSS feeds
+    that cover this league; one click each adds them to the user's
+    subscriptions via /sports/feeds/subscribe → FeedsStore.add_for_user. %>
+<% if @league_feeds.any? %>
+  <section class="sports-league-feeds">
+    <h3>News + podcasts</h3>
+    <p class="subtitle">
+      Subscribe to RSS feeds that cover <strong><%= h(@league[:name]) %></strong>.
+      Adds them to your <a href="/feeds">/feeds</a>; manage there.
+    </p>
+    <ul class="sports-feed-grid">
+      <% @league_feeds.each do |feed| %>
+        <% subscribed = @subscribed_urls.include?(feed[:url]) %>
+        <li class="sports-feed-card <%= 'is-subscribed' if subscribed %>">
+          <div class="sports-feed-meta">
+            <span class="sports-feed-title"><%= h(feed[:title]) %></span>
+            <% if feed[:blurb] %>
+              <span class="sports-feed-blurb"><%= h(feed[:blurb]) %></span>
+            <% end %>
+          </div>
+          <% if subscribed %>
+            <span class="sports-feed-state" title="Already subscribed">✓ Subscribed</span>
+          <% else %>
+            <form method="post" action="/sports/feeds/subscribe" class="sports-feed-form">
+              <input type="hidden" name="url" value="<%= h(feed[:url]) %>">
+              <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(@league[:slug]) %>">
+              <button type="submit" class="btn-primary sports-feed-toggle" title="Subscribe to this feed">+ Subscribe</button>
+            </form>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </section>
 <% end %>
