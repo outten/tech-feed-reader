@@ -725,10 +725,20 @@ Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 
 **Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
 
-## [ ] 53. Update the Logged Out Home Page
+## [x] 53. Update the Logged Out Home Page
 
 The home page (welcome page) content appears to be stale. We've added a lot since te last time we updated, like Sports for example.
 
 Can you update it?
 
 And in the future, always review the welcome page after we implement a key, new feature.
+
+**Shipped.** Surgical copy refresh on the anonymous branch of [views/home.erb](views/home.erb) and [views/about.erb](views/about.erb) — no new sections, just bringing stale claims current:
+
+- Browser tab title `'Tech Feed Reader'` → `'Feeder'` ([app/main.rb:948](app/main.rb#L948)) — catches up with the #50 brand rename.
+- "One inbox" card: `25+ feeds` → `90+ curated feeds`, and explicitly names YouTube channels + nature documentaries that have joined the catalog since the original copy was written.
+- "AI-assisted triage" card: `Three runs nightly via cron` → `via Sidekiq` (post #45 / #46 — cron-on-Droplet was retired; Sidekiq is the only runner now).
+- Sports card retitled `🏈 Sports — same engine, different domain` → `🌍 Sports — global, not just US`, body rewritten to surface #45/#52: 12 sports across ~60 leagues, named leagues (NFL/NBA/MLB/EPL/La Liga/IPL/F1/golf), women's leagues equal-weight (WNBA, NWSL, WSL, Frauen-Bundesliga).
+- About → "How it works" → Sports bullet matches the home card: hand-curated catalog (12 sports / ~60 leagues / ~250 teams, global, women's equal-weight) feeds the follow-flow, ESPN supplies the live data.
+
+The standing follow-up from the user ("always review the welcome page after we implement a key, new feature") is captured as a feedback memory so future PRs that ship a user-visible feature get a welcome-page audit automatically.

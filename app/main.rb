@@ -945,7 +945,7 @@ class TechFeedReader < Sinatra::Base
       redirect to('/welcome')
     end
 
-    @page_title  = 'Tech Feed Reader'
+    @page_title  = 'Feeder'
     @public_page = true
     @returning_user = signed_in? &&
                       ArticlesStore.count.positive? &&
