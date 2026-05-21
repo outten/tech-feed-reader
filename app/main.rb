@@ -3069,6 +3069,7 @@ end
 # script invocation.
 if __FILE__ == $PROGRAM_NAME
   require 'sidekiq/web'
+  require 'sidekiq/cron/web'   # adds the "Cron" tab to /admin/sidekiq
   require 'rack/session/cookie'
   require 'rack/auth/basic'
   require 'securerandom'

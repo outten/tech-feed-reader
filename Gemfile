@@ -55,6 +55,11 @@ gem 'anthropic'
 # redis://localhost:6379/0).
 gem 'sidekiq', '~> 7.3'
 
+# Recurring background jobs (hourly feed refresh, nightly sports sync).
+# Schedule is loaded at sidekiq_boot in the server process only; jobs
+# fire via the standard Sidekiq queue + retry pipeline.
+gem 'sidekiq-cron', '~> 1.12'
+
 # Pin connection_pool to the 2.x line — Sidekiq 7.3 declares
 # `connection_pool >= 2.3.0` but is incompatible with the 3.x rewrite
 # (Sidekiq::Scheduled::Poller#initial_wait calls TimedStack#pop with a

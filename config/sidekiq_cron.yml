@@ -1,0 +1,22 @@
+# Recurring background jobs loaded by sidekiq-cron at worker boot.
+# Cron expressions are evaluated in the process timezone (UTC on the
+# Droplet). Edit + redeploy the sidekiq container to pick up changes.
+#
+# Schedule overview:
+#   - refresh_all_feeds — hourly fan-out (mirrors the /refresh/all
+#     button). Each tick enqueues one FeedRefreshWorker per feed.
+#   - sports_sync       — nightly sweep of match schedules + league
+#     standings + ATP/WTA rankings. 04:00 UTC keeps the Droplet quiet
+#     during US prime-time games and finalises overnight scores.
+
+refresh_all_feeds:
+  cron: "0 * * * *"
+  class: "RefreshAllFeedsWorker"
+  queue: default
+  description: "Hourly: enqueue FeedRefreshWorker for every subscribed feed."
+
+sports_sync:
+  cron: "0 4 * * *"
+  class: "SportsSyncWorker"
+  queue: default
+  description: "Nightly 04:00 UTC: ESPN match schedules + league standings + tennis rankings."
