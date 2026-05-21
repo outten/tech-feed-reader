@@ -41,7 +41,11 @@ serve:
 	bundle exec ruby app/main.rb
 
 test:
-	bundle exec rspec
+	@# STUFF #47: spec_helper requires TEST_DATABASE_URL (no silent
+	@# fallback to SQLite). Default to the local Postgres tfr_test
+	@# database; override with `TEST_DATABASE_URL=... make test` for
+	@# a different host. CI sets this in .github/workflows/ci.yml.
+	TEST_DATABASE_URL=$${TEST_DATABASE_URL:-postgres://localhost/tfr_test} bundle exec rspec
 
 # Poll every feed in FeedsStore once. Honours per-feed ETag / Last-Modified
 # so feeds that support 304 don't waste bandwidth.
