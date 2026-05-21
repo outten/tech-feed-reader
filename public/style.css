@@ -4103,6 +4103,62 @@ html.dark .sports-manage-team.is-followed { border-color: #30d158; background: r
 .sports-manage-form { margin: 0; flex-shrink: 0; }
 .sports-manage-toggle { padding: 0.35rem 0.85rem; font-size: 0.8rem; }
 
+/* STUFF #52 — sport-first catalog browse. Three depths share this
+   card grid:
+     - /sports/manage           → big emoji + sport name
+     - /sports/manage/:sport    → league cards with women's/region/Live chips
+     - (the /:league depth uses the existing .sports-manage-grid above) */
+.sports-catalog-grid {
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+.sports-catalog-card {
+  border: 1px solid #e5e5ea;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.sports-catalog-card:hover { border-color: #b6b6bb; transform: translateY(-1px); }
+html.dark .sports-catalog-card { background: rgba(28, 28, 30, 0.85); border-color: #2c2c2e; }
+html.dark .sports-catalog-card:hover { border-color: #5a5a5c; }
+.sports-catalog-card.is-womens { border-left: 3px solid #ff375f; }
+html.dark .sports-catalog-card.is-womens { border-left-color: #ff6482; }
+.sports-catalog-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.sports-catalog-emoji { font-size: 2rem; line-height: 1; }
+.sports-catalog-name { font-weight: 600; font-size: 1.05rem; color: #1d1d1f; }
+html.dark .sports-catalog-name { color: #f5f5f7; }
+.sports-catalog-meta { font-size: 0.82rem; color: #6e6e73; }
+.sports-catalog-blurb { font-size: 0.85rem; color: #6e6e73; line-height: 1.4; margin-top: 0.25rem; }
+html.dark .sports-catalog-blurb { color: #aeaeb2; }
+.sports-catalog-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.sports-catalog-chip {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: #f0f0f5;
+  color: #3a3a3c;
+}
+html.dark .sports-catalog-chip { background: #2c2c2e; color: #c7c7cc; }
+.sports-catalog-chip.women  { background: rgba(255, 55, 95, 0.12); color: #d70015; }
+html.dark .sports-catalog-chip.women { background: rgba(255, 100, 130, 0.18); color: #ff6482; }
+.sports-catalog-chip.live   { background: rgba(52, 199, 89, 0.15); color: #146c2e; }
+html.dark .sports-catalog-chip.live  { background: rgba(48, 209, 88, 0.18); color: #30d158; }
+.sports-catalog-chip.region { text-transform: capitalize; letter-spacing: 0; }
+
 .sports-article {
   display: block;
   padding: 0.85rem 0;
