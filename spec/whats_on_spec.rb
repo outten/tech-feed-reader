@@ -170,7 +170,10 @@ RSpec.describe 'header nav consolidation (STUFF.md #15)' do
 
   it 'renders the Search icon link' do
     get '/admin/dashboard'
-    expect(last_response.body).to match(%r{<a href="/search"[^>]*nav-search-icon})
+    # STUFF #50 — Search moved out of `<nav>` into the icon-utility
+    # row alongside Bus + Refresh, so it now wears the shared
+    # `header-icon-btn` class.
+    expect(last_response.body).to match(%r{<a href="/search"[^>]*header-icon-btn})
   end
 
   it 'highlights AI dropdown active when on /triage' do

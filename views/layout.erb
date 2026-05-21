@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tech Feed Reader<%= @page_title ? " — #{h(@page_title)}" : '' %></title>
+  <title>Feeder<%= @page_title ? " — #{h(@page_title)}" : '' %></title>
   <link rel="stylesheet" href="/style.css?v=<%= asset_mtime('public/style.css') %>">
   <%# Hotwire Turbo. Intercepts link clicks + form submits, fetches
       HTML via XHR, swaps <body> in place. Lets the mini-player below
@@ -35,7 +35,15 @@
     <%# STUFF.md #14 — title is a link to /, with data-turbo="false"
         so the click does a full document refresh (Turbo would otherwise
         do an SPA-style swap that doesn't always feel like "go home"). %>
-    <a class="logo" href="/" data-turbo="false" title="Home">Tech Feed Reader</a>
+    <%# STUFF #50 — brand renamed from "Tech Feed Reader" to "Feeder".
+        Animal icon is picked at random per request from a pool of
+        things-that-get-fed: birds (bird feeder pun), barnyard animals
+        (the user's hint), and a bee for variety. %>
+    <% logo_emoji = %w[🐦 🦜 🐤 🦉 🦅 🦆 🦢 🐄 🐷 🐝].sample %>
+    <a class="logo" href="/" data-turbo="false" title="Home">
+      <span class="logo-icon" aria-hidden="true"><%= logo_emoji %></span>
+      <span class="logo-word">Feeder</span>
+    </a>
     <%# STUFF.md #39 — signed-in-only navigation. Logged-out visitors only
         see the logo + sign-in / sign-up CTAs + theme toggle. The nav
         below points exclusively at routes that require auth (Articles,
@@ -80,15 +88,6 @@
           </div>
         </div>
 
-        <a href="/search" class="nav-search-icon <%= 'active' if request.path_info == '/search' %>"
-           title="Search (press / from anywhere)" aria-label="Search">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"
-               fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </a>
         <%# STUFF #49 — disable Turbo's hover-prefetch on the Admin link.
             Turbo 8 prefetches links on hover by default; without the
             opt-out, hovering over "Admin" triggers a silent GET /admin
@@ -97,6 +96,18 @@
         <a href="/admin" data-turbo-prefetch="false"
            class="<%= request.path_info.start_with?('/admin') ? 'active' : '' %>">Admin</a>
       </nav>
+      <%# STUFF #50 — Search sits with the icon-utility buttons (Bus,
+          Refresh, etc.) rather than inside the section-nav: it's a
+          global tool, not a page section. %>
+      <a href="/search" class="header-icon-btn <%= 'active' if request.path_info == '/search' %>"
+         title="Search (press / from anywhere)" aria-label="Search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </a>
       <a href="/bus" class="header-icon-btn <%= 'active' if request.path_info == '/bus' %>"
          title="Bus mode — recent podcast episodes short enough for the commute"
          aria-label="Bus mode">
@@ -163,7 +174,7 @@
   </main>
   <footer>
     <small>
-      Tech Feed Reader &mdash; Public RSS aggregation for personal use.
+      Feeder &mdash; Public RSS aggregation for personal use.
       &middot;
       <a href="/about" title="What this is + the philosophy behind it">About</a>
       &middot;
@@ -280,7 +291,7 @@
       of this inline <script>. The gsub closes that hole. %>
   <script>
     window.PAGE_CONTEXT = {
-      title:   <%= ((@chat_context && @chat_context[:title])   || @page_title || 'Tech Feed Reader').to_json.gsub('</', '<\/') %>,
+      title:   <%= ((@chat_context && @chat_context[:title])   || @page_title || 'Feeder').to_json.gsub('</', '<\/') %>,
       excerpt: <%= ((@chat_context && @chat_context[:excerpt]) || '').to_json.gsub('</', '<\/') %>
     };
     <%# Picsum IDs for the page-background rotation. /admin/backgrounds

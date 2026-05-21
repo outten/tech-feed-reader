@@ -33,8 +33,16 @@
             page 2 of "unread". The Skim toggle does NOT reset page —
             it's a presentation toggle, not a filter. %>
         <% %i[all unread bookmarked archived].each do |state| %>
-          <a href="<%= filter_url(state: state == :all ? nil : state, page: nil) %>"
-             class="<%= 'active' if @state_filter == state && @sort_filter != :relevance %>"><%= state %></a>
+          <%# STUFF #50 — clicking an active state chip deactivates it
+              (state → nil → "all"). Without this, the chip stayed
+              stuck on with no obvious way to clear it. The :all chip
+              already lands on the unfiltered URL when clicked, so
+              the toggle-off is a no-op there. %>
+          <% is_active = @state_filter == state && @sort_filter != :relevance %>
+          <% target = (is_active || state == :all) ? nil : state %>
+          <a href="<%= filter_url(state: target, page: nil) %>"
+             class="<%= 'active' if is_active %>"
+             <% if is_active && state != :all %>title="Click to clear this filter"<% end %>><%= state %></a>
         <% end %>
         &middot;
         <% if @kind_filter == :podcast %>
@@ -210,13 +218,18 @@
           <span class="news-kind-icon" title="<%= kind_label %>" aria-label="<%= kind_label %>"><%= kind_icon %></span>
           <span class="news-headline"><%= h(article['title']) %></span>
         </a>
-        <% if @view_filter == :skim %>
-          <%
-            summary_row = @summaries_by_article_id[article['id']]
-            summary_text = skim_summary_for(article, summary_row)
-          %>
-          <% unless summary_text.empty? %>
+        <%# STUFF #50 — summary preview on every row in the default
+            view (2-line clamped). Skim mode keeps the longer, un-clamped
+            variant for users explicitly skimming. %>
+        <%
+          summary_row  = @summaries_by_article_id[article['id']]
+          summary_text = skim_summary_for(article, summary_row)
+        %>
+        <% unless summary_text.empty? %>
+          <% if @view_filter == :skim %>
             <p class="news-summary-skim"><%= h(summary_text) %></p>
+          <% else %>
+            <p class="news-item-summary"><%= h(summary_text) %></p>
           <% end %>
         <% end %>
         <% feedback_value = article['feedback'].to_i %>
