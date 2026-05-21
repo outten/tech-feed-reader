@@ -30,9 +30,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY Gemfile Gemfile.lock ./
+# --jobs 1 (not $(nproc)): when building amd64 from an arm64 Mac via
+# buildx + qemu, every native-extension gem compile runs cc1 under
+# emulation. Parallel jobs each peak ~1.5–2 GB; on an 8 GB-class Mac
+# (colima default 1.9 GB, even bumped to 6 GB) 4 parallel compiles
+# OOM-segfault the compiler (openssl 4.x and prism 1.x are the usual
+# culprits). Serial install is ~30–60s slower but doesn't crash.
 RUN bundle config set --local deployment true \
  && bundle config set --local without 'development test' \
- && bundle install --jobs "$(nproc)" \
+ && bundle install --jobs 1 \
  && rm -rf vendor/bundle/ruby/*/cache
 
 # ---- runtime: slim image with just the libs the gems need at runtime -------
