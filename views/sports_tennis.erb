@@ -43,12 +43,19 @@
     </p>
   </div>
 <% else %>
+  <%# STUFF #54 — tour shortcut chips. With ATP + WTA stacked
+      vertically the page is long; these jump-links skip to whichever
+      tour the user wants without scrolling past the other. %>
+  <nav class="sports-tennis-toc" aria-label="Jump to tour">
+    <a href="#tour-atp" class="sports-tennis-toc-link">ATP &darr;</a>
+    <a href="#tour-wta" class="sports-tennis-toc-link">WTA &darr;</a>
+  </nav>
   <div class="sports-tennis-grid">
     <% [
       ['ATP', "men's tour",   @atp, 'atp'],
       ['WTA', "women's tour", @wta, 'wta']
     ].each do |label, gender, rows, tour_slug| %>
-      <section class="benchmark-section sports-tennis-tour">
+      <section id="tour-<%= tour_slug %>" class="benchmark-section sports-tennis-tour">
         <h3 class="sports-tennis-heading"><%= label %> &mdash; <%= gender %></h3>
         <% if rows.empty? %>
           <p class="muted">No <%= label %> rankings synced yet.</p>
@@ -97,11 +104,13 @@
                   </td>
                   <td class="sports-tennis-follow-cell">
                     <% followed = (@followed_player_slugs || []).include?(p['slug']) %>
-                    <form method="post" action="/sports/players/<%= followed ? 'unfollow' : 'follow' %>" style="display:inline">
+                    <form method="post" action="/sports/players/<%= followed ? 'unfollow' : 'follow' %>"
+                          class="js-sports-follow-form" style="display:inline">
                       <input type="hidden" name="slug" value="<%= h(p['slug']) %>">
                       <input type="hidden" name="return_to" value="/sports/tennis">
                       <button type="submit"
                               class="sports-tennis-follow-btn <%= 'is-followed' if followed %>"
+                              data-full-name="<%= h(p['full_name']) %>"
                               title="<%= followed ? "Unfollow #{p['full_name']}" : "Follow #{p['full_name']}" %>"
                               aria-label="<%= followed ? 'Unfollow' : 'Follow' %> <%= h(p['full_name']) %>">
                         <%= followed ? '★' : '☆' %>

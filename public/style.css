@@ -841,6 +841,36 @@ html.dark .news-item-thumb-link { background: #2c2c2e; }
 .news-item .news-meta,
 .news-item .news-item-summary { margin-left: 0; }
 
+/* STUFF #55 — simple stacked variant used by topic pages (and any
+   other surface that renders .news-item without thumbnails or badges).
+   The /articles 3-column grid above was crushing the title link into
+   a sliver on /topics/:term where rows only have title + excerpt +
+   meta. This variant drops the grid columns so each row stacks
+   naturally: title, excerpt, meta — all full-width. */
+.news-list-simple .news-item {
+  display: block;
+  padding: 0.5rem 0;
+}
+.news-list-simple .news-item + .news-item {
+  border-top: 1px solid #e5e5ea;
+}
+html.dark .news-list-simple .news-item + .news-item {
+  border-top-color: #2c2c2e;
+}
+.news-list-simple .news-headline {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin-bottom: 0.2rem;
+}
+.news-list-simple .excerpt { margin: 0.2rem 0; }
+.news-list-simple .news-meta {
+  font-size: 0.85rem;
+  color: #6e6e73;
+  margin-top: 0.2rem;
+}
+html.dark .news-list-simple .news-meta { color: #98989d; }
+
 @media (max-width: 600px) {
   .news-item-thumb-link { width: 72px; height: 54px; }
   /* On narrow screens, drop the right-side badges column so badges
@@ -3924,11 +3954,31 @@ html.dark .sports-calendar-live { background: #ff453a; }
    Two side-by-side tables (ATP + WTA), each top-N players. Player
    row links to /sports/player/:slug. Detail page reuses the
    existing stat-cards grid. */
+/* STUFF #54 — stack ATP/WTA tour tables vertically. Two-column grid
+   was cramming long player names and bleeding the WTA photo cell into
+   the ATP follow column (so the star was unclickable). One column per
+   tour gives each table the full content width; the rankings list is
+   already long, so vertical scroll is the natural read pattern. */
 .sports-tennis-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: 1fr;
   gap: 1.5rem;
 }
+/* Tour shortcut chips (jump-to-ATP / jump-to-WTA anchors). */
+.sports-tennis-toc {
+  display: flex; gap: 0.5rem; margin: 0 0 1rem;
+}
+.sports-tennis-toc-link {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.35rem 0.8rem; border-radius: 999px;
+  border: 1px solid #d2d2d7; background: #fff; color: #1d1d1f;
+  text-decoration: none; font-size: 0.9rem;
+}
+.sports-tennis-toc-link:hover { border-color: #b6b6bb; background: #f5f5f7; }
+html.dark .sports-tennis-toc-link {
+  background: #1c1c1e; border-color: #3a3a3c; color: #f5f5f7;
+}
+html.dark .sports-tennis-toc-link:hover { background: #2c2c2e; border-color: #5a5a5c; }
 .sports-tennis-tour { margin: 0; }
 .sports-tennis-heading { margin: 0 0 0.5rem; font-size: 1.05rem; }
 .sports-tennis-table { font-size: 0.9rem; }
@@ -4049,6 +4099,23 @@ html.dark .sports-feed-chip:hover { background: #3a3a3c; }
   padding: 0;
 }
 
+/* STUFF #54 — "Where things happen" callout above the league grid
+   on /sports/manage/<sport>. Right now only tennis renders this
+   (individuals-not-teams, so the follow surface lives on
+   /sports/tennis rather than a team grid). */
+.sports-manage-action-callout {
+  display: flex; flex-direction: column; gap: 0.75rem;
+  margin: 0 0 1.5rem; padding: 1rem 1.25rem;
+  border: 1px solid #d2d2d7; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(0, 113, 227, 0.06), rgba(0, 113, 227, 0.02));
+}
+.sports-manage-action-callout p { margin: 0; }
+.sports-manage-action-callout .btn-primary { align-self: flex-start; }
+html.dark .sports-manage-action-callout {
+  border-color: #3a3a3c;
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.10), rgba(10, 132, 255, 0.03));
+}
+
 /* STUFF #43 — /sports/manage team-management grid. Followable
    teams per league as a responsive card grid; pill follow toggle
    on each card; green accent on already-followed teams. */
@@ -4061,16 +4128,27 @@ html.dark .sports-feed-chip:hover { background: #3a3a3c; }
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.75rem;
 }
+/* STUFF #55 — two-row layout (logo+name above, follow button below)
+   so long team names + the action button don't fight for the same
+   row. Previous flex-row layout truncated team names with ellipsis
+   on narrow league cards. */
 .sports-manage-team {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 0.75rem;
+  column-gap: 0.75rem;
+  row-gap: 0.5rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid #e5e5ea;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.85);
   transition: border-color 0.15s ease, background 0.15s ease;
 }
+.sports-manage-team .sports-manage-form {
+  grid-column: 1 / -1;
+}
+.sports-manage-team .sports-manage-toggle { width: 100%; }
 .sports-manage-team:hover { border-color: #d2d2d7; }
 .sports-manage-team.is-followed { border-color: #34c759; background: rgba(52, 199, 89, 0.05); }
 html.dark .sports-manage-team { background: rgba(28, 28, 30, 0.85); border-color: #2c2c2e; }
@@ -4183,17 +4261,21 @@ html.dark .sports-catalog-chip.live  { background: rgba(48, 209, 88, 0.18); colo
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 0.6rem;
 }
+/* STUFF #55 — two-row layout matching .sports-manage-team. Meta on
+   row 1, Subscribe / ✓ Subscribed action on row 2 so the meta gets
+   the full card width. */
 .sports-feed-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
   padding: 0.75rem 0.9rem;
   border: 1px solid #e5e5ea;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.85);
   transition: border-color 0.15s ease;
 }
+.sports-feed-card .sports-feed-toggle { width: 100%; }
+.sports-feed-card .sports-feed-state { text-align: left; }
 .sports-feed-card:hover { border-color: #b6b6bb; }
 html.dark .sports-feed-card { background: rgba(28, 28, 30, 0.85); border-color: #2c2c2e; }
 html.dark .sports-feed-card:hover { border-color: #5a5a5c; }

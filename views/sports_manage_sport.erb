@@ -12,14 +12,36 @@
   </div>
 </div>
 
+<%# STUFF #54 — tennis is an individuals-not-teams sport, so the
+    natural follow surface is the /sports/tennis rankings page, not
+    a team grid. Callout sends the user there. %>
+<% if @sport[:slug] == 'tennis' %>
+  <div class="sports-manage-action-callout">
+    <p>
+      <strong>Follow tennis players on the rankings page.</strong>
+      The ATP and WTA rankings let you star individual players (Sinner, Świątek, Alcaraz, …)
+      so their matches surface across the rest of the app.
+    </p>
+    <a href="/sports/tennis" class="btn-primary">🎾 Browse rankings &amp; follow players →</a>
+  </div>
+<% end %>
+
 <ul class="sports-catalog-grid">
   <% @sport[:leagues].each do |league| %>
     <%
       team_count = (league[:teams] || []).length
       followed_in_league = (league[:teams] || []).count { |t| @followed_slugs.include?(t[:slug]) }
+      # STUFF #54 — tennis leagues drill into the rankings page
+      # (player-based follow surface), not a team grid. The anchor
+      # jumps to the relevant tour section.
+      card_href = if @sport[:slug] == 'tennis'
+                    "/sports/tennis#tour-#{league[:slug]}"
+                  else
+                    "/sports/manage/#{@sport[:slug]}/#{league[:slug]}"
+                  end
     %>
     <li class="sports-catalog-card <%= 'is-womens' if league[:women] %>">
-      <a class="sports-catalog-card-link" href="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(league[:slug]) %>">
+      <a class="sports-catalog-card-link" href="<%= h(card_href) %>">
         <span class="sports-catalog-name"><%= h(league[:name]) %></span>
         <span class="sports-catalog-chips">
           <% if league[:women] %>
@@ -33,9 +55,13 @@
           <% end %>
         </span>
         <span class="sports-catalog-meta">
-          <%= team_count %> team<%= 's' unless team_count == 1 %>
-          <% if followed_in_league.positive? %>
-            &middot; <strong><%= followed_in_league %> followed</strong>
+          <% if @sport[:slug] == 'tennis' %>
+            🎾 Browse rankings &amp; follow players &rarr;
+          <% else %>
+            <%= team_count %> team<%= 's' unless team_count == 1 %>
+            <% if followed_in_league.positive? %>
+              &middot; <strong><%= followed_in_league %> followed</strong>
+            <% end %>
           <% end %>
         </span>
         <% if league[:blurb] %>

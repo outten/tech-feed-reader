@@ -723,8 +723,30 @@ Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 
 **Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
 
-## [ ] 54. Tennis Rankings Page
+## [x] 54. Tennis Rankings Page
 
 - can you add a link from the Manage Sports Tennis page to this page to make it easy for users to follow players
 - on the Tennis Rankings page, clicking the Follow / Like button from the player results in the page reloading ... to the top of the page. We did this before, can we make these types of calls AJAX throughout the site to keep the user where they are. Some of our pages are very long. So scrolling is not a good user experience.
 - in general, we should have links from the manage pages to the pages where things happen
+- also on the tennis rankings page, if the WTA player has a picture, it overlaps with the favorite star button from the ATP player. So you can click it. Please fix.
+
+**Shipped.** Four concerns in one PR:
+
+- **AJAX follow/unfollow on sports surfaces.** The four routes (`POST /sports/players/follow`, `/players/unfollow`, `/teams/follow`, `/teams/unfollow`) plus `POST /feeds/:id/feedback` now return `{ok, slug/feed_id, kind/direction, followed/weight}` when `Accept: application/json`. New [public/sports-follow.js](public/sports-follow.js) intercepts `form.js-sports-follow-form` submits via the *form's* submit event (more robust than click — fires regardless of trigger) and toggles button state in place. [public/feeds.js](public/feeds.js) gains a sibling handler for the per-row `+/−` weight buttons; the weight readout updates inline. No reload, no scroll loss.
+- **Tennis navigation gap closed.** `/sports/manage/tennis` now shows a soft-blue callout linking to `/sports/tennis` (the player follow surface); each tennis league card retargets its click from the team grid (which doesn't exist for individuals) to `/sports/tennis#tour-{slug}` so ATP/WTA jump straight to the right section. Also adds an "ATP ↓ / WTA ↓" anchor TOC on the rankings page itself.
+- **WTA picture overlap fix.** ATP/WTA tour tables previously sat in a 2-column grid (`minmax(420px, 1fr)`); long player names + cell-overflow caused the WTA photo column to bleed into the ATP follow-cell so the star was unclickable. Stacked vertically (single column) — each table gets the full content width.
+- **Session-hijacking gotcha.** Rack::Protection's `:session_hijacking` fingerprints the session against User-Agent / Accept-Encoding / Accept-Language and silently clears the session if any change between requests. Browser `fetch()` calls normalised those headers differently than the initial WebAuthn sign-in, destroying the session for AJAX even though browser navigation worked fine. Excluded the protection (low-value heuristic, defeated by easy spoofing anyway). Cost was a totally broken AJAX-follow UX until I traced it.
+
+**Specs**: +12 examples (8 in [spec/sports_follow_ajax_spec.rb](spec/sports_follow_ajax_spec.rb) for the four sports routes + JS lockdown; +1 JSON-branch example on the feed-feedback route). Full suite: 1384 / 0.
+
+## [x] 55. Beauty Pass 002
+
+- on the /feeds pqge, please remove the Refresh All button
+- on the sports drill down pages, example /sports/manage/basketball/euroleague, the "Follow" and "Subscribe" buttons force a truncation of the first column. Instead of doing in two columns, do in two rows.
+- on the topics pages, for example /topics/philadelphia, the individual elements are in two colums, with the link in the first colum. Instead of columns, format in two rows. The link is squooshed making it hard to read.
+
+**Shipped on the same PR as #54.** Three minor visual cleanups:
+
+- **`/feeds` Refresh-all removed.** Header button + its JS handler in [public/feeds.js](public/feeds.js) gone now that the hourly RefreshAllFeedsWorker cron fans out automatically. `POST /refresh/all` route stays (still used by `/admin/cache` + scripted ops).
+- **Sports drill-down two-row layout.** `.sports-manage-team` (team grid) and `.sports-feed-card` (news+podcasts grid) switched from flex-row to two-row CSS grid: logo+meta on row 1, full-width action button (`+ Follow` / `+ Subscribe`) on row 2. The button no longer competes with the meta column for horizontal space; long team names no longer truncate.
+- **Topic pages stacked rows.** [views/topic.erb](views/topic.erb) was reusing `.news-item` (designed for `/articles` with a 96px thumb column + right-side badges column), but topic rows have no thumb or badges — so the grid was crushing the title link into a sliver. New `.news-list-simple` modifier overrides the grid to `display: block` so each row stacks naturally (title → excerpt → meta), full width.

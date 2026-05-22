@@ -126,6 +126,23 @@ RSpec.describe 'POST /feeds/:id/feedback' do
     post "/feeds/#{feed['id']}/feedback", { direction: 'up', return_to: '/dashboard' }
     expect(last_response.headers['Location']).to end_with('/dashboard')
   end
+
+  # STUFF #54 — AJAX path. public/feeds.js POSTs with
+  # Accept: application/json to update the inline +/- weight
+  # display without reloading + scrolling to top.
+  it 'returns {ok, feed_id, direction, weight} JSON on Accept: application/json' do
+    feed = FeedsStore.add(url: 'https://x.com/feedrt', title: 'X')
+    post "/feeds/#{feed['id']}/feedback", { direction: 'up' }, { 'HTTP_ACCEPT' => 'application/json' }
+    expect(last_response.status).to eq(200)
+    expect(last_response.content_type).to include('application/json')
+    body = JSON.parse(last_response.body)
+    expect(body).to include(
+      'ok' => true,
+      'feed_id' => feed['id'],
+      'direction' => 'up',
+      'weight' => 1.25
+    )
+  end
 end
 
 RSpec.describe 'Feedback UI surfaces' do
