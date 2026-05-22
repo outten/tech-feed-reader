@@ -2572,7 +2572,6 @@ html.dark .feeds-filter-count { color: #98989d; }
    POSTs to /refresh/all, which redirects to /feeds with the
    per-feed result counts in the flash. Match the theme-toggle pill
    shape so the two icon buttons feel like a set. */
-.header-refresh-form { margin: 0; }
 .header-icon-btn {
   display: inline-flex;
   align-items: center;

@@ -578,7 +578,7 @@ Need: a management page (under Manage ▾) where users browse the team catalog g
 
 **Operator step after merge + deploy**: SSH the Droplet and run `docker compose run --rm app make seed-sports-data` to populate the full catalog. Existing user 1's follows survive (idempotent upsert).
 
-**Follow-up gap (closed)**: recurring sport-sync now runs nightly at 04:00 UTC via `SportsSyncWorker` + sidekiq-cron (`config/sidekiq_cron.yml`). Same PR adds hourly `RefreshAllFeedsWorker` so articles / podcasts / YouTube also stay fresh without the operator clicking "Refresh all". The `scripts/sync_sports.rb` body was extracted into [app/sports_sync.rb](app/sports_sync.rb) so the worker and the manual `make sync-sports` entry point share one code path. The header "Refresh all" button stays in place until the hourly cron is verified live on the Droplet — removal will follow.
+**Follow-up gap (closed)**: recurring sport-sync now runs nightly at 04:00 UTC via `SportsSyncWorker` + sidekiq-cron (`config/sidekiq_cron.yml`). Same PR adds hourly `RefreshAllFeedsWorker` so articles / podcasts / YouTube also stay fresh without the operator clicking "Refresh all". The `scripts/sync_sports.rb` body was extracted into [app/sports_sync.rb](app/sports_sync.rb) so the worker and the manual `make sync-sports` entry point share one code path. **Update**: hourly cron verified firing in prod on v0.13.0 deploy (00:00 UTC tick imported across all subscribed feeds); the header "Refresh all" button was removed in a follow-up PR — `POST /refresh/all` route stays for the per-feed buttons on `/feeds`, the admin cache page, and scripted-ops usage.
 
 ## [x] 46. /sports/tennis autosyncs on page load
 

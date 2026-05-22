@@ -3,8 +3,9 @@ require_relative '../app/main'
 
 # STUFF.md #39 — Header navigation is gated behind signed_in?
 # Anonymous visitors see logo + Sign in / Sign up + theme toggle only.
-# Signed-in users see the full nav (Articles / Podcasts / Sports / …),
-# the Bus icon, and the Refresh-all button.
+# Signed-in users see the full nav (Articles / Podcasts / Sports / …)
+# and the Bus icon. (The Refresh-all button was removed once the
+# hourly RefreshAllFeedsWorker cron took over its job.)
 #
 # Public paths (`/`, `/about`, `/sign-in`, `/sign-up`) are the only
 # routes an anonymous visitor can actually reach — those are where
@@ -35,10 +36,9 @@ RSpec.describe 'Header (STUFF #39)' do
           expect(last_response.body).not_to match(%r{<nav>}m)
         end
 
-        it 'does NOT render the Bus icon or Refresh-all button' do
+        it 'does NOT render the Bus icon' do
           get path
           expect(last_response.body).not_to include('aria-label="Bus mode"')
-          expect(last_response.body).not_to include('aria-label="Refresh all feeds"')
         end
 
         it 'renders the Sign in + Sign up links' do
@@ -65,10 +65,9 @@ RSpec.describe 'Header (STUFF #39)' do
       expect(last_response.body).to include('href="/sports"')
     end
 
-    it 'renders the Bus icon + Refresh-all button on /articles' do
+    it 'renders the Bus icon on /articles' do
       get '/articles'
       expect(last_response.body).to include('aria-label="Bus mode"')
-      expect(last_response.body).to include('aria-label="Refresh all feeds"')
     end
 
     it 'renders the auth-chip (signed-in identifier) and not the sign-in/sign-up links' do
