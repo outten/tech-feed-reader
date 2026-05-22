@@ -124,17 +124,6 @@
           <circle cx="17" cy="14" r="2"/>
         </svg>
       </a>
-      <form method="post" action="/refresh/all" class="header-refresh-form js-header-refresh">
-        <button type="submit" id="header-refresh" class="header-icon-btn"
-                title="Refresh all feeds now" aria-label="Refresh all feeds">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"
-               fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 12a9 9 0 1 1-3-6.7"/>
-            <polyline points="21 4 21 12 13 12"/>
-          </svg>
-        </button>
-      </form>
     <% else %>
       <%# Logged-out: push the auth CTAs out to the right edge so the
           header doesn't feel half-empty. The block below the auth-chip
@@ -303,7 +292,6 @@
   </script>
   <script src="/page-background.js?v=<%= asset_mtime('public/page-background.js') %>"></script>
   <script src="/global-player.js?v=<%= asset_mtime('public/global-player.js') %>"></script>
-  <script src="/header-refresh.js?v=<%= asset_mtime('public/header-refresh.js') %>"></script>
   <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>
   <script src="/search-shortcut.js?v=<%= asset_mtime('public/search-shortcut.js') %>"></script>
 </body>
