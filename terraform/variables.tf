@@ -37,9 +37,9 @@ variable "region" {
 }
 
 variable "droplet_size" {
-  description = "DigitalOcean Droplet size slug. s-1vcpu-2gb ($12/mo) handles Sinatra + Sidekiq + Redis + Caddy without OOM. Downsize to s-1vcpu-1gb ($6/mo) only after verifying memory headroom."
+  description = "DigitalOcean Droplet size slug. s-4vcpu-8gb ($48/mo) — bumped from s-1vcpu-2gb after STUFF #54 deploy: the hourly RefreshAllFeedsWorker fan-out (sidekiq -c 5 in docker-compose, 80+ feeds) wedged the 1vCPU/2GB box every top-of-hour. 4 vCPU lets the fan-out finish without starving Caddy/SSH; 8GB gives memory headroom for feedjira XML parses + future Anthropic calls + Puma threads."
   type        = string
-  default     = "s-1vcpu-2gb"
+  default     = "s-4vcpu-8gb"
 }
 
 variable "ssh_key_fingerprint" {
