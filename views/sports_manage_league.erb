@@ -50,13 +50,14 @@
           <% if team[:location] && !team[:location].empty? && team[:location] != team[:name] %>
             <span class="muted sports-manage-team-location"><%= h(team[:location]) %></span>
           <% end %>
-          <%# STUFF #52 PR3 — notable players. Catalog-curated, no
-              click navigation yet (those land when /sports/player/:slug
-              upserts catalog players to the DB on demand). %>
+          <%# STUFF #52 PR3 + #52.1 — notable players. Each chip
+              links to /sports/player/{team_slug}-{name_slug}; the
+              route's ensure_catalog_player_by_slug helper upserts
+              the sports_players row on first click. %>
           <% if (team[:players] || []).any? %>
             <span class="sports-manage-team-players">
               <span class="muted" aria-hidden="true">👤</span>
-              <%= h(team[:players].join(' · ')) %>
+              <% team[:players].each_with_index do |player_name, idx| %><%= ' · ' if idx.positive? %><a class="sports-manage-player-link" href="/sports/player/<%= h(catalog_player_slug(team[:slug], player_name)) %>"><%= h(player_name) %></a><% end %>
             </span>
           <% end %>
         </div>

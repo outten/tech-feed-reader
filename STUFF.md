@@ -723,6 +723,8 @@ Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 
 **Deferred to a follow-up PR**: player-click navigation (catalog → DB player upsert mirroring the team upsert from PR1); logos beyond the 🏟 fallback; NPB + KBO + badminton RSS bridge entries (couldn't find stable English-language URLs in this pass).
 
+**#52.1 follow-up — player-click navigation — shipped.** Mirrors the catalog-team-on-demand upsert pattern from PR #145. New helpers in [app/main.rb](app/main.rb): `ensure_catalog_player_in_db(team_slug, name)` upserts a `sports_players` row with composite slug `"{team_slug}-{name_slug}"` and `source_provider='catalog'`; `ensure_catalog_player_by_slug(slug)` walks the catalog matching a team-slug prefix and resolves the player. `GET /sports/player/:slug` falls back to that resolver when the DB miss, then renders the existing player view. The view ([views/sports_player.erb](views/sports_player.erb)) now branches on `@player['tour']`: tennis players still get their flag / rankings / stat-cards / ESPN profile; catalog players see "Notable player on **TEAM** · Sport" with a back-link to the team's manage page, and the tennis-specific UI hides. Player chips in [views/sports_manage_league.erb](views/sports_manage_league.erb) are now anchors with a subtle dotted-underline hover. 8 examples in [spec/catalog_player_upsert_spec.rb](spec/catalog_player_upsert_spec.rb) cover the upsert, idempotence, view branching, 404s for unknown slugs, the `slugify` helper (accent stripping + edge-trim), and the chip-link render.
+
 ## [x] 54. Tennis Rankings Page
 
 - can you add a link from the Manage Sports Tennis page to this page to make it easy for users to follow players
