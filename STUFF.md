@@ -750,3 +750,14 @@ Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 - **`/feeds` Refresh-all removed.** Header button + its JS handler in [public/feeds.js](public/feeds.js) gone now that the hourly RefreshAllFeedsWorker cron fans out automatically. `POST /refresh/all` route stays (still used by `/admin/cache` + scripted ops).
 - **Sports drill-down two-row layout.** `.sports-manage-team` (team grid) and `.sports-feed-card` (news+podcasts grid) switched from flex-row to two-row CSS grid: logo+meta on row 1, full-width action button (`+ Follow` / `+ Subscribe`) on row 2. The button no longer competes with the meta column for horizontal space; long team names no longer truncate.
 - **Topic pages stacked rows.** [views/topic.erb](views/topic.erb) was reusing `.news-item` (designed for `/articles` with a 96px thumb column + right-side badges column), but topic rows have no thumb or badges — so the grid was crushing the title link into a sliver. New `.news-list-simple` modifier overrides the grid to `display: block` so each row stacks naturally (title → excerpt → meta), full width.
+
+## [x] 56. Beauty Pass 003
+
+On the artlce page, there's a section for "Related" articles. Like other elements throughout the site, it's hard to read because it is two columns, the first being the title. Can you refactor to having two rows instead of two columns.
+
+**Shipped.** Same root cause as the topic-page fix in #55: the bare `<li class="news-item">` reuses the `/articles` 3-column grid (`thumb / main / badges`) without rendering thumbnail or badge children, which collapses the title into a narrow main column next to a wide auto-sized meta column. The `.news-list-simple` modifier added in #55 already overrides that — just needed to be applied here. Two 1-line ERB edits:
+
+- [views/article.erb](views/article.erb) — `/article/:uid` Related section.
+- [views/dashboard.erb](views/dashboard.erb) — `/admin/dashboard` "Recent unread" list (same pattern, you would have hit it next).
+
+Audit verified no other instance of the bug — `/articles` and `/search` use the full grid; `/topics` was fixed in #55.

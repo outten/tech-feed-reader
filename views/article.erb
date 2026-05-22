@@ -247,7 +247,7 @@
   <% if @related && @related.any? %>
     <section class="benchmark-section">
       <h3>Related</h3>
-      <ul class="news-list">
+      <ul class="news-list news-list-simple">
         <% @related.each do |a| %>
           <li class="news-item">
             <a class="news-headline" href="/article/<%= a['uid'] %>"><%= h(a['title']) %></a>
