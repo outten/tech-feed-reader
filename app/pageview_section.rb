@@ -35,7 +35,7 @@ module PageviewSection
   # land in the pageviews table.
   IGNORE_PATTERNS = [
     %r{\A/(health|metrics)\z},
-    %r{\A/(style\.css|page-background\.js|global-player\.js|chat-widget\.js|search-shortcut\.js|continue-progress\.js|feeds-filter\.js)(\?|\z)},
+    %r{\A/(style\.css|page-background\.js|global-player\.js|chat-widget\.js|search-shortcut\.js|continue-progress\.js|feeds-filter\.js|sports-follow\.js)(\?|\z)},
     %r{\A/img/},
     %r{\A/api/chat\b}
   ].freeze

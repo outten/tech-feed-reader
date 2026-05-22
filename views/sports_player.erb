@@ -58,10 +58,14 @@
       Follow to surface them at the top of the rankings page.
     <% end %>
   </p>
-  <form method="post" action="/sports/players/<%= @is_followed ? 'unfollow' : 'follow' %>">
+  <form method="post" action="/sports/players/<%= @is_followed ? 'unfollow' : 'follow' %>" class="js-sports-follow-form">
     <input type="hidden" name="slug" value="<%= h(@player['slug']) %>">
     <input type="hidden" name="return_to" value="/sports/player/<%= h(@player['slug']) %>">
-    <button type="submit" class="btn-primary">
+    <button type="submit"
+            class="btn-primary <%= 'is-followed' if @is_followed %>"
+            data-full-name="<%= h(@player['full_name']) %>"
+            data-follow-label="☆ Follow <%= h(@player['full_name']) %>"
+            data-following-label="★ Unfollow <%= h(@player['full_name']) %>">
       <%= @is_followed ? "★ Unfollow #{@player['full_name']}" : "☆ Follow #{@player['full_name']}" %>
     </button>
   </form>

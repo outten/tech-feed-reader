@@ -141,9 +141,24 @@ class TechFeedReader < Sinatra::Base
   end
   set :host_authorization, { permitted_hosts: permitted_hosts }
 
-  # JSON CSRF isn't needed: SameSite cookie + custom Content-Type
-  # combo means cross-origin forms can't post JSON with our session.
-  set :protection, except: [:json_csrf]
+  # Protections we explicitly opt out of:
+  #   :json_csrf       — SameSite cookie + custom Content-Type combo
+  #                       means cross-origin forms can't post JSON
+  #                       with our session anyway.
+  #   :session_hijacking — STUFF #54. The default rack-protection
+  #                       middleware fingerprints the session against
+  #                       HTTP_USER_AGENT / HTTP_ACCEPT_ENCODING /
+  #                       HTTP_ACCEPT_LANGUAGE and clears the session
+  #                       if any change between requests. Browser
+  #                       `fetch()` calls can normalise those headers
+  #                       differently than the initial WebAuthn
+  #                       request, silently destroying the session
+  #                       for AJAX even though browser navigation
+  #                       worked fine. The protection's value is low
+  #                       (heuristic, defeated by easy spoofing) and
+  #                       the cost was a totally broken AJAX-follow
+  #                       experience.
+  set :protection, except: %i[json_csrf session_hijacking]
 
   Auth.configure!
 
@@ -345,6 +360,23 @@ class TechFeedReader < Sinatra::Base
       JSON.parse(raw)
     rescue JSON::ParserError
       nil
+    end
+
+    # True when the client signals it wants JSON (the AJAX path used
+    # by public/sports-follow.js + similar). HTML form submits set
+    # Accept: text/html,…, so they take the 302 fallback.
+    def wants_json?
+      request.env['HTTP_ACCEPT'].to_s.include?('application/json')
+    end
+
+    # Shared shape for the four sports follow/unfollow routes so the
+    # JS handler in public/sports-follow.js can toggle button state
+    # without round-tripping HTML. The `followed` field is the
+    # authoritative new state — JS doesn't have to guess from the
+    # request kind.
+    def sports_follow_json(slug:, kind:, followed:)
+      content_type :json
+      { ok: true, slug: slug, kind: kind, followed: followed }.to_json
     end
 
     def relative_time(iso)
@@ -1751,6 +1783,7 @@ class TechFeedReader < Sinatra::Base
     halt 404 unless SportsPlayersStore.find_by_slug(slug)
     SportsFollowsStore.add(user_id: current_user_id, kind: 'player', value: slug)
     AppLogger.info('player_follow', slug: slug)
+    return sports_follow_json(slug: slug, kind: 'player', followed: true) if wants_json?
     redirect to(params['return_to'] || "/sports/player/#{slug}")
   end
 
@@ -1759,6 +1792,7 @@ class TechFeedReader < Sinatra::Base
     halt 400, 'slug required' if slug.empty?
     SportsFollowsStore.remove(user_id: current_user_id, kind: 'player', value: slug)
     AppLogger.info('player_unfollow', slug: slug)
+    return sports_follow_json(slug: slug, kind: 'player', followed: false) if wants_json?
     redirect to(params['return_to'] || "/sports/player/#{slug}")
   end
 
@@ -1855,6 +1889,7 @@ class TechFeedReader < Sinatra::Base
       AppLogger.warn('team_follow_enqueue_failed', slug: slug, message: e.message)
     end
     AppLogger.info('team_follow', slug: slug, team_id: team['id'])
+    return sports_follow_json(slug: slug, kind: 'team', followed: true) if wants_json?
     redirect to(params['return_to'] || '/sports/manage')
   end
 
@@ -1863,6 +1898,7 @@ class TechFeedReader < Sinatra::Base
     halt 400, 'slug required' if slug.empty?
     SportsFollowsStore.remove(user_id: current_user_id, kind: 'team', value: slug)
     AppLogger.info('team_unfollow', slug: slug)
+    return sports_follow_json(slug: slug, kind: 'team', followed: false) if wants_json?
     redirect to(params['return_to'] || '/sports/manage')
   end
 
@@ -2315,6 +2351,13 @@ class TechFeedReader < Sinatra::Base
     halt 400, 'direction must be up, down, or reset' unless FeedFeedbackStore::DIRECTIONS.include?(direction)
     weight = FeedFeedbackStore.bump(current_user_id, feed['id'], direction: direction)
     AppLogger.info('feed_feedback', feed_id: feed['id'], direction: direction, weight: weight)
+    # STUFF #54 — AJAX path used by public/feeds.js weight buttons.
+    # Returns the new weight so JS can update the inline display
+    # without reloading + scrolling to top.
+    if wants_json?
+      content_type :json
+      return { ok: true, feed_id: feed['id'], direction: direction, weight: weight }.to_json
+    end
     redirect to(params['return_to'] || '/feeds')
   end
 

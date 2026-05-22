@@ -5,11 +5,6 @@
       Manage subscribed RSS / Atom sources. <span id="feed-count"><%= @feeds.length %></span> active.
     </p>
   </div>
-  <% if @feeds.any? %>
-    <form method="post" action="/refresh/all" class="js-refresh-all">
-      <button type="submit" class="refresh-btn" title="Enqueue a fetch for every subscribed feed (background)">Refresh all</button>
-    </form>
-  <% end %>
 </div>
 
 <div id="flash-mount" aria-live="polite"></div>

@@ -28,7 +28,7 @@
       <p class="subtitle">
         First sentence of each article's auto-summary — read these instead of every full article.
       </p>
-      <ul class="news-list">
+      <ul class="news-list news-list-simple">
         <% @highlights.each do |sentence, article| %>
           <li class="news-item">
             <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
@@ -47,7 +47,7 @@
 
   <section class="benchmark-section" style="margin-top:1.5rem">
     <h3>All articles in this topic</h3>
-    <ul class="news-list">
+    <ul class="news-list news-list-simple">
       <% @articles.each do |article| %>
         <li class="news-item">
           <a class="news-headline" href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>

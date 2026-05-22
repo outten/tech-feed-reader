@@ -170,6 +170,35 @@
     li.appendChild(form);
   }
 
+  /* ---- Per-row +/- weight (STUFF #54) -----------------------------
+     The two tiny forms next to each .feed-weight-display POST to
+     /feeds/:id/feedback with direction=up|down. Pre-AJAX they redirected
+     back to /feeds and scrolled to top — painful with a long feeds
+     table. Now we fetch JSON and rewrite the weight display in place. */
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest('form.js-feed-weight-form');
+    if (!form) return;
+    e.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    postForm(form.action, form).then(function (r) {
+      if (btn) btn.disabled = false;
+      if (r.ok && typeof r.data.weight === 'number') {
+        var holder = form.parentElement;
+        var display = holder && holder.querySelector('.feed-weight-display');
+        if (display) {
+          display.textContent = r.data.weight.toFixed(2) + '×';
+          display.setAttribute('title',
+            'Current weight: ' + r.data.weight.toFixed(2) + '× — click + or − to adjust');
+        }
+        // Toggle the is-default styling so the visual cue follows.
+        if (holder) holder.classList.toggle('is-default', r.data.weight === 1.0);
+      } else {
+        showFlash(r.data.message || 'Failed to adjust feed weight.', 'error');
+      }
+    });
+  });
+
   /* ---- Per-row Refresh ------------------------------------------- */
   document.addEventListener('submit', function (e) {
     var form = e.target.closest('form.js-refresh-feed');
@@ -195,21 +224,4 @@
     });
   });
 
-  /* ---- "Refresh all" (page-header button) ------------------------ */
-  var refreshAll = document.querySelector('form.js-refresh-all');
-  if (refreshAll) {
-    refreshAll.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var btn = refreshAll.querySelector('button[type="submit"]');
-      if (btn) btn.disabled = true;
-      postForm('/api/refresh/all').then(function (r) {
-        if (btn) btn.disabled = false;
-        if (r.ok) {
-          showFlash('Queued ' + r.data.queued + ' feed' + (r.data.queued === 1 ? '' : 's') + ' for refresh.');
-        } else {
-          showFlash(r.data.message || 'Failed to queue refresh-all.', 'error');
-        }
-      });
-    });
-  }
 })();

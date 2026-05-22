@@ -60,14 +60,17 @@
             </span>
           <% end %>
         </div>
-        <form method="post" action="/sports/teams/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form">
+        <form method="post" action="/sports/teams/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form js-sports-follow-form">
           <input type="hidden" name="slug" value="<%= h(team[:slug]) %>">
           <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(@league[:slug]) %>">
-          <% if followed %>
-            <button type="submit" class="btn-secondary sports-manage-toggle" title="Stop following">✓ Following</button>
-          <% else %>
-            <button type="submit" class="btn-primary sports-manage-toggle" title="Follow — fetches recent results in the background">+ Follow</button>
-          <% end %>
+          <button type="submit"
+                  class="<%= followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if followed %>"
+                  data-full-name="<%= h(team[:name]) %>"
+                  data-follow-label="+ Follow"
+                  data-following-label="✓ Following"
+                  title="<%= followed ? 'Stop following' : 'Follow — fetches recent results in the background' %>">
+            <%= followed ? '✓ Following' : '+ Follow' %>
+          </button>
         </form>
       </li>
     <% end %>
