@@ -70,7 +70,11 @@ module FeedParser
         url:                    url,
         author:                 (entry.respond_to?(:author) ? entry.author : nil),
         published_at:           entry.published&.utc&.iso8601,
-        content_html:           Sanitizer.sanitize_html(raw),
+        # STUFF #61 — pass the entry URL as base so the sanitizer
+        # absolutizes any relative <a href> / <img src> against the
+        # publisher's domain. Without this, in-domain links like
+        # `/news/foo` resolve against feeder.tmoneystuff.com → 404.
+        content_html:           Sanitizer.sanitize_html(raw, base_url: url),
         content_text:           Sanitizer.text_only(raw),
         image_url:              extract_entry_image(entry, raw),
         audio_url:              audio_url,

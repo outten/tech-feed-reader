@@ -28,9 +28,17 @@ RSpec.describe 'config/sidekiq_cron.yml' do
     expect(job['cron']).to eq('0 4 * * *')
   end
 
+  it 'registers the daily fix-article-links job at :45 past 4am UTC' do
+    expect(schedule).to have_key('fix_article_links')
+    job = schedule['fix_article_links']
+    expect(job['class']).to eq('FixArticleLinksWorker')
+    expect(job['cron']).to eq('45 4 * * *')
+  end
+
   it 'every job names a class that resolves at load time' do
     require_relative '../app/workers/refresh_all_feeds_worker'
     require_relative '../app/workers/sports_sync_worker'
+    require_relative '../app/workers/fix_article_links_worker'
 
     schedule.each do |name, job|
       klass_name = job['class']

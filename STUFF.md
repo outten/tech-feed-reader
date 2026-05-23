@@ -828,3 +828,23 @@ After the last refresh in #53, six claims on the logged-out home + about pages h
 - `views/about.erb` Sports bullet: `~250 teams` → `~300 teams`; mentions notable-player click-through chips.
 
 Surgical changes (one paragraph per item), no new sections. Triggered by the standing follow-up rule from #53 ("always review the welcome page after a key new feature").
+
+## [x] 61. Broken Links
+
+I've noticed broken links in content that we import. Perhaps we should add a filter to test links and remove broken ones or fix them if we can. Perhaps some are local links that can be updated to the content source.
+
+Also, add the ability to run via make a directive to fix the entire article database.
+
+**Shipped.** Two parts:
+
+**At import — link absolutization.** Publisher RSS often emits in-domain links as relative paths (`/category/foo`, `author/bar.html`) or protocol-relative (`//cdn.x.com/img.jpg`). When rendered under `feeder.tmoneystuff.com` those resolve against the wrong origin → 404 or wrong image. New `LinkAbsolutizer` Loofah scrubber in [app/sanitizer.rb](app/sanitizer.rb) rewrites every relative `<a href>` and `<img src>` (also `<source src>`) to absolute using `URI.join(base_url, href)`. Anchors (`#section`), `mailto:`, `tel:`, `javascript:`, and `data:` URLs are skipped. Defensive `rescue` around `URI.join` so malformed publisher HREFs don't crash the import. `Sanitizer.sanitize_html` gains a `base_url:` kwarg (backward-compatible — defaults to nil, in which case the scrubber doesn't run). Both call sites updated: `app/feed_parser.rb` passes the entry URL, `app/providers/readability.rb` passes the fetch URL.
+
+**Retroactive fix — `make fix-article-links` + daily Sidekiq-cron.** Logic lives in [app/article_link_scrubber.rb](app/article_link_scrubber.rb): iterates every article with non-empty `content_html` AND `content_scrubbed = FALSE`, re-sanitizes with the article's own URL as the base, then bumps `content_scrubbed = TRUE` so subsequent runs skip the row entirely (no re-parsing). Empty-content rows get a flag-only bump in a final pass so the unscrubbed pool drains to zero. New migration `003_articles_content_scrubbed.sql` adds the column (`BOOLEAN NOT NULL DEFAULT FALSE`); new imports in `ArticlesStore.import` set it to `TRUE` on insert since the scrubber already ran.
+
+Two entry points share the module: [scripts/fix_article_links.rb](scripts/fix_article_links.rb) (manual one-shot, env flags `DRY_RUN=1` / `LIMIT=N` / `VERBOSE=1`) and a new `FixArticleLinksWorker` registered in [config/sidekiq_cron.yml](config/sidekiq_cron.yml) at `45 4 * * *` UTC (daily 04:45, slotted between the nightly sports sync at 04:00 and the next hourly feed refresh at 05:00). Steady-state daily run is a millisecond no-op; the WHERE-clause filter keeps the query cheap regardless of total article count. The operator can also trigger it on demand from the Sidekiq web tab.
+
+Dev-DB pass (20,628 articles): 1,671 had relative URLs rewritten (Engadget `/category/...` and `/author/...` paths, Schneier blog cross-links, 404media internal links, the `tomscii.sig7.se` electronics post with 24 images + 22 cross-refs); 5,440 already-absolute (flag bumped); 3,507 skipped (opaque GUID URLs from older podcast feeds — flag bumped); 762 empty-content (flag bumped). Final remaining unscrubbed: 0.
+
+**Not in scope** — HTTP HEAD probing for dead external URLs. Detection is expensive (one request per link), false-positive-prone (sites return 403/405 to bots, return 200 with soft-404 bodies), and remediation is ambiguous (remove the anchor? replace with text?). The absolutize fix addresses the most common breakage; dead-link probing left as a future task if it becomes a real problem.
+
+**Specs**: +9 examples in [spec/sanitizer_spec.rb](spec/sanitizer_spec.rb) cover root-relative, path-relative, protocol-relative, already-absolute, anchor/mailto/tel skip, `<img src>` rewrite, malformed-URI tolerance, no-op-when-base_url-empty, and idempotence. Suite: 1428 / 0.
