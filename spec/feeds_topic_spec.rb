@@ -57,16 +57,17 @@ RSpec.describe FeedCatalog, 'Phase S1 + S2' do
     expect(FeedCatalog.topic_for(entry)).to eq(:sports)
   end
 
-  it 'has 37 sports entries spanning the original Phase S2 set + #52 PR3 breadth' do
+  it 'has 42 sports entries spanning the original Phase S2 set + #52 PR3 + #52.3 breadth' do
     # Phase 2 follow-up added :youtube_sports as a parallel sports
     # sub-category. STUFF #52 PR3 added cricket / baseball / golf /
-    # motorsport / horse_racing categories and 16 new feed entries
-    # for the leagues that didn't have curated RSS before.
+    # motorsport / horse_racing categories and 16 new feed entries.
+    # STUFF #52.3 added 5 more — 3 baseball (BBC Baseball + MyKBO +
+    # Yonhap) and 2 badminton (BWF + Badzine).
     sports_entries = FeedCatalog.all.select { |e| FeedCatalog.topic_for(e) == :sports }
-    expect(sports_entries.length).to eq(37)
+    expect(sports_entries.length).to eq(42)
     expect(sports_entries.map { |e| e[:category] }.uniq).to contain_exactly(
       :nfl, :nba, :soccer, :rugby, :tennis, :youtube_sports,
-      :cricket, :baseball, :golf, :motorsport, :horse_racing
+      :cricket, :baseball, :golf, :motorsport, :horse_racing, :badminton
     )
   end
 

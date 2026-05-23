@@ -415,6 +415,34 @@ module FeedCatalog
       title: 'ESPN MLB', category: :baseball,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Major League Baseball news + analysis from ESPN.' },
+    { url: 'https://feeds.bbci.co.uk/sport/baseball/rss.xml',
+      title: 'BBC Sport — Baseball', category: :baseball,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC global baseball coverage — MLB, international, occasional NPB/KBO.' },
+    # STUFF #52.3 — KBO + NPB English-language sources. KBO has a
+    # dedicated independent site; NPB English coverage is sparse, so
+    # the bridge falls back to the broader BBC/ESPN baseball feeds.
+    { url: 'https://mykbo.net/feed/',
+      title: 'MyKBO — Korea Baseball Organization', category: :baseball,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'KBO-specific English coverage — daily recaps, standings, roster moves.' },
+    { url: 'https://en.yna.co.kr/RSS/sports.xml',
+      title: 'Yonhap News — Korean Sports', category: :baseball,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Korean sports news (KBO baseball, K-League soccer, Olympics) from Yonhap.' },
+
+    # Badminton — BWF is the global federation; Badzine is the
+    # established independent badminton news site. Both are stable
+    # English-language sources and cover men\'s + women\'s singles +
+    # doubles tournaments.
+    { url: 'https://bwfbadminton.com/news/feed/',
+      title: 'BWF Badminton — Official', category: :badminton,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official BWF news — World Tour, World Championships, Olympics, Sudirman Cup.' },
+    { url: 'https://www.badzine.net/feed/',
+      title: 'Badzine', category: :badminton,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent badminton journalism — interviews, tournament recaps, opinion.' },
 
     # Golf
     { url: 'https://www.espn.com/espn/rss/golf/news',
@@ -789,9 +817,24 @@ module FeedCatalog
     # Baseball
     'mlb' => %w[
       https://www.espn.com/espn/rss/mlb/news
+      https://feeds.bbci.co.uk/sport/baseball/rss.xml
     ],
-    # NPB + KBO don't have a stable English-language feed I can
-    # confidently bind here — left empty for a future PR.
+    # STUFF #52.3 — NPB has no dedicated English RSS feed I can
+    # find. Closest reliable proxies: BBC Sport Baseball (worldwide
+    # baseball, regular NPB mentions especially around Japan Series)
+    # and ESPN MLB (heavy coverage of Japanese players in MLB —
+    # Ohtani, Yamamoto, Suzuki). Both stable; users get a baseline.
+    'npb' => %w[
+      https://feeds.bbci.co.uk/sport/baseball/rss.xml
+      https://www.espn.com/espn/rss/mlb/news
+    ],
+    # KBO has a dedicated independent English site (MyKBO) — primary
+    # source. Yonhap News covers Korean sports broadly including KBO.
+    'kbo' => %w[
+      https://mykbo.net/feed/
+      https://en.yna.co.kr/RSS/sports.xml
+      https://feeds.bbci.co.uk/sport/baseball/rss.xml
+    ],
     # Cricket
     'icc-mens' => %w[
       https://feeds.bbci.co.uk/sport/cricket/rss.xml
@@ -859,8 +902,19 @@ module FeedCatalog
     'wec' => %w[
       https://www.espn.com/espn/rss/rpm/news
     ],
-    # Badminton — no major English-language RSS we can bind
-    # confidently; left empty for a future PR.
+    # Badminton — BWF (Badminton World Federation) publishes an
+    # official news feed; Badzine is the established independent
+    # English-language badminton news outlet. Both cover men's +
+    # women's singles + doubles across all tours, so bound to both
+    # league entries. STUFF #52.3.
+    'bwf-mens' => %w[
+      https://bwfbadminton.com/news/feed/
+      https://www.badzine.net/feed/
+    ],
+    'bwf-womens' => %w[
+      https://bwfbadminton.com/news/feed/
+      https://www.badzine.net/feed/
+    ],
     # Horse racing
     'uk-flat'         => %w[https://feeds.bbci.co.uk/sport/horse-racing/rss.xml],
     'uk-jumps'        => %w[https://feeds.bbci.co.uk/sport/horse-racing/rss.xml],

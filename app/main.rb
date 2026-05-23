@@ -566,6 +566,59 @@ class TechFeedReader < Sinatra::Base
       )
     end
 
+    # STUFF #52.1 — catalog players (notable-player chips on team
+    # cards) live in app/sports_catalog.rb as plain strings under
+    # `team[:players]`. Clicking a chip needs to land on the player
+    # detail page; that requires a sports_players row. This helper
+    # upserts on demand, mirroring ensure_catalog_team_in_db above.
+    #
+    # The player's globally-unique slug is `"#{team_slug}-#{name_slug}"`
+    # so two teams that happen to share a player name (rare in the
+    # curated catalog) don't collide. The source_provider/external_id
+    # keys carry the same composite so re-upserts are idempotent.
+    def ensure_catalog_player_in_db(team_slug, player_name)
+      catalog_team = SportsCatalog.find_team(team_slug)
+      return nil unless catalog_team
+      return nil unless (catalog_team[:players] || []).include?(player_name)
+
+      catalog_league = SportsCatalog.find_league(catalog_team[:sport_slug], catalog_team[:league_slug])
+      return nil unless catalog_league
+
+      slug = catalog_player_slug(team_slug, player_name)
+      SportsPlayersStore.upsert(
+        sport:           catalog_league[:sport],
+        slug:            slug,
+        full_name:       player_name,
+        source_provider: 'catalog',
+        external_id:     slug
+      )
+    end
+
+    # Resolve a catalog player from its composite slug. Walks the
+    # catalog looking for a team whose slug is a prefix and a player
+    # whose name slug matches the remainder. Returns the upserted
+    # sports_players row, or nil if no catalog match.
+    def ensure_catalog_player_by_slug(slug)
+      SportsCatalog.all_teams.each do |team|
+        prefix = "#{team[:slug]}-"
+        next unless slug.to_s.start_with?(prefix)
+        suffix = slug[prefix.length..]
+        (team[:players] || []).each do |player_name|
+          return ensure_catalog_player_in_db(team[:slug], player_name) if slugify(player_name) == suffix
+        end
+      end
+      nil
+    end
+
+    def catalog_player_slug(team_slug, player_name)
+      "#{team_slug}-#{slugify(player_name)}"
+    end
+
+    def slugify(s)
+      s.to_s.unicode_normalize(:nfkd).gsub(/[^\x00-\x7F]/, '').downcase
+       .gsub(/[^a-z0-9]+/, '-').gsub(/^-+|-+$/, '')
+    end
+
     # Phase S9 helpers — build lookup tables for a list of match
     # rows so the calendar view doesn't N+1 across 30+ rows.
     def build_teams_by_id_for_matches(matches)
@@ -1755,12 +1808,27 @@ class TechFeedReader < Sinatra::Base
 
   # Sports Phase S7 — single-player detail page.
   get '/sports/player/:slug' do |slug|
-    @player = SportsPlayersStore.find_by_slug(slug)
+    # Catalog players (notable-player chips on team cards in #52)
+    # are upserted to sports_players on first click — see
+    # ensure_catalog_player_by_slug for the lookup walk.
+    @player = SportsPlayersStore.find_by_slug(slug) || ensure_catalog_player_by_slug(slug)
     halt 404, erb(:article_not_found) unless @player
     @page_title    = @player['full_name']
     # ESPN player-card link reconstructed from external_id + slug.
-    @espn_url      = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}"
+    # Only meaningful for tennis players synced from ESPN; catalog
+    # players (source_provider='catalog') don't have an ESPN profile
+    # so the view hides the section.
+    @espn_url      = "https://www.espn.com/tennis/player/_/id/#{@player['external_id']}/#{slug}" if @player['tour']
     @is_followed   = SportsFollowsStore.follow?(current_user_id, 'player', slug)
+
+    # STUFF #52.1 — for catalog players, surface the back-link to
+    # their team page. The slug is "{team_slug}-{name_slug}" so we
+    # match the team by prefix.
+    if @player['source_provider'] == 'catalog'
+      @catalog_team = SportsCatalog.all_teams.find do |t|
+        @player['external_id'].to_s.start_with?("#{t[:slug]}-")
+      end
+    end
     # S7 follow-up #2 — articles mentioning the player. Refresh
     # if the cache is stale (TTL 1h), then read from the join table.
     SportsEntityArticlesStore.refresh_for(
