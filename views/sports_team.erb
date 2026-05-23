@@ -141,7 +141,7 @@
 
   <% if @articles.empty? %>
     <div class="empty-state">
-      <p>No articles ingested yet from these feeds. Try clicking <strong>Refresh all</strong> in the header.</p>
+      <p>No articles ingested yet from these feeds. The hourly refresh cron pulls articles automatically; new ones should appear within the next hour.</p>
     </div>
   <% else %>
     <ul class="sports-article-list">

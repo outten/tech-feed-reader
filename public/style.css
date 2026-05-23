@@ -2268,6 +2268,18 @@ html.dark .empty-state { background: #1c1c1e; border-color: #3a3a3c; }
   margin: 1rem 0 1.5rem;
 }
 .stat-cards .summary-card { display: flex; flex-direction: column; gap: 0.2rem; }
+/* STUFF #57 — pair modifier. .stat-cards-pairs forces a 2-column
+   grid (half-width each) for sections where 4 auto-fit cards crammed
+   their content into too-narrow columns. Used on /admin/llm-quota
+   for the Active Budgets section. Other .stat-cards consumers
+   (dashboard, dev-stats) keep the default auto-fit grid. */
+.stat-cards.stat-cards-pairs { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) {
+  /* Below ~640px there isn't enough room for two half-width cards
+     side-by-side; collapse to a single column so labels + values
+     keep their hierarchy. */
+  .stat-cards.stat-cards-pairs { grid-template-columns: 1fr; }
+}
 .stat-cards .summary-label { font-size: 0.78rem; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat-cards .summary-value { font-size: 1.5rem; font-weight: 600; color: #1d1d1f; }
 .stat-cards .summary-sub   { font-size: 0.78rem; color: #8e8e93; }

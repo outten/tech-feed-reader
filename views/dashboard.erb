@@ -125,8 +125,8 @@
   </section>
 <% elsif @article_count.zero? %>
   <div class="empty-state">
-    No articles yet. <a href="/feeds">Add a feed</a> and click "Refresh all"
-    to populate.
+    No articles yet. <a href="/feeds">Add a feed</a> — the hourly
+    refresh cron will pull articles automatically.
   </div>
 <% else %>
   <div class="empty-state">
