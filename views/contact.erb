@@ -1,0 +1,87 @@
+<%# Public contact form. Signed-in or anonymous (no auth wall —
+    /contact is in Auth::PUBLIC_PATHS). Submissions land in the
+    support_messages table; the operator reviews at /admin/support. %>
+
+<div class="page-header">
+  <div>
+    <h2>Contact</h2>
+    <p class="subtitle">
+      Send a message. No email or account required.
+      &middot; <a href="/privacy">Privacy &rarr;</a>
+    </p>
+  </div>
+</div>
+
+<% if params['sent'] == '1' %>
+  <div class="notice">
+    <strong>Thanks — your message is in the queue.</strong>
+    We review submissions when we can. If you supplied a reply-to address,
+    we'll respond to it directly; otherwise this is one-way.
+  </div>
+<% end %>
+
+<% if @error %>
+  <div class="error"><%= h(@error) %></div>
+<% end %>
+
+<section class="benchmark-section">
+  <p class="subtitle">
+    This form is the only public channel. The project repository is private and
+    we don't publish an email address (per our anti-spam stance — see
+    <a href="/privacy">Privacy</a> for why).
+  </p>
+
+  <form method="post" action="/contact" class="portfolio-form contact-form">
+    <%# Honeypot — bots auto-fill every visible field on a page; humans
+        don't see this one (display:none + autocomplete=off + tabindex
+        out of natural order). Server rejects any submission where it's
+        non-empty without explaining why, so spam scripts can't iterate. %>
+    <div class="contact-honeypot" aria-hidden="true">
+      <label>
+        Leave this field blank
+        <input type="text" name="website" tabindex="-1" autocomplete="off" value="">
+      </label>
+    </div>
+
+    <%# Row 1: Subject + Email side-by-side. Both are short single-
+        line inputs, so two columns reads compactly. %>
+    <label>
+      Subject <span class="muted">(optional)</span>
+      <input type="text" name="subject"
+             maxlength="<%= SupportMessagesStore::SUBJECT_MAX %>"
+             value="<%= h(@subject) %>"
+             placeholder="Short summary">
+    </label>
+
+    <label>
+      Email <span class="muted">(optional, for a reply)</span>
+      <input type="email" name="reply_to"
+             maxlength="<%= SupportMessagesStore::REPLY_TO_MAX %>"
+             value="<%= h(@reply_to) %>"
+             placeholder="your@email.com">
+    </label>
+
+    <%# Row 2: Message takes the full grid width (both columns). %>
+    <label class="full-width">
+      Message
+      <textarea name="body" rows="8" required
+                maxlength="<%= SupportMessagesStore::BODY_MAX %>"
+                placeholder="What's on your mind?"><%= h(@body) %></textarea>
+    </label>
+
+    <%# Row 3: who-am-I context + the submit button on the same line. %>
+    <p class="subtitle full-width contact-form-context">
+      <% if signed_in? %>
+        Signed in as <strong><%= h(current_user['username']) %></strong> —
+        we'll attach that to the message. Sign out first if you'd prefer
+        anonymity.
+      <% else %>
+        Submitting anonymously. We won't know who you are unless you tell us.
+      <% end %>
+    </p>
+
+    <div class="contact-form-submit full-width">
+      <button type="submit" class="btn-primary">Send message</button>
+    </div>
+  </form>
+</section>

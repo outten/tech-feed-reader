@@ -1,0 +1,118 @@
+<%# Public privacy page. Plain-language summary of what the app
+    actually collects + how it's used. Updated alongside features
+    that change the data model — keep this honest, not aspirational. %>
+
+<div class="page-header">
+  <div>
+    <h2>Privacy</h2>
+    <p class="subtitle">
+      Last updated: <%= File.mtime(__FILE__).strftime('%B %-d, %Y') %>
+      &middot; <a href="/about">About Feeder &rarr;</a>
+    </p>
+  </div>
+</div>
+
+<section class="about-section">
+  <h3>Short version</h3>
+  <p>
+    Feeder is an RSS reader. It pulls feeds <em>you</em> chose, stores them in a database we
+    host, and ranks / triages them for you. There are no ad networks, no third-party
+    analytics, no behavioural tracking pixels, and no sale of your data to anyone. Your
+    account is identified by a username and a passkey — we never ask for your email,
+    real name, phone number, or location.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>What we store</h3>
+  <ul>
+    <li><strong>Account</strong> — the username you chose (3-20 chars), an optional display name, and the WebAuthn public keys of every passkey you registered. Passkey private keys never leave your device; the server only stores the public half + a usage counter to detect cloned credentials.</li>
+    <li><strong>Recovery codes</strong> — ten one-time codes generated at signup, stored as HMAC-SHA256 hashes (the plaintext is shown to you once and never persisted by us).</li>
+    <li><strong>Your subscriptions</strong> — every feed URL you added, your topic preferences, your mute rules (authors / keywords / feeds), your tags.</li>
+    <li><strong>Your reading state</strong> — which articles you've read, bookmarked, thumbs-upped, thumbs-downed, or had Claude summarise.</li>
+    <li><strong>Articles you pulled</strong> — RSS / Atom feed entries you subscribed to. The body, title, and metadata are stored so we can rank them. Articles older than the retention window (default 7 days) are automatically pruned unless you bookmarked them.</li>
+    <li><strong>Sports follows</strong> — the teams / players you starred, plus league schedules + standings we sync from public ESPN endpoints.</li>
+    <li><strong>HTTP request log</strong> — one structured JSON line per request (method, path, status code, latency, anonymised IP, user-agent) for ~30 days. Used for operational debugging, never tied to behavioural profiles.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>What we don't store</h3>
+  <ul>
+    <li>Your email address — Feeder doesn't ask for one.</li>
+    <li>Your phone number, real name, or location.</li>
+    <li>Behavioural analytics events ("user clicked X at time Y") beyond what's strictly needed for the For-You ranker (your bookmarks + thumbs-up/down).</li>
+    <li>Cross-site tracking cookies, fingerprinting hashes, or device IDs.</li>
+    <li>Anything we send to advertisers or data brokers — there are none.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>Cookies</h3>
+  <p>
+    We set exactly one cookie: <code>tfr.session</code>. It's a signed, <code>HttpOnly</code>,
+    <code>SameSite=Lax</code> session cookie used to keep you signed in. No third-party
+    cookies. No tracking pixels.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Third parties we send data to</h3>
+  <ul>
+    <li><strong>Anthropic (Claude API)</strong> — when you click <em>Summarize with Claude</em> on a digest, or when the nightly triage runs, the article text + a small sample of your bookmarked / voted articles is sent to Anthropic to compute the summary or triage classification. Anthropic publishes its own <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>; per their commercial terms, API inputs are not used to train their models.</li>
+    <li><strong>DigitalOcean</strong> — hosts the app server, the managed PostgreSQL database, and the off-site backup bucket. Your data lives in their NYC3 region.</li>
+    <li><strong>The publishers of the feeds you subscribed to</strong> — we make HTTP GET requests to their public RSS / Atom URLs on your behalf. They see the request, not your identity.</li>
+    <li><strong>ESPN's public API</strong> — for sports scores, standings, schedules. No personal data is sent; only league / team identifiers.</li>
+    <li><strong>iTunes Search API</strong> — to back-fill podcast cover art when the feed doesn't carry one. Same shape as ESPN: no personal data sent.</li>
+    <li><strong>Picsum</strong> — for the rotating nature background images. Image URLs are public; no account info crosses the network.</li>
+  </ul>
+  <p>
+    No data is sold or rented to anyone, ever.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Retention</h3>
+  <ul>
+    <li>Articles you didn't bookmark: automatically pruned after the retention window (default 7 days).</li>
+    <li>Bookmarked articles: kept until you remove the bookmark or delete your account.</li>
+    <li>Your account, subscriptions, follows, summaries, and recovery codes: kept until you delete your account.</li>
+    <li>HTTP request logs: ~30 days, then rotated out.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>Your rights</h3>
+  <ul>
+    <li><strong>Delete your account at any time</strong> — go to <a href="/account">/account</a>, scroll to "Delete account", type your username to confirm. Cascade-deletes every per-user table in one transaction. The username is freed for re-use.</li>
+    <li><strong>Add or revoke passkeys</strong> — same page. Revoking the last passkey requires un-used recovery codes (we won't lock you out by accident).</li>
+    <li><strong>Regenerate recovery codes</strong> — invalidates the previous ten; shown once.</li>
+    <li><strong>Export your data</strong> — not yet implemented; planned. Until then, contact us using the link in the footer if you need a copy.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>Children</h3>
+  <p>
+    Feeder isn't directed at children under 13 and we don't knowingly accept signups from them.
+    If you believe a child has created an account, contact us and we'll delete it.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Changes to this policy</h3>
+  <p>
+    We'll update the "Last updated" date at the top whenever this page changes. Material
+    changes (new data we collect, new third parties we share with) will be called out
+    in the app's release notes.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Contact</h3>
+  <p>
+    Questions about this policy, or a request to export / delete data outside the
+    in-app flows: use the <a href="/contact">contact form</a> (signed-in or anonymous;
+    include a reply-to address if you'd like a response).
+  </p>
+</section>
