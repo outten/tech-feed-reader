@@ -175,29 +175,11 @@
           <% end %>)
         </span>
       </h3>
-      <%# Regenerate controls in a vertical button stack — out of the
-          H3 so the heading isn't a jumble of title + muted text + two
-          buttons on one line. %>
-      <div class="summary-actions">
-        <form method="post" action="/article/<%= @article['uid'] %>/summarize">
-          <button type="submit" class="refresh-btn"
-                  title="Regenerate the extractive summary from the article body">
-            Re-summarize (extractive)
-          </button>
-        </form>
-        <% if @claude_available %>
-          <%# js-article-summarize: public/article-summarize-form.js swaps
-              the label to "Summarizing… (5–15s)" on submit so the user
-              sees progress during the synchronous Claude call. %>
-          <form method="post" action="/article/<%= @article['uid'] %>/summarize/llm"
-                class="js-article-summarize">
-            <button type="submit" class="refresh-btn"
-                    title="Send the article to Claude and replace the LLM summary">
-              <%= @summary['llm'].to_s.empty? ? 'Summarize with Claude' : 'Re-summarize with Claude' %>
-            </button>
-          </form>
-        <% end %>
-      </div>
+      <%# STUFF #59 — the inline Re-summarize + "Summarize with Claude"
+          buttons were removed. Extractive summaries are still
+          generated at import time and rendered below; the existing
+          POST /article/:uid/summarize and .../summarize/llm routes
+          stay in place for curl / scripted use. %>
       <% unless @summary['llm'].to_s.empty? %>
         <p class="excerpt" style="border-left:3px solid #0071e3; padding-left:0.75rem">
           <strong>Claude</strong> &middot;
@@ -352,5 +334,3 @@
     });
   })();
 </script>
-
-<script src="/article-summarize-form.js?v=<%= asset_mtime('public/article-summarize-form.js') %>"></script>

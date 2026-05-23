@@ -803,3 +803,28 @@ New helper [`format_youtube_description_html`](app/main.rb) escapes the text and
 Line breaks survive via `white-space: pre-line` on the `.article-youtube-description` wrapper — no need to inject `<br>`. Styled to match the rest of the article body: subtle blue dotted-underline links, soft-blue pill timestamps that hover into a stronger accent. Branch in [views/article.erb](views/article.erb) opt-ins YouTube articles only (via `youtube_video_id(@article)`); non-YouTube articles render `content_html` raw as before.
 
 10 lockdown specs in [spec/youtube_description_format_spec.rb](spec/youtube_description_format_spec.rb) cover HTML escaping, URL anchor attributes, trailing-punctuation trimming, MM:SS / HH:MM:SS conversion, URL-vs-timestamp disambiguation, hashtag matching rules, and a combined BBC Earth fixture.
+
+## [x] 59. Summaries on Article Page
+
+Get ride of Re-Summarize and Summarize by Claude on the artice pages.
+
+**Shipped.** Removed the two action buttons ("Re-summarize (extractive)" and "Summarize with Claude") + the `.summary-actions` wrapper from [views/article.erb](views/article.erb). The Summary section itself stays — the extractive sentences (generated at import time) still render inline below the heading, and any previously-cached Claude summary still appears with its blue accent border. Dependencies untouched:
+
+- **Extractive generation at import** still runs (`Summarizer::Extractive`) and feeds the `summaries.extractive` column.
+- **Skim previews** on `/articles`, `/search`, `/triage`, `/sports/team/*`, `/podcasts`, `/whats-on` — `skim_summary_for` still cascades `llm → extractive → content_text excerpt`, so those 2-line previews keep working.
+- **Daily digest Claude summarization** at `/digests/:id` is a separate code path and untouched.
+- **`POST /article/:uid/summarize` + `.../summarize/llm`** routes left intact so curl / scripted clients keep working. UI just doesn't expose them anymore.
+
+Also deleted [public/article-summarize-form.js](public/article-summarize-form.js) (the "Summarizing… (5–15s)" loading-state hook for the removed button) and its `<script>` tag in article.erb — no other surface uses it.
+
+## [x] 60. Welcome page drift sweep
+
+After the last refresh in #53, six claims on the logged-out home + about pages had drifted from reality. Audit + fix:
+
+- `views/home.erb` "One inbox" card: `90+ curated feeds` → `100+` (after #52.3 added 5).
+- `views/home.erb` Sports card: rewritten to mention every NFL + NBA team (per #157), NPB + KBO baseball (per #52.3), and notable-individual-player follow chips (per #52.1). The old text only mentioned "tennis players" individually.
+- `views/home.erb` narrative: "Tech Feed Reader inverts that" → "Feeder inverts that" (brand rename from #50, finally caught up); "pulls every feed every ten minutes" → "the hourly refresh cron pulls every feed automatically" (since #150's sidekiq-cron).
+- `views/about.erb` Ingest bullet: "every 10 minutes" → describes the RefreshAllFeedsWorker fan-out + per-feed worker pattern.
+- `views/about.erb` Sports bullet: `~250 teams` → `~300 teams`; mentions notable-player click-through chips.
+
+Surgical changes (one paragraph per item), no new sections. Triggered by the standing follow-up rule from #53 ("always review the welcome page after a key new feature").
