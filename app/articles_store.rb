@@ -236,8 +236,9 @@ module ArticlesStore
     sql = <<~SQL
       INSERT INTO articles
         (uid, feed_id, title, url, author, published_at, content_html, content_text,
-         audio_url, audio_mime_type, audio_duration_seconds, image_url, categories)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         audio_url, audio_mime_type, audio_duration_seconds, image_url, categories,
+         content_scrubbed)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
       ON CONFLICT DO NOTHING
     SQL
 

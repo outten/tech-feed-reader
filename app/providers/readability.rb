@@ -57,7 +57,11 @@ module Providers
       return nil unless best
 
       raw_html = best.inner_html.to_s
-      html     = Sanitizer.sanitize_html(raw_html)
+      # STUFF #61 — pass the source URL so relative links inside the
+      # readability-extracted body get absolutized against the
+      # publisher's domain (same as feed_parser.rb does for feed
+      # entries).
+      html     = Sanitizer.sanitize_html(raw_html, base_url: url)
       text     = Sanitizer.text_only(raw_html)
       return nil if text.length < DENSITY_MIN_TEXT
       { html: html, text: text }

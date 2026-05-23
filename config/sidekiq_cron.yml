@@ -20,3 +20,9 @@ sports_sync:
   class: "SportsSyncWorker"
   queue: default
   description: "Nightly 04:00 UTC: ESPN match schedules + league standings + tennis rankings."
+
+fix_article_links:
+  cron: "45 4 * * *"
+  class: "FixArticleLinksWorker"
+  queue: default
+  description: "Daily 04:45 UTC: re-scrub any article content_html flagged content_scrubbed = FALSE. Steady-state no-op; safety net for imports that bypass Sanitizer's base_url path."

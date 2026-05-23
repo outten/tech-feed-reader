@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy
+.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links
 
 install:
 	bundle install
@@ -156,6 +156,14 @@ prune:
 # re-run after adding new podcasts. See app/providers/itunes_lookup.rb.
 backfill-podcast-images:
 	bundle exec ruby scripts/backfill_podcast_images.rb
+
+# STUFF #61 — re-sanitize every article's content_html with the
+# article's own URL as the absolute-link base. Fixes relative <a>
+# and <img> from rows imported before #61 landed. Idempotent;
+# already-absolute URLs stay put. DRY_RUN=1 to preview; LIMIT=N to
+# sample; VERBOSE=1 to log every changed row.
+fix-article-links:
+	bundle exec ruby scripts/fix_article_links.rb
 
 # Sports Phase S3 — seed the leagues / teams / follows the user
 # cares about (Eagles, Sixers, Union, All Blacks). Idempotent;
