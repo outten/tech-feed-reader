@@ -4,6 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Feeder<%= @page_title ? " — #{h(@page_title)}" : '' %></title>
+  <%# Pre-launch — Open Graph + Twitter card meta so a shared
+      Feeder link on Mastodon / Slack / iMessage renders a preview
+      card instead of a bare URL. @og_description can be set per-
+      page from a route; otherwise we fall back to the marketing
+      tagline. og:image is the existing dashboard hero. %>
+  <% canonical_url = "#{request.base_url}#{request.path}" %>
+  <% og_title       = @page_title ? "Feeder — #{@page_title}" : 'Feeder — RSS that ranks, summarizes, and triages for you' %>
+  <% og_description = @og_description || 'An RSS reader that ranks, summarizes, and triages your feed for you. No tracking, no algorithmic agenda. Passkey-only sign-in.' %>
+  <meta name="description" content="<%= h(og_description) %>">
+  <link rel="canonical" href="<%= h(canonical_url) %>">
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="Feeder">
+  <meta property="og:title"       content="<%= h(og_title) %>">
+  <meta property="og:description" content="<%= h(og_description) %>">
+  <meta property="og:url"         content="<%= h(canonical_url) %>">
+  <meta property="og:image"       content="<%= h("#{request.base_url}/img/home/dashboard.png") %>">
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="<%= h(og_title) %>">
+  <meta name="twitter:description" content="<%= h(og_description) %>">
+  <meta name="twitter:image"       content="<%= h("#{request.base_url}/img/home/dashboard.png") %>">
   <link rel="stylesheet" href="/style.css?v=<%= asset_mtime('public/style.css') %>">
   <%# Hotwire Turbo. Intercepts link clicks + form submits, fetches
       HTML via XHR, swaps <body> in place. Lets the mini-player below

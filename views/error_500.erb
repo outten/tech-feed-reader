@@ -1,0 +1,21 @@
+<%# 500 — branded error page. Operator sees the structured log via
+    AppLogger.error; the user gets a calm "we're on it" message
+    instead of Sinatra's default grey trace. %>
+<div class="page-header">
+  <div>
+    <h2>Something went sideways.</h2>
+    <p class="subtitle">
+      Server error on <code><%= h(request.path_info) %></code>. It's been logged
+      and we'll look at it. If this is urgent, reach us via
+      <a href="/contact">the contact form</a>.
+    </p>
+  </div>
+</div>
+
+<section class="benchmark-section">
+  <p>In the meantime:</p>
+  <ul>
+    <li><a href="/">Reload the home page</a> — most errors are transient</li>
+    <li><a href="/health">/health</a> — operational status snapshot</li>
+  </ul>
+</section>

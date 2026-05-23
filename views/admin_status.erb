@@ -1,0 +1,143 @@
+<%# Pre-launch — operator status page. Stitches together what's
+    otherwise scattered across /health, /admin/sidekiq, and the cron
+    schedule into one at-a-glance view. Gated by /admin/* Basic Auth +
+    WebAuthn sign-in. Refresh manually; no auto-poll. %>
+
+<div class="page-header">
+  <div>
+    <p class="subtitle"><a href="/admin">&larr; Admin</a></p>
+    <h2>Status</h2>
+    <p class="subtitle">
+      Snapshot at <%= h(@now.iso8601) %>
+      &middot; v<%= h(AppVersion::SEMVER) %>
+      &middot; up <%= h(@uptime_human) %>
+    </p>
+  </div>
+</div>
+
+<%# Top-line: db / redis / sidekiq dots. Same data /health returns. %>
+<section class="benchmark-section">
+  <h3>System</h3>
+  <div class="stat-cards stat-cards-pairs">
+    <div class="summary-card">
+      <span class="summary-label">Overall</span>
+      <span class="summary-value">
+        <% case @health[:status]
+           when 'ok' %>
+          <span class="badge bookmarked">ok</span>
+        <% when 'degraded' %>
+          <span class="badge" style="background:#ff9500;color:#fff">degraded</span>
+        <% else %>
+          <span class="badge" style="background:#ff3b30;color:#fff">fail</span>
+        <% end %>
+      </span>
+      <span class="summary-sub muted">/health rolls up DB + Redis</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">DB</span>
+      <span class="summary-value"><%= h(@health.dig(:checks, :db, :status)) %></span>
+      <span class="summary-sub muted">PostgreSQL · <%= h(@db_size_pretty) %></span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Redis</span>
+      <span class="summary-value"><%= h(@health.dig(:checks, :redis, :status)) %></span>
+      <span class="summary-sub muted">cache + sidekiq queue</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Sidekiq</span>
+      <span class="summary-value">
+        <% if @sidekiq[:ok] %>
+          <%= @sidekiq[:workers] %> <%= @sidekiq[:workers] == 1 ? 'worker' : 'workers' %>
+        <% else %>
+          <span class="muted">unreachable</span>
+        <% end %>
+      </span>
+      <span class="summary-sub muted">
+        <% if @sidekiq[:ok] %>
+          <%= @sidekiq[:enqueued] %> enqueued · <%= @sidekiq[:retries] %> retries
+        <% else %>
+          <%= h(@sidekiq[:error]) %>
+        <% end %>
+      </span>
+    </div>
+  </div>
+</section>
+
+<%# Cron tab — what's scheduled, when each last fired. Pulled from
+    Redis via Sidekiq::Cron::Job. If sidekiq-cron isn't loaded yet
+    (web process boot order), the table just stays empty. %>
+<section class="benchmark-section">
+  <h3>Scheduled jobs</h3>
+  <% if @cron_jobs.empty? %>
+    <p class="muted">
+      No cron jobs registered in Redis yet. The worker process loads the schedule
+      at boot — if you just restarted Sidekiq, refresh in 30s.
+    </p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Class</th>
+          <th>Schedule</th>
+          <th>Last enqueued</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @cron_jobs.each do |j| %>
+          <tr>
+            <td><strong><%= h(j[:name]) %></strong></td>
+            <td><code><%= h(j[:klass]) %></code></td>
+            <td><code><%= h(j[:cron]) %></code></td>
+            <td>
+              <% if j[:last_enqueue_time] %>
+                <span title="<%= h(j[:last_enqueue_time]) %>">
+                  <%= relative_time(j[:last_enqueue_time]) %>
+                </span>
+              <% else %>
+                <span class="muted">never</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+  <p class="subtitle">
+    Trigger any of these manually from <a href="/admin/sidekiq/cron">/admin/sidekiq/cron</a>.
+  </p>
+</section>
+
+<%# Counts — useful at-a-glance corpus health. %>
+<section class="benchmark-section">
+  <h3>Corpus</h3>
+  <div class="stat-cards stat-cards-pairs">
+    <div class="summary-card">
+      <span class="summary-label">Users</span>
+      <span class="summary-value"><%= @counts[:users] %></span>
+      <span class="summary-sub muted">total registered</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Feeds</span>
+      <span class="summary-value"><%= @counts[:feeds] %></span>
+      <span class="summary-sub muted">distinct URLs subscribed</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Articles</span>
+      <span class="summary-value"><%= @counts[:articles] %></span>
+      <span class="summary-sub muted">
+        <%= @counts[:articles_last_24h] %> imported in last 24h
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Support queue</span>
+      <span class="summary-value"><%= @counts[:support_new] %></span>
+      <span class="summary-sub muted">
+        new messages
+        <% if (@counts[:support_new] || 0).positive? %>
+          · <a href="/admin/support">review &rarr;</a>
+        <% end %>
+      </span>
+    </div>
+  </div>
+</section>

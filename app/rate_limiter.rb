@@ -19,13 +19,23 @@ require 'rack/request'
 class RateLimiter
   RULES = [
     # Auth — keep these tight. A real user retries 2-3 times max.
-    { match: ->(req) { req.post? && req.path == '/sign-in' },              limit: 10, window: 300 },
-    { match: ->(req) { req.post? && req.path == '/sign-up' },              limit: 5,  window: 300 },
-    { match: ->(req) { req.post? && req.path.start_with?('/api/auth/') }, limit: 20, window: 300 },
+    # Pre-launch — registration is tightened further: a legitimate
+    # human creates one account; a botnet doing credential stuffing
+    # tries hundreds per IP. Two distinct rules so the recovery /
+    # login paths (which a real user might retry more often) still
+    # get the more permissive 20/5min.
+    { match: ->(req) { req.post? && req.path.start_with?('/api/auth/register/') }, limit: 3,  window: 1800 },
+    { match: ->(req) { req.post? && req.path == '/sign-up' },                       limit: 5,  window: 300  },
+    { match: ->(req) { req.post? && req.path == '/sign-in' },                       limit: 10, window: 300  },
+    { match: ->(req) { req.post? && req.path.start_with?('/api/auth/') },           limit: 20, window: 300  },
 
     # Chat — extra brake above LlmGuard so a runaway client can't
     # exhaust the per-user daily quota in 60 seconds.
-    { match: ->(req) { req.post? && req.path == '/chat' },                 limit: 60, window: 60 }
+    { match: ->(req) { req.post? && req.path == '/chat' },                          limit: 60, window: 60   },
+
+    # Contact form — bounded so spammers can't flood the queue past
+    # the honeypot. A real user submits once or twice.
+    { match: ->(req) { req.post? && req.path == '/contact' },                       limit: 5,  window: 600  }
   ].freeze
 
   RESPONSE_HEADERS = { 'Content-Type' => 'application/json' }.freeze
