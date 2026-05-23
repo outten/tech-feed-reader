@@ -326,6 +326,50 @@ class TechFeedReader < Sinatra::Base
       vid && "https://i.ytimg.com/vi/#{vid}/hqdefault.jpg"
     end
 
+    # STUFF — format a YouTube video description for readable inline
+    # display. The Atom feed delivers descriptions as plain text with
+    # bare URLs, bare hashtags, and `\n` line breaks; rendered as HTML
+    # the browser collapses all whitespace and leaves URLs unclickable
+    # — exactly what the user reported (a "blob of letters and numbers").
+    #
+    # Output is escaped HTML with three classes of inline links wired:
+    #   .yt-link      — auto-linked http/https URLs (new tab, noopener)
+    #   .yt-timestamp — <button> carrying data-seconds; public/youtube-
+    #                   watch.js seeks the embedded player on click
+    #   .yt-hashtag   — link to YouTube's search-by-hashtag page
+    #
+    # Line breaks are preserved via `white-space: pre-line` on the
+    # `.article-youtube-description` wrapper — no need to inject <br>.
+    YT_DESC_PATTERN = %r{
+      (?<url>https?://[^\s<>"]+)
+      | (?<=^|\s)(?<hash>\#\w+)
+      | (?<=^|[\s\(\[])(?<time>\d{1,2}:\d{2}(?::\d{2})?)\b
+    }x.freeze
+
+    def format_youtube_description_html(text)
+      return '' if text.to_s.strip.empty?
+      escaped = h(text.to_s)
+      escaped.gsub(YT_DESC_PATTERN) do
+        m = Regexp.last_match
+        if m[:url]
+          url = m[:url]
+          trailing = +''
+          while url.length > 1 && %w[. , ; ! ? )].include?(url[-1])
+            trailing = url[-1] + trailing
+            url = url[0..-2]
+          end
+          %(<a href="#{url}" rel="noopener noreferrer" target="_blank" class="yt-link">#{url}</a>#{trailing})
+        elsif m[:time]
+          stamp   = m[:time]
+          seconds = stamp.split(':').map(&:to_i).reduce(0) { |acc, n| acc * 60 + n }
+          %(<button type="button" class="yt-timestamp" data-seconds="#{seconds}">#{stamp}</button>)
+        elsif m[:hash]
+          tag = m[:hash][1..]
+          %(<a href="https://www.youtube.com/results?search_query=%23#{tag}" rel="noopener noreferrer" target="_blank" class="yt-hashtag">##{tag}</a>)
+        end
+      end
+    end
+
     # STUFF #26 — derive the human-facing YouTube channel URL from the
     # feed URL we subscribed to. Returns nil for any non-YouTube feed
     # URL so the caller can decide whether to render the "↗ Channel"
