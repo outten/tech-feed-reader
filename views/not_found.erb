@@ -1,0 +1,21 @@
+<%# 404 — friendly catch-all. Sinatra's default is browser-grey
+    ugly; this matches the rest of the site's tone. %>
+<div class="page-header">
+  <div>
+    <h2>Lost?</h2>
+    <p class="subtitle">
+      We couldn't find <code><%= h(request.path_info) %></code>. The link may have changed,
+      or the article may have been pruned (we keep them for ~7 days unless you bookmarked).
+    </p>
+  </div>
+</div>
+
+<section class="benchmark-section">
+  <p>Try one of these instead:</p>
+  <ul>
+    <li><a href="/">Home</a> — your daily queue</li>
+    <li><a href="/articles">All articles</a> — what's in your inbox</li>
+    <li><a href="/feeds">Feeds</a> — manage subscriptions</li>
+    <li><a href="/about">About</a> — what Feeder is</li>
+  </ul>
+</section>

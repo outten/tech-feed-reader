@@ -40,6 +40,8 @@ module Auth
     /sign-out
     /health
     /metrics
+    /robots.txt
+    /sitemap.xml
   ]).freeze
 
   # Path prefixes that don't require auth (more flexible than PUBLIC_PATHS

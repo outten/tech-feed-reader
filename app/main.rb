@@ -28,6 +28,7 @@ require_relative 'background_pool'
 require_relative 'feed_feedback_store'
 require_relative 'mute_rules_store'
 require_relative 'support_messages_store'
+require_relative 'account_export'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'recommendation/for_you'
@@ -194,6 +195,37 @@ class TechFeedReader < Sinatra::Base
       backtrace:  Array(err.backtrace).first(5)
     )
     raise err if settings.raise_errors?
+    # Pre-launch — branded 500 page instead of Sinatra's default
+    # grey trace. The structured AppLogger.error line above is what
+    # the operator looks at; this is just the user-facing surface.
+    @page_title  = 'Server error'
+    @public_page = true
+    halt 500, erb(:error_500)
+  end
+
+  # Pre-launch — branded 404 catch-all (any route the router doesn't
+  # match). Keeps the tone consistent with the rest of the app rather
+  # than the default Sinatra "Not Found" string.
+  #
+  # Important: if a route explicitly set a 404 body via `halt 404,
+  # "..."`, leave it alone. The not_found handler fires AFTER halt,
+  # so we'd otherwise stomp `halt 404, erb(:article_not_found)` and
+  # similar per-route 404 surfaces. Detect a pre-existing body and
+  # short-circuit.
+  not_found do
+    body_already_set = response.body && !response.body.empty? &&
+                       !(response.body.is_a?(Array) && response.body.join.strip.empty?)
+    next response.body if body_already_set
+
+    if request.path_info.start_with?('/api/') ||
+       request.env['HTTP_ACCEPT'].to_s.include?('application/json')
+      content_type :json
+      next JSON.generate(ok: false, error: 'not-found',
+                         message: "No route matches #{request.path_info}.")
+    end
+    @page_title  = 'Not found'
+    @public_page = true
+    erb :not_found
   end
 
   # Phase A1 (consumer auth). Mix the Auth::Helpers methods into
@@ -1157,6 +1189,64 @@ class TechFeedReader < Sinatra::Base
     redirect to('/contact?sent=1')
   end
 
+  # Pre-launch — crawler-facing files. robots.txt disallows the
+  # authed surface (anything user-scoped); sitemap.xml lists only
+  # the public marketing pages. Both served from Sinatra so we can
+  # generate the dates dynamically; not heavy enough to need a
+  # static cache layer.
+  get '/robots.txt' do
+    content_type 'text/plain'
+    <<~ROBOTS
+      # Feeder — public RSS aggregation
+      # Public pages are crawlable; user-scoped surface is blocked.
+      User-agent: *
+      Disallow: /admin
+      Disallow: /admin/
+      Disallow: /api/
+      Disallow: /account
+      Disallow: /account/
+      Disallow: /articles
+      Disallow: /article/
+      Disallow: /bookmarks
+      Disallow: /digests
+      Disallow: /feeds
+      Disallow: /podcasts
+      Disallow: /youtube
+      Disallow: /sports
+      Disallow: /search
+      Disallow: /tags
+      Disallow: /topics
+      Disallow: /triage
+      Disallow: /whats-on
+      Disallow: /bus
+      Disallow: /sign-out
+      Disallow: /refresh/
+
+      Sitemap: #{request.base_url}/sitemap.xml
+    ROBOTS
+  end
+
+  get '/sitemap.xml' do
+    content_type 'application/xml'
+    base = request.base_url
+    pages = [
+      ['/',         1.0],
+      ['/about',    0.8],
+      ['/privacy',  0.5],
+      ['/terms',    0.5],
+      ['/contact',  0.5],
+      ['/sign-up',  0.7],
+      ['/sign-in',  0.5]
+    ]
+    lastmod = Time.now.utc.strftime('%Y-%m-%d')
+    <<~XML
+      <?xml version="1.0" encoding="UTF-8"?>
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      #{pages.map { |path, pri| "  <url><loc>#{base}#{path}</loc><lastmod>#{lastmod}</lastmod><priority>#{pri}</priority></url>" }.join("\n")}
+      </urlset>
+    XML
+  end
+
   # ===================================================================
   # Phase A1 (consumer auth). Passkey-only sign-up + sign-in + recovery.
   # Two HTML page shells (/sign-up, /sign-in), one logout POST, plus
@@ -1369,6 +1459,20 @@ class TechFeedReader < Sinatra::Base
     @account_notice          = params['notice']
     @account_error           = params['error']
     erb :account
+  end
+
+  # Pre-launch — fulfils the privacy-policy promise: "Export your
+  # data". Returns a JSON dump of every per-user row + a manifest
+  # of what's intentionally excluded (publisher content, passkey
+  # private keys, recovery-code plaintexts). content-disposition:
+  # attachment so browsers prompt to download instead of rendering.
+  get '/account/export.json' do
+    require_signed_in!
+    require 'base64'
+    response['Content-Type']        = 'application/json; charset=utf-8'
+    response['Content-Disposition'] = %(attachment; filename="feeder-export-user-#{current_user_id}-#{Date.today}.json")
+    AppLogger.info('account_export', user_id: current_user_id)
+    JSON.pretty_generate(AccountExport.for_user(current_user_id))
   end
 
   post '/account/display-name' do
@@ -3017,6 +3121,81 @@ class TechFeedReader < Sinatra::Base
     @tags_by_article = TagsStore.tags_for_articles(current_user_id, @results.map { |a| a['id'] })
     @page_title      = @query.empty? ? 'Search' : "Search: #{@query}"
     erb :search
+  end
+
+  # Pre-launch — operator status page. Stitches /health + Sidekiq
+  # stats + sidekiq-cron job state + corpus counts into one
+  # at-a-glance view. Same Basic Auth + WebAuthn gate as the rest
+  # of /admin/*.
+  get '/admin/status' do
+    @page_title = 'Status'
+    @now        = Time.now.utc
+
+    # Reuse the /health JSON computation. Mirror the route's logic
+    # rather than re-implement.
+    db_status   = check_db
+    redis_check = check_redis
+    sidekiq_h   = check_sidekiq
+    overall     =
+      if db_status[:status] != 'ok' then 'fail'
+      elsif redis_check[:status] != 'ok' then 'degraded'
+      else 'ok'
+      end
+    @health = {
+      status: overall,
+      checks: { db: db_status, redis: redis_check, sidekiq: sidekiq_h }
+    }
+
+    # Uptime in a human-readable form.
+    sec  = AppVersion.uptime_seconds.to_i
+    days = sec / 86_400
+    hrs  = (sec % 86_400) / 3600
+    mins = (sec % 3600) / 60
+    @uptime_human = [
+      days.positive? ? "#{days}d" : nil,
+      hrs.positive?  ? "#{hrs}h"  : nil,
+      "#{mins}m"
+    ].compact.join(' ')
+
+    @sidekiq = sidekiq_stats
+    @db_size_pretty = Database.connection.execute(
+      "SELECT pg_size_pretty(pg_database_size(current_database())) AS s"
+    ).first['s'] rescue 'unknown'
+
+    # sidekiq-cron job state from Redis. The require is defensive —
+    # the worker process loads it at boot, but the web process only
+    # touches it here. Safe to re-require; gem load is idempotent.
+    begin
+      require 'sidekiq-cron'
+      @cron_jobs = Sidekiq::Cron::Job.all.map do |j|
+        {
+          name:              j.name,
+          klass:             j.klass,
+          cron:              j.cron,
+          last_enqueue_time: j.last_enqueue_time
+        }
+      end.sort_by { |j| j[:cron] }
+    rescue StandardError
+      @cron_jobs = []
+    end
+
+    articles_last_24h =
+      begin
+        Database.connection.execute(
+          "SELECT COUNT(*) AS c FROM articles WHERE created_at > NOW() - INTERVAL '24 hours'"
+        ).first['c'].to_i
+      rescue StandardError
+        0
+      end
+    @counts = {
+      users:              UsersStore.count,
+      feeds:              FeedsStore.count,
+      articles:           ArticlesStore.count,
+      articles_last_24h:  articles_last_24h,
+      support_new:        SupportMessagesStore.count_by_status['new'] || 0
+    }
+
+    erb :admin_status
   end
 
   # STUFF #62 — admin queue for the public /contact form. Gated by

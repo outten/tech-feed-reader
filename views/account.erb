@@ -130,7 +130,26 @@
   </form>
 </section>
 
-<%# Section 4 — Delete account. Two-step: button reveals a typed-
+<%# Section — Data export. One-click JSON dump of every per-user
+    row the operator stores. Honours the privacy-policy promise
+    ("Export your data") that previously read as "not yet
+    implemented". %>
+<section class="benchmark-section account-section">
+  <h3>Export your data</h3>
+  <p class="subtitle">
+    Download every per-user row we have for you — subscriptions, reading state,
+    bookmarks, tags, mute rules, sports follows, passkey metadata (public keys + sign
+    counts only; private keys never leave your device), recovery-code hashes.
+    Article bodies aren't included — they're the publisher's content, not yours.
+    JSON format. Open it in any text editor.
+  </p>
+  <p>
+    <a class="btn-primary" href="/account/export.json"
+       title="Download your data as JSON" download>📦 Download my data (JSON)</a>
+  </p>
+</section>
+
+<%# Section — Delete account. Two-step: button reveals a typed-
     confirmation card; user must type their username exactly to enable
     the final destructive button. %>
 <section class="benchmark-section account-section account-delete-section">
