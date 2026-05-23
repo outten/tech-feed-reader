@@ -44,7 +44,7 @@
   <section class="benchmark-section">
     <h3>Recent episodes</h3>
     <% if @recent_episodes.empty? %>
-      <p class="muted">No episodes ingested yet — try clicking "Refresh all" in the header.</p>
+      <p class="muted">No episodes ingested yet — feeds refresh hourly, so new episodes will appear within the next hour.</p>
     <% else %>
       <ul class="podcast-episodes">
         <% @recent_episodes.each do |ep| %>

@@ -27,7 +27,13 @@
 
 <section class="benchmark-section">
   <h3>Active budgets</h3>
-  <div class="stat-cards">
+  <%# STUFF #57 — pair-layout modifier. The default .stat-cards
+      auto-fit grid (minmax 160px) packs all four budget cards into
+      a single row on wide screens, cramping the env-var names + the
+      "rolling 24h"/"API-equivalent" subtitles. .stat-cards-pairs
+      forces 2 columns / half-width each so each card has breathing
+      room. %>
+  <div class="stat-cards stat-cards-pairs">
     <div class="summary-card">
       <span class="summary-label">Feature flag</span>
       <span class="summary-value">

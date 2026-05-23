@@ -782,4 +782,8 @@ On the artlce page, there's a section for "Related" articles. Like other element
 
 Audit verified no other instance of the bug — `/articles` and `/search` use the full grid; `/topics` was fixed in #55.
 
-## [ ] 57. ...
+## [x] 57. Active Budgets
+
+On the /admin/llm-quota page, the Active Budgets area elements are two skinny for the content. Instead of trying to put four items per row, can we do two items per row. Make them take up 1/2 the width.
+
+**Shipped (bundled with the Refresh-all copy sweep).** The default `.stat-cards` grid is `repeat(auto-fit, minmax(160px, 1fr))`, which packs all four budget cards into a single row on wide admin screens — cramping the env-var names (`LLM_USER_DAILY_TOKEN_BUDGET` etc.) and the "rolling 24h" / "API-equivalent" subtitles. New `.stat-cards-pairs` modifier scoped to the Active Budgets div forces `repeat(2, 1fr)` so each card gets half the row width; collapses to a single column under ~640px so the hierarchy still reads on narrow screens. Other `.stat-cards` consumers (dashboard, dev-stats) keep the auto-fit grid unchanged.

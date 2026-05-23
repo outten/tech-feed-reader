@@ -122,8 +122,9 @@
     <% elsif @feed_filter || @tag_filter %>
       No articles match this filter.
     <% else %>
-      No articles yet. Add a feed at <a href="/feeds">/feeds</a> and click
-      "Refresh all" to populate.
+      No articles yet. Add a feed at <a href="/feeds">/feeds</a> —
+      the hourly refresh cron pulls articles automatically; new ones
+      should appear within the next hour.
     <% end %>
   </div>
 <% else %>
