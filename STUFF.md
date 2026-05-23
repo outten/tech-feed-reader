@@ -741,6 +741,8 @@ Wired into `SPORTS_LEAGUE_FEEDS`: `npb` → BBC Baseball + ESPN MLB (fallback si
 
 **With #52.1 + #52.2 + #52.3 shipped, STUFF #52's three deferred follow-ups are closed.** Remaining sports work is real per-team logos (still deferred — see note above).
 
+**Full NFL + NBA rosters — shipped (separate small PR).** The catalog originally had 5 NFL teams (Eagles + Cowboys + Chiefs + 49ers + Bills) and 5 NBA teams (Sixers + Celtics + Lakers + Warriors + Bucks) — enough for demo but a freshly-signed-up fan of any other team had no way to follow them through the UI. Backfilled the remaining 27 NFL + 25 NBA teams via the live ESPN `/teams` endpoint (canonical IDs, slugs, locations) so `/sports/manage/football/nfl` and `/sports/manage/basketball/nba` now show the complete league. Notable-player chips intentionally left empty for the new teams (player data changes too fast to maintain by hand; the original Eagles + Sixers entries' players stay because they were curated). 8 lockdown specs in [spec/nfl_nba_full_rosters_spec.rb](spec/nfl_nba_full_rosters_spec.rb) cover the full slug set + uniqueness of IDs and slugs.
+
 ## [x] 54. Tennis Rankings Page
 
 - can you add a link from the Manage Sports Tennis page to this page to make it easy for users to follow players
@@ -779,3 +781,5 @@ On the artlce page, there's a section for "Related" articles. Like other element
 - [views/dashboard.erb](views/dashboard.erb) — `/admin/dashboard` "Recent unread" list (same pattern, you would have hit it next).
 
 Audit verified no other instance of the bug — `/articles` and `/search` use the full grid; `/topics` was fixed in #55.
+
+## [ ] 57. ...
