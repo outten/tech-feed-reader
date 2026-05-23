@@ -190,6 +190,35 @@
     });
   });
 
+  // STUFF — clickable timestamps in the description. The format
+  // helper renders each timestamp as <button class="yt-timestamp"
+  // data-seconds="N">; clicking should seek the embedded player and
+  // start playback. Delegated on document so it survives if the
+  // description block is rendered async someday.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.yt-timestamp[data-seconds]');
+    if (!btn) return;
+    e.preventDefault();
+    var sec = parseFloat(btn.dataset.seconds);
+    if (!isFinite(sec) || sec < 0) return;
+    var uids = Object.keys(trackers);
+    if (uids.length === 0) return;
+    // Article pages render at most one YouTube iframe, but support
+    // multiple defensively by seeking the first one.
+    var t = trackers[uids[0]];
+    if (!t || !t.player) return;
+    try {
+      t.player.seekTo(sec, true);
+      t.player.playVideo();
+      // Smooth-scroll the iframe back into view so the user can see
+      // the result of their click (descriptions can be long).
+      var ifr = t.iframe;
+      if (ifr && typeof ifr.scrollIntoView === 'function') {
+        ifr.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } catch (_) { /* player may not be ready yet */ }
+  });
+
   // Load the IFrame API once. If another surface already loaded it
   // we don't double-inject; YT's API is idempotent on load anyway.
   if (!window.YT || !window.YT.Player) {

@@ -581,6 +581,57 @@ html.dark .continue-progress-resume { color: #aeaeb2; }
   border: 0;
 }
 
+/* STUFF — YouTube video description block. pre-line preserves the
+   `\n` line breaks that the Atom feed delivers; the format helper
+   wraps URLs, timestamps, and hashtags in distinct classes. */
+.article-youtube-description {
+  white-space: pre-line;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #1d1d1f;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+html.dark .article-youtube-description { color: #f5f5f7; }
+.article-youtube-description .yt-link,
+.article-youtube-description .yt-hashtag {
+  color: #0071e3;
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(0, 113, 227, 0.5);
+}
+.article-youtube-description .yt-link:hover,
+.article-youtube-description .yt-hashtag:hover {
+  border-bottom-color: #0071e3;
+  text-decoration: none;
+}
+html.dark .article-youtube-description .yt-link,
+html.dark .article-youtube-description .yt-hashtag { color: #0a84ff; border-bottom-color: rgba(10, 132, 255, 0.5); }
+.article-youtube-description .yt-hashtag { font-weight: 500; }
+.article-youtube-description .yt-timestamp {
+  background: #f0f7ff;
+  border: 1px solid #d6e6fb;
+  color: #0071e3;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.article-youtube-description .yt-timestamp:hover {
+  background: #d6e6fb;
+  border-color: #0071e3;
+}
+html.dark .article-youtube-description .yt-timestamp {
+  background: rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.35);
+  color: #0a84ff;
+}
+html.dark .article-youtube-description .yt-timestamp:hover {
+  background: rgba(10, 132, 255, 0.25);
+}
+
 /* /whats-on "To watch today" cards — thumbnail + body side-by-side
    on desktop, stack on mobile. The play overlay is a CSS-only
    semi-transparent circle with a triangle. */

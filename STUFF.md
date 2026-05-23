@@ -787,3 +787,19 @@ Audit verified no other instance of the bug — `/articles` and `/search` use th
 On the /admin/llm-quota page, the Active Budgets area elements are two skinny for the content. Instead of trying to put four items per row, can we do two items per row. Make them take up 1/2 the width.
 
 **Shipped (bundled with the Refresh-all copy sweep).** The default `.stat-cards` grid is `repeat(auto-fit, minmax(160px, 1fr))`, which packs all four budget cards into a single row on wide admin screens — cramping the env-var names (`LLM_USER_DAILY_TOKEN_BUDGET` etc.) and the "rolling 24h" / "API-equivalent" subtitles. New `.stat-cards-pairs` modifier scoped to the Active Budgets div forces `repeat(2, 1fr)` so each card gets half the row width; collapses to a single column under ~640px so the hierarchy still reads on narrow screens. Other `.stat-cards` consumers (dashboard, dev-stats) keep the auto-fit grid unchanged.
+
+## [x] 58. YouTube description formatting
+
+On a YouTube article page, the text under the video almost always does look right. Links are formatted or clickable. The text is just a blob of letters and numbers. What format do you generally get that information? Any thoughts on how to make it more readable?
+
+**Shipped.** Root cause: YouTube channels publish Atom feeds where each `<entry>` has the video description as **plain text** — URLs are bare, hashtags are bare, line breaks are `\n`. Our [app/feed_parser.rb](app/feed_parser.rb) runs that through `Sanitizer.sanitize_html`, which preserves it as-is (no `<br>`, no `<a>`). The article view then renders the result raw, so the browser collapses all whitespace and leaves the text unclickable — exactly the "blob of letters and numbers" the user described.
+
+New helper [`format_youtube_description_html`](app/main.rb) escapes the text and runs a single combined regex that wraps three classes of inline markup:
+
+- **`.yt-link`** — bare `http://` and `https://` URLs become `<a target="_blank" rel="noopener noreferrer">`, trailing punctuation (`.` `,` `;` `!` `?` `)`) stays outside the anchor so URLs read correctly.
+- **`.yt-timestamp`** — `0:00`, `1:23`, `1:23:45` patterns become `<button data-seconds="N">`. [public/youtube-watch.js](public/youtube-watch.js) gains a delegated click handler that uses the IFrame API to `seekTo(seconds, true)` + `playVideo()` + scroll the iframe back into view. Lookbehind on the regex ensures `https://example.com/v1:2` isn't false-positive as a timestamp.
+- **`.yt-hashtag`** — `#word` (only when preceded by start-of-string or whitespace, so `issue#123` doesn't match) links to YouTube's search-by-hashtag URL.
+
+Line breaks survive via `white-space: pre-line` on the `.article-youtube-description` wrapper — no need to inject `<br>`. Styled to match the rest of the article body: subtle blue dotted-underline links, soft-blue pill timestamps that hover into a stronger accent. Branch in [views/article.erb](views/article.erb) opt-ins YouTube articles only (via `youtube_video_id(@article)`); non-YouTube articles render `content_html` raw as before.
+
+10 lockdown specs in [spec/youtube_description_format_spec.rb](spec/youtube_description_format_spec.rb) cover HTML escaping, URL anchor attributes, trailing-punctuation trimming, MM:SS / HH:MM:SS conversion, URL-vs-timestamp disambiguation, hashtag matching rules, and a combined BBC Earth fixture.

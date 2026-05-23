@@ -237,7 +237,13 @@
   <% end %>
 
   <section class="article-body">
-    <% if @article['content_html'] && !@article['content_html'].empty? %>
+    <% if youtube_video_id(@article) && (@article['content_text'] && !@article['content_text'].empty?) %>
+      <%# STUFF — YouTube descriptions are plain text with bare URLs,
+          bare hashtags, and \n line breaks. Render via the format
+          helper so each is clickable + line breaks survive via
+          .article-youtube-description's `white-space: pre-line`. %>
+      <div class="article-youtube-description"><%= format_youtube_description_html(@article['content_text']) %></div>
+    <% elsif @article['content_html'] && !@article['content_html'].empty? %>
       <%= @article['content_html'] %>
     <% else %>
       <p><em>(no content extracted &mdash; try the source link)</em></p>
