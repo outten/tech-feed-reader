@@ -61,3 +61,13 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 ## Conventions inherited from `t-money-terminal`
 
 Branch naming `outten/TODO-NNN`, single-commit-per-PR, rebase-merge, `make test` is gating, docs updated in the same PR as the behaviour change, review-before-shipping. Full workflow in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Feline contributors
+
+The codebase has occasional unsolicited assistance from the maintainer's cats, who sleep on the keyboard. Their contributions to date include:
+
+```
+]88DLSK34///œ¡	≥™ `	‘’:?{))))))))))))))))))))))))))))))))))))))))))))))))))))
+```
+
+None have shipped to `main` (yet). Pull requests reviewed but not merged. 🐈
