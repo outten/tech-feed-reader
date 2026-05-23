@@ -725,6 +725,22 @@ Final tally: 12 sports, ~60 leagues, ~250 teams/players. Suite: 1356 / 0.
 
 **#52.1 follow-up — player-click navigation — shipped.** Mirrors the catalog-team-on-demand upsert pattern from PR #145. New helpers in [app/main.rb](app/main.rb): `ensure_catalog_player_in_db(team_slug, name)` upserts a `sports_players` row with composite slug `"{team_slug}-{name_slug}"` and `source_provider='catalog'`; `ensure_catalog_player_by_slug(slug)` walks the catalog matching a team-slug prefix and resolves the player. `GET /sports/player/:slug` falls back to that resolver when the DB miss, then renders the existing player view. The view ([views/sports_player.erb](views/sports_player.erb)) now branches on `@player['tour']`: tennis players still get their flag / rankings / stat-cards / ESPN profile; catalog players see "Notable player on **TEAM** · Sport" with a back-link to the team's manage page, and the tennis-specific UI hides. Player chips in [views/sports_manage_league.erb](views/sports_manage_league.erb) are now anchors with a subtle dotted-underline hover. 8 examples in [spec/catalog_player_upsert_spec.rb](spec/catalog_player_upsert_spec.rb) cover the upsert, idempotence, view branching, 404s for unknown slugs, the `slugify` helper (accent stripping + edge-trim), and the chip-link render.
 
+**#52.2 follow-up — sport-emoji fallback — shipped (pragmatic).** Catalog teams without an `image_url` rendered as 🏟 (generic stadium) on `/sports/manage/<sport>/<league>`. Swapped the fallback for the sport's own emoji (`@sport[:emoji]`): NFL → 🏈, NBA → 🏀, EPL/La Liga/MLS → ⚽, IPL → 🏏, F1 → 🏎️, etc. Every sport in [app/sports_catalog.rb](app/sports_catalog.rb) carries its own emoji at the sport level, so the swap is a one-line view change with no per-team data work. Note `/sports` score tiles and `/sports/team/:slug` headers already use per-team emojis from [app/sports_teams.rb](app/sports_teams.rb) (🦅 Eagles, 🥍 Lions, etc.) for the structured-data teams the user has followed, so this fix lands exactly where it was needed.
+
+**Real per-team logos remain a future task** (not in this PR): the catalog currently carries no `image_url` for any of the ~250 teams. Filling them in needs a sustainable source — Wikipedia/Wikidata via a one-shot scrape into the catalog, or hand-curation. The visual benefit is real but the maintenance cost (broken hotlinks, rebranding, etc.) is non-trivial. Deferred until someone has time to do the Wikidata pass cleanly.
+
+**#52.3 follow-up — NPB / KBO / BWF RSS bridges — shipped.** Original sweep noted "couldn't find stable English-language URLs in this pass." Re-tried with `curl` verification; landed five new catalog entries:
+
+- **BBC Sport — Baseball** (`feeds.bbci.co.uk/sport/baseball/rss.xml`) — worldwide baseball, regular NPB mentions around Japan Series.
+- **MyKBO** (`mykbo.net/feed/`) — independent KBO-specific English coverage; daily recaps + standings + roster moves.
+- **Yonhap News — Korean Sports** (`en.yna.co.kr/RSS/sports.xml`) — Korean sports overall (KBO + K-League + Olympics).
+- **BWF Badminton — Official** (`bwfbadminton.com/news/feed/`) — World Tour + Championships + Olympics + Sudirman Cup.
+- **Badzine** (`badzine.net/feed/`) — independent badminton journalism, interviews + tournament recaps.
+
+Wired into `SPORTS_LEAGUE_FEEDS`: `npb` → BBC Baseball + ESPN MLB (fallback since dedicated English NPB feeds don't exist; ESPN MLB heavily covers Japanese players); `kbo` → MyKBO + Yonhap + BBC Baseball; `bwf-mens` + `bwf-womens` → BWF + Badzine. 9 lockdown specs in [spec/sports_league_feeds_bridge_spec.rb](spec/sports_league_feeds_bridge_spec.rb) — 2 per sport for the bridge bindings + 5 catalog-integrity checks confirming each new URL is registered (so `/sports/feeds/subscribe` doesn't 422 when a user clicks Subscribe).
+
+**With #52.1 + #52.2 + #52.3 shipped, STUFF #52's three deferred follow-ups are closed.** Remaining sports work is real per-team logos (still deferred — see note above).
+
 ## [x] 54. Tennis Rankings Page
 
 - can you add a link from the Manage Sports Tennis page to this page to make it easy for users to follow players

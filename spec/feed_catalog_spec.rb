@@ -3,12 +3,11 @@ require_relative '../app/feed_catalog'
 
 RSpec.describe FeedCatalog do
   describe '.all' do
-    it 'returns 95 curated entries (Phase 2 sports YouTube + STUFF #52 PR3 breadth)' do
-      # 72 (per #18) + 7 (Phase 2 :youtube_sports) + 16 (#52 PR3 — BBC
-      # Sport / ESPN / Cricinfo per-sport feeds spanning cricket,
-      # baseball, golf, motorsport, WNBA, horse racing, plus the
-      # European / African / women's soccer breadth) = 95.
-      expect(FeedCatalog.all.length).to eq(95)
+    it 'returns 100 curated entries (Phase 2 sports YouTube + STUFF #52 PR3 + #52.3 NPB/KBO/BWF)' do
+      # 72 (per #18) + 7 (Phase 2 :youtube_sports) + 16 (#52 PR3) +
+      # 5 (#52.3 — BBC Baseball, MyKBO, Yonhap, BWF Badminton,
+      # Badzine) = 100.
+      expect(FeedCatalog.all.length).to eq(100)
     end
 
     it 'every entry has the required keys' do

@@ -40,10 +40,16 @@
     <% @league[:teams].sort_by { |t| t[:name].to_s }.each do |team| %>
       <% followed = @followed_slugs.include?(team[:slug]) %>
       <li class="sports-manage-team <%= 'is-followed' if followed %>">
+        <%# STUFF #52.2 — fall back to the sport's emoji (🏈 / 🏀 /
+            ⚽ / 🏏 / 🎾 / 🏎️ / 🏸 / 🐎 / ⛳ / 🏉 / ⚾) instead of the
+            generic 🏟 stadium glyph. Catalog entries don't carry
+            real team logos yet — that's a future Wikipedia/Wikidata
+            scrape — but at least each card now reads at-a-glance as
+            the right sport. %>
         <% if team[:image_url] && !team[:image_url].empty? %>
           <img src="<%= h(team[:image_url]) %>" alt="" class="sports-manage-logo" loading="lazy">
         <% else %>
-          <span class="sports-manage-logo sports-manage-logo-fallback" aria-hidden="true">🏟</span>
+          <span class="sports-manage-logo sports-manage-logo-fallback" aria-hidden="true"><%= @sport[:emoji] || '🏟' %></span>
         <% end %>
         <div class="sports-manage-team-info">
           <span class="sports-manage-team-name"><%= h(team[:short_name] || team[:name]) %></span>
