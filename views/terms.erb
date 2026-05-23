@@ -1,0 +1,115 @@
+<%# Public terms-of-use page. Plain-language, matched to a small
+    consumer reader app. Not legal advice; review by counsel before
+    relying on it for anything serious. %>
+
+<div class="page-header">
+  <div>
+    <h2>Terms of Use</h2>
+    <p class="subtitle">
+      Last updated: <%= File.mtime(__FILE__).strftime('%B %-d, %Y') %>
+      &middot; <a href="/privacy">Privacy &rarr;</a>
+    </p>
+  </div>
+</div>
+
+<section class="about-section">
+  <h3>The short version</h3>
+  <p>
+    Feeder is a free, personal-scale RSS reader. By creating an account, you agree to use
+    it for personal reading — not for industrial-scale scraping, abuse, or anything that
+    breaks the underlying publishers' terms. We can suspend an account that's doing that.
+    You own your data; we just host it. The service is provided as-is, without warranty.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>What you can do</h3>
+  <ul>
+    <li>Read, organise, and personalise public RSS / Atom feeds for your own use.</li>
+    <li>Subscribe to any feed whose URL you can access publicly.</li>
+    <li>Save articles, tag them, follow sports teams or players, take notes, export your reading state via the in-app account page.</li>
+    <li>Stop using the service at any time. Delete your account at <a href="/account">/account</a> — it cascades through every per-user table.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>What you agree not to do</h3>
+  <ul>
+    <li><strong>No industrial-scale subscribing.</strong> Adding more than a few hundred feeds per account, or scripting the catalog-add endpoint, defeats the personal-use model and hammers the publishers we pull from.</li>
+    <li><strong>No re-publishing of imported article content</strong> outside the bounds of fair use. The articles you read here belong to their publishers — they granted us a public-feed license, not a redistribution one.</li>
+    <li><strong>No automated account creation</strong>, credential brute-forcing, or attempts to bypass the auth wall. Passkey-only sign-in is the whole security model; don't try to get around it.</li>
+    <li><strong>No abuse of the AI features</strong> — the Claude triage and summarise calls cost real money. Daily / hourly token budgets are enforced; bypassing them isn't acceptable use.</li>
+    <li><strong>No use of the service to harm others</strong> — including but not limited to sending illegal content through the chat widget or attempting to deanonymise other accounts.</li>
+  </ul>
+</section>
+
+<section class="about-section">
+  <h3>Your data</h3>
+  <p>
+    You own the content you produce inside Feeder (tags, notes, bookmarks, follow lists).
+    We claim no ownership of it. We will not transfer it to a third party without your
+    direction or a legitimate legal request that compels us. When you delete your
+    account, the per-user rows are cascade-deleted; see <a href="/privacy">Privacy</a>
+    for the data model.
+  </p>
+  <p>
+    The articles you imported belong to their publishers; we display them under the same
+    public-RSS terms every other reader does. If a publisher asks us to stop syncing
+    their feed, we will.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Availability + warranty</h3>
+  <p>
+    Feeder is a one-developer, single-server project. We aim to keep it running but we
+    don't promise specific uptime, error-free operation, or that any particular feature
+    will exist next month. The service is provided <strong>as-is, without warranty of
+    any kind</strong> — express or implied, including merchantability, fitness for a
+    particular purpose, and non-infringement.
+  </p>
+  <p>
+    To the maximum extent permitted by law, we are not liable for indirect, incidental,
+    consequential, or punitive damages arising from your use of the service. If we are
+    held liable despite that limit, the total amount is capped at the greater of (a) the
+    amount you paid us in the last 12 months (typically zero, since the service is free)
+    or (b) one US dollar.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Termination</h3>
+  <p>
+    You can close your account at any time from <a href="/account">/account</a>. We
+    can suspend or close an account that violates these terms (the prohibited-use list
+    above), with notice when practical. Sections that by their nature survive
+    termination (your ownership of your data, our warranty disclaimer, liability caps)
+    survive.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Changes to these terms</h3>
+  <p>
+    We may update these terms. Material changes will be called out in the app's release
+    notes; the "Last updated" date at the top of this page tracks every change. Continuing
+    to use the service after a change means you accept the new terms.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Governing law</h3>
+  <p>
+    These terms are governed by the laws of the State of Pennsylvania, USA. Any dispute
+    will be resolved in the state or federal courts located in Philadelphia County.
+  </p>
+</section>
+
+<section class="about-section">
+  <h3>Contact</h3>
+  <p>
+    For questions about these terms, reach us via the
+    <a href="/contact">contact form</a>. Include a reply-to address if you'd like
+    a response.
+  </p>
+</section>

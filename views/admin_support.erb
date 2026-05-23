@@ -1,0 +1,94 @@
+<%# STUFF #62 — admin queue for /contact form submissions. Gated by
+    the #49 Basic Auth wall + the WebAuthn sign-in. Operator-only. %>
+
+<div class="page-header">
+  <div>
+    <p class="subtitle"><a href="/admin">&larr; Admin</a></p>
+    <h2>Support messages</h2>
+    <p class="subtitle">
+      <%= @counts['new']       || 0 %> new
+      &middot;
+      <%= @counts['reviewed']  || 0 %> reviewed
+      &middot;
+      <%= @counts['responded'] || 0 %> responded
+    </p>
+  </div>
+</div>
+
+<nav class="feeds-filter-bar" data-target="admin-support">
+  <div class="feeds-filter-chips" role="tablist" aria-label="Filter by status">
+    <a class="feeds-filter-chip <%= 'is-active' unless @status %>" href="/admin/support">All</a>
+    <% SupportMessagesStore::STATUSES.each do |s| %>
+      <a class="feeds-filter-chip <%= 'is-active' if @status == s %>"
+         href="/admin/support?status=<%= s %>"><%= s.capitalize %></a>
+    <% end %>
+  </div>
+</nav>
+
+<% if (@messages || []).empty? %>
+  <div class="empty-state">
+    <p><strong>Nothing here.</strong> When users submit via <a href="/contact">/contact</a>,
+    new messages appear at the top.</p>
+  </div>
+<% else %>
+  <ul class="admin-support-list">
+    <% @messages.each do |m| %>
+      <% user = m['user_id'] ? @users_by_id[m['user_id']] : nil %>
+      <li class="admin-support-row admin-support-status-<%= h(m['status']) %>">
+        <header class="admin-support-row-header">
+          <span class="admin-support-status-badge">
+            <%= h(m['status'].upcase) %>
+          </span>
+          <span class="admin-support-row-meta">
+            <% if user %>
+              <strong><%= h(user['username']) %></strong>
+            <% else %>
+              <em>anonymous</em>
+            <% end %>
+            &middot;
+            <span title="<%= h(m['created_at']) %>">
+              <%= relative_time(m['created_at']) %>
+            </span>
+            <% if m['reply_to'] && !m['reply_to'].to_s.empty? %>
+              &middot;
+              reply-to: <code><%= h(m['reply_to']) %></code>
+            <% end %>
+          </span>
+        </header>
+        <% if m['subject'] && !m['subject'].to_s.empty? %>
+          <h3 class="admin-support-subject"><%= h(m['subject']) %></h3>
+        <% end %>
+        <p class="admin-support-body"><%= h(m['body']) %></p>
+
+        <% if m['admin_note'] && !m['admin_note'].to_s.empty? %>
+          <p class="admin-support-note">
+            <strong>Admin note:</strong>
+            <%= h(m['admin_note']) %>
+          </p>
+        <% end %>
+
+        <details class="admin-support-actions">
+          <summary>Update</summary>
+          <form method="post" action="/admin/support/<%= m['id'] %>/update" class="portfolio-form">
+            <label>
+              Status
+              <select name="status">
+                <% SupportMessagesStore::STATUSES.each do |s| %>
+                  <option value="<%= s %>" <%= 'selected' if m['status'] == s %>>
+                    <%= s.capitalize %>
+                  </option>
+                <% end %>
+              </select>
+            </label>
+            <label>
+              Admin note <span class="muted">(private)</span>
+              <textarea name="admin_note" rows="2"
+                        maxlength="<%= SupportMessagesStore::ADMIN_NOTE_MAX %>"><%= h(m['admin_note']) %></textarea>
+            </label>
+            <button type="submit" class="btn-primary">Save</button>
+          </form>
+        </details>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

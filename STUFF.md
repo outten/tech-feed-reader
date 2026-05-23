@@ -848,3 +848,26 @@ Dev-DB pass (20,628 articles): 1,671 had relative URLs rewritten (Engadget `/cat
 **Not in scope** — HTTP HEAD probing for dead external URLs. Detection is expensive (one request per link), false-positive-prone (sites return 403/405 to bots, return 200 with soft-404 bodies), and remediation is ambiguous (remove the anchor? replace with text?). The absolutize fix addresses the most common breakage; dead-link probing left as a future task if it becomes a real problem.
 
 **Specs**: +9 examples in [spec/sanitizer_spec.rb](spec/sanitizer_spec.rb) cover root-relative, path-relative, protocol-relative, already-absolute, anchor/mailto/tel skip, `<img src>` rewrite, malformed-URI tolerance, no-op-when-base_url-empty, and idempotence. Suite: 1428 / 0.
+
+## [x] 62. Legal
+
+As we get ready for launch, we need to probably update the site for legal complance. For example, a privacy statement and anything else you feel necessary. We'll probably need to add links to the footer for these items.
+
+**Shipped — two new public pages, both linked from the layout footer.**
+
+[views/privacy.erb](views/privacy.erb) is a plain-language summary, factually pinned to the actual data model: what we store (account, subscriptions, reading state, articles + retention window, sports follows, structured request log), what we don't (no email, no real name, no behavioural analytics, no third-party cookies), what we send to which third party (Anthropic for triage / summaries; DigitalOcean for hosting; iTunes / ESPN / Picsum for unauthenticated public lookups), retention windows, and the user's in-app rights (delete via `/account`, passkey management, recovery-code regen, data export marked as not-yet-implemented).
+
+[views/terms.erb](views/terms.erb) covers as-is provision, acceptable use (no industrial scraping, no abuse of LLM budgets, no auth-wall bypassing), termination (you can leave any time; we can suspend on abuse), the warranty disclaimer + liability cap, and change-of-terms semantics. Includes a clearly-marked `[Operator: insert governing-law state ...]` placeholder in the Governing law section so it's obvious what needs to be filled in before launch.
+
+Both pages reachable without sign-in: `/privacy` + `/terms` added to `Auth::PUBLIC_PATHS`. Public routes in [app/main.rb](app/main.rb) mirror the existing `/about` shape. Footer links wired between the existing About + shuffle-background entries. 4 specs in [spec/legal_pages_spec.rb](spec/legal_pages_spec.rb) cover the route 200s, key-section presence, public-path registration, and footer linkage.
+
+**Governing law filled in**: Pennsylvania (state and federal courts in Philadelphia County).
+
+**Contact path — form + admin queue.** The repo is private (so an "open an issue" link goes nowhere) and a published email address is a spam magnet. Solved with a third path:
+
+- Public `/contact` form ([views/contact.erb](views/contact.erb)) — body required, subject + reply-to optional, hidden honeypot field that bots auto-fill (server pretends success on honeypot match so the bot's heuristics don't iterate). Signed-in submitters get `user_id` attached automatically for triage context; anonymous submissions accepted with a clear "we won't know who you are unless you tell us" note.
+- New `support_messages` table (migration `004_support_messages.sql`) with `status` (`new` / `reviewed` / `responded`) + `admin_note` for private operator triage.
+- Admin queue at `/admin/support` ([views/admin_support.erb](views/admin_support.erb)) — newest-first, status-filter chips, status-coded left border (orange = new, blue = reviewed, green = responded), inline expand-to-update form for status + admin note. Linked from `/admin` index.
+- Footer link added between Terms and shuffle-background; `/contact` registered in `Auth::PUBLIC_PATHS`. Both `views/privacy.erb` and `views/terms.erb` Contact sections updated to point at the form (was: "open an issue on the project's repository").
+
+13 specs in [spec/contact_form_spec.rb](spec/contact_form_spec.rb) cover the public-paths registration, GET/POST shape, the empty-body 400, honeypot silent-success, max-length trimming, blank-fields-as-nil, signed-in user_id attachment, admin list + filter, and admin update. **Suite: 1449 / 0.**

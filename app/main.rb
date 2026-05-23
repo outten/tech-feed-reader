@@ -27,6 +27,7 @@ require_relative 'digest_store'
 require_relative 'background_pool'
 require_relative 'feed_feedback_store'
 require_relative 'mute_rules_store'
+require_relative 'support_messages_store'
 require_relative 'opml'
 require_relative 'recommendation'
 require_relative 'recommendation/for_you'
@@ -1095,6 +1096,65 @@ class TechFeedReader < Sinatra::Base
     @page_title  = 'About'
     @public_page = true
     erb :about
+  end
+
+  # STUFF #62 — public legal pages. Both reachable without sign-in
+  # (Auth::PUBLIC_PATHS); footer links + crawlable for SEO so a
+  # privacy-cautious user can read them before signing up.
+  get '/privacy' do
+    @page_title  = 'Privacy'
+    @public_page = true
+    erb :privacy
+  end
+
+  get '/terms' do
+    @page_title  = 'Terms of Use'
+    @public_page = true
+    erb :terms
+  end
+
+  # STUFF #62 — public contact form. No auth wall (added to
+  # Auth::PUBLIC_PATHS). Signed-in submissions attach user_id;
+  # anonymous submissions accepted. Honeypot field rejects bots
+  # silently (no specific error message — denying script feedback).
+  get '/contact' do
+    @page_title  = 'Contact'
+    @public_page = true
+    @subject = @body = @reply_to = ''
+    erb :contact
+  end
+
+  post '/contact' do
+    # Honeypot — bots autofill every input. Humans never see this
+    # field (display:none in the view). On a match: pretend success
+    # so the bot's heuristics see "submitted OK" and don't retry.
+    if params['website'].to_s.strip != ''
+      AppLogger.info('contact_honeypot_caught', ip: request.ip)
+      redirect to('/contact?sent=1')
+    end
+
+    @subject  = params['subject'].to_s.strip[0, SupportMessagesStore::SUBJECT_MAX]
+    @body     = params['body'].to_s.strip[0, SupportMessagesStore::BODY_MAX]
+    @reply_to = params['reply_to'].to_s.strip[0, SupportMessagesStore::REPLY_TO_MAX]
+
+    if @body.empty?
+      @error = 'Message is required.'
+      @page_title  = 'Contact'
+      @public_page = true
+      halt 400, erb(:contact)
+    end
+
+    SupportMessagesStore.create!(
+      user_id:  signed_in? ? current_user_id : nil,
+      subject:  @subject.empty?  ? nil : @subject,
+      body:     @body,
+      reply_to: @reply_to.empty? ? nil : @reply_to
+    )
+    AppLogger.info('contact_submitted',
+                   signed_in: signed_in?,
+                   has_subject: !@subject.empty?,
+                   has_reply_to: !@reply_to.empty?)
+    redirect to('/contact?sent=1')
   end
 
   # ===================================================================
@@ -2957,6 +3017,32 @@ class TechFeedReader < Sinatra::Base
     @tags_by_article = TagsStore.tags_for_articles(current_user_id, @results.map { |a| a['id'] })
     @page_title      = @query.empty? ? 'Search' : "Search: #{@query}"
     erb :search
+  end
+
+  # STUFF #62 — admin queue for the public /contact form. Gated by
+  # the existing /admin/* Basic Auth wall (#49) + WebAuthn sign-in.
+  # Newest-first; filter by status via ?status=new|reviewed|responded.
+  get '/admin/support' do
+    @page_title = 'Support messages'
+    @status     = params['status'].to_s
+    @status     = nil unless SupportMessagesStore::STATUSES.include?(@status)
+    @messages   = SupportMessagesStore.list(status: @status)
+    @counts     = SupportMessagesStore.count_by_status
+    user_ids    = @messages.map { |m| m['user_id'] }.compact.uniq
+    @users_by_id = user_ids.each_with_object({}) { |uid, h| h[uid] = UsersStore.find(uid) }
+    erb :admin_support
+  end
+
+  post '/admin/support/:id/update' do |id|
+    msg = SupportMessagesStore.find(id)
+    halt 404 unless msg
+    SupportMessagesStore.update!(
+      id,
+      status:     params['status'],
+      admin_note: params['admin_note'].to_s[0, SupportMessagesStore::ADMIN_NOTE_MAX]
+    )
+    AppLogger.info('support_message_updated', id: id, status: params['status'])
+    redirect to('/admin/support')
   end
 
   # System overview — single page consolidating counts, DB size,

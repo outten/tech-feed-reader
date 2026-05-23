@@ -32,6 +32,9 @@ module Auth
   PUBLIC_PATHS = Set.new(%w[
     /
     /about
+    /privacy
+    /terms
+    /contact
     /sign-up
     /sign-in
     /sign-out
