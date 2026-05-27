@@ -303,6 +303,8 @@ GEM
     raabro (1.4.0)
     racc (1.8.1)
     rack (3.2.6)
+    rack-mini-profiler (3.3.1)
+      rack (>= 1.2.0)
     rack-protection (4.2.1)
       base64 (>= 0.1.0)
       logger (>= 1.6.0)
@@ -356,6 +358,7 @@ GEM
       rack-protection (= 4.2.1)
       rack-session (>= 2.0.0, < 3)
       tilt (~> 2.0)
+    stackprof (0.2.28)
     tilt (2.7.0)
     tpm-key_attestation (0.14.1)
       bindata (~> 2.4)
@@ -397,6 +400,7 @@ DEPENDENCIES
   pg (~> 1.5)
   prometheus-client (~> 4.2)
   puma
+  rack-mini-profiler (~> 3.3)
   rack-test
   rackup (~> 2.3)
   rerun
@@ -404,6 +408,7 @@ DEPENDENCIES
   sidekiq (~> 7.3)
   sidekiq-cron (~> 1.12)
   sinatra
+  stackprof
   webauthn
 
 BUNDLED WITH

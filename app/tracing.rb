@@ -93,10 +93,28 @@ module Tracing
       OTLP_ENABLED = false
     end
 
+    # STUFF #64 — rack-mini-profiler (dev-only) also patches PG::Connection
+    # via alias_method. OTel's instrumentation prepends a wrapper that calls
+    # `super`; rack-mini-profiler aliases the prepended method as
+    # `_without_profiling` and redefines exec_params on the class. The two
+    # combined produce infinite recursion (OTel's super hits mini-profiler's
+    # redef → calls the alias → which is OTel's wrapper → which calls super
+    # → loop, stack overflows on the first query). Disable OTel's PG
+    # auto-instrumentation in development; staging + production keep it on.
+    # Sinatra's `configure :development` block (where mini-profiler is
+    # loaded) fires when RACK_ENV is 'development' OR unset — match the
+    # same condition here so the OTel-disable lines up with the
+    # mini-profiler-loaded condition.
+    dev_mode = ENV['RACK_ENV'].to_s.empty? || ENV['RACK_ENV'].to_s == 'development'
+    instrumentation_config = {}
+    if dev_mode
+      instrumentation_config['OpenTelemetry::Instrumentation::PG'] = { enabled: false }
+    end
+
     OpenTelemetry::SDK.configure do |c|
       c.service_name    = ENV.fetch('OTEL_SERVICE_NAME', 'tech-feed-reader')
       c.service_version = AppVersion::GIT_SHA
-      c.use_all
+      c.use_all(instrumentation_config)
       c.add_span_processor(RecorderProcessor.new)
       if OTLP_ENABLED
         c.add_span_processor(
