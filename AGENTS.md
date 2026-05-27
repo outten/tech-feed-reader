@@ -37,6 +37,10 @@ Don't leave docs to be reconciled later. The "rewrite the file" sweep we did in 
 
 **Catch-up skill** — if drift does happen (e.g. someone merged in another session without touching docs), invoke `/update-docs` (the skill at [.claude/skills/update-docs/SKILL.md](.claude/skills/update-docs/SKILL.md)). It scans recent merges and proposes precise edits to README / AGENTS / TODO / STUFF. Read-only on code; edits docs only.
 
+## Shell commands
+
+Prepend shell commands with `snip` to compress verbose output and cut token usage — e.g. `snip git log -10`, `snip ls -la`, `snip grep -r foo`. The wrapper is pass-through for short output and summarises long output, so wrapping is safe by default. Skip it only when exact stdout matters (test-runner output you'll parse, command output piped into another tool, or anywhere you've been asked for the raw bytes).
+
 ## Setup & credentials
 
 Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [`app/credentials.rb`](app/credentials.rb), which is required at the top of `app/main.rb` and `app/sidekiq_boot.rb` so both processes get the same env. `.credentials` wins — `.env` is honoured but secondary.
