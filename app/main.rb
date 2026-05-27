@@ -173,6 +173,31 @@ class TechFeedReader < Sinatra::Base
     set :show_exceptions, false
   end
 
+  # STUFF #64 — rack-mini-profiler. Dev-only badge in the top-left of
+  # every HTML response with per-request timing + per-SQL-query
+  # breakdown (auto-instruments the `pg` gem on load). Not bundled
+  # into the production image (Gemfile group :development).
+  configure :development do
+    # rack-mini-profiler's pg-adapter patch is gated on `patch_rails?`
+    # in the gem's auto-detect logic (lib/patches/sql_patches.rb) — so
+    # in a non-Rails app the patch is silently skipped and SQL queries
+    # never show up in the badge drill-down. Force-load the patch via
+    # the documented `RACK_MINI_PROFILER_PATCH` env-var escape hatch.
+    # Must be set BEFORE `require 'rack-mini-profiler'`; `pg` is
+    # already loaded by `require_relative 'database'` above so the
+    # monkey-patch finds its target.
+    ENV['RACK_MINI_PROFILER_PATCH'] ||= 'pg'
+    require 'rack-mini-profiler'
+    require 'stackprof' # enables ?pp=flamegraph
+    Rack::MiniProfiler.config.enable_advanced_debugging_tools = true
+    # Hide the call-stack column for anything under 250ms — the stack
+    # only earns its keep on genuinely slow queries (joins, ranker
+    # scans, FTS searches). Below the threshold queries still show
+    # their duration; just no backtrace column.
+    Rack::MiniProfiler.config.backtrace_threshold_ms = 250
+    use Rack::MiniProfiler
+  end
+
   # ---- Request logging ------------------------------------------------
   # Every HTTP request logs a single JSON line to STDOUT with
   # method / path / status / latency. Errors get a separate event

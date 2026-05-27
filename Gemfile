@@ -15,6 +15,18 @@ group :test do
   gem 'rack-test'
 end
 
+# Dev-only request profiler — injects a small badge in the top-left of
+# every HTML response with per-request timing + per-SQL-query breakdown
+# (auto-instruments `pg` when loaded). Loaded only in development; not
+# bundled into the production image.
+group :development do
+  gem 'rack-mini-profiler', '~> 3.3'
+  # stackprof powers rack-mini-profiler's flamegraph view
+  # (`?pp=flamegraph` on any URL). Must be `require`d explicitly —
+  # rack-mini-profiler auto-detects it once it's loaded.
+  gem 'stackprof'
+end
+
 # Config
 gem 'dotenv'
 gem 'ostruct'

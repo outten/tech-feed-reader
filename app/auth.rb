@@ -48,7 +48,8 @@ module Auth
   # for routes that take a tail like /api/auth/*).
   PUBLIC_PREFIXES = [
     '/api/auth/',
-    '/img/'
+    '/img/',
+    '/mini-profiler-resources/'
   ].freeze
 
   def public_path?(path)
