@@ -111,6 +111,18 @@ module Tracing
       instrumentation_config['OpenTelemetry::Instrumentation::PG'] = { enabled: false }
     end
 
+    # opentelemetry-instrumentation-all 0.93.0 (pulled in when Gemfile.lock
+    # bumped in PR #165) added `opentelemetry-instrumentation-anthropic`
+    # as a transitive dependency. That gem wraps every Anthropic SDK
+    # method, but the SDK underneath uses Net::HTTP which OTel also
+    # instruments — the two layers re-enter each other and stack-overflow
+    # on the first messages.create call (`/feeds/ai-recommend`, `/chat`
+    # both crash with SystemStackError). We already emit manual
+    # `llm.summarize` / `llm.chat` / `llm.feed_recommend` spans around
+    # every Claude call site, so the auto-instrumentation is redundant
+    # anyway. Disable it everywhere.
+    instrumentation_config['OpenTelemetry::Instrumentation::Anthropic'] = { enabled: false }
+
     OpenTelemetry::SDK.configure do |c|
       c.service_name    = ENV.fetch('OTEL_SERVICE_NAME', 'tech-feed-reader')
       c.service_version = AppVersion::GIT_SHA
