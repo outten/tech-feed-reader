@@ -147,6 +147,34 @@ module ArticlesStore
     SQL
   end
 
+  # STUFF #65 — distinct webcomic feeds in the user's subscriptions.
+  # Matched by `feeds.topic = 'humor'` (the catalog-add path plumbs the
+  # category's topic through). Returns the latest article's uid + its
+  # panel image_url so /comics can render a tile per series with the
+  # most-recent panel as the cover. Falls back to the feed's own
+  # image_url when the latest article has no inline panel image.
+  def comic_feeds(user_id)
+    db.execute(<<~SQL, [user_id.to_i])
+      SELECT f.id, f.title, f.url, f.image_url,
+             COUNT(a.id)         AS panel_count,
+             MAX(a.published_at) AS latest_at,
+             (SELECT uid FROM articles
+                WHERE feed_id = f.id
+                ORDER BY published_at DESC NULLS LAST, id DESC
+                LIMIT 1) AS latest_uid,
+             (SELECT image_url FROM articles
+                WHERE feed_id = f.id AND image_url IS NOT NULL
+                ORDER BY published_at DESC NULLS LAST, id DESC
+                LIMIT 1) AS latest_image
+      FROM feeds f
+      JOIN user_feed_subscriptions ufs ON ufs.feed_id = f.id AND ufs.user_id = ?
+      LEFT JOIN articles a ON a.feed_id = f.id
+      WHERE f.topic = 'humor'
+      GROUP BY f.id
+      ORDER BY latest_at DESC NULLS LAST, f.title ASC
+    SQL
+  end
+
   # Most recent N articles for one feed_id, joined with read_state for
   # the user — used by /youtube/:feed_id to render the recent-videos
   # grid. Doesn't go through state_query because we don't need the

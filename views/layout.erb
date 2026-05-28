@@ -76,19 +76,36 @@
       <%
         ai_paths      = %w[/topics /triage /digests]
         manage_paths  = %w[/feeds /tags /sports/manage]
+        # STUFF #65 — Browse ▾ consolidates the per-content-type
+        # destinations (Podcasts / YouTube / Sports / Comics) under
+        # one parent so adding new content types doesn't keep growing
+        # the horizontal nav. /sports/manage is excluded so it lights
+        # up Manage ▾ instead of Browse ▾.
+        browse_paths  = %w[/podcasts /youtube /sports /comics]
         ai_active     = ai_paths.any?     { |p| request.path_info == p || request.path_info.start_with?(p + '/') }
         manage_active = manage_paths.any? { |p| request.path_info == p }
+        browse_active = !manage_active && browse_paths.any? { |p|
+          request.path_info == p || request.path_info.start_with?(p + '/')
+        }
       %>
       <nav>
         <%# STUFF.md follow-up: Dashboard moved under /admin/dashboard;
             What's On now lives at / (returning users) so the dedicated
             /whats-on link is redundant. Title-click reaches both for
-            returning users. /dashboard is one click further into Admin. %>
+            returning users. /dashboard is one click further into Admin.
+            STUFF #65 — content-type links moved under Browse ▾. %>
         <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
         <a href="/bookmarks" class="<%= request.path_info == '/bookmarks' ? 'active' : '' %>" title="Articles you've saved">★ Bookmarks</a>
-        <a href="/podcasts"  class="<%= request.path_info == '/podcasts' ? 'active' : '' %>">Podcasts</a>
-        <a href="/youtube"   class="<%= (request.path_info == '/youtube' || request.path_info.start_with?('/youtube/')) ? 'active' : '' %>">YouTube</a>
-        <a href="/sports"    class="<%= request.path_info == '/sports'   ? 'active' : '' %>">Sports</a>
+
+        <div class="nav-dropdown <%= 'active' if browse_active %>">
+          <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">Browse <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>
+          <div class="nav-dropdown-menu" role="menu">
+            <a href="/podcasts" class="<%= 'active' if request.path_info == '/podcasts' %>" role="menuitem">Podcasts</a>
+            <a href="/youtube"  class="<%= 'active' if request.path_info == '/youtube' || request.path_info.start_with?('/youtube/') %>" role="menuitem">YouTube</a>
+            <a href="/sports"   class="<%= 'active' if (request.path_info == '/sports' || request.path_info.start_with?('/sports/')) && request.path_info != '/sports/manage' %>" role="menuitem">Sports</a>
+            <a href="/comics"   class="<%= 'active' if request.path_info == '/comics' || request.path_info.start_with?('/comics/') %>" role="menuitem">Comics</a>
+          </div>
+        </div>
 
         <div class="nav-dropdown <%= 'active' if ai_active %>">
           <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">AI <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>
@@ -321,5 +338,6 @@
   <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>
   <script src="/search-shortcut.js?v=<%= asset_mtime('public/search-shortcut.js') %>"></script>
   <script src="/sports-follow.js?v=<%= asset_mtime('public/sports-follow.js') %>"></script>
+  <script src="/image-lightbox.js?v=<%= asset_mtime('public/image-lightbox.js') %>"></script>
 </body>
 </html>

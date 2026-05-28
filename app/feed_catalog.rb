@@ -19,7 +19,8 @@ module FeedCatalog
   TOPICS = {
     technology: 'Technology',
     sports:     'Sports',
-    nature:     'Nature & Documentary'
+    nature:     'Nature & Documentary',
+    humor:      'Humor'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -56,7 +57,9 @@ module FeedCatalog
     # watch today" alongside nature.
     youtube_sports: 'Sports (YouTube)',
     # STUFF.md #18 — mythology / classical history (Greek / Roman / Norse).
-    mythos:      'Mythology & classical history'
+    mythos:      'Mythology & classical history',
+    # STUFF #65 — daily-ish webcomics + humor (xkcd, SMBC, Oatmeal, etc.).
+    webcomics:   'Webcomics & humor'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -85,7 +88,8 @@ module FeedCatalog
     horse_racing:  :sports,
     youtube_nature: :nature,
     youtube_sports: :sports,
-    mythos:      :technology
+    mythos:      :technology,
+    webcomics:   :humor
   }.freeze
 
   CATALOG = [
@@ -553,7 +557,43 @@ module FeedCatalog
     { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCLcSuj4B8YyUVJdVDeozFQg',
       title: 'UEFA Champions League (YouTube)', category: :youtube_sports,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Champions League official channel — matchday highlights + classics.' }
+      blurb: 'Champions League official channel — matchday highlights + classics.' },
+
+    # ---- Webcomics & humor (8) ----------------------------------------
+    # STUFF #65. All publicly available, free, no paywall, no API key.
+    # PERSONAL_BLOG_INTERVAL (4h) since most update daily-ish at most.
+    { url: 'https://xkcd.com/atom.xml',
+      title: 'xkcd', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "Randall Munroe's stick-figure science, math, and internet humor — the canonical webcomic." },
+    { url: 'https://www.smbc-comics.com/comic/rss',
+      title: 'Saturday Morning Breakfast Cereal', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "Zach Weinersmith's daily strip — science, philosophy, and dark absurdism." },
+    { url: 'https://feeds.feedburner.com/oatmealfeed',
+      title: 'The Oatmeal', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "Matthew Inman's internet humor and long-form comic essays." },
+    { url: 'https://existentialcomics.com/rss.xml',
+      title: 'Existential Comics', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Philosophy in four panels — Kant, Sartre, and friends caught off-guard.' },
+    { url: 'https://www.qwantz.com/rssfeed.php',
+      title: 'Dinosaur Comics', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "Ryan North's six-panel dialogue comic — the art never changes." },
+    { url: 'https://poorlydrawnlines.com/feed/',
+      title: 'Poorly Drawn Lines', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "Reza Farazmand's quiet, weird, deadpan strips." },
+    { url: 'https://wondermark.com/feed/',
+      title: 'Wondermark', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "David Malki's vintage-clipart Victorian-era panel comic." },
+    { url: 'https://feeds.feedburner.com/Explosm',
+      title: 'Cyanide & Happiness', category: :webcomics,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: "Explosm.net's absurd stick-figure black-comedy strip." }
   ].freeze
 
   module_function
@@ -635,6 +675,14 @@ module FeedCatalog
       https://feeds.simplecast.com/l2i9YnTd
       https://feeds.simplecast.com/BqbsxVfO
       https://feeds.simplecast.com/Sl5CSM3S
+    ].freeze,
+    humor: %w[
+      https://xkcd.com/atom.xml
+      https://www.smbc-comics.com/comic/rss
+      https://feeds.feedburner.com/oatmealfeed
+      https://existentialcomics.com/rss.xml
+      https://www.qwantz.com/rssfeed.php
+      https://poorlydrawnlines.com/feed/
     ].freeze
   }.freeze
 
@@ -645,7 +693,8 @@ module FeedCatalog
     technology: { label: 'Technology',  blurb: 'Tech news + engineering blogs + AI commentary.', emoji: '💻' },
     sports:     { label: 'Sports',      blurb: 'NFL / NBA / soccer / rugby / tennis news.',       emoji: '🏟' },
     nature:     { label: 'Nature',      blurb: 'BBC Earth, Nat Geo, PBS Nature documentaries.',   emoji: '📺' },
-    podcasts:   { label: 'Podcasts',    blurb: 'Long-form audio: Changelog, Lex Fridman, more.',  emoji: '🎧' }
+    podcasts:   { label: 'Podcasts',    blurb: 'Long-form audio: Changelog, Lex Fridman, more.',  emoji: '🎧' },
+    humor:      { label: 'Humor',       blurb: 'xkcd, SMBC, The Oatmeal, and friends — daily-ish webcomics.', emoji: '😂' }
   }.freeze
 
   def starters_for_topic(topic)

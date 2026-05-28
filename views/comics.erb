@@ -1,0 +1,92 @@
+<%# STUFF #65 — Comics index. Mirrors /podcasts + /youtube in shape:
+    a "Subscribed series" tile grid keyed by feed, plus a "Recent panels"
+    list of the latest individual strips. Empty state points at /feeds
+    catalog browse so users can subscribe to xkcd / SMBC / etc. %>
+<div class="page-header">
+  <div>
+    <h2>Comics</h2>
+    <p class="subtitle">
+      <% if @series.empty? %>
+        No webcomics subscribed yet.
+      <% else %>
+        <%= @series.length %> series &middot;
+        latest panel <%= relative_time(@series.first['latest_at']) %> &middot;
+        <a href="/articles?topic=humor" title="Show every panel in a single chronological list">Linear list &rarr;</a>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @series.empty? %>
+  <div class="empty-state">
+    <p>
+      Subscribe to a webcomic from the catalog at <a href="/feeds">/feeds</a> &rarr;
+      "Webcomics &amp; humor". xkcd, SMBC, The Oatmeal, and friends. Once you click
+      "+ Add" and the next refresh runs, panels show up here.
+    </p>
+  </div>
+<% else %>
+  <section class="benchmark-section">
+    <h3>Subscribed series</h3>
+    <div class="podcast-shows">
+      <% @series.each do |s| %>
+        <%
+          # Prefer the latest panel as cover art so the page looks alive
+          # (every feed shares its own logo otherwise); fall back to the
+          # feed's image_url if no panel image was captured.
+          cover = s['latest_image'].to_s.empty? ? s['image_url'] : s['latest_image']
+          target = s['latest_uid'] ? "/article/#{s['latest_uid']}" : "/articles?feed_id=#{s['id']}&topic=humor"
+        %>
+        <a class="podcast-show-card" href="<%= h(target) %>"
+           title="Open the latest panel from <%= h(s['title'] || s['url']) %>">
+          <% if cover && !cover.to_s.empty? %>
+            <img class="podcast-show-cover" src="<%= h(cover) %>" alt="" loading="lazy">
+          <% end %>
+          <span class="podcast-show-title"><%= h(s['title'] || s['url']) %></span>
+          <span class="podcast-show-meta">
+            <%= s['panel_count'] %> panel<%= 's' unless s['panel_count'] == 1 %>
+            <% if s['latest_at'] %>
+              &middot; latest <%= relative_time(s['latest_at']) %>
+            <% end %>
+          </span>
+        </a>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="benchmark-section">
+    <h3>Recent panels</h3>
+    <% if @recent_comics.empty? %>
+      <p class="muted">No panels ingested yet — feeds refresh hourly, so new strips will appear within the next hour.</p>
+    <% else %>
+      <ul class="podcast-episodes">
+        <% @recent_comics.each do |c| %>
+          <%
+            # Per-article image_url is where webcomic parsers store the
+            # panel. If absent (rare), fall back to the feed's cover so
+            # the row still renders with a thumbnail.
+            panel = c['image_url'].to_s.empty? ?
+                     @series.find { |s| s['id'] == c['feed_id'] }&.fetch('image_url', nil) :
+                     c['image_url']
+          %>
+          <li class="podcast-card <%= c['read'] == 1 ? 'read' : '' %> <%= 'has-image' if panel && !panel.to_s.empty? %>">
+            <% if panel && !panel.to_s.empty? %>
+              <a class="podcast-card-image" href="/article/<%= c['uid'] %>" title="Open this panel">
+                <img src="<%= h(panel) %>" alt="" loading="lazy">
+              </a>
+            <% end %>
+            <div class="podcast-card-body">
+              <h4 class="podcast-card-title">
+                <a href="/article/<%= c['uid'] %>"><%= h(c['title']) %></a>
+              </h4>
+              <p class="podcast-card-meta">
+                <%= h(c['feed_title'] || c['feed_url']) %>
+                &middot; <%= relative_time(c['published_at']) %>
+              </p>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>

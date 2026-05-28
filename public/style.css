@@ -831,8 +831,65 @@ html.dark .bg-pool-card { background: #1c1c1e; border-color: #2c2c2e; }
   border-radius: 10px;
   margin: 0 0 1rem;
   background: #f0f0f5;
+  cursor: zoom-in;
 }
 html.dark .article-hero { background: #2c2c2e; }
+
+/* STUFF #65 — webcomics. The default `.article-hero` rule crops on
+   `object-fit: cover` + 260px max-height, which chops the comic and
+   makes text unreadable. For humor-topic feeds we show the full
+   panel at its natural aspect ratio and let it grow as tall as
+   needed (capped at 80vh so absurdly-long verticals still scroll). */
+.article-hero.is-comic {
+  max-height: 80vh;
+  height: auto;
+  object-fit: contain;
+  background: transparent;
+}
+html.dark .article-hero.is-comic { background: transparent; }
+
+/* STUFF #65 — click-to-zoom lightbox. Toggled by public/image-lightbox.js
+   on any .article-hero or article-body image. Fixed-position fullscreen
+   overlay with the image at near-viewport size; click anywhere outside
+   the image or hit Escape to close. */
+#img-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: zoom-out;
+  padding: 1rem;
+}
+#img-lightbox-overlay.open { display: flex; }
+#img-lightbox-overlay img {
+  max-width: 95vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  background: #fff;
+}
+.lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  line-height: 1;
+  font-size: 1.6rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-close:hover { background: rgba(255, 255, 255, 0.32); }
 
 /* STUFF.md follow-up — article-row thumbnails moved to the LEFT
    and enlarged from 64px → 96px so the list has visual rhythm.
@@ -2260,7 +2317,7 @@ html.dark .badge.podcast-badge    { background: #3a1d5e; color: #d6b8ff; }
   margin-top: 1rem;
   line-height: 1.6;
 }
-.reading-view .article-body img { max-width: 100%; height: auto; border-radius: 6px; }
+.reading-view .article-body img { max-width: 100%; height: auto; border-radius: 6px; cursor: zoom-in; }
 .reading-view .article-body pre  { overflow-x: auto; }
 .reading-view .article-footer { margin-top: 1.5rem; }
 html.dark .reading-view .article-body { background: #1c1c1e; border-color: #2c2c2e; }
