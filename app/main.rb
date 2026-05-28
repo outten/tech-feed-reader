@@ -1842,6 +1842,17 @@ class TechFeedReader < Sinatra::Base
   # canonical channel-feed URL pattern), with cover art, recent video
   # count, latest-video age, and a small "↗ Channel" link that opens
   # the channel on YouTube in a new tab. Card click → /youtube/:feed_id.
+  # STUFF #65 — webcomics index. Mirrors /podcasts + /youtube in shape:
+  # one tile per subscribed humor-topic feed, ordered by latest-panel
+  # date desc. Tile shows the latest panel image (or the feed's cover
+  # art as a fallback) + title + relative time. Click → article reader.
+  get '/comics' do
+    @page_title    = 'Comics'
+    @series        = ArticlesStore.comic_feeds(current_user_id)
+    @recent_comics = ArticlesStore.recent(current_user_id, limit: 12, topic: 'humor')
+    erb :comics
+  end
+
   get '/youtube' do
     @page_title    = 'YouTube'
     @channels      = ArticlesStore.youtube_channels(current_user_id)

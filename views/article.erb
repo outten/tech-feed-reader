@@ -11,7 +11,11 @@
 <article class="reading-view">
   <header>
     <% if hero_image && !hero_image.to_s.empty? && !yt_embed %>
-      <img class="article-hero" src="<%= h(hero_image) %>" alt="" loading="lazy">
+      <% is_comic = @feed && @feed['topic'].to_s == 'humor' %>
+      <img class="article-hero<%= ' is-comic' if is_comic %>"
+           src="<%= h(hero_image) %>"
+           alt="<%= h(@article['title']) %>"
+           loading="lazy">
     <% end %>
     <h2>
       <% if @article['audio_url'] && !@article['audio_url'].to_s.empty? %>

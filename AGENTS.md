@@ -69,7 +69,7 @@ No other API keys required — RSS / Atom feeds are public and unauthenticated. 
 ```bash
 make install                 # bundle install
 make migrate                 # apply any pending db/migrations/*.sql (idempotent)
-make seed-feeds              # insert FeedCatalog::seed_defaults (5 starters; 79-entry catalog browsable on /feeds)
+make seed-feeds              # insert FeedCatalog::seed_defaults (5 starters; 108-entry catalog browsable on /feeds)
 make run                     # auto-reload via rerun → http://localhost:4567 (alias: make dev)
 make serve                   # one-shot run, no auto-reload
 make test                    # RSpec
@@ -295,7 +295,7 @@ app/
   # Feeds + articles core
   feed_fetcher.rb                  # conditional GET → parse → update FeedsStore (OTel feed.fetch span)
   feed_parser.rb                   # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom; extracts entry.categories
-  feed_catalog.rb                  # curated 79-feed catalog + seed_defaults + recommend_for personalisation
+  feed_catalog.rb                  # curated 108-feed catalog + seed_defaults + recommend_for personalisation
   feeds_store.rb                   # feeds + user_feed_subscriptions bridge; popular_by_type for #24 top charts
   articles_store.rb                # articles + tsvector search + audio + categories backfill; podcast_feeds + youtube_channels
   read_state_store.rb              # per-user-per-article read / bookmark / archive / feedback
