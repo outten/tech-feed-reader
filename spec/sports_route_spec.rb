@@ -122,7 +122,10 @@ RSpec.describe 'GET /sports' do
   end
 
   it 'top nav highlights the Sports tab when on /sports' do
+    # STUFF #65 — Sports moved into the Browse ▾ dropdown; the link
+    # now carries `role="menuitem"` so the assertion has to allow
+    # arbitrary attributes between `href` and `class="active"`.
     get '/sports'
-    expect(last_response.body).to match(%r{<a href="/sports"\s+class="active">Sports</a>})
+    expect(last_response.body).to match(%r{<a href="/sports"[^>]*class="active"[^>]*>Sports</a>})
   end
 end
