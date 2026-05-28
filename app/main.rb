@@ -1845,12 +1845,38 @@ class TechFeedReader < Sinatra::Base
   # STUFF #65 — webcomics index. Mirrors /podcasts + /youtube in shape:
   # one tile per subscribed humor-topic feed, ordered by latest-panel
   # date desc. Tile shows the latest panel image (or the feed's cover
-  # art as a fallback) + title + relative time. Click → article reader.
+  # art as a fallback) + title + relative time. Click → /comics/:id
+  # panel list for that series (STUFF #66 behavior — was "jump to
+  # latest panel", changed so users see the series archive).
   get '/comics' do
     @page_title    = 'Comics'
     @series        = ArticlesStore.comic_feeds(current_user_id)
     @recent_comics = ArticlesStore.recent(current_user_id, limit: 12, topic: 'humor')
+    # STUFF #66 — needed by views/comics.erb to render the source
+    # series name on each Recent-panels row. Mirrors the @feeds_by_id
+    # plumbing in /podcasts + /youtube.
+    @feeds_by_id   = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :comics
+  end
+
+  # STUFF #66 — per-series panel list. Patterns after /youtube/:feed_id:
+  # subscription + topic guard, then `recent_for_feed` for the most
+  # recent panels. Click any panel → /article/:uid reader (where the
+  # comic-hero + lightbox already handle the actual viewing).
+  COMIC_SERIES_PANELS_LIMIT = 30
+  get '/comics/:feed_id' do |feed_id|
+    @feed = FeedsStore.find(feed_id.to_i)
+    halt 404, erb(:article_not_found) unless @feed
+    unless FeedsStore.subscribed?(current_user_id, @feed['id'])
+      halt 404, erb(:article_not_found)
+    end
+    unless @feed['topic'].to_s == 'humor'
+      halt 404, erb(:article_not_found)
+    end
+
+    @page_title = @feed['title'] || 'Comic series'
+    @panels     = ArticlesStore.recent_for_feed(current_user_id, @feed['id'], limit: COMIC_SERIES_PANELS_LIMIT)
+    erb :comic_series
   end
 
   get '/youtube' do
@@ -2276,7 +2302,38 @@ class TechFeedReader < Sinatra::Base
   # the /sports overview page so the visual language is consistent.
   get '/sports/team/:slug' do |slug|
     @team = SportsTeams.find(slug)
-    halt 404, erb(:article_not_found) unless @team
+    # STUFF #67 — fall back to the DB-side sports_teams catalog when
+    # the curated Ruby module doesn't know this slug. The module only
+    # ships ~5 curated teams (Eagles, Sixers, Union, All Blacks,
+    # Tennis); standings tables link every team to /sports/team/<slug>
+    # regardless of catalog coverage, so without a fallback every
+    # non-curated row 404s (FIFA World Cup countries, most NFL/NBA
+    # teams, etc.). The DB path renders a leaner template focused on
+    # what we know: header + standings + fixtures + results + mentions.
+    if @team.nil?
+      db_team = SportsTeamsStore.find_by_slug(slug)
+      halt 404, erb(:article_not_found) unless db_team
+
+      @team_row      = db_team
+      @league        = SportsLeaguesStore.find(db_team['league_id'])
+      @standings     = SportsStandingsStore.for_team(db_team['id'])
+      @upcoming      = SportsMatchesStore.upcoming_for_team(db_team['id'], limit: 8)
+      @recent_finals = SportsMatchesStore.recent_finals_for_team(db_team['id'], limit: 6)
+      @teams_by_id   = SportsTeamsStore.all.each_with_object({}) { |t, h| h[t['id']] = t }
+      @followed      = SportsFollowsStore.for_kind(current_user_id, 'team').any? { |f| f['value'] == db_team['slug'] }
+
+      # Cache + FTS5 phrase MATCH on the team's name — same bridge
+      # the curated team pages populate.
+      SportsEntityArticlesStore.refresh_for(
+        kind: 'team', entity_id: db_team['id'], name: db_team['name']
+      )
+      @mentions = SportsEntityArticlesStore.for_entity(
+        kind: 'team', entity_id: db_team['id'], limit: 20
+      )
+
+      @page_title = db_team['name']
+      halt erb(:sports_team_db)
+    end
 
     @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @team_feeds  = SportsTeams.subscribed_feeds_for(@team)

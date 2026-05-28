@@ -37,7 +37,23 @@ RSpec.describe 'GET /comics' do
     expect(last_response.body).to include('xkcd')
     expect(last_response.body).to include('podcast-show-card') # reused tile CSS
     expect(last_response.body).to include('Standards')
-    expect(last_response.body).to include('/article/comic_panel01')
+    # STUFF #66 — series tile now opens the series archive at
+    # /comics/:feed_id (not directly the latest panel article).
+    expect(last_response.body).to include(%(href="/comics/#{feed['id']}"))
+  end
+
+  it 'shows the source series name on every recent-panels row (STUFF #66)' do
+    feed = subscribe_comic_feed(url: 'https://xkcd.example/atom.xml', title: 'xkcd')
+    ArticlesStore.import(feed_id: feed['id'], entries: [{
+      uid: 'comic_seriesnm', title: 'Geohashing', url: 'https://xkcd.example/426',
+      author: nil, published_at: '2026-05-20T12:00:00Z',
+      content_html: '<p>x</p>', content_text: 'x'
+    }])
+
+    get '/comics'
+    # The Recent panels meta line links the series name back to the
+    # series archive.
+    expect(last_response.body).to match(%r{<a href="/comics/#{feed['id']}">xkcd</a>})
   end
 
   it 'excludes non-humor feeds even when other content exists' do
@@ -63,6 +79,70 @@ RSpec.describe 'GET /comics' do
     get '/admin/dashboard'
     expect(last_response.body).to include('href="/comics"')
     expect(last_response.body).to include('Browse')
+  end
+end
+
+RSpec.describe 'GET /comics/:feed_id' do
+  include Rack::Test::Methods
+
+  def app
+    TechFeedReader
+  end
+
+  def subscribe_comic_feed(url:, title:)
+    FeedsStore.add(url: url, title: title, topic: 'humor', subscriber_id: 1)
+  end
+
+  it 'lists the recent panels for the series with thumbnails + per-panel links' do
+    feed = subscribe_comic_feed(url: 'https://xkcd.example/atom.xml', title: 'xkcd')
+    ArticlesStore.import(feed_id: feed['id'], entries: [
+      { uid: 'series_pn001', title: 'Standards',  url: 'https://xkcd.example/927',
+        author: nil, published_at: '2026-05-20T12:00:00Z',
+        content_html: '<p>x</p>', content_text: 'Standards',
+        image_url: 'https://xkcd.example/927.png' },
+      { uid: 'series_pn002', title: 'Geohashing', url: 'https://xkcd.example/426',
+        author: nil, published_at: '2026-05-18T12:00:00Z',
+        content_html: '<p>x</p>', content_text: 'Geohashing',
+        image_url: 'https://xkcd.example/426.png' }
+    ])
+
+    get "/comics/#{feed['id']}"
+    expect(last_response.status).to eq(200)
+    expect(last_response.body).to include('xkcd')
+    expect(last_response.body).to include('Standards')
+    expect(last_response.body).to include('Geohashing')
+    expect(last_response.body).to include('/article/series_pn001')
+    expect(last_response.body).to include('/article/series_pn002')
+    expect(last_response.body).to include('All series')
+  end
+
+  it 'renders the empty-state when no panels exist yet' do
+    feed = subscribe_comic_feed(url: 'https://xkcd.example/atom.xml', title: 'xkcd')
+    get "/comics/#{feed['id']}"
+    expect(last_response.status).to eq(200)
+    expect(last_response.body).to include('No panels ingested for this series yet')
+  end
+
+  it '404s for a non-humor feed even when subscribed' do
+    tech = FeedsStore.add(url: 'https://ars.example/rss', title: 'Ars',
+                          topic: 'technology', subscriber_id: 1)
+    get "/comics/#{tech['id']}"
+    expect(last_response.status).to eq(404)
+  end
+
+  it '404s for a humor feed the user is not subscribed to' do
+    # add_to_catalog creates a catalog row without subscribing the
+    # default test user — same shape another user's subscription
+    # would have left behind.
+    foreign = FeedsStore.add_to_catalog(url: 'https://other.example/rss',
+                                        title: 'Other', topic: 'humor')
+    get "/comics/#{foreign['id']}"
+    expect(last_response.status).to eq(404)
+  end
+
+  it '404s for a non-existent feed id' do
+    get '/comics/999999'
+    expect(last_response.status).to eq(404)
   end
 end
 

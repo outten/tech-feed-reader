@@ -1,0 +1,54 @@
+<%# STUFF #66 — per-series panel list. Mirrors /youtube/:feed_id in
+    shape: header with feed title + back link, then a grid of recent
+    panels with thumbnail + title + relative time. Each tile links to
+    /article/:uid where the existing comic-hero rendering + image
+    lightbox handle viewing. %>
+<div class="page-header">
+  <div>
+    <h2><%= h(@feed['title'] || 'Comic series') %></h2>
+    <p class="subtitle">
+      <a href="/comics">&larr; All series</a>
+      <% if @panels.any? %>
+        &middot; Showing the <%= @panels.length %> most recent
+        <%= @panels.length == 1 ? 'panel' : 'panels' %>
+      <% end %>
+      <% if @feed['url'] && !@feed['url'].to_s.empty? %>
+        &middot; <a href="<%= h(@feed['url']) %>" target="_blank" rel="noopener noreferrer">↗ Feed source</a>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<% if @panels.empty? %>
+  <div class="empty-state">
+    <p>No panels ingested for this series yet. Feeds refresh hourly; new panels should appear within the next hour.</p>
+  </div>
+<% else %>
+  <section class="benchmark-section">
+    <ul class="podcast-episodes comic-panel-list">
+      <% @panels.each do |panel| %>
+        <%
+          # Prefer the per-article panel image, fall back to the feed's
+          # cover art so the tile still renders even if the parser
+          # couldn't pull an image off this specific entry.
+          thumb = panel['image_url'].to_s.empty? ? @feed['image_url'] : panel['image_url']
+        %>
+        <li class="podcast-card <%= panel['read'] == 1 ? 'read' : '' %> <%= 'has-image' if thumb && !thumb.to_s.empty? %>">
+          <% if thumb && !thumb.to_s.empty? %>
+            <a class="podcast-card-image" href="/article/<%= h(panel['uid']) %>" title="Open this panel">
+              <img src="<%= h(thumb) %>" alt="" loading="lazy">
+            </a>
+          <% end %>
+          <div class="podcast-card-body">
+            <h4 class="podcast-card-title">
+              <a href="/article/<%= h(panel['uid']) %>"><%= h(panel['title']) %></a>
+            </h4>
+            <p class="podcast-card-meta">
+              <%= relative_time(panel['published_at']) %>
+            </p>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>

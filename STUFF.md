@@ -922,3 +922,38 @@ New `GET /comics` route ([app/main.rb](app/main.rb)) mirrors `/podcasts` and `/y
 
 6 new examples in [spec/comics_route_spec.rb](spec/comics_route_spec.rb) cover the empty state, subscribed-series render, non-humor-exclusion, nav exposure, and the store helper's ordering + topic filter.
 
+## [x] 66. Comics
+
+On the comics page top area, Subscribed series, it says that the feed has say 10 panes. Clicking on the element takes the user to the latest panel. Clicking on the element should take the user to a page that shows the 10 panels. Then the user can click on an element in the list and go to than specific panel.
+
+Also, in tbe "Recent panels" area, can you add the comic strip name to the element.
+
+**Shipped.** Two changes on `/comics`:
+
+- **Series tile target** — was jumping to `/article/:latest_uid` (the latest panel), which felt like a dead-end. Now opens a new `GET /comics/:feed_id` series archive listing the most recent 30 panels with thumbnails, titles, and dates; tiles in the archive click through to `/article/:uid` where the existing comic-hero rendering + image lightbox handle the actual viewing.
+- **Recent panels meta line** — now surfaces the source series name (xkcd / SMBC / etc.) as a link back to `/comics/:feed_id`. `ArticlesStore.recent` doesn't JOIN feeds, so the route now also loads `@feeds_by_id` (same pattern as `/podcasts` and `/youtube`) and the view looks the title up.
+
+New route guards (404 on): non-existent feed, feed the user isn't subscribed to, feed whose topic isn't `humor`. 6 new examples in [spec/comics_route_spec.rb](spec/comics_route_spec.rb) cover the panel list, empty state, all three 404 paths, and the series name appearing as a link on the index recent-panels rows.
+
+## [x] 67. Rugby Page
+
+On the /sports/league/fifa-world page, there's a link for each country. The link goes to an article not found page. Should that be the case? During the world cup will the pages have content?
+
+The same is the same for /sports/league/mls.
+
+Do a sweep of all the league pages. Perhaps we should remove the links. Or take the user to a page where they can subscribe to feeds for the team. Please analyzee and make a recommendation.
+
+**Analysis.** The 404 isn't FIFA-specific or MLS-specific — it's universal. `/sports/team/:slug` was looking up via `SportsTeams.find` ([app/sports_teams.rb](app/sports_teams.rb)), a hand-curated Ruby module shipping only 5 teams (Eagles / Sixers / Union / All Blacks / Tennis). Every standings table on `/sports/league/:slug` links every team row to `/sports/team/<slug>`, so anything that wasn't one of those 5 — every FIFA-World country, every NFL team besides Eagles, every NBA team besides Sixers, every MLS team besides Union, every rugby/cricket/baseball team — 404'd. Not a per-league bug; the same root cause hit every league page.
+
+**Why "DB fallback team page" beats "remove links" or "subscribe-only page".** Removing the links would deprive users of the structured data we already have (DB-side `sports_teams` + `sports_matches` + `sports_standings` are populated from ESPN sync). Pointing them at a feed-subscription page punts on the actual question — most users following Brazil during the World Cup care about the fixture / score / standing, not subscribing to a Portuguese-language Brazilian RSS feed. The shipped fix gives them both: a useful page with the structured data, AND an empty-state CTA toward `/feeds` when there's no article coverage.
+
+**Shipped.** `GET /sports/team/:slug` now tries the curated Ruby module first, then falls back to `SportsTeamsStore.find_by_slug` for DB-side teams ([app/main.rb](app/main.rb)). A new lean template [views/sports_team_db.erb](views/sports_team_db.erb) renders:
+
+- **Header** — team logo + name, league link (back to standings), follow/unfollow toggle
+- **Standings position** — group / rank / record / streak / "Full standings →" if the row exists
+- **Upcoming fixtures** — next 8 matches with opponent links (so navigating across teams works), kickoff time, venue, LIVE badge
+- **Recent results** — last 6 finals with score
+- **Mentions** — articles surfaced via `SportsEntityArticlesStore.refresh_for` (FTS5 phrase MATCH on the team name) when the user has any feed that mentions the team
+- **Empty state** — graceful "no fixtures, results, or articles yet" copy that explains tournaments fill in via `make sync-sports` and nudges toward `/feeds` for article coverage
+
+Curated teams (the 5 in `SportsTeams::TEAMS`) keep their rich existing page; the regression-guard spec asserts `/sports/team/eagles` still renders the Bleeding Green Nation blurb. 6 new examples in [spec/sports_team_db_route_spec.rb](spec/sports_team_db_route_spec.rb) cover both paths plus all four data-availability states. Full local suite: **1479 / 0**.
