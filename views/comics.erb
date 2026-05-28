@@ -35,10 +35,13 @@
           # (every feed shares its own logo otherwise); fall back to the
           # feed's image_url if no panel image was captured.
           cover = s['latest_image'].to_s.empty? ? s['image_url'] : s['latest_image']
-          target = s['latest_uid'] ? "/article/#{s['latest_uid']}" : "/articles?feed_id=#{s['id']}&topic=humor"
+          # STUFF #66 — tile goes to the series archive (/comics/:id)
+          # so users can pick which panel to read; was the latest
+          # article uid before, which felt like a dead-end.
+          target = "/comics/#{s['id']}"
         %>
         <a class="podcast-show-card" href="<%= h(target) %>"
-           title="Open the latest panel from <%= h(s['title'] || s['url']) %>">
+           title="See all panels from <%= h(s['title'] || s['url']) %>">
           <% if cover && !cover.to_s.empty? %>
             <img class="podcast-show-cover" src="<%= h(cover) %>" alt="" loading="lazy">
           <% end %>
@@ -62,12 +65,18 @@
       <ul class="podcast-episodes">
         <% @recent_comics.each do |c| %>
           <%
+            feed_row = (@feeds_by_id || {})[c['feed_id']]
             # Per-article image_url is where webcomic parsers store the
             # panel. If absent (rare), fall back to the feed's cover so
             # the row still renders with a thumbnail.
             panel = c['image_url'].to_s.empty? ?
-                     @series.find { |s| s['id'] == c['feed_id'] }&.fetch('image_url', nil) :
+                     (feed_row && feed_row['image_url']) :
                      c['image_url']
+            # STUFF #66 — surface the source series name on the row.
+            # ArticlesStore.recent doesn't JOIN feeds, so the row
+            # itself only carries feed_id; look up the title from the
+            # @feeds_by_id index loaded in the route.
+            series_name = feed_row ? (feed_row['title'] || feed_row['url']) : nil
           %>
           <li class="podcast-card <%= c['read'] == 1 ? 'read' : '' %> <%= 'has-image' if panel && !panel.to_s.empty? %>">
             <% if panel && !panel.to_s.empty? %>
@@ -80,8 +89,11 @@
                 <a href="/article/<%= c['uid'] %>"><%= h(c['title']) %></a>
               </h4>
               <p class="podcast-card-meta">
-                <%= h(c['feed_title'] || c['feed_url']) %>
-                &middot; <%= relative_time(c['published_at']) %>
+                <% if series_name %>
+                  <a href="/comics/<%= c['feed_id'] %>"><%= h(series_name) %></a>
+                  &middot;
+                <% end %>
+                <%= relative_time(c['published_at']) %>
               </p>
             </div>
           </li>

@@ -1,0 +1,155 @@
+<%# STUFF #67 — leaner team detail page for DB-side teams not in the
+    curated SportsTeams Ruby module (FIFA World Cup countries, every
+    NFL team besides Eagles, every NBA team besides Sixers, etc.).
+    Mirrors the curated sports_team.erb but drops the curated-only
+    sections (per-team RSS feeds, hand-written blurb, emoji): just
+    name + logo + league + standings + fixtures + results + mentions. %>
+
+<div class="page-header sports-team-header">
+  <div>
+    <h2>
+      <% if @team_row['image_url'] && !@team_row['image_url'].to_s.empty? %>
+        <img class="sports-team-logo" src="<%= h(@team_row['image_url']) %>" alt="" loading="lazy">
+      <% end %>
+      <%= h(@team_row['name']) %>
+    </h2>
+    <p class="subtitle">
+      <% if @league %>
+        <a href="/sports/league/<%= h(@league['slug']) %>"><%= h(@league['name']) %></a>
+        &middot;
+      <% end %>
+      <a href="/sports">&larr; All sports</a>
+    </p>
+    <% if @standings %>
+      <p class="subtitle sports-team-standing">
+        <% if @standings['group_name'] %>
+          <strong><%= h(@standings['group_name']) %></strong> &middot;
+        <% end %>
+        <%= @standings['position'] || '—' %><% if @standings['position'] %><sup><%= position_suffix(@standings['position'].to_i) %></sup><% end %>
+        <% if @standings['wins'] && @standings['losses'] %>
+          (<%= @standings['wins'] %>&ndash;<%= @standings['losses'] %><% if @standings['ties'].to_i > 0 %>&ndash;<%= @standings['ties'] %><% end %>)
+        <% end %>
+        <% if @standings['streak'] && !@standings['streak'].to_s.empty? %>
+          &middot; <span class="<%= @standings['streak'].start_with?('W') ? 'positive' : 'negative' %>">streak <%= h(@standings['streak']) %></span>
+        <% end %>
+        <% if @league %>
+          &middot; <a href="/sports/league/<%= h(@league['slug']) %>">Full standings &rarr;</a>
+        <% end %>
+      </p>
+    <% end %>
+  </div>
+  <%# Follow / unfollow toggle. Mirrors the curated team page button.
+      Action targets the existing /sports/teams/{follow,unfollow}
+      endpoints (which accept slug in the POST body + a return_to). %>
+  <form class="sports-follow-form" method="post"
+        action="/sports/teams/<%= @followed ? 'unfollow' : 'follow' %>"
+        data-follow-toggle data-kind="team" data-value="<%= h(@team_row['slug']) %>">
+    <input type="hidden" name="slug" value="<%= h(@team_row['slug']) %>">
+    <input type="hidden" name="return_to" value="/sports/team/<%= h(@team_row['slug']) %>">
+    <button type="submit" class="btn-secondary sports-follow-btn <%= 'is-followed' if @followed %>"
+            title="<%= @followed ? 'Stop following' : 'Follow this team' %>">
+      <% if @followed %>★ Following<% else %>☆ Follow<% end %>
+    </button>
+  </form>
+</div>
+
+<%# Upcoming fixtures. Renders nothing if the team has no scheduled
+    matches in the table (off-season, or league not synced yet). %>
+<% if @upcoming.any? %>
+  <section class="benchmark-section">
+    <h3>Upcoming fixtures</h3>
+    <ul class="whats-on-matches">
+      <% @upcoming.each do |m| %>
+        <% home = (@teams_by_id || {})[m['home_team_id']] %>
+        <% away = (@teams_by_id || {})[m['away_team_id']] %>
+        <li class="whats-on-match">
+          <span class="whats-on-time">
+            <% if m['scheduled_at'] %>
+              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%a %-l:%M %p') rescue m['scheduled_at'] %>
+            <% else %>
+              TBD
+            <% end %>
+          </span>
+          <span class="whats-on-matchup">
+            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>—<% end %>
+            <span class="muted">@</span>
+            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>—<% end %>
+          </span>
+          <% if m['venue'] && !m['venue'].to_s.empty? %>
+            <span class="muted whats-on-league"><%= h(m['venue']) %></span>
+          <% end %>
+          <% if m['status'].to_s == 'live' %>
+            <span class="badge live-badge" title="Match is live now">LIVE</span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<%# Recent results. Same shape as fixtures, with final score added. %>
+<% if @recent_finals.any? %>
+  <section class="benchmark-section">
+    <h3>Recent results</h3>
+    <ul class="whats-on-matches">
+      <% @recent_finals.each do |m| %>
+        <% home = (@teams_by_id || {})[m['home_team_id']] %>
+        <% away = (@teams_by_id || {})[m['away_team_id']] %>
+        <li class="whats-on-match">
+          <span class="whats-on-time">
+            <% if m['scheduled_at'] %>
+              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%b %-d') rescue m['scheduled_at'] %>
+            <% end %>
+          </span>
+          <span class="whats-on-matchup">
+            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>—<% end %>
+            <strong><%= m['away_score'] || '—' %></strong>
+            <span class="muted">@</span>
+            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>—<% end %>
+            <strong><%= m['home_score'] || '—' %></strong>
+          </span>
+          <span class="muted whats-on-league">FT</span>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<%# Articles mentioning this team — bridges sports_entity_articles
+    populated by FTS5 phrase MATCH on the team name. Often empty for
+    international/lower-profile teams where the user has no relevant
+    feed subscribed; the empty-state nudges them toward subscribing. %>
+<% if @mentions.any? %>
+  <section class="benchmark-section">
+    <h3>📰 Mentions of <%= h(@team_row['name']) %></h3>
+    <ul class="sports-article-list">
+      <% @mentions.each do |a| %>
+        <li class="sports-article">
+          <h4 class="sports-article-title">
+            <a href="/article/<%= h(a['uid']) %>"><%= h(a['title']) %></a>
+          </h4>
+          <div class="sports-article-meta">
+            <span title="Published <%= h(a['published_at']) %>"><%= relative_time(a['published_at']) %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<%# Empty-state for teams with no fixtures, results, or articles —
+    typical between tournaments. %>
+<% if @upcoming.empty? && @recent_finals.empty? && @mentions.empty? %>
+  <div class="empty-state">
+    <p>
+      No fixtures, results, or articles for <strong><%= h(@team_row['name']) %></strong> yet.
+      <% if @league %>
+        Pages fill in once the <%= h(@league['name']) %> sync runs
+        (<code>make sync-sports</code>); during the tournament window
+        the schedule, scores, and standings populate automatically.
+      <% end %>
+      Subscribe to a relevant feed at <a href="/feeds">/feeds</a> if you
+      want article coverage too.
+    </p>
+  </div>
+<% end %>
