@@ -93,4 +93,16 @@ module SportsTeamsStore
   def count
     db.execute('SELECT COUNT(*) AS c FROM sports_teams').first['c']
   end
+
+  # STUFF #69 — rename a row's slug in place. `upsert` doesn't touch
+  # the slug column for existing rows (it identifies them by
+  # source_provider+external_id), so we need a dedicated path to
+  # promote an auto-slug row like `nba-team-13` to the catalog slug
+  # `lakers` when a follow arrives from /sports/manage. Returns the
+  # updated row, or nil if no row with that id exists.
+  def rename_slug!(id, new_slug)
+    return nil if new_slug.to_s.strip.empty?
+    db.execute('UPDATE sports_teams SET slug = ? WHERE id = ?', [new_slug.to_s, id])
+    find(id)
+  end
 end

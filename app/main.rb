@@ -666,6 +666,27 @@ class TechFeedReader < Sinatra::Base
         external_id:     catalog_league[:external_id]     || catalog_league[:slug],
         country:         catalog_league[:country]
       )
+
+      # STUFF #69 — the ESPN standings sync may have already created
+      # a row for this team under the auto-slug pattern
+      # `<league>-team-<external_id>` (e.g. `nba-team-13` for the
+      # Lakers). `SportsTeamsStore.upsert` finds existing rows by
+      # `(source_provider, external_id)` and updates their columns,
+      # but never touches the slug — so without an explicit rename
+      # the auto-slug persists. Result: a follow stored with the
+      # catalog slug (`lakers`) doesn't match any DB row at lookup
+      # time, and the team never surfaces on /sports.
+      #
+      # Detect the mismatched row, rename its slug to the catalog
+      # canonical, THEN run upsert (which now hits the renamed row
+      # via the same external_id and refreshes name/image/etc.).
+      provider    = catalog_team[:source_provider] || 'catalog'
+      external_id = catalog_team[:external_id]     || catalog_team[:slug]
+      existing    = SportsTeamsStore.find_by_external(provider, external_id, league_id: league['id'])
+      if existing && existing['slug'] != catalog_team[:slug]
+        SportsTeamsStore.rename_slug!(existing['id'], catalog_team[:slug])
+      end
+
       SportsTeamsStore.upsert(
         league_id:       league['id'],
         slug:            catalog_team[:slug],
@@ -673,8 +694,8 @@ class TechFeedReader < Sinatra::Base
         short_name:      catalog_team[:short_name],
         location:        catalog_team[:location],
         image_url:       catalog_team[:image_url],
-        source_provider: catalog_team[:source_provider] || 'catalog',
-        external_id:     catalog_team[:external_id]     || catalog_team[:slug]
+        source_provider: provider,
+        external_id:     external_id
       )
     end
 
