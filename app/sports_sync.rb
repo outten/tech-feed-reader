@@ -21,7 +21,11 @@ module SportsSync
   # Sports for which the per-team schedule endpoint is reliable. Rugby
   # is excluded — it 500s on /teams/<id>/schedule, so we use the
   # league-scoreboard endpoint and filter to the followed team.
-  TEAM_SCHEDULE_SPORTS = %w[football basketball soccer].freeze
+  # STUFF #68 — added `baseball` (MLB). The ESPN endpoint
+  # /apis/site/v2/sports/baseball/mlb/teams/<id>/schedule returns
+  # full team schedules; without it MLB followers got an empty
+  # /sports score-tile + an empty Last-game on per-team pages.
+  TEAM_SCHEDULE_SPORTS = %w[football basketball soccer baseball].freeze
 
   def self.run!(logger: AppLogger)
     matches_upserted = sync_team_schedules!(logger: logger)
@@ -113,6 +117,25 @@ module SportsSync
         external_id:     existing['external_id'],
         image_url:       existing['image_url'].to_s.empty? ? logo : existing['image_url']
       )
+    elsif (catalog_match = SportsTeamsStore.find_by_name_in_league(name, league_id: league['id']))
+      # STUFF #68 — pre-existing catalog row (manually-seeded slug
+      # like 'phillies', source_provider='catalog') matches the ESPN
+      # payload's team by name. Promote that row to ESPN-tracked
+      # by writing the real external_id + source_provider, so
+      # matches + standings + follows all converge on a single row.
+      # Without this, a second `<league>-team-<external_id>` row got
+      # created on the first sync — and the user's 'phillies' follow
+      # then pointed at an empty row with no matches.
+      SportsTeamsStore.upsert(
+        league_id:       catalog_match['league_id'],
+        slug:            catalog_match['slug'],
+        name:            catalog_match['name'],
+        short_name:      catalog_match['short_name'],
+        location:        catalog_match['location'],
+        source_provider: league['source_provider'],
+        external_id:     external_id,
+        image_url:       catalog_match['image_url'].to_s.empty? ? logo : catalog_match['image_url']
+      )
     else
       opponent_slug = "#{league['slug']}-team-#{external_id}"
       SportsTeamsStore.upsert(
@@ -137,17 +160,15 @@ module SportsSync
       groups = Providers::ESPN.standings(sport_path: league['external_id'])
       groups.each do |group|
         group.entries.each_with_index do |entry, idx|
-          team_row = SportsTeamsStore.find_by_external(
-            league['source_provider'], entry.team_external_id, league_id: league['id']
+          # STUFF #68 — go through ensure_team! so the standings sync
+          # gets the same catalog-promotion behaviour as the schedule
+          # sync. Previously the inline branch always auto-created a
+          # `<league>-team-<external_id>` row, which is why MLB
+          # standings + catalog rows ended up split into duplicates.
+          team_row = ensure_team!(
+            entry.team_external_id, entry.team_name, entry.team_logo, league: league
           )
-          team_row ||= SportsTeamsStore.upsert(
-            league_id:       league['id'],
-            slug:            "#{league['slug']}-team-#{entry.team_external_id}",
-            name:            entry.team_name.to_s.empty? ? entry.team_external_id : entry.team_name,
-            source_provider: league['source_provider'],
-            external_id:     entry.team_external_id,
-            image_url:       entry.team_logo
-          )
+          next unless team_row
 
           SportsStandingsStore.upsert(
             league_id:           league['id'],

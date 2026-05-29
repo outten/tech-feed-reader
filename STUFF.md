@@ -957,3 +957,22 @@ Do a sweep of all the league pages. Perhaps we should remove the links. Or take 
 - **Empty state** — graceful "no fixtures, results, or articles yet" copy that explains tournaments fill in via `make sync-sports` and nudges toward `/feeds` for article coverage
 
 Curated teams (the 5 in `SportsTeams::TEAMS`) keep their rich existing page; the regression-guard spec asserts `/sports/team/eagles` still renders the Bleeding Green Nation blurb. 6 new examples in [spec/sports_team_db_route_spec.rb](spec/sports_team_db_route_spec.rb) cover both paths plus all four data-availability states. Full local suite: **1479 / 0**.
+
+## [x] 68. Sports — followed teams not appearing on /sports
+
+User followed three MLB teams (Phillies, Dodgers, Mets) but `/sports` only showed the four curated teams (Eagles / Sixers / Union / NZ Rugby). The "Major League Baseball" button was also missing from the "By League" area.
+
+**Root cause(s)** — three interacting issues, all stemming from the curated Ruby module (`SportsTeams::TEAMS`, ~5 hardcoded teams) vs DB-side catalog (`sports_teams` table, populated from ESPN sync) split first identified in STUFF #67:
+
+1. `/sports` route's `@teams_with_subs` was built only from the curated module, so DB-side followed teams (everything outside Eagles/Sixers/Union/All-Blacks/Tennis) had no panel.
+2. `SportsSync::TEAM_SCHEDULE_SPORTS` lacked `baseball`, so MLB team schedules never synced — even after fix #1 lands, score tiles would stay empty until matches existed.
+3. `SportsSync.ensure_team!` and the inline standings-sync logic always created a fresh `<league>-team-<external_id>` row when `find_by_external` missed — splitting every catalog-seeded MLB team into two rows (`phillies` natural + `mlb-team-22` ESPN), so the user's `phillies` follow pointed at an empty row while all the data lived under `mlb-team-22`.
+
+**Shipped.**
+
+- **Overview merge** ([app/main.rb](app/main.rb)): `/sports` now merges curated + DB-followed teams into a unified `@teams_with_subs`, deduplicated by slug. New `db_team_as_curated(row)` helper normalizes a sports_teams row to the symbol-keyed shape the view expects. Score tiles, the TOC team-button row, and "Last game" tile rendering all flow through unchanged.
+- **Baseball schedule sync** ([app/sports_sync.rb](app/sports_sync.rb)): added `baseball` to `TEAM_SCHEDULE_SPORTS`. ESPN's `/apis/site/v2/sports/baseball/mlb/teams/<id>/schedule` endpoint returns full schedules; verified live for Phillies (external_id 22, ~2MB response).
+- **Catalog promotion** ([app/sports_sync.rb](app/sports_sync.rb) + [app/sports_teams_store.rb](app/sports_teams_store.rb)): `ensure_team!` now falls back to a case-insensitive name lookup within the league before auto-creating. When the ESPN payload matches a pre-existing catalog row (`phillies` / `dodgers` / `mets`), that row gets promoted to ESPN-tracked (its `source_provider` + `external_id` rewritten) so future syncs find it via the steady-state `find_by_external` path. New `SportsTeamsStore.find_by_name_in_league`. Standings sync refactored to call `ensure_team!` so it gets the same behavior.
+- **One-shot backfill** ([scripts/dedup_sports_teams.rb](scripts/dedup_sports_teams.rb)): collapses pre-existing duplicate rows (`<natural>` + `<league>-team-<external_id>` pairs sharing a league_id + name). Moves matches, standings (collision-safe via dedup), entity_articles (INSERT…ON CONFLICT pattern), and follows (idempotent: drops auto-slug follow if user already follows natural), then promotes the natural row to ESPN-tracked and deletes the auto row. Wrapped in a transaction per pair. Dry-run by default; `--apply` to commit. Already run against dev (3 MLB pairs collapsed).
+
+11 new examples across [spec/sports_overview_db_teams_spec.rb](spec/sports_overview_db_teams_spec.rb) (4 — tile renders for DB-followed team with synced final, TOC button without final, orphan-follow no-crash, no-duplicate-when-both-sources-match) and [spec/sports_sync_catalog_promotion_spec.rb](spec/sports_sync_catalog_promotion_spec.rb) (7 — catalog promotion, auto-slug fallback, idempotence, case-insensitive name match, plus 3 store-level tests of `find_by_name_in_league`). Full local suite: **1490 / 0**.

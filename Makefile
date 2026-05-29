@@ -1,4 +1,4 @@
-.PHONY: run dev serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links
+.PHONY: run dev stop serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links
 
 install:
 	bundle install
@@ -35,6 +35,16 @@ seed-user:
 # `make dev` is an alias kept for muscle memory.
 run dev:
 	bundle exec rerun 'ruby app/main.rb'
+
+# Stop a `make run` / `make dev` / `make serve` web server. Targets
+# the rerun watcher, the Puma child it spawns, and anything else
+# listening on port 4567. Idempotent — exits 0 when nothing was
+# running, so it's safe to chain (`make stop run`).
+stop:
+	@pkill -TERM -f 'rerun.*ruby app/main\.rb' 2>/dev/null || true
+	@pkill -TERM -f 'ruby app/main\.rb'         2>/dev/null || true
+	@pids=`lsof -ti:4567 2>/dev/null`; if [ -n "$$pids" ]; then kill -TERM $$pids 2>/dev/null || true; fi
+	@echo "stopped (port 4567 freed if any was running)"
 
 # Plain server with no auto-reload — rare, e.g. when profiling startup time.
 serve:

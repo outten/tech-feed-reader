@@ -50,6 +50,20 @@ module SportsTeamsStore
     db.execute('SELECT * FROM sports_teams WHERE league_id = ? ORDER BY name', [league_id])
   end
 
+  # STUFF #68 — case-insensitive lookup used by SportsSync.ensure_team!
+  # to promote pre-existing catalog rows when ESPN payloads first
+  # arrive. Without this, every league not in the seed-time catalog
+  # (CATALOG_LEAGUES in scripts/seed_sports_data.rb) ends up with
+  # duplicate rows: the natural-slug catalog row + an auto-slug
+  # `<league>-team-<external_id>` row from the ESPN sync.
+  def find_by_name_in_league(name, league_id:)
+    return nil if name.to_s.strip.empty?
+    db.execute(
+      'SELECT * FROM sports_teams WHERE league_id = ? AND LOWER(name) = LOWER(?) LIMIT 1',
+      [league_id, name.to_s.strip]
+    ).first
+  end
+
   def upsert(league_id:, slug:, name:, source_provider:, external_id:,
              short_name: nil, location: nil, image_url: nil)
     existing = find_by_external(source_provider, external_id, league_id: league_id) ||
