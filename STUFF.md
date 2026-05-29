@@ -976,3 +976,21 @@ User followed three MLB teams (Phillies, Dodgers, Mets) but `/sports` only showe
 - **One-shot backfill** ([scripts/dedup_sports_teams.rb](scripts/dedup_sports_teams.rb)): collapses pre-existing duplicate rows (`<natural>` + `<league>-team-<external_id>` pairs sharing a league_id + name). Moves matches, standings (collision-safe via dedup), entity_articles (INSERT…ON CONFLICT pattern), and follows (idempotent: drops auto-slug follow if user already follows natural), then promotes the natural row to ESPN-tracked and deletes the auto row. Wrapped in a transaction per pair. Dry-run by default; `--apply` to commit. Already run against dev (3 MLB pairs collapsed).
 
 11 new examples across [spec/sports_overview_db_teams_spec.rb](spec/sports_overview_db_teams_spec.rb) (4 — tile renders for DB-followed team with synced final, TOC button without final, orphan-follow no-crash, no-duplicate-when-both-sources-match) and [spec/sports_sync_catalog_promotion_spec.rb](spec/sports_sync_catalog_promotion_spec.rb) (7 — catalog promotion, auto-slug fallback, idempotence, case-insensitive name match, plus 3 store-level tests of `find_by_name_in_league`). Full local suite: **1490 / 0**.
+
+## [x] 69. Sport Teams Follow
+
+Ok. I think I see the pattern. When I follow on this page /sports/manage/basketball/nba, the team doesn't appear on the /sports page. However, when I follow from the league page, it works.
+
+Can you investigate? Perhaps the manage page is doing something different. Could this lead to the duplication problem you discovered?
+
+**Root cause.** Same family as STUFF #68, opposite direction. `/sports/manage/basketball/nba` reads its team list from `SportsCatalog` (Ruby module) where the slugs are human-readable (`lakers`, `celtics`, `bucks`). The follow form POSTs `slug=lakers`. The handler called `ensure_catalog_team_in_db('lakers')`, which called `SportsTeamsStore.upsert(slug: 'lakers', source_provider: 'espn', external_id: '13', ...)`. But `upsert` looks up by `(source_provider, external_id)` first — and the ESPN standings sync had already created an `nba-team-13` row for the Lakers under that same external_id. `upsert` updates name/image/etc. on the existing row but **leaves the slug as `nba-team-13`**. Meanwhile `sports_follows` got `value='lakers'`. Then `/sports`'s `SportsTeamsStore.find_by_slug('lakers')` returned nil and the Lakers never surfaced.
+
+Every NBA/NFL/WNBA team in the dev DB was affected — only the 4 hand-seeded teams (Eagles / Sixers / Union / All Blacks) escaped because they were inserted with their natural slug at seed time.
+
+**Shipped.**
+
+- **Slug rename in `ensure_catalog_team_in_db`** ([app/main.rb](app/main.rb)) — detect the mismatch (DB row found via `find_by_external` whose slug differs from the catalog slug) and rename via the new `SportsTeamsStore.rename_slug!` before running `upsert`. Future follows from /sports/manage land on a row whose slug matches.
+- **`SportsTeamsStore.rename_slug!(id, new_slug)`** ([app/sports_teams_store.rb](app/sports_teams_store.rb)) — small UPDATE-only path; `upsert` deliberately never touches slug for existing rows, so this is the dedicated promotion lever.
+- **One-shot backfill** ([scripts/normalize_team_slugs_to_catalog.rb](scripts/normalize_team_slugs_to_catalog.rb)) — walks `SportsCatalog.all_teams`, finds DB rows whose slug differs from the catalog's, renames the row + rewrites any `sports_follows.value` entries to match (deduping per-user when both halves of the rename were followed). Dry-run by default; `--apply` to commit. Safe because matches/standings/entity_articles all FK by `team.id`. Already applied to dev — 39 renames (NFL + NBA + WNBA teams that previously lived under `<league>-team-<external_id>` auto-slugs).
+
+5 new examples in [spec/sports_team_follow_slug_rename_spec.rb](spec/sports_team_follow_slug_rename_spec.rb) cover the store-level `rename_slug!`, the POST `/sports/teams/follow` slug-rename path (with auto-slug row pre-existing), idempotence (no-op when slug already matches), and the cold-start path (no DB row at all). Full local suite: **1495 / 0**.
