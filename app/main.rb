@@ -187,6 +187,16 @@ class TechFeedReader < Sinatra::Base
     # already loaded by `require_relative 'database'` above so the
     # monkey-patch finds its target.
     ENV['RACK_MINI_PROFILER_PATCH'] ||= 'pg'
+    # rack-mini-profiler's lib/patches/net_patches.rb wraps Net::HTTP
+    # via the same alias_method trick the pg patch uses; OTel's
+    # net_http instrumentation prepends a wrapper that calls `super`,
+    # so the two recurse infinitely the moment anything calls
+    # Net::HTTP — most visibly the Anthropic SDK on /chat, /triage,
+    # and /feeds/ai-recommend (SystemStackError, "internal.rb line 28").
+    # Documented opt-out: setting this env var BEFORE require skips
+    # the entire net_patches block. We don't need outbound-HTTP timing
+    # from mini-profiler — OTel covers that path with no conflict.
+    ENV['RACK_MINI_PROFILER_PATCH_NET_HTTP'] ||= 'false'
     require 'rack-mini-profiler'
     require 'stackprof' # enables ?pp=flamegraph
     Rack::MiniProfiler.config.enable_advanced_debugging_tools = true
