@@ -864,6 +864,27 @@ class TechFeedReader < Sinatra::Base
       end
     end
 
+    # STUFF #68 — present a DB-side sports_teams row as a Hash that
+    # mimics the curated `SportsTeams::TEAMS` entries (symbol keys,
+    # the four fields the /sports view actually reads). Lets us merge
+    # both team sources into a single `@teams_with_subs` list without
+    # branching the view. Same idea as the DB-fallback path on
+    # /sports/team/:slug from STUFF #67.
+    def db_team_as_curated(row)
+      {
+        slug:       row['slug'],
+        name:       row['name'],
+        short_name: row['short_name'] || row['name'],
+        image_url:  row['image_url'],
+        # The view shows :emoji only when image_url is empty — DB
+        # teams nearly always carry a logo from the ESPN sync, but
+        # fall back to a generic stadium glyph just in case.
+        emoji:      '🏟',
+        sport:      nil,
+        feed_urls:  []
+      }
+    end
+
     # Resolve a SportsTeams Ruby module entry to its
     # sports_teams.id and pull the most recent final. The Ruby
     # module's slug is the bridging key; if the structured layer
@@ -2032,9 +2053,22 @@ class TechFeedReader < Sinatra::Base
     # overlap with the user's actual subscriptions. No point linking
     # to /sports/team/eagles if the user hasn't subscribed to a
     # single Eagles feed.
-    @teams_with_subs = SportsTeams.all.select do |team|
+    curated_with_subs = SportsTeams.all.select do |team|
       SportsTeams.subscribed_feeds_for(team).any?
     end
+    # STUFF #68 — extend the score-tile + TOC team-button rows to
+    # include DB-side teams the user follows via sports_follows.
+    # Without this, following the Phillies (or any team outside the
+    # curated 5) leaves no panel on /sports. Resolves each follow's
+    # slug against sports_teams; skips the ones already present in
+    # the curated set so they don't render twice.
+    curated_slugs = curated_with_subs.map { |t| t[:slug] }.to_set
+    db_followed_teams = SportsFollowsStore.for_kind(current_user_id, 'team')
+                                          .map { |f| f['value'] }
+                                          .reject { |slug| curated_slugs.include?(slug) }
+                                          .filter_map { |slug| SportsTeamsStore.find_by_slug(slug) }
+                                          .map { |row| db_team_as_curated(row) }
+    @teams_with_subs = curated_with_subs + db_followed_teams
     # STUFF.md #9 — score tiles at the top of /sports. Pull last
     # final per followed team from the structured-data layer (S3+S4)
     # and surface as score tiles. Empty when no follows or no
