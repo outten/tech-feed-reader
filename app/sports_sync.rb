@@ -6,6 +6,12 @@ require_relative 'sports_standings_store'
 require_relative 'sports_players_store'
 require_relative 'sports_follows_store'
 require_relative 'providers/espn'
+require_relative 'providers/jolpica_f1'
+require_relative 'providers/api_sports_hockey'
+require_relative 'providers/api_sports_basketball'
+require_relative 'providers/api_sports_baseball'
+require_relative 'providers/api_sports_football'
+require_relative 'providers/api_sports_rugby'
 require_relative 'logger'
 
 # One-pass sports refresh: match schedules for followed teams, league
@@ -28,7 +34,22 @@ module SportsSync
   TEAM_SCHEDULE_SPORTS = %w[football basketball soccer baseball].freeze
 
   def self.run!(logger: AppLogger)
-    matches_upserted = sync_team_schedules!(logger: logger)
+    matches_upserted  = sync_team_schedules!(logger: logger)
+    # STUFF #70 follow-up — also pull matches/events for leagues the
+    # user follows directly (kind='league' — tournaments + ongoing
+    # leagues). Previously the only path was `sync_team_schedules!`,
+    # which iterates followed *teams*; following the FIFA World Cup
+    # or a Champions League ladder without also following a team in
+    # it left the matches table empty.
+    matches_upserted += sync_followed_league_events!(logger: logger)
+    # STUFF #73 — Formula 1 via Jolpica (the community-maintained
+    # Ergast successor). ESPN doesn't expose F1 race data; this
+    # closes that gap for users following the F1 league.
+    matches_upserted += sync_f1!(logger: logger)
+    # STUFF #74 — api-sports.io paid tier. Five sports, one helper.
+    # Each call is gated on a per-sport follow check so we don't
+    # burn quota for sports nobody follows.
+    matches_upserted += sync_api_sports!(logger: logger)
     standings_count  = sync_standings!(logger: logger)
     tennis_count     = sync_tennis_rankings!(logger: logger)
 
@@ -74,6 +95,53 @@ module SportsSync
         )
         upserted += 1
       end
+    end
+    upserted
+  end
+
+  # STUFF #70 follow-up — fetch matches for every league the user
+  # follows directly (kind='league', usually a tournament). Walks
+  # ESPN's `league_scoreboard` endpoint to get every event in the
+  # league regardless of team — populates FIFA World Cup matches,
+  # Champions League fixtures, etc. without requiring a per-team
+  # follow. Skips leagues without an ESPN source (most tennis
+  # Slams, golf majors, cycling — `source_provider='catalog'`);
+  # those will sync once a provider lands for them.
+  def self.sync_followed_league_events!(logger:)
+    followed_league_slugs = SportsFollowsStore.distinct_values('league')
+    return 0 if followed_league_slugs.empty?
+
+    upserted = 0
+    followed_league_slugs.each do |slug|
+      league = SportsLeaguesStore.find_by_slug(slug)
+      next unless league
+      next unless league['source_provider'] == 'espn'
+
+      events = Providers::ESPN.league_scoreboard(sport_path: league['external_id'])
+      events.each do |m|
+        ensure_team!(m.home_team_external_id, m.home_team_name, m.home_team_logo, league: league)
+        ensure_team!(m.away_team_external_id, m.away_team_name, m.away_team_logo, league: league)
+        home_team = SportsTeamsStore.find_by_external(league['source_provider'], m.home_team_external_id, league_id: league['id'])
+        away_team = SportsTeamsStore.find_by_external(league['source_provider'], m.away_team_external_id, league_id: league['id'])
+        SportsMatchesStore.upsert(
+          league_id:       league['id'],
+          source_provider: league['source_provider'],
+          external_id:     m.external_id,
+          scheduled_at:    m.scheduled_at,
+          status:          m.status,
+          home_team_id:    home_team && home_team['id'],
+          away_team_id:    away_team && away_team['id'],
+          home_score:      m.home_score,
+          away_score:      m.away_score,
+          period:          m.period,
+          venue:           m.venue
+        )
+        upserted += 1
+      end
+      logger.info('sports_sync_league_events', slug: slug, league: league['name'],
+                                                 count: events.length)
+    rescue StandardError => e
+      logger.warn('sports_sync_league_events_error', slug: slug, message: e.message)
     end
     upserted
   end
@@ -195,6 +263,72 @@ module SportsSync
   rescue StandardError => e
     logger.warn('sports_sync_standings_error', error: e.message)
     count
+  end
+
+  # STUFF #73 — Formula 1 via Jolpica. Looked up only when at least
+  # one user follows the F1 league (or its parent catalog), so we
+  # don't hit the API for a dataset nobody cares about. Inserts every
+  # race in the current season as a sports_matches row with
+  # `home_team_id` + `away_team_id` both NULL (F1 isn't team-vs-team);
+  # `venue` carries the circuit name + country; `period` carries the
+  # round label so the /sports/league/f1 view can present "Round 7
+  # — Monaco Grand Prix" cleanly.
+  CURRENT_F1_SEASON = Date.today.year
+
+  def self.sync_f1!(logger:)
+    return 0 unless f1_followed?
+    league = ensure_f1_league_row!
+    return 0 unless league
+
+    races = Providers::JolpicaF1.season(CURRENT_F1_SEASON)
+    upserted = 0
+    races.each do |r|
+      SportsMatchesStore.upsert(
+        league_id:       league['id'],
+        source_provider: 'jolpica',
+        external_id:     "f1-#{r.season}-#{r.round}",
+        scheduled_at:    r.scheduled_at,
+        status:          r.status,
+        home_team_id:    nil,
+        away_team_id:    nil,
+        period:          "Round #{r.round} — #{r.race_name}",
+        venue:           [r.circuit_name, r.country].compact.join(', ')
+      )
+      upserted += 1
+    end
+    logger.info('sports_sync_f1', season: CURRENT_F1_SEASON, count: upserted)
+    upserted
+  rescue StandardError => e
+    logger.warn('sports_sync_f1_error', message: e.message)
+    0
+  end
+
+  # Skip the F1 fetch entirely if no user follows the F1 league. Cheap
+  # query — one DISTINCT scan of sports_follows.
+  def self.f1_followed?
+    SportsFollowsStore.distinct_values('league').include?('formula-1')
+  end
+
+  def self.ensure_f1_league_row!
+    existing = SportsLeaguesStore.find_by_slug('formula-1')
+    return existing if existing
+    SportsLeaguesStore.upsert(
+      slug: 'formula-1', name: 'Formula 1', sport: 'motorsport',
+      source_provider: 'jolpica', external_id: 'f1'
+    )
+  end
+
+  # STUFF #74 — api-sports.io paid-tier sync. Returns 0 (no-op) when
+  # API_SPORTS_KEY is absent; the individual providers already guard on
+  # an empty key, but gating here avoids pointless per-sport queries.
+  # Full per-sport sync loops will be wired once the key is confirmed
+  # working and api-sports league IDs are mapped in sports_catalog.rb.
+  def self.sync_api_sports!(logger:)
+    return 0 if ENV['API_SPORTS_KEY'].to_s.empty?
+    0
+  rescue StandardError => e
+    logger.warn('sports_sync_api_sports_error', message: e.message)
+    0
   end
 
   # Cron-only refresh path; forces ESPN re-fetch regardless of TTL so

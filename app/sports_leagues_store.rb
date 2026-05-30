@@ -58,4 +58,23 @@ module SportsLeaguesStore
   def count
     db.execute('SELECT COUNT(*) AS c FROM sports_leagues').first['c']
   end
+
+  # STUFF #73 — set the catalog-time Wikipedia article title on a
+  # league (so the Wikipedia provider knows which page to fetch).
+  # Idempotent.
+  def set_wikipedia_title!(id, title)
+    db.execute('UPDATE sports_leagues SET wikipedia_title = ? WHERE id = ?', [title.to_s, id])
+    find(id)
+  end
+
+  # STUFF #73 — cache the Wikipedia summary JSON + timestamp.
+  # Called by Providers::Wikipedia.refresh_for_league once per TTL.
+  def set_wikipedia_summary!(id, summary_json, now: Time.now)
+    db.execute(<<~SQL, [summary_json, now.utc.iso8601, id])
+      UPDATE sports_leagues
+      SET wikipedia_summary = ?, wikipedia_summary_fetched_at = ?
+      WHERE id = ?
+    SQL
+    find(id)
+  end
 end

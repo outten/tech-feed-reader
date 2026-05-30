@@ -76,3 +76,110 @@
     </section>
   <% end %>
 <% end %>
+
+<%# STUFF #73 — Wikipedia summary. Renders only when the league
+    has a wikipedia_title in the catalog AND the fetch succeeded.
+    Cached on the row for 24h; the route handler calls refresh
+    on demand. %>
+<% if @wikipedia && @wikipedia['extract'].to_s != '' %>
+  <section class="sports-league-wikipedia" aria-label="About this competition">
+    <h3>About</h3>
+    <div class="sports-league-wikipedia-body">
+      <% if @wikipedia['thumbnail_url'] && !@wikipedia['thumbnail_url'].to_s.empty? %>
+        <img class="sports-league-wikipedia-thumb"
+             src="<%= h(@wikipedia['thumbnail_url']) %>"
+             alt="" loading="lazy">
+      <% end %>
+      <div class="sports-league-wikipedia-text">
+        <p><%= h(@wikipedia['extract']) %></p>
+        <% if @wikipedia['page_url'] %>
+          <p class="subtitle">
+            <a href="<%= h(@wikipedia['page_url']) %>" target="_blank" rel="noopener noreferrer">
+              Read on Wikipedia &rarr;
+            </a>
+          </p>
+        <% end %>
+      </div>
+    </div>
+  </section>
+<% end %>
+
+<%# STUFF #70 follow-up — fixtures + results pulled from
+    sports_matches via SportsSync.sync_followed_league_events!
+    Sections only render when there's data, so a catalog-source
+    tournament without ESPN integration (e.g. tennis Slams)
+    keeps the standings-empty state above and stays quiet here. %>
+<% if (@upcoming_matches || []).any? %>
+  <section class="benchmark-section">
+    <h3>Upcoming fixtures</h3>
+    <ul class="whats-on-matches">
+      <% @upcoming_matches.each do |m| %>
+        <% home = (@teams_by_id || {})[m['home_team_id']] %>
+        <% away = (@teams_by_id || {})[m['away_team_id']] %>
+        <li class="whats-on-match">
+          <span class="whats-on-time">
+            <% if m['scheduled_at'] %>
+              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%a %b %-d %-l:%M %p') rescue m['scheduled_at'] %>
+            <% else %>
+              TBD
+            <% end %>
+          </span>
+          <span class="whats-on-matchup">
+            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>TBD<% end %>
+            <span class="muted">@</span>
+            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>TBD<% end %>
+          </span>
+          <% if m['venue'] && !m['venue'].to_s.empty? %>
+            <span class="muted whats-on-league"><%= h(m['venue']) %></span>
+          <% end %>
+          <% if m['status'].to_s == 'live' %>
+            <span class="badge live-badge" title="Match is live now">LIVE</span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<% if (@recent_finals || []).any? %>
+  <section class="benchmark-section">
+    <h3>Recent results</h3>
+    <ul class="whats-on-matches">
+      <% @recent_finals.each do |m| %>
+        <% home = (@teams_by_id || {})[m['home_team_id']] %>
+        <% away = (@teams_by_id || {})[m['away_team_id']] %>
+        <li class="whats-on-match">
+          <span class="whats-on-time">
+            <% if m['scheduled_at'] %>
+              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%b %-d') rescue m['scheduled_at'] %>
+            <% end %>
+          </span>
+          <span class="whats-on-matchup">
+            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>—<% end %>
+            <strong><%= m['away_score'] || '—' %></strong>
+            <span class="muted">@</span>
+            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>—<% end %>
+            <strong><%= m['home_score'] || '—' %></strong>
+          </span>
+          <span class="muted whats-on-league">FT</span>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<%# Empty state — when standings + fixtures + results are all
+    empty (catalog-source tournament, off-season league, never-
+    synced league). %>
+<% if @standings_groups.empty? && (@upcoming_matches || []).empty? && (@recent_finals || []).empty? %>
+  <div class="empty-state">
+    <p>
+      No live data synced for <strong><%= h(@league['name']) %></strong> yet.
+      <% if @league['source_provider'] == 'espn' %>
+        Run <code>make sync-sports</code> on the server (the cron also fires nightly); fixtures + standings populate when the tournament is in season.
+      <% else %>
+        This catalog-source tournament doesn't have a live-data provider wired up yet — articles mentioning <strong><%= h(@league['name']) %></strong> are surfaced via your feed subscriptions in the meantime.
+      <% end %>
+    </p>
+  </div>
+<% end %>

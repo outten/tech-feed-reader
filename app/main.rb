@@ -39,6 +39,7 @@ require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'providers/itunes_lookup'
 require_relative 'providers/youtube_channel_resolver'
+require_relative 'providers/wikipedia'
 require_relative 'auth'
 
 # Phase A1 (consumer auth) — load .env in dev for SESSION_SECRET
@@ -708,7 +709,7 @@ class TechFeedReader < Sinatra::Base
       catalog_league = SportsCatalog.all_leagues.find { |lg| lg[:slug] == league_slug.to_s }
       return nil unless catalog_league
 
-      SportsLeaguesStore.upsert(
+      row = SportsLeaguesStore.upsert(
         slug:            catalog_league[:slug],
         name:            catalog_league[:name],
         sport:           catalog_league[:sport],
@@ -716,6 +717,16 @@ class TechFeedReader < Sinatra::Base
         external_id:     catalog_league[:external_id]     || catalog_league[:slug],
         country:         catalog_league[:country]
       )
+      # STUFF #73 — stamp the Wikipedia title from the catalog so the
+      # summary provider can pick it up. Only writes when the catalog
+      # has a mapping AND the row doesn't already carry one (lets a
+      # human override stick).
+      wiki = SportsCatalog.wikipedia_title_for(league_slug)
+      if wiki && row['wikipedia_title'].to_s.empty?
+        SportsLeaguesStore.set_wikipedia_title!(row['id'], wiki)
+        row = SportsLeaguesStore.find(row['id'])
+      end
+      row
     end
 
     # STUFF #52.1 — catalog players (notable-player chips on team
@@ -2412,13 +2423,47 @@ class TechFeedReader < Sinatra::Base
     @league = SportsLeaguesStore.find_by_slug(slug)
     halt 404, erb(:article_not_found) unless @league
 
+    # STUFF #73 — stamp the Wikipedia title if catalog has one and
+    # the row hasn't been seeded yet (catches leagues materialised
+    # before the WIKIPEDIA_TITLES map existed).
+    if @league['wikipedia_title'].to_s.empty?
+      wiki = SportsCatalog.wikipedia_title_for(slug)
+      if wiki
+        SportsLeaguesStore.set_wikipedia_title!(@league['id'], wiki)
+        @league = SportsLeaguesStore.find(@league['id'])
+      end
+    end
+    # Refresh the Wikipedia summary cache (no-op if fresh OR if no
+    # title is set). 24h TTL — see Providers::Wikipedia.
+    begin
+      @league = Providers::Wikipedia.refresh_for_league(@league)
+    rescue StandardError => e
+      AppLogger.warn('wikipedia_refresh_failed', league: @league['slug'], message: e.message)
+    end
+    @wikipedia = nil
+    if @league['wikipedia_summary'].to_s != ''
+      @wikipedia = JSON.parse(@league['wikipedia_summary']) rescue nil
+    end
+
     @page_title  = "#{@league['name']} — Standings"
     rows = SportsStandingsStore.for_league(@league['id'])
     @standings_groups = rows.group_by { |r| r['group_name'] }
 
-    # Resolve team rows so we can show name + logo + slug. Cheap —
-    # there are only ~30 teams per league.
-    team_ids = rows.map { |r| r['team_id'] }.uniq
+    # STUFF #70 follow-up — load matches for the league so the page
+    # surfaces fixtures + results, not just the standings table. Pulls
+    # whatever sync has populated; tournaments with `source_provider=
+    # 'catalog'` (most tennis Slams, golf majors, cycling) stay empty
+    # until a provider lands.
+    @upcoming_matches = SportsMatchesStore.upcoming_for_league(@league['id'], limit: 20)
+    @recent_finals    = SportsMatchesStore.recent_finals_for_league(@league['id'], limit: 12)
+
+    # Build a teams_by_id that covers both the standings teams and any
+    # team referenced by the new match rows (some matches may involve
+    # teams not in the standings — e.g. group-stage opponents who
+    # haven't been added to the table yet).
+    team_ids  = rows.map { |r| r['team_id'] }
+    team_ids += (@upcoming_matches + @recent_finals).flat_map { |m| [m['home_team_id'], m['away_team_id']] }
+    team_ids  = team_ids.compact.uniq
     @teams_by_id = team_ids.each_with_object({}) do |tid, h|
       h[tid] = SportsTeamsStore.find(tid)
     end

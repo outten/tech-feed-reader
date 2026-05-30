@@ -529,6 +529,7 @@ module SportsCatalog
         {
           slug: 'fifa-womens-world', name: "FIFA Women's World Cup", sport: 'soccer', women: true,
           region: 'global', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'soccer/fifa.wwc',
           blurb: 'Women\'s World Cup — every four years.',
           teams: []
         },
@@ -1450,6 +1451,171 @@ module SportsCatalog
           teams: []
         }
       ]
+    },
+
+    # STUFF #72 — cycling (road). UCI WorldTour seasons + Grand Tours
+    # + Monuments + Worlds. Players land on each team's :players
+    # chips, same pattern as NBA / tennis.
+    'cycling' => {
+      name: 'Cycling',
+      emoji: '🚴',
+      region: 'global',
+      blurb: 'Road racing — Grand Tours + Monuments. Men\'s + women\'s WorldTour.',
+      leagues: [
+        {
+          slug: 'uci-worldtour-men', name: 'UCI WorldTour (Men)', sport: 'cycling', women: false,
+          region: 'global', country: nil,
+          blurb: 'Top tier of men\'s professional road cycling.',
+          teams: [
+            { slug: 'uae-team-emirates',  name: 'UAE Team Emirates',           short_name: 'UAE Emirates',
+              location: 'UAE',
+              players: ['Tadej Pogačar', 'Adam Yates', 'João Almeida'] },
+            { slug: 'visma-lease-a-bike', name: 'Visma | Lease a Bike',        short_name: 'Visma',
+              location: 'Netherlands',
+              players: ['Jonas Vingegaard', 'Wout van Aert', 'Sepp Kuss'] },
+            { slug: 'ineos-grenadiers',   name: 'INEOS Grenadiers',            short_name: 'INEOS',
+              location: 'United Kingdom',
+              players: ['Filippo Ganna', 'Carlos Rodríguez', 'Egan Bernal'] },
+            { slug: 'soudal-quick-step',  name: 'Soudal Quick-Step',           short_name: 'Soudal QS',
+              location: 'Belgium',
+              players: ['Remco Evenepoel', 'Mikel Landa', 'Tim Merlier'] },
+            { slug: 'lidl-trek',          name: 'Lidl-Trek',                   short_name: 'Lidl-Trek',
+              location: 'United States',
+              players: ['Mads Pedersen', 'Jonathan Milan', 'Giulio Ciccone'] },
+            { slug: 'red-bull-bora',      name: 'Red Bull–BORA–hansgrohe',     short_name: 'Red Bull-Bora',
+              location: 'Germany',
+              players: ['Primož Roglič', 'Aleksandr Vlasov'] },
+            { slug: 'alpecin-deceuninck', name: 'Alpecin-Deceuninck',          short_name: 'Alpecin',
+              location: 'Belgium',
+              players: ['Mathieu van der Poel', 'Jasper Philipsen'] },
+            { slug: 'movistar-cycling',   name: 'Movistar Team',               short_name: 'Movistar',
+              location: 'Spain',
+              players: ['Enric Mas', 'Nairo Quintana'] }
+          ]
+        },
+        {
+          slug: 'uci-worldtour-women', name: "UCI Women's WorldTour", sport: 'cycling', women: true,
+          region: 'global', country: nil,
+          blurb: 'Top tier of women\'s professional road cycling.',
+          teams: [
+            { slug: 'sd-worx-protime',           name: 'Team SD Worx–ProTime',  short_name: 'SD Worx',
+              location: 'Netherlands',
+              players: ['Demi Vollering', 'Lotte Kopecky', 'Lorena Wiebes'] },
+            { slug: 'visma-lease-a-bike-women',  name: 'Visma | Lease a Bike (Women)', short_name: 'Visma (W)',
+              location: 'Netherlands',
+              players: ['Marianne Vos', 'Riejanne Markus'] },
+            { slug: 'lidl-trek-women',           name: 'Lidl-Trek (Women)',     short_name: 'Lidl-Trek (W)',
+              location: 'United States',
+              players: ['Elisa Longo Borghini', 'Lizzie Deignan'] },
+            { slug: 'canyon-sram',               name: 'Canyon//SRAM Racing',   short_name: 'Canyon-SRAM',
+              location: 'Germany',
+              players: ['Kasia Niewiadoma', 'Chloé Dygert'] },
+            { slug: 'movistar-cycling-women',    name: 'Movistar Team Women',   short_name: 'Movistar (W)',
+              location: 'Spain',
+              players: ['Liane Lippert', 'Emma Norsgaard'] }
+          ]
+        },
+
+        # Grand Tours
+        {
+          slug: 'tour-de-france', name: 'Tour de France', sport: 'cycling', women: false,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: 'The biggest race in cycling — July, 3 weeks, 21 stages.',
+          teams: []
+        },
+        {
+          slug: 'giro-italia', name: "Giro d'Italia", sport: 'cycling', women: false,
+          region: 'global', country: 'Italy', format: :tournament,
+          blurb: "Italy's Grand Tour — May, 3 weeks.",
+          teams: []
+        },
+        {
+          slug: 'vuelta-espana', name: 'Vuelta a España', sport: 'cycling', women: false,
+          region: 'global', country: 'Spain', format: :tournament,
+          blurb: "Spain's Grand Tour — August/September.",
+          teams: []
+        },
+        {
+          slug: 'tour-de-france-femmes', name: 'Tour de France Femmes', sport: 'cycling', women: true,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: "Women's Tour de France — August. Restarted 2022 after a long hiatus.",
+          teams: []
+        },
+        {
+          slug: 'vuelta-femenina', name: 'La Vuelta Femenina', sport: 'cycling', women: true,
+          region: 'global', country: 'Spain', format: :tournament,
+          blurb: "Spain's women's stage race — May.",
+          teams: []
+        },
+
+        # Monuments — the five most prestigious one-day races
+        {
+          slug: 'milan-san-remo', name: 'Milan–San Remo', sport: 'cycling', women: false,
+          region: 'global', country: 'Italy', format: :tournament,
+          blurb: 'Monument — March. Longest one-day Monument (~300km). "La Classicissima".',
+          teams: []
+        },
+        {
+          slug: 'tour-of-flanders', name: 'Tour of Flanders', sport: 'cycling', women: false,
+          region: 'global', country: 'Belgium', format: :tournament,
+          blurb: 'Monument — April. Belgian classic over cobbled climbs ("De Ronde").',
+          teams: []
+        },
+        {
+          slug: 'paris-roubaix', name: 'Paris-Roubaix', sport: 'cycling', women: false,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: 'Monument — April. "Hell of the North"; punishing cobbled sectors finishing at the Roubaix Velodrome.',
+          teams: []
+        },
+        {
+          slug: 'liege-bastogne-liege', name: 'Liège–Bastogne–Liège', sport: 'cycling', women: false,
+          region: 'global', country: 'Belgium', format: :tournament,
+          blurb: 'Monument — April. Oldest of the Monuments; hilly Ardennes.',
+          teams: []
+        },
+        {
+          slug: 'il-lombardia', name: 'Il Lombardia', sport: 'cycling', women: false,
+          region: 'global', country: 'Italy', format: :tournament,
+          blurb: 'Monument — October. "Race of the Falling Leaves"; closes the road season.',
+          teams: []
+        },
+
+        # World championships
+        {
+          slug: 'uci-road-worlds', name: 'UCI Road World Championships', sport: 'cycling', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Annual world championship — September. Rainbow jersey at stake.',
+          teams: []
+        }
+      ]
+    },
+
+    # STUFF #74 — hockey. ESPN doesn't cover hockey at all; api-sports
+    # provides NHL fixtures + standings. Teams populated on demand by
+    # the sync (which calls ensure_team! per game's home/away pair).
+    'hockey' => {
+      name: 'Hockey',
+      emoji: '🏒',
+      region: 'global',
+      blurb: 'NHL + KHL via api-sports.io. Teams populate on first sync.',
+      leagues: [
+        {
+          slug: 'nhl', name: 'NHL', sport: 'hockey', women: false,
+          region: 'us', country: 'US',
+          source_provider: 'api-sports', external_id: 'hockey/nhl',
+          api_sports_league_id: 57,
+          blurb: 'National Hockey League — 32 teams across the US and Canada.',
+          teams: []
+        },
+        {
+          slug: 'khl', name: 'KHL', sport: 'hockey', women: false,
+          region: 'global', country: nil,
+          source_provider: 'api-sports', external_id: 'hockey/khl',
+          api_sports_league_id: 31,
+          blurb: 'Kontinental Hockey League — Russia + neighbouring countries.',
+          teams: []
+        }
+      ]
     }
   }.freeze
 
@@ -1504,5 +1670,77 @@ module SportsCatalog
   # follow handler to materialize the row from any sport's catalog.
   def find_tournament(slug)
     all_leagues.find { |lg| lg[:slug] == slug.to_s && lg[:format] == :tournament }
+  end
+
+  # STUFF #73 — map catalog slug → Wikipedia article title. Set on
+  # the sports_leagues row by ensure_catalog_league_in_db so the
+  # Wikipedia summary provider knows which page to fetch. Add a
+  # mapping here to expand coverage incrementally — leagues without
+  # a mapping just skip the summary fetch (the league page still
+  # renders, sans the Wikipedia section).
+  WIKIPEDIA_TITLES = {
+    # Soccer tournaments
+    'fifa-world'              => 'FIFA World Cup',
+    'fifa-womens-world'       => "FIFA Women's World Cup",
+    'uefa-euro'               => 'UEFA European Championship',
+    'copa-america'            => 'Copa América',
+    'uefa-champions-league'   => 'UEFA Champions League',
+    # Rugby
+    'mens-rugby-world'        => 'Rugby World Cup',
+    'womens-rugby-world'      => "Women's Rugby World Cup",
+    # Tennis Slams
+    'australian-open'         => 'Australian Open',
+    'roland-garros'           => 'French Open',
+    'wimbledon'               => 'Wimbledon Championships',
+    'us-open-tennis'          => 'US Open (tennis)',
+    # Tennis Masters / Finals
+    'indian-wells'            => 'Indian Wells Masters',
+    'miami-open'              => 'Miami Open (tennis)',
+    'monte-carlo-masters'     => 'Monte-Carlo Masters',
+    'madrid-open'             => 'Madrid Open (tennis)',
+    'italian-open'            => 'Italian Open (tennis)',
+    'shanghai-masters'        => 'Shanghai Masters',
+    'paris-masters'           => 'Paris Masters',
+    'atp-finals'              => 'ATP Finals',
+    'wta-finals'              => 'WTA Finals',
+    # Cricket
+    'icc-cricket-world-cup'   => 'Cricket World Cup',
+    'icc-womens-world-cup'    => "Women's Cricket World Cup",
+    'icc-t20-world-cup'       => 'ICC Men\'s T20 World Cup',
+    'the-ashes'               => 'The Ashes',
+    # Golf majors + team events
+    'the-masters'             => 'Masters Tournament',
+    'pga-championship'        => 'PGA Championship',
+    'us-open-golf'            => 'U.S. Open (golf)',
+    'the-open'                => 'The Open Championship',
+    'ryder-cup'               => 'Ryder Cup',
+    'solheim-cup'             => 'Solheim Cup',
+    # Motorsport — single events
+    'le-mans-24'              => '24 Hours of Le Mans',
+    'indy-500'                => 'Indianapolis 500',
+    'daytona-500'             => 'Daytona 500',
+    'monaco-gp'               => 'Monaco Grand Prix',
+    'dakar-rally'             => 'Dakar Rally',
+    # Cycling
+    'tour-de-france'          => 'Tour de France',
+    'giro-italia'             => "Giro d'Italia",
+    'vuelta-espana'           => 'Vuelta a España',
+    'tour-de-france-femmes'   => 'Tour de France Femmes',
+    'milan-san-remo'          => 'Milan–San Remo',
+    'tour-of-flanders'        => 'Tour of Flanders',
+    'paris-roubaix'           => 'Paris–Roubaix',
+    'liege-bastogne-liege'    => 'Liège–Bastogne–Liège',
+    'il-lombardia'            => 'Il Lombardia',
+    'uci-road-worlds'         => 'UCI Road World Championships',
+    # Horse Racing
+    'us-triple-crown'         => 'Triple Crown of Thoroughbred Racing',
+    'melbourne-cup'           => 'Melbourne Cup',
+    'prix-arc-de-triomphe'    => "Prix de l'Arc de Triomphe",
+    # F1 (the league itself, since users follow F1 directly)
+    'formula-1'               => 'Formula One'
+  }.freeze
+
+  def wikipedia_title_for(slug)
+    WIKIPEDIA_TITLES[slug.to_s]
   end
 end
