@@ -1,5 +1,6 @@
 require 'date'
 require_relative 'database'
+require_relative 'sports_catalog'
 require_relative 'sports_leagues_store'
 require_relative 'sports_teams_store'
 require_relative 'sports_matches_store'
@@ -319,17 +320,87 @@ module SportsSync
     )
   end
 
-  # STUFF #74 — api-sports.io paid-tier sync. Returns 0 (no-op) when
-  # API_SPORTS_KEY is absent; the individual providers already guard on
-  # an empty key, but gating here avoids pointless per-sport queries.
-  # Full per-sport sync loops will be wired once the key is confirmed
-  # working and api-sports league IDs are mapped in sports_catalog.rb.
+  # STUFF #74 — api-sports.io paid-tier sync.
+  # Walks every league the user follows whose source_provider is
+  # 'api-sports', resolves the numeric league_id from the catalog,
+  # routes to the right sport provider, and upserts matches. Season
+  # is resolved by trying current_year-1 then current_year-2 so the
+  # sync stays live even when the API lags a season behind.
+  API_SPORTS_PROVIDERS = {
+    'hockey'     => Providers::ApiSportsHockey,
+    'rugby'      => Providers::ApiSportsRugby,
+    'baseball'   => Providers::ApiSportsBaseball,
+    'basketball' => Providers::ApiSportsBasketball,
+    'football'   => Providers::ApiSportsFootball
+  }.freeze
+
   def self.sync_api_sports!(logger:)
     return 0 if ENV['API_SPORTS_KEY'].to_s.empty?
-    0
+
+    followed_slugs = SportsFollowsStore.distinct_values('league')
+    return 0 if followed_slugs.empty?
+
+    total = 0
+    followed_slugs.each do |slug|
+      league = SportsLeaguesStore.find_by_slug(slug)
+      next unless league
+      next unless league['source_provider'] == 'api-sports'
+
+      catalog_entry = SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug }
+      api_league_id = catalog_entry&.dig(:api_sports_league_id)
+      next unless api_league_id
+
+      provider = API_SPORTS_PROVIDERS[league['sport']]
+      next unless provider
+
+      # Try current season then one year back — api-sports often lags
+      # one season. Whichever has data wins.
+      games = []
+      api_sports_seasons_to_try.each do |season|
+        games = provider.fixtures(league_id: api_league_id, season: season)
+        break unless games.empty?
+      end
+
+      games.each do |g|
+        ensure_team!(g[:home_team_external_id], g[:home_team_name],
+                     g[:home_team_logo], league: league)
+        ensure_team!(g[:away_team_external_id], g[:away_team_name],
+                     g[:away_team_logo], league: league)
+        home = SportsTeamsStore.find_by_external(
+          'api-sports', g[:home_team_external_id], league_id: league['id']
+        )
+        away = SportsTeamsStore.find_by_external(
+          'api-sports', g[:away_team_external_id], league_id: league['id']
+        )
+        SportsMatchesStore.upsert(
+          league_id:       league['id'],
+          source_provider: 'api-sports',
+          external_id:     "#{league['sport']}-#{g[:external_id]}",
+          scheduled_at:    g[:scheduled_at],
+          status:          g[:status],
+          home_team_id:    home&.dig('id'),
+          away_team_id:    away&.dig('id'),
+          home_score:      g[:home_score],
+          away_score:      g[:away_score],
+          period:          nil,
+          venue:           g[:venue]
+        )
+        total += 1
+      end
+      logger.info('sports_sync_api_sports', slug: slug, sport: league['sport'],
+                                             count: games.length)
+    rescue StandardError => e
+      logger.warn('sports_sync_api_sports_league_error', slug: slug, message: e.message)
+    end
+    total
   rescue StandardError => e
     logger.warn('sports_sync_api_sports_error', message: e.message)
     0
+  end
+
+  def self.api_sports_seasons_to_try
+    year = Date.today.year
+    [year - 1, year - 2]
   end
 
   # Cron-only refresh path; forces ESPN re-fetch regardless of TTL so

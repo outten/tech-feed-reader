@@ -586,6 +586,9 @@ module SportsCatalog
         {
           slug: 'six-nations', name: 'Six Nations', sport: 'rugby', women: false,
           region: 'europe', country: nil,
+          source_provider: 'api-sports', external_id: 'rugby/six-nations',
+          api_sports_league_id: 51,
+          blurb: 'Annual European international championship — England, France, Ireland, Italy, Scotland, Wales.',
           teams: [
             { slug: 'ireland-rugby',  name: 'Ireland',  short_name: 'Ireland',  location: 'Ireland' },
             { slug: 'england-rugby',  name: 'England',  short_name: 'England',  location: 'England' },
@@ -594,6 +597,22 @@ module SportsCatalog
             { slug: 'wales-rugby',    name: 'Wales',    short_name: 'Wales',    location: 'Wales' },
             { slug: 'italy-rugby',    name: 'Italy',    short_name: 'Italy',    location: 'Italy' }
           ]
+        },
+        {
+          slug: 'super-rugby', name: 'Super Rugby Pacific', sport: 'rugby', women: false,
+          region: 'asia-pacific', country: nil,
+          source_provider: 'api-sports', external_id: 'rugby/super-rugby',
+          api_sports_league_id: 71,
+          blurb: '12 teams from Australia, New Zealand, Fiji, Argentina, Japan.',
+          teams: []
+        },
+        {
+          slug: 'urc', name: 'United Rugby Championship', sport: 'rugby', women: false,
+          region: 'europe', country: nil,
+          source_provider: 'api-sports', external_id: 'rugby/urc',
+          api_sports_league_id: 76,
+          blurb: '16 teams from Ireland, Scotland, Wales, South Africa, Italy.',
+          teams: []
         },
         {
           slug: 'womens-rugby-world', name: "Women's Rugby World Cup", sport: 'rugby', women: true,
@@ -817,6 +836,8 @@ module SportsCatalog
         {
           slug: 'npb', name: 'Nippon Professional Baseball', sport: 'baseball', women: false,
           region: 'asia', country: 'JP',
+          source_provider: 'api-sports', external_id: 'baseball/npb',
+          api_sports_league_id: 2,
           blurb: "Japan's top professional league.",
           teams: [
             { slug: 'npb-giants',  name: 'Yomiuri Giants',         short_name: 'Giants',
@@ -832,6 +853,8 @@ module SportsCatalog
         {
           slug: 'kbo', name: 'Korea Baseball Organization', sport: 'baseball', women: false,
           region: 'asia', country: 'KR',
+          source_provider: 'api-sports', external_id: 'baseball/kbo',
+          api_sports_league_id: 5,
           blurb: "South Korea's top professional league.",
           teams: [
             { slug: 'kbo-doosan',  name: 'Doosan Bears',     short_name: 'Bears',

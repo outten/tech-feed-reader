@@ -1088,7 +1088,7 @@ Given that ESPN is limited with information, we need to identify sources of info
 
 Full local suite: **1539 / 0** (13 new examples across the two provider specs + cross-cutting test coverage that exercises the refreshed `/sports/league/:slug` route).
 
-## [ ] 74. Sports Data — Phase B (API-Sports paid tier)
+## [x] 74. Sports Data — Phase B (API-Sports paid tier)
 
 Phase B of STUFF #73 — close the gaps Phase A left (NHL, golf leaderboards, cricket live scores, lower-tier soccer leagues, MMA) via a paid multi-sport data API.
 
@@ -1124,6 +1124,16 @@ Phase B of STUFF #73 — close the gaps Phase A left (NHL, golf leaderboards, cr
 
 API-Sports' rate limit is per-day across the account. The daily sync (`make sync-sports`) bundled across ~6 sports will burn maybe 200-500 requests per run if we're thoughtful about caching and only sync sports that have at least one follower. The $10/mo Pro plan gives us 15× headroom for ad-hoc page-load fetches if we add any. If usage spikes, the next tier is $25/mo for 75,000/day.
 
-### Defer until ready
+**Shipped.** Five sport providers wired into `SportsSync.run!` via `sync_api_sports!`. Season resolution tries `Date.today.year - 1` first, then `year - 2`, so the sync stays live even when the API lags a season (the provider returns an informational error for future seasons; the fallback picks up the most recent complete season automatically).
 
-Not blocking anything Phase A shipped. Comfortable to defer indefinitely if the user decides ESPN + Jolpica + Wikipedia is enough coverage in practice. Just leave the placeholder + signup instructions here; we can pick it up later by following the operator step above.
+**What landed:**
+- `Providers::ApiSportsHockey` — NHL (league 57) + KHL (league 31). Verified live: 1,503 NHL 2024-season games synced on first run.
+- `Providers::ApiSportsRugby` — Six Nations (51), Super Rugby Pacific (71), United Rugby Championship (76), Rugby Championship (85). League IDs corrected from pre-key estimates; verified via live endpoint.
+- `Providers::ApiSportsBaseball` — NPB (2), KBO (5). Both verified present in 2024 season.
+- `Providers::ApiSportsBasketball` + `Providers::ApiSportsFootball` — providers present and gated; catalog entries for additional soccer leagues and WNBA can be added as follow-ups.
+- `SportsCatalog` updated: Six Nations, Super Rugby Pacific, URC, NPB, KBO carry `source_provider: 'api-sports'` + `api_sports_league_id`.
+- `SportsSync` requires `sports_catalog` (was missing, caused NameError on first run).
+- Sync is follow-gated per league — zero API calls when no api-sports leagues are followed.
+- `API_SPORTS_KEY` absent → returns 0 immediately (safe for environments without the key).
+
+**Not covered (defer):** golf leaderboards (ESPN covers Masters/PGA via `football/golf`; no free-tier api-sports golf endpoint), MMA (niche), lower-tier soccer leagues (add catalog entries + api-sports football league IDs as needed).

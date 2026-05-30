@@ -11,10 +11,11 @@ module Providers
     include ApiSportsBase
     HOST = 'v1.rugby.api-sports.io'.freeze
 
-    SIX_NATIONS_LEAGUE_ID    = 4
-    SUPER_RUGBY_LEAGUE_ID    = 17
-    PREMIERSHIP_LEAGUE_ID    = 38
-    URC_LEAGUE_ID            = 39 # United Rugby Championship
+    SIX_NATIONS_LEAGUE_ID    = 51  # verified live 2024-05-30
+    SUPER_RUGBY_LEAGUE_ID    = 71
+    PREMIERSHIP_LEAGUE_ID    = 13  # Gallagher Premiership, England
+    URC_LEAGUE_ID            = 76  # United Rugby Championship
+    RUGBY_CHAMPIONSHIP_ID    = 85  # The Rugby Championship (southern hemisphere)
 
     module_function
 
