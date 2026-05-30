@@ -521,15 +521,40 @@ module SportsCatalog
         },
         {
           slug: 'fifa-world', name: 'FIFA World Cup', sport: 'soccer', women: false,
-          region: 'global', country: nil,
+          region: 'global', country: nil, format: :tournament,
           source_provider: 'espn', external_id: 'soccer/fifa.world',
           blurb: 'Men\'s World Cup — every four years.',
           teams: []  # No persistent team list; participants vary each cycle
         },
         {
           slug: 'fifa-womens-world', name: "FIFA Women's World Cup", sport: 'soccer', women: true,
-          region: 'global', country: nil,
+          region: 'global', country: nil, format: :tournament,
           blurb: 'Women\'s World Cup — every four years.',
+          teams: []
+        },
+        # STUFF #70 — major soccer tournaments. UEFA Euro + Copa America
+        # are the two biggest non-FIFA international competitions; both
+        # held every four years (offset two years from the FIFA cycle).
+        # UEFA Champions League is the premier annual club tournament.
+        {
+          slug: 'uefa-euro', name: 'UEFA European Championship', sport: 'soccer', women: false,
+          region: 'europe', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'soccer/uefa.euro',
+          blurb: "Europe's quadrennial men's national-team tournament.",
+          teams: []
+        },
+        {
+          slug: 'copa-america', name: 'Copa América', sport: 'soccer', women: false,
+          region: 'south-america', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'soccer/conmebol.america',
+          blurb: 'South America\'s quadrennial men\'s national-team tournament.',
+          teams: []
+        },
+        {
+          slug: 'uefa-champions-league', name: 'UEFA Champions League', sport: 'soccer', women: false,
+          region: 'europe', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'soccer/uefa.champions',
+          blurb: "Annual club-level tournament — Europe's biggest clubs.",
           teams: []
         }
       ]
@@ -571,7 +596,7 @@ module SportsCatalog
         },
         {
           slug: 'womens-rugby-world', name: "Women's Rugby World Cup", sport: 'rugby', women: true,
-          region: 'global', country: nil,
+          region: 'global', country: nil, format: :tournament,
           blurb: 'Every four years; growing fast.',
           teams: [
             { slug: 'black-ferns',    name: 'New Zealand', short_name: 'Black Ferns',
@@ -583,6 +608,15 @@ module SportsCatalog
             { slug: 'wrugby-canada',  name: 'Canada',      short_name: 'Canada',
               location: 'Canada' }
           ]
+        },
+        # STUFF #70 — Men's Rugby World Cup. Every four years; next
+        # cycle Australia 2027. Tournament-shape (no persistent team
+        # list — participants vary each cycle).
+        {
+          slug: 'mens-rugby-world', name: "Men's Rugby World Cup", sport: 'rugby', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Every four years; the premier men\'s international rugby competition.',
+          teams: []
         }
       ]
     },
@@ -624,6 +658,134 @@ module SportsCatalog
             { slug: 'tennis-rybakina', name: 'Elena Rybakina', short_name: 'Rybakina',
               location: 'Kazakhstan' }
           ]
+        },
+        # STUFF #70 — Grand Slam tournaments. Both tours play each
+        # Slam (men's + women's singles + doubles), so they're listed
+        # at the sport level rather than under ATP or WTA. ESPN's
+        # event-shaped tennis API (see /tennis/atp/scoreboard) covers
+        # them but doesn't fit our standings-table view — the
+        # follow-up "tennis bracket on /sports/league/:slug" is
+        # deferred. For now, following surfaces articles + adds the
+        # tournament to the user's "📅 Following tournaments" list.
+        {
+          slug: 'australian-open', name: 'Australian Open', sport: 'tennis', women: false,
+          region: 'global', country: 'Australia', format: :tournament,
+          blurb: 'First Grand Slam of the year — January, Melbourne.',
+          teams: []
+        },
+        {
+          slug: 'roland-garros', name: 'Roland Garros', sport: 'tennis', women: false,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: 'The French Open — May/June, Paris. Clay court.',
+          teams: []
+        },
+        {
+          slug: 'wimbledon', name: 'Wimbledon', sport: 'tennis', women: false,
+          region: 'global', country: 'United Kingdom', format: :tournament,
+          blurb: 'The Championships — June/July, London. Grass court.',
+          teams: []
+        },
+        {
+          slug: 'us-open-tennis', name: 'US Open (Tennis)', sport: 'tennis', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: 'Final Grand Slam of the year — August/September, New York. Hard court.',
+          teams: []
+        },
+        # STUFF #70 follow-up — ATP Masters 1000 + WTA 1000 (the tier
+        # below Grand Slams). Co-hosted events (Indian Wells, Miami,
+        # Madrid, Rome, Canada, Cincinnati) get one entry covering
+        # both tours since they share venue + week; tour-specific
+        # events listed separately. Year-end championships (ATP Finals,
+        # WTA Finals) close the calendar.
+        {
+          slug: 'indian-wells', name: 'Indian Wells (BNP Paribas Open)', sport: 'tennis', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: "ATP Masters 1000 + WTA 1000 — March, Indian Wells, CA. Outdoor hard court.",
+          teams: []
+        },
+        {
+          slug: 'miami-open', name: 'Miami Open', sport: 'tennis', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: "ATP Masters 1000 + WTA 1000 — March/April, Miami. Outdoor hard court.",
+          teams: []
+        },
+        {
+          slug: 'monte-carlo-masters', name: 'Monte-Carlo Masters', sport: 'tennis', women: false,
+          region: 'global', country: 'Monaco', format: :tournament,
+          blurb: "ATP Masters 1000 — April, Monaco. Clay court. (Men's only — no WTA equivalent.)",
+          teams: []
+        },
+        {
+          slug: 'madrid-open', name: 'Madrid Open', sport: 'tennis', women: false,
+          region: 'global', country: 'Spain', format: :tournament,
+          blurb: "ATP Masters 1000 + WTA 1000 — April/May, Madrid. Clay court.",
+          teams: []
+        },
+        {
+          slug: 'italian-open', name: 'Italian Open (Rome)', sport: 'tennis', women: false,
+          region: 'global', country: 'Italy', format: :tournament,
+          blurb: "ATP Masters 1000 + WTA 1000 — May, Rome. Clay court. Final Slam tune-up before Roland Garros.",
+          teams: []
+        },
+        {
+          slug: 'canadian-open', name: 'Canadian Open', sport: 'tennis', women: false,
+          region: 'global', country: 'Canada', format: :tournament,
+          blurb: "ATP Masters 1000 + WTA 1000 — August. Alternates Toronto / Montreal between the tours.",
+          teams: []
+        },
+        {
+          slug: 'cincinnati-open', name: 'Cincinnati Open', sport: 'tennis', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: "ATP Masters 1000 + WTA 1000 — August, Cincinnati. US Open warm-up.",
+          teams: []
+        },
+        {
+          slug: 'shanghai-masters', name: 'Shanghai Masters', sport: 'tennis', women: false,
+          region: 'global', country: 'China', format: :tournament,
+          blurb: "ATP Masters 1000 — October, Shanghai. (Men's only — WTA has Wuhan/Beijing in the Asian swing.)",
+          teams: []
+        },
+        {
+          slug: 'paris-masters', name: 'Paris Masters', sport: 'tennis', women: false,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: "ATP Masters 1000 — October/November, Paris (indoor). Final Masters event before ATP Finals.",
+          teams: []
+        },
+        {
+          slug: 'wta-dubai', name: 'Dubai Tennis Championships', sport: 'tennis', women: true,
+          region: 'global', country: 'UAE', format: :tournament,
+          blurb: "WTA 1000 — February. Alternates with Qatar Open as the early-season WTA 1000.",
+          teams: []
+        },
+        {
+          slug: 'wta-doha', name: 'Qatar Open (Doha)', sport: 'tennis', women: true,
+          region: 'global', country: 'Qatar', format: :tournament,
+          blurb: "WTA 1000 — February. Alternates with Dubai.",
+          teams: []
+        },
+        {
+          slug: 'wta-beijing', name: 'China Open (Beijing)', sport: 'tennis', women: true,
+          region: 'global', country: 'China', format: :tournament,
+          blurb: "WTA 1000 — September/October. Asian-swing flagship.",
+          teams: []
+        },
+        {
+          slug: 'wta-wuhan', name: 'Wuhan Open', sport: 'tennis', women: true,
+          region: 'global', country: 'China', format: :tournament,
+          blurb: "WTA 1000 — October. Hard court; paired with Beijing in the Asian swing.",
+          teams: []
+        },
+        {
+          slug: 'atp-finals', name: 'ATP Finals', sport: 'tennis', women: false,
+          region: 'global', country: 'Italy', format: :tournament,
+          blurb: "Year-end championship — November. Top 8 men's singles + doubles. Indoor hard court.",
+          teams: []
+        },
+        {
+          slug: 'wta-finals', name: 'WTA Finals', sport: 'tennis', women: true,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "Year-end championship — November. Top 8 women's singles + doubles. Indoor hard court.",
+          teams: []
         }
       ]
     },
@@ -761,6 +923,51 @@ module SportsCatalog
             { slug: 'wec-cadillac', name: 'Cadillac Hertz Team Jota', short_name: 'Cadillac',
               location: 'Detroit, US / Huntingdon, UK' }
           ]
+        },
+        # STUFF #70 follow-up — single-event motorsport classics that
+        # transcend their parent series (Le Mans, Indy 500, Daytona
+        # 500, etc.) plus the most-watched F1 race of the year (Monaco).
+        {
+          slug: 'le-mans-24', name: '24 Hours of Le Mans', sport: 'motorsport', women: false,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: 'The most prestigious endurance race in the world — June, Circuit de la Sarthe.',
+          teams: []
+        },
+        {
+          slug: 'indy-500', name: 'Indianapolis 500', sport: 'motorsport', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: '"The Greatest Spectacle in Racing" — May, Indianapolis Motor Speedway. IndyCar\'s crown jewel.',
+          teams: []
+        },
+        {
+          slug: 'daytona-500', name: 'Daytona 500', sport: 'motorsport', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: "NASCAR Cup Series opener — February, Daytona International Speedway. The Super Bowl of stock-car racing.",
+          teams: []
+        },
+        {
+          slug: 'monaco-gp', name: 'Monaco Grand Prix', sport: 'motorsport', women: false,
+          region: 'global', country: 'Monaco', format: :tournament,
+          blurb: "F1's most prestigious race — May, Circuit de Monaco. Tightest, slowest, most glamorous round of the year.",
+          teams: []
+        },
+        {
+          slug: 'british-gp', name: 'British Grand Prix', sport: 'motorsport', women: false,
+          region: 'global', country: 'United Kingdom', format: :tournament,
+          blurb: 'F1 — July, Silverstone. One of the original World Championship rounds.',
+          teams: []
+        },
+        {
+          slug: 'italian-gp', name: 'Italian Grand Prix', sport: 'motorsport', women: false,
+          region: 'global', country: 'Italy', format: :tournament,
+          blurb: "F1 — September, Monza (\"Temple of Speed\"). Tifosi territory.",
+          teams: []
+        },
+        {
+          slug: 'dakar-rally', name: 'Dakar Rally', sport: 'motorsport', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Two-week off-road cross-country rally — January, Saudi Arabia. Cars, bikes, trucks, quads.',
+          teams: []
         }
       ]
     },
@@ -902,6 +1109,55 @@ module SportsCatalog
             { slug: 'hundred-w-spirit', name: 'London Spirit (W)',  short_name: 'Spirit',
               location: 'London' }
           ]
+        },
+        # STUFF #70 follow-up — ICC tournaments + The Ashes.
+        {
+          slug: 'icc-cricket-world-cup', name: 'ICC Cricket World Cup', sport: 'cricket', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "Men's 50-over ODI World Cup — every four years; the marquee men's international event.",
+          teams: []
+        },
+        {
+          slug: 'icc-womens-world-cup', name: "ICC Women's Cricket World Cup", sport: 'cricket', women: true,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "Women's 50-over ODI World Cup — every four years.",
+          teams: []
+        },
+        {
+          slug: 'icc-t20-world-cup', name: "ICC Men's T20 World Cup", sport: 'cricket', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Short-format world championship — every two years.',
+          teams: []
+        },
+        {
+          slug: 'icc-womens-t20-world-cup', name: "ICC Women's T20 World Cup", sport: 'cricket', women: true,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "Women's T20 championship — every two years.",
+          teams: []
+        },
+        {
+          slug: 'icc-champions-trophy', name: 'ICC Champions Trophy', sport: 'cricket', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "Top-8 ODI nations only — Champions Trophy, every four years.",
+          teams: []
+        },
+        {
+          slug: 'icc-world-test-championship', name: 'ICC World Test Championship', sport: 'cricket', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Final of the two-year Test Championship cycle.',
+          teams: []
+        },
+        {
+          slug: 'the-ashes', name: 'The Ashes', sport: 'cricket', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "England vs Australia Test series — the oldest rivalry in cricket. ~Every two years.",
+          teams: []
+        },
+        {
+          slug: 'asia-cup', name: 'Asia Cup', sport: 'cricket', women: false,
+          region: 'asia', country: nil, format: :tournament,
+          blurb: 'Asian Cricket Council championship — alternates ODI / T20 format.',
+          teams: []
         }
       ]
     },
@@ -986,6 +1242,88 @@ module SportsCatalog
             { slug: 'liv-fireballs', name: 'Fireballs GC', short_name: 'Fireballs',
               location: 'Spain' }
           ]
+        },
+        # STUFF #70 follow-up — golf majors (men's + women's) + the
+        # marquee team-format internationals. Majors aren't tied to
+        # a tour — they invite the world's best regardless of where
+        # they play their week-to-week golf.
+        {
+          slug: 'the-masters', name: 'The Masters', sport: 'golf', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: 'First men\'s major of the year — April, Augusta National. Green jacket.',
+          teams: []
+        },
+        {
+          slug: 'pga-championship', name: 'PGA Championship', sport: 'golf', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: 'Second men\'s major — May. Rotates US courses.',
+          teams: []
+        },
+        {
+          slug: 'us-open-golf', name: 'US Open (Golf)', sport: 'golf', women: false,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: 'Third men\'s major — June, the USGA\'s flagship event.',
+          teams: []
+        },
+        {
+          slug: 'the-open', name: 'The Open Championship', sport: 'golf', women: false,
+          region: 'global', country: 'United Kingdom', format: :tournament,
+          blurb: 'Fourth men\'s major — July. The oldest championship in golf, played on UK / Ireland links courses.',
+          teams: []
+        },
+        {
+          slug: 'the-players', name: 'The Players Championship', sport: 'golf', women: false,
+          region: 'us', country: 'United States', format: :tournament,
+          blurb: "PGA Tour's flagship non-major. March, TPC Sawgrass.",
+          teams: []
+        },
+        {
+          slug: 'ryder-cup', name: 'Ryder Cup', sport: 'golf', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Biennial Europe vs USA men\'s team match-play. Alternates US / Europe.',
+          teams: []
+        },
+        {
+          slug: 'presidents-cup', name: 'Presidents Cup', sport: 'golf', women: false,
+          region: 'global', country: nil, format: :tournament,
+          blurb: "Biennial USA vs International (ex-Europe) men's team match-play. Offset from Ryder Cup years.",
+          teams: []
+        },
+        {
+          slug: 'chevron-championship', name: 'Chevron Championship', sport: 'golf', women: true,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: "First LPGA major — April. Formerly the ANA Inspiration.",
+          teams: []
+        },
+        {
+          slug: 'us-womens-open', name: "U.S. Women's Open", sport: 'golf', women: true,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: 'LPGA major — May/June. USGA-run.',
+          teams: []
+        },
+        {
+          slug: 'kpmg-womens-pga', name: "KPMG Women's PGA Championship", sport: 'golf', women: true,
+          region: 'global', country: 'United States', format: :tournament,
+          blurb: 'LPGA major — June. PGA of America–run.',
+          teams: []
+        },
+        {
+          slug: 'evian-championship', name: 'The Evian Championship', sport: 'golf', women: true,
+          region: 'global', country: 'France', format: :tournament,
+          blurb: 'LPGA major — July, Evian-les-Bains, France.',
+          teams: []
+        },
+        {
+          slug: 'aig-womens-open', name: "AIG Women's Open", sport: 'golf', women: true,
+          region: 'global', country: 'United Kingdom', format: :tournament,
+          blurb: 'Final LPGA major of the year — August. UK / Ireland links courses.',
+          teams: []
+        },
+        {
+          slug: 'solheim-cup', name: 'Solheim Cup', sport: 'golf', women: true,
+          region: 'global', country: nil, format: :tournament,
+          blurb: 'Biennial Europe vs USA women\'s team match-play (the Ryder Cup\'s LPGA counterpart).',
+          teams: []
         }
       ]
     },
@@ -1041,7 +1379,7 @@ module SportsCatalog
       leagues: [
         {
           slug: 'us-triple-crown', name: 'US Triple Crown', sport: 'horse-racing', women: false,
-          region: 'us', country: 'US',
+          region: 'us', country: 'US', format: :tournament,
           blurb: 'Kentucky Derby → Preakness → Belmont. Three races, five weeks.',
           teams: [
             { slug: 'race-kentucky-derby', name: 'Kentucky Derby',
@@ -1056,7 +1394,7 @@ module SportsCatalog
         },
         {
           slug: 'uk-flat', name: 'UK Flat Racing', sport: 'horse-racing', women: false,
-          region: 'europe', country: 'GB',
+          region: 'europe', country: 'GB', format: :tournament,
           blurb: 'Royal Ascot, the Derby at Epsom, St Leger — Britain\'s classic flat-racing schedule.',
           teams: [
             { slug: 'race-royal-ascot',    name: 'Royal Ascot',          short_name: 'Royal Ascot',
@@ -1071,7 +1409,7 @@ module SportsCatalog
         },
         {
           slug: 'uk-jumps', name: 'UK Jumps Racing', sport: 'horse-racing', women: false,
-          region: 'europe', country: 'GB',
+          region: 'europe', country: 'GB', format: :tournament,
           blurb: "Cheltenham Festival + Grand National headline the National Hunt calendar.",
           teams: [
             { slug: 'race-cheltenham',     name: 'Cheltenham Festival', short_name: 'Cheltenham',
@@ -1082,7 +1420,7 @@ module SportsCatalog
         },
         {
           slug: 'dubai-world-cup', name: 'Dubai World Cup', sport: 'horse-racing', women: false,
-          region: 'middle-east', country: 'AE',
+          region: 'middle-east', country: 'AE', format: :tournament,
           blurb: 'The richest single-day card in racing. UAE\'s flagship meeting.',
           teams: [
             { slug: 'race-dubai-world-cup', name: 'Dubai World Cup',    short_name: 'Dubai World Cup',
@@ -1090,6 +1428,26 @@ module SportsCatalog
             { slug: 'race-dubai-turf',      name: 'Dubai Turf',         short_name: 'Dubai Turf',
               location: 'Meydan, UAE' }
           ]
+        },
+        # STUFF #70 follow-up — international classics not already
+        # captured under the regional umbrellas above.
+        {
+          slug: 'melbourne-cup', name: 'Melbourne Cup', sport: 'horse-racing', women: false,
+          region: 'oceania', country: 'Australia', format: :tournament,
+          blurb: "\"The race that stops a nation\" — November, Flemington Racecourse, Melbourne.",
+          teams: []
+        },
+        {
+          slug: 'japan-cup', name: 'Japan Cup', sport: 'horse-racing', women: false,
+          region: 'asia', country: 'Japan', format: :tournament,
+          blurb: 'Japan\'s premier international turf race — November, Tokyo Racecourse. Top-class field every year.',
+          teams: []
+        },
+        {
+          slug: 'prix-arc-de-triomphe', name: "Prix de l'Arc de Triomphe", sport: 'horse-racing', women: false,
+          region: 'europe', country: 'France', format: :tournament,
+          blurb: "Europe's top middle-distance race — October, Longchamp, Paris.",
+          teams: []
         }
       ]
     }
@@ -1124,5 +1482,27 @@ module SportsCatalog
 
   def find_team(team_slug)
     all_teams.find { |t| t[:slug] == team_slug.to_s }
+  end
+
+  # STUFF #70 — split leagues by format. `format: :tournament` marks
+  # event-shaped competitions (World Cups, Grand Slams). Anything
+  # without an explicit `format:` defaults to `:season` (ongoing
+  # league play like NFL / NBA / MLS).
+  def tournaments_for(sport_slug)
+    sport = find_sport(sport_slug)
+    return [] unless sport
+    sport[:leagues].select { |lg| lg[:format] == :tournament }
+  end
+
+  def seasons_for(sport_slug)
+    sport = find_sport(sport_slug)
+    return [] unless sport
+    sport[:leagues].reject { |lg| lg[:format] == :tournament }
+  end
+
+  # Cross-sport lookup of a tournament by slug — used by the league
+  # follow handler to materialize the row from any sport's catalog.
+  def find_tournament(slug)
+    all_leagues.find { |lg| lg[:slug] == slug.to_s && lg[:format] == :tournament }
   end
 end

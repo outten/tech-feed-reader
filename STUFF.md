@@ -1000,3 +1000,53 @@ Every NBA/NFL/WNBA team in the dev DB was affected — only the 4 hand-seeded te
 - **One-shot backfill** ([scripts/normalize_team_slugs_to_catalog.rb](scripts/normalize_team_slugs_to_catalog.rb)) — walks `SportsCatalog.all_teams`, finds DB rows whose slug differs from the catalog's, renames the row + rewrites any `sports_follows.value` entries to match (deduping per-user when both halves of the rename were followed). Dry-run by default; `--apply` to commit. Safe because matches/standings/entity_articles all FK by `team.id`. Already applied to dev — 39 renames (NFL + NBA + WNBA teams that previously lived under `<league>-team-<external_id>` auto-slugs).
 
 5 new examples in [spec/sports_team_follow_slug_rename_spec.rb](spec/sports_team_follow_slug_rename_spec.rb) cover the store-level `rename_slug!`, the POST `/sports/teams/follow` slug-rename path (with auto-slug row pre-existing), idempotence (no-op when slug already matches), and the cold-start path (no DB row at all). Full local suite: **1495 / 0**.
+
+## [x] 70. Sport Tournaments
+
+In the /sports/manage/tennis area, can we add a list of the major tennis tournaments for all over the world. Grand Slams and others. The user should be able to subscribe to a tournament and recieve articles and relevant information. For example, the French Open is happening right now. I would love to be able to see:
+
+- articles
+- current ladder
+- recent matches and scores
+
+Also, coming soon to America is the World Cup Soccer Tournament. We should add the ability to subscribe to tournaments like this in every sport.
+
+**Shipped (MVP — catalog + follow + surface; tennis bracket rendering deferred).**
+
+**Key insight.** "Tournament" maps directly onto our existing `sports_leagues` table — FIFA World Cup already lives there as `slug='fifa-world'`. The `sports_follows` table already supports `kind='league'` (`KINDS = %w[team player league]`); it was just never wired into the UI. Reused existing infrastructure rather than building a parallel table.
+
+**Catalog** ([app/sports_catalog.rb](app/sports_catalog.rb)) — added a `format:` field to league entries (`:season` default, `:tournament` for event-shaped). **60 tournament entries** across every sport in the catalog:
+
+- **Tennis (19)** — 4 Grand Slams (Australian Open / Roland Garros / Wimbledon / US Open) + 9 ATP Masters 1000 (Indian Wells, Miami, Monte-Carlo, Madrid, Rome, Canada, Cincinnati, Shanghai, Paris) + 4 women's-only WTA 1000 (Dubai, Doha, Beijing, Wuhan) + ATP/WTA Finals.
+- **Soccer (5)** — FIFA World Cup + Women's World Cup + UEFA Euro + Copa América + UEFA Champions League.
+- **Rugby (2)** — Men's + Women's Rugby World Cup.
+- **Cricket (8)** — ICC Cricket World Cup, Women's Cricket World Cup, Men's + Women's T20 World Cup, Champions Trophy, World Test Championship, The Ashes, Asia Cup.
+- **Golf (12)** — 4 men's majors (Masters, PGA Championship, US Open, The Open) + The Players + Ryder Cup + Presidents Cup + 5 LPGA majors (Chevron, US Women's Open, KPMG Women's PGA, Evian, AIG Women's Open) + Solheim Cup.
+- **Motorsport (7)** — Le Mans 24, Indy 500, Daytona 500, Monaco / British / Italian GP, Dakar Rally.
+- **Horse Racing (7)** — US Triple Crown, UK Flat, UK Jumps, Dubai World Cup (the four existing event-series leagues marked `:tournament`) + Melbourne Cup, Japan Cup, Prix de l'Arc de Triomphe.
+
+New helpers `SportsCatalog.tournaments_for(sport_slug)`, `.seasons_for(sport_slug)`, `.find_tournament(slug)`.
+
+**Follow plumbing** ([app/main.rb](app/main.rb)) — `POST /sports/leagues/follow` + `/sports/leagues/unfollow` mirror the team-follow handlers. `ensure_catalog_league_in_db(slug)` lazy-upserts the catalog league into `sports_leagues` (same pattern as `ensure_catalog_team_in_db`).
+
+**Manage UI** ([views/sports_manage_sport.erb](views/sports_manage_sport.erb)) — per-sport manage page now splits into **Leagues** (drill-down cards for ongoing seasons) and **📅 Tournaments** (inline ★ Follow toggle on each card). Followed tournaments get a green is-followed border.
+
+**`/sports` overview** ([views/sports.erb](views/sports.erb)) — new "📅 Following tournaments" section above the TOC. One tile per followed league with sport emoji + tournament name + blurb. Click → `/sports/league/:slug` (existing route — shows standings for FIFA-shape tournaments; tennis Grand Slams show empty state for now since their event-shaped data doesn't fit a standings table).
+
+**Out of scope (Phase 2 — separate STUFF item):** tennis bracket rendering on `/sports/league/:slug` (ESPN exposes draws via the scoreboard `groupings` block, which doesn't fit the current standings template); per-tournament dashboard with live scores during ongoing tournaments; article bridging via `SportsEntityArticlesStore.refresh_for(kind: 'league', ...)`.
+
+**14 new examples** in [spec/sports_tournament_follow_spec.rb](spec/sports_tournament_follow_spec.rb) cover catalog helpers (tournaments/seasons split, cross-sport find), `POST /sports/leagues/follow` (happy path, idempotence, reuse-existing-row, 404, 400), unfollow, the manage view's Leagues/Tournaments split + followed-state button flip, and the `/sports` follow surface. Full local suite: **1509 / 0**.
+
+## [x] 71. Sports Calendar
+
+On the /sports/calendar page, each sports team appears to be a link; however, the link doesn't do anything. It should take the user to the sports team's page.
+
+**Shipped.** Stale gate from before STUFF #67. The calendar view was rendering team chips as `<a>` only when `SportsTeams.find(slug)` returned a hit — i.e. only for the 5 curated Ruby-module teams (Eagles / Sixers / Union / All Blacks / Tennis). Everything else fell through to a `<span>` non-link with the comment "_/sports/team/:slug 404s for structured-only opponents_". That hasn't been true since STUFF #67 made the team detail route fall back to `SportsTeamsStore.find_by_slug`. Removed the `linkable` gate in [views/sports_calendar.erb](views/sports_calendar.erb) — every team chip is now a link. Updated [spec/sports_calendar_spec.rb](spec/sports_calendar_spec.rb)'s linkability assertion to match the new behaviour (was: "Cowboys → span"; now: "Cowboys → href"). Full local suite: 1511 / 0.
+
+## [ ] 72. Biking
+
+Biking is a popular sport. Let's add as a category. Follow the same as other sports:
+
+- subscribe to tournaments
+- follow teams
+- follow players

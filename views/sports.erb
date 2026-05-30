@@ -80,6 +80,33 @@
   </section>
 <% end %>
 
+<%# STUFF #70 — followed tournaments. Tile per league the user has
+    `sports_follows.kind='league'` for, rendered with sport emoji +
+    name + blurb + link to /sports/league/:slug. Cards click into
+    standings (works for FIFA-shape) or a "data coming" view
+    (tennis Grand Slams; bracket rendering is a Phase 2 follow-up). %>
+<% if (@followed_tournaments || []).any? %>
+  <section class="sports-tournament-section" aria-label="Following tournaments">
+    <h3>📅 Following tournaments</h3>
+    <ul class="sports-tournament-grid">
+      <% @followed_tournaments.each do |t| %>
+        <% row     = t[:row] %>
+        <% catalog = t[:catalog] %>
+        <% sport   = t[:sport] %>
+        <li class="sports-tournament-tile">
+          <a class="sports-tournament-link" href="/sports/league/<%= h(row['slug']) %>">
+            <span class="sports-tournament-emoji" aria-hidden="true"><%= sport ? sport[:emoji] : '📅' %></span>
+            <span class="sports-tournament-name"><%= h(row['name']) %></span>
+            <% if catalog && catalog[:blurb] %>
+              <span class="sports-tournament-blurb"><%= h(catalog[:blurb]) %></span>
+            <% end %>
+          </a>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
 <% rendered_sports = @sports_sub_categories.select { |s| (@feeds_by_sport[s] || []).any? || (@recent_by_sport[s] || []).any? } %>
 <% if rendered_sports.any? || (@teams_with_subs || []).any? || (@leagues_with_standings || []).any? %>
   <nav class="sports-toc" aria-label="Jump to sport or team">

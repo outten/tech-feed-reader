@@ -699,6 +699,25 @@ class TechFeedReader < Sinatra::Base
       )
     end
 
+    # STUFF #70 — analog for league-shaped catalog entries (mostly
+    # tournaments). When a user follows a tournament that doesn't yet
+    # have a sports_leagues row, materialize it on demand so the
+    # follow target exists. Same idea as ensure_catalog_team_in_db
+    # but no league_id parent to resolve — leagues are the top level.
+    def ensure_catalog_league_in_db(league_slug)
+      catalog_league = SportsCatalog.all_leagues.find { |lg| lg[:slug] == league_slug.to_s }
+      return nil unless catalog_league
+
+      SportsLeaguesStore.upsert(
+        slug:            catalog_league[:slug],
+        name:            catalog_league[:name],
+        sport:           catalog_league[:sport],
+        source_provider: catalog_league[:source_provider] || 'catalog',
+        external_id:     catalog_league[:external_id]     || catalog_league[:slug],
+        country:         catalog_league[:country]
+      )
+    end
+
     # STUFF #52.1 — catalog players (notable-player chips on team
     # cards) live in app/sports_catalog.rb as plain strings under
     # `team[:players]`. Clicking a chip needs to land on the player
@@ -2105,6 +2124,22 @@ class TechFeedReader < Sinatra::Base
         'SELECT 1 FROM sports_standings WHERE league_id = ? LIMIT 1', [lg['id']]
       ).any?
     end
+    # STUFF #70 — followed tournaments (sports_follows.kind='league').
+    # Resolve each follow slug to its DB row + catalog metadata so the
+    # view can render a tile per tournament with name, sport emoji,
+    # blurb, and a link to /sports/league/:slug. Skips orphan follows
+    # (slug doesn't resolve to a sports_leagues row).
+    followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league').map { |f| f['value'] }
+    @followed_tournaments = followed_league_slugs.filter_map do |slug|
+      row     = SportsLeaguesStore.find_by_slug(slug)
+      next nil unless row
+      catalog = SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug }
+      {
+        row:     row,
+        catalog: catalog,
+        sport:   catalog && SportsCatalog.find_sport(catalog[:sport_slug])
+      }
+    end
     erb :sports
   end
 
@@ -2230,6 +2265,12 @@ class TechFeedReader < Sinatra::Base
     @page_title    = "#{@sport[:name]} — Manage"
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
                                         .map { |f| f['value'] }.to_set
+    # STUFF #70 — tournament-shape leagues are follow-toggleable on
+    # this page (vs. season leagues which drill into team grids).
+    # Pre-load the user's league follows so the button can flip
+    # state alongside the team-follow buttons in the same view.
+    @followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league')
+                                                .map { |f| f['value'] }.to_set
     erb :sports_manage_sport
   end
 
@@ -2303,6 +2344,32 @@ class TechFeedReader < Sinatra::Base
     AppLogger.info('team_unfollow', slug: slug)
     return sports_follow_json(slug: slug, kind: 'team', followed: false) if wants_json?
     redirect to(params['return_to'] || '/sports/manage')
+  end
+
+  # STUFF #70 — league/tournament follow. Mirrors the team-follow
+  # path: ensure the catalog league has a sports_leagues row (lazy
+  # upsert via ensure_catalog_league_in_db), then add the follow
+  # with kind='league'. The /sports overview's "📅 Tournaments"
+  # section reads from this. Articles bridging happens later via
+  # SportsEntityArticlesStore (called when the league page renders).
+  post '/sports/leagues/follow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    league = SportsLeaguesStore.find_by_slug(slug) || ensure_catalog_league_in_db(slug)
+    halt 404, 'league not found' unless league
+    SportsFollowsStore.add(user_id: current_user_id, kind: 'league', value: slug)
+    AppLogger.info('league_follow', slug: slug, league_id: league['id'])
+    return sports_follow_json(slug: slug, kind: 'league', followed: true) if wants_json?
+    redirect to(params['return_to'] || '/sports')
+  end
+
+  post '/sports/leagues/unfollow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    SportsFollowsStore.remove(user_id: current_user_id, kind: 'league', value: slug)
+    AppLogger.info('league_unfollow', slug: slug)
+    return sports_follow_json(slug: slug, kind: 'league', followed: false) if wants_json?
+    redirect to(params['return_to'] || '/sports')
   end
 
   # Phase S9 — upcoming-fixtures calendar across followed teams.

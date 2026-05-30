@@ -126,14 +126,15 @@ RSpec.describe 'GET /sports/calendar' do
     expect(sixers_pos).to be < eagles_pos # earlier day first
   end
 
-  it 'links to /sports/team/:slug only when the team has a SportsTeams Ruby module entry' do
+  it 'links every team chip to /sports/team/:slug (STUFF #71)' do
     setup_followed_match(scheduled_at: (Time.now.utc + 86400).iso8601)
     get '/sports/calendar'
-    # Eagles slug is in SportsTeams Ruby module → linked.
+    # Eagles — curated SportsTeams entry, links as before.
     expect(last_response.body).to include('href="/sports/team/eagles"')
-    # Cowboys auto-created opponent → rendered as plain span (no link).
-    expect(last_response.body).to match(/<span class="sports-calendar-team">[^<]*Dallas Cowboys/m).or include('Dallas Cowboys')
-    expect(last_response.body).not_to include('href="/sports/team/nfl-team-6"')
+    # Cowboys auto-created opponent — STUFF #67 made /sports/team/:slug
+    # fall back to SportsTeamsStore.find_by_slug, so this slug now
+    # links too (was a plain span pre-#71).
+    expect(last_response.body).to include('href="/sports/team/nfl-team-6"')
   end
 
   it 'honours ?days= and clamps to 1..365' do
