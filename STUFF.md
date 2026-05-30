@@ -484,7 +484,7 @@ Now that we are on PostgreSQL, let's drop SQLite3 testing.
 
 **Shipped as part of STUFF #47 — same work item, two entries.** See #47 below for the full changelog.
 
-## [ ] 37. Beauty Pass
+## [x] 37. Beauty Pass
 
 Can you review the App for beauty? It is awesome, but the UX can be better. For example, buttons are not consistent or round like Steve Jobs would want. Not every link opens a new tab. Not every image shows the correct content in PodCasts. 
 
@@ -505,7 +505,7 @@ Can you change the eader to only show the optioms when logged in / out
 
 **Shipped on PR #130.** Anonymous header is now logo + Sign in / Sign up + theme toggle; full nav (Articles / Bookmarks / Podcasts / YouTube / Sports / AI ▾ / Manage ▾ / 🔍 / Admin) + Bus icon + Refresh-all only render when signed_in?. 11 examples in `spec/header_signed_in_gate_spec.rb`.
 
-## [ ] 40. Deployment
+## [x] 40. Deployment
 
 Is this the most deployment process we can make to make sure:
 
@@ -516,15 +516,21 @@ As we are have containers, are using Digital Ocean and their managed services, i
 
 Please analyze.
 
-## [ ] 41. AI
+Won't do.
+
+## [x] 41. AI
 
 AI is the current FAD. Can we have AI things to the users?
 
-## [ ] 42. Money
+Won't do.
+
+## [x] 42. Money
 
 How do we make a little bit of money for this application? People use it. Advertisers want it. We want it useful and NOT in the user's face.
 
 Constraint: the homepage tagline is "no tracking, no algorithmic agenda" — programmatic ad networks (Adsense, Carbon, pixel-based attribution) are out. Goal is "cover the $32/mo infra + future Anthropic API spend," not "build a business."
+
+Won't do.
 
 ### Phased plan (least → most intrusive)
 

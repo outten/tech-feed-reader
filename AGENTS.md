@@ -360,11 +360,13 @@ public/
   youtube-watch.js                 # YouTube IFrame API watch-progress tracking
 
 scripts/
-  migrate.rb / seed_feeds.rb / scheduler.rb
-  refresh_feed.rb / refresh_feeds.rb
-  generate_digest.rb / prune_articles.rb / triage_run.rb
-  seed_sports.rb / sync_sports.rb / backfill_podcast_images.rb
-  backfill_audio.rb
+  migrate.rb / seed_feeds.rb / seed_user.rb / scheduler.rb
+  refresh_feed.rb / refresh_feeds.rb / fix_article_links.rb
+  generate_digest.rb / prune_articles.rb / generate_triage.rb
+  seed_sports_data.rb / sync_sports.rb / backfill_podcast_images.rb / backfill_audio.rb
+  dedup_sports_teams.rb / normalize_team_slugs_to_catalog.rb  # STUFF #68 + #69 one-shot data fixes
+  capture_home_screenshots.rb     # marketing screenshot capture (boots app on :4569 with auth bypassed)
+  bump_version.rb                  # VERSION bump for release-{major,minor,patch}
   run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for one-command dev
 
 spec/                              # RSpec (test env: PG via TEST_DATABASE_URL, no real HTTP, auth wall OFF by default)

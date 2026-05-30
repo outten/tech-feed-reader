@@ -1,14 +1,30 @@
 # Tech Feed Reader
 
-A multi-user, passkey-authenticated web application that aggregates public, free RSS / Atom feeds for technology articles, sports news + scores, nature/YouTube channels, and podcasts. Reading, tagging, search, summarization, AI-assisted triage, and personalised relevance ranking. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is PostgreSQL (managed DO cluster, `tsvector` + `ts_rank` for search) instead of `t-money`'s file-per-store JSON.
+A multi-user, passkey-authenticated web application that aggregates public, free RSS / Atom feeds for technology articles, sports news + scores, nature/YouTube channels, podcasts, and webcomics. Reading, tagging, search, summarization, AI-assisted triage, and personalised relevance ranking. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is PostgreSQL (managed DO cluster, `tsvector` + `ts_rank` for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.** Auth (Phase A1) ships passkey-only sign-up + sign-in with 10 single-use recovery codes, an auth-wall middleware on every protected route, and `/account` for managing display name + passkeys + recovery-code regeneration + account deletion. Per-user data split (Phase A2) gives every signed-in user their own `read_state` / bookmarks / tags / mute rules / sports follows / digests / triages; the `feeds` catalog stays shared via a `user_feed_subscriptions` bridge so one fetch keeps every subscriber up to date. Add feeds from a curated catalog of 79 entries on `/feeds` (recommended-for-you + 🔥 popular-with-other-readers top charts + a client-side filter toolbar with search + topic chips on every list); Apple Podcasts URLs auto-resolve to the underlying RSS; an AI feed recommender (Claude) suggests catalog picks from a free-text prompt. The home `/` shows the marketing pitch to first-time visitors, a topic-chip onboarding (`/welcome`, with curated starter-feed sets for Tech / Sports / Nature / Podcasts) to newly signed-in users with zero subscriptions, and **What's On Today** (today's sports fixtures for followed teams, top reads ranked by the For You scorer, podcast episodes, and YouTube videos) to everyone else. `/articles` is the unified reading list with day-group dividers, left-anchored thumbnails (per-article → YouTube → feed-cover fallback), source-cluster ribbons, and a 📖 reading-time pill. `/triage` runs an AI triage (Claude Sonnet 4.6) that classifies your unread queue into must-read / optional / skip with rationale; daily cron emits a triage per topic. `/sports` covers scores / standings / iCal calendar / per-team detail / tennis rankings with follows + "articles mentioning Sinner" surfaces. `/podcasts` groups subscribed shows; a persistent mini-player at the bottom of every page keeps audio playing across navigation, with resume-where-you-left-off + a 🚌 bus-mode chip for sub-15-min commute episodes. `/youtube` lists subscribed channels with a bulk-add textarea that resolves `@PBSNewsHour`-style handles → canonical channel-feed URLs via a single channel-page scrape and kicks off a background fetch so new channels populate within ~30s. `/topics` clusters across the recent corpus using a weighted-scoring tokenizer (publisher categories 2× body keywords, proper-noun phrase detection like "Jannik Sinner", ubiquity ceiling, URL/site-boilerplate stopword sweep). `/search` is PG full-text (`tsvector` + `ts_headline` snippet highlighting) with kind-icon results and pre-search suggestion chips. Observability ships `/health` (liveness JSON), `/metrics` (Prometheus), `/admin/dashboard` (article counts + 7-day Activity chart), and `/admin/traces` (OpenTelemetry). CLI: `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`, `make digest`, `make triage`, `make sync-sports`, `make run-all` / `make stop-all`.
+> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
+
+## What it does
+
+- **Multi-user, passkey-only auth** (Phase A1) — WebAuthn sign-up + sign-in with 10 single-use recovery codes; an auth-wall middleware on every protected route; `/account` for display name + passkeys + recovery-code regeneration + account deletion. No passwords, no email.
+- **Per-user data, shared catalog** (Phase A2) — every signed-in user has their own `read_state` / bookmarks / tags / mute rules / sports follows / digests / triages; the `feeds` catalog stays shared via a `user_feed_subscriptions` bridge so one fetch keeps every subscriber up to date.
+- **Discovery on `/feeds`** — 108 curated catalog entries with a client-side filter toolbar (search + topic chips); recommended-for-you + 🔥 popular-with-other-readers top charts; AI feed recommender (Claude) from a free-text prompt; Apple Podcasts URLs auto-resolve to the underlying RSS.
+- **Home & onboarding** — `/` shows a marketing pitch to first-time visitors, the `/welcome` topic-chip onboarding (Tech / Sports / Nature / Podcasts / Humor) to newly signed-in users with zero subscriptions, and **What's On Today** (today's sports fixtures, top reads ranked by For You, podcast episodes, YouTube videos) to everyone else.
+- **Unified reading list** (`/articles`) — mixes 📄 articles, 🎧 podcasts, 📺 videos with day-group dividers, left-anchored thumbnails (per-article → YouTube → feed-cover fallback), source-cluster ribbons, and a 📖 reading-time pill.
+- **AI triage** (`/triage`) — Claude Sonnet 4.6 classifies your unread queue into must-read / optional / skip with rationale; daily cron emits one triage per topic.
+- **Sports** (`/sports`) — followed-team score tiles, iCal calendar export, per-team detail pages, league standings, tennis rankings, and "articles mentioning Sinner"-style entity surfaces.
+- **Podcasts** (`/podcasts`) — subscribed-show grid with a persistent mini-player at the bottom of every page that survives Turbo navigation; resume-where-you-left-off; 🚌 bus-mode chip for sub-15-min commute episodes.
+- **YouTube** (`/youtube`) — subscribed-channel grid with a bulk-add textarea that resolves `@PBSNewsHour`-style handles → canonical channel-feed URLs via channel-page scrape; background fetch populates new channels within ~30s.
+- **Comics** (`/comics`) — subscribed webcomic series tiles (latest panel as cover) + recent panels list; comic-aware article hero (no crop) + click-to-zoom image lightbox.
+- **Topics & search** — `/topics` clusters across the recent corpus using weighted scoring (publisher categories 2× body keywords, proper-noun phrase detection like "Jannik Sinner", ubiquity ceiling, URL/site-boilerplate stopword sweep); `/search` is PG full-text with `tsvector` + `ts_headline` snippet highlighting and pre-search suggestion chips.
+- **Observability** — `/health` (liveness JSON), `/metrics` (Prometheus), `/admin/dashboard` (article counts + 7-day Activity chart), `/admin/traces` (OpenTelemetry ring buffer).
+- **CLI** — `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`, `make digest`, `make triage`, `make sync-sports`, `make run-all` / `make stop-all`.
 
 ## Getting started
 
 ```bash
 make install
-make seed-feeds # optional: insert the 5 starter feeds (browse 79 more on /feeds)
+make seed-feeds # optional: insert the 5 starter feeds (browse 103 more on /feeds)
 make run        # dev server with rerun auto-reload → http://localhost:4567
 make test       # RSpec — smoke suite passes out of the box
 ```
@@ -29,6 +45,8 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | Podcasts | `/podcasts` | Subscribed shows grouped freshest-first + recent episodes |
 | YouTube | `/youtube` | Subscribed YouTube channels grid + "+ Add channels" bulk-textarea (resolves @handles via channel-page scrape) |
 | YouTube channel | `/youtube/:feed_id` | 10 most recent videos for one subscribed channel as 16:9 tiles |
+| Comics | `/comics` | Subscribed webcomic series tiles (latest panel as cover) + recent panels linear list |
+| Comic series | `/comics/:feed_id` | 30 most recent panels for one subscribed series; click any to read in /article/:uid with comic-aware hero + lightbox |
 | Sports | `/sports` | Followed-team score tiles + per-sport landings (NFL / NBA / soccer / rugby / tennis). Calendar + standings + per-team detail + tennis player follows nested below |
 | Sports calendar | `/sports/calendar` | Upcoming fixtures across followed teams + iCal export |
 | Triage | `/triage` | AI triage (Claude Sonnet 4.6) — classifies unread into must-read / optional / skip with rationale; per-topic chips; daily cron history |
@@ -40,7 +58,7 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | Bus mode | `/bus` | Podcast episodes ≤15 min — pick something for the commute |
 | Sign up | `/sign-up` | Passkey registration ceremony; receive 10 single-use recovery codes (shown once) |
 | Sign in | `/sign-in` | Passkey authentication; "Use a recovery code" fallback |
-| Welcome | `/welcome` | First-time-user onboarding — pick topic chips (Tech / Sports / Nature / Podcasts) and one-click-subscribe to curated starter feeds. Fires automatically when a signed-in user has zero subscriptions |
+| Welcome | `/welcome` | First-time-user onboarding — pick topic chips (Tech / Sports / Nature / Podcasts / Humor) and one-click-subscribe to curated starter feeds. Fires automatically when a signed-in user has zero subscriptions |
 | Account | `/account` | Manage display name, list / add / revoke passkeys, regenerate recovery codes, delete account (typed-confirmation gate) |
 | Admin | `/admin` | System overview, integration status, sub-page links |
 | Admin dashboard | `/admin/dashboard` | Article counts, 7-day Activity chart, top feeds + tags |

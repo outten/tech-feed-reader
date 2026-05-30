@@ -177,13 +177,13 @@ Eight catalog entries verified live (HTTP 200 + valid RSS/Atom signature) coveri
 
 Quick, immediate-value win once S1 lands. Curates the user's specific teams as catalog entries with `:category => :sports`. Articles flow through the existing scheduler / parser / search / feedback pipeline — no new code paths.
 
-- [ ] **Eagles** — [Bleeding Green Nation](https://www.bleedinggreennation.com/) is the SB Nation community blog with active beat-writer coverage; SB Nation sites publish RSS at `/rss/index.xml` (verify on add). [PhillyVoice Sports RSS](https://www.phillyvoice.com/rss-feeds/) also covers Eagles among Philadelphia teams.
-- [ ] **Sixers** — [Liberty Ballers](https://www.libertyballers.com/) (SB Nation, same `/rss/index.xml` convention). PhillyVoice as a second source.
-- [ ] **Union** — [Brotherly Game](http://www.brotherlygame.com/) (SB Nation) + [The Philly Soccer Page](https://phillysoccerpage.net/) (independent, has WordPress RSS).
-- [ ] **All Blacks (men's)** — [Stuff Rugby](https://www.stuff.co.nz/sport/rugby) (NZ's largest news site; RSS at `https://www.stuff.co.nz/rss/sport/rugby/`), [RNZ Sport RSS](https://www.rnz.co.nz/rss/sport.xml), [NZ Herald All Blacks](https://www.nzherald.co.nz/sport/rugby/all-blacks/).
-- [ ] **Black Ferns** — [allblacks.com Black Ferns](https://www.allblacks.com/teams/black-ferns) (official) + [NZ Herald Black Ferns](https://www.nzherald.co.nz/sport/rugby/black-ferns/). RSS coverage thinner than men's; if no RSS, defer to Phase S4 structured fixtures.
-- [ ] **Tennis** — [ATP Tour RSS](https://www.atptour.com/en/media/rss-feed), [ESPN Tennis](https://www.espn.com/tennis/), and Tennis365 (`https://tennis365.com/feed`).
-- [ ] **Specs**: catalog entries surface with the right category; subscribed Eagles articles render under `/articles?category=sports`; one-shot `make seed-sports-feeds` script (analogous to `make seed-feeds`).
+- [x] **Eagles** — [Bleeding Green Nation](https://www.bleedinggreennation.com/) is the SB Nation community blog with active beat-writer coverage; SB Nation sites publish RSS at `/rss/index.xml` (verify on add). [PhillyVoice Sports RSS](https://www.phillyvoice.com/rss-feeds/) also covers Eagles among Philadelphia teams.
+- [x] **Sixers** — [Liberty Ballers](https://www.libertyballers.com/) (SB Nation, same `/rss/index.xml` convention). PhillyVoice as a second source.
+- [x] **Union** — [Brotherly Game](http://www.brotherlygame.com/) (SB Nation) + [The Philly Soccer Page](https://phillysoccerpage.net/) (independent, has WordPress RSS).
+- [x] **All Blacks (men's)** — [Stuff Rugby](https://www.stuff.co.nz/sport/rugby) (NZ's largest news site; RSS at `https://www.stuff.co.nz/rss/sport/rugby/`), [RNZ Sport RSS](https://www.rnz.co.nz/rss/sport.xml), [NZ Herald All Blacks](https://www.nzherald.co.nz/sport/rugby/all-blacks/).
+- [x] **Black Ferns** — [allblacks.com Black Ferns](https://www.allblacks.com/teams/black-ferns) (official) + [NZ Herald Black Ferns](https://www.nzherald.co.nz/sport/rugby/black-ferns/). RSS coverage thinner than men's; if no RSS, defer to Phase S4 structured fixtures.
+- [x] **Tennis** — [ATP Tour RSS](https://www.atptour.com/en/media/rss-feed), [ESPN Tennis](https://www.espn.com/tennis/), and Tennis365 (`https://tennis365.com/feed`).
+- [x] **Specs**: catalog entries surface with the right category; subscribed Eagles articles render under `/articles?category=sports`; one-shot `make seed-sports-feeds` script (analogous to `make seed-feeds`).
 
 ## Sports — Phase S3: structured-data schema (matches, teams, players, leagues)
 
@@ -191,14 +191,14 @@ Quick, immediate-value win once S1 lands. Curates the user's specific teams as c
 
 News alone isn't enough — the user asked for "scores of recent games, charts of performance in leagues". That requires structured records, not free-text articles. New tables sit alongside the existing schema; no migration of the article tables.
 
-- [ ] **Schema** (`012_sports_core.sql`):
+- [x] **Schema** (`012_sports_core.sql`):
   - `sports_leagues (id, slug, name, sport, source_provider, external_id, country, season_year)` — e.g. `(1, 'nfl', 'NFL', 'football', 'espn', 'nfl', 'US', 2026)`.
   - `sports_teams (id, league_id, slug, name, short_name, location, source_provider, external_id, image_url)` — e.g. Eagles row tied to NFL league.
   - `sports_matches (id, league_id, home_team_id, away_team_id, scheduled_at, status, home_score, away_score, period, venue, source_provider, external_id, last_synced_at)` — `status ∈ {scheduled, live, final, postponed, cancelled}`. Composite UNIQUE on `(source_provider, external_id)` for idempotent upserts.
   - `sports_players (id, sport, slug, full_name, country, image_url, source_provider, external_id)` — primarily for tennis follows. NULL `team_id` for individual-sport players.
   - `sports_follows (kind, value, created_at)` — analogous to `mute_rules`; `kind ∈ {team, player, league}`. The user's "I follow the Eagles + Black Ferns + Iga Świątek" list. Drives every UI surface below.
-- [ ] **Stores**: `SportsLeaguesStore`, `SportsTeamsStore`, `SportsMatchesStore`, `SportsPlayersStore`, `SportsFollowsStore` — same hash-row return shape as the existing stores.
-- [ ] **Specs**: schema round-trip; idempotent upsert by `(source_provider, external_id)`; cascade behaviour when a league is removed; follows CRUD.
+- [x] **Stores**: `SportsLeaguesStore`, `SportsTeamsStore`, `SportsMatchesStore`, `SportsPlayersStore`, `SportsFollowsStore` — same hash-row return shape as the existing stores.
+- [x] **Specs**: schema round-trip; idempotent upsert by `(source_provider, external_id)`; cascade behaviour when a league is removed; follows CRUD.
 
 ## Sports — Phase S4: data providers — ESPN (NFL/NBA/MLS + intl rugby) + TheSportsDB (deferred)
 
