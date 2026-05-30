@@ -2292,6 +2292,8 @@ class TechFeedReader < Sinatra::Base
     @page_title    = "#{@league[:name]} — Manage"
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
                                         .map { |f| f['value'] }.to_set
+    @followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league')
+                                                .map { |f| f['value'] }.to_set
     # STUFF #52 PR3 — curated RSS feeds for this league + which the
     # user is already subscribed to (so the button can flip).
     @league_feeds   = FeedCatalog.feeds_for_sports_league(@league[:slug])

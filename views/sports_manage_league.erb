@@ -18,6 +18,8 @@
       <% end %>
       <% if @league[:source_provider] == 'espn' %>
         <span class="sports-catalog-chip live" title="Live scores + standings from ESPN">Live</span>
+      <% elsif @league[:source_provider] == 'api-sports' %>
+        <span class="sports-catalog-chip live" title="Live fixtures via api-sports.io">Live</span>
       <% end %>
       <% if @league[:blurb] %>
         <span class="muted"><%= h(@league[:blurb]) %></span>
@@ -27,14 +29,38 @@
 </div>
 
 <% if (@league[:teams] || []).empty? %>
-  <div class="empty-state">
-    <p>No teams listed in the catalog for this league yet.</p>
-    <p class="muted">
-      Tournament-style competitions (World Cups, regional cups) don't have a
-      persistent team roster — participants vary each cycle. Live scores still
-      arrive via the league's RSS feeds.
-    </p>
-  </div>
+  <% if @league[:source_provider] == 'api-sports' %>
+    <%# api-sports leagues are followed at the league level (teams populate
+        on first sync); show a Follow toggle so the user can opt in. %>
+    <%
+      followed = @followed_league_slugs.include?(@league[:slug])
+    %>
+    <div class="sports-manage-league-follow">
+      <p>
+        <%= h(@league[:name]) %> fixtures and scores sync via api-sports.io.
+        Follow this league to include it in your daily sync — teams populate automatically on the first run.
+      </p>
+      <form method="post" action="/sports/leagues/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form js-sports-follow-form">
+        <input type="hidden" name="slug" value="<%= h(@league[:slug]) %>">
+        <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(@league[:slug]) %>">
+        <button type="submit"
+                class="<%= followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if followed %>"
+                data-following-label="✓ Following"
+                data-follow-label="+ Follow league">
+          <%= followed ? '✓ Following' : '+ Follow league' %>
+        </button>
+      </form>
+    </div>
+  <% else %>
+    <div class="empty-state">
+      <p>No teams listed in the catalog for this league yet.</p>
+      <p class="muted">
+        Tournament-style competitions (World Cups, regional cups) don't have a
+        persistent team roster — participants vary each cycle. Live scores still
+        arrive via the league's RSS feeds.
+      </p>
+    </div>
+  <% end %>
 <% else %>
   <ul class="sports-manage-grid">
     <% @league[:teams].sort_by { |t| t[:name].to_s }.each do |team| %>
