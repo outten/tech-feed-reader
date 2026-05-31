@@ -1010,18 +1010,24 @@ module SportsCatalog
         {
           slug: 'monaco-gp', name: 'Monaco Grand Prix', sport: 'motorsport', women: false,
           region: 'global', country: 'Monaco', format: :tournament,
+          source_provider: 'espn', external_id: 'monaco-gp',
+          espn_tournament_name: 'Monaco Grand Prix',
           blurb: "F1's most prestigious race — May, Circuit de Monaco. Tightest, slowest, most glamorous round of the year.",
           teams: []
         },
         {
           slug: 'british-gp', name: 'British Grand Prix', sport: 'motorsport', women: false,
           region: 'global', country: 'United Kingdom', format: :tournament,
+          source_provider: 'espn', external_id: 'british-gp',
+          espn_tournament_name: 'British Grand Prix',
           blurb: 'F1 — July, Silverstone. One of the original World Championship rounds.',
           teams: []
         },
         {
           slug: 'italian-gp', name: 'Italian Grand Prix', sport: 'motorsport', women: false,
           region: 'global', country: 'Italy', format: :tournament,
+          source_provider: 'espn', external_id: 'italian-gp',
+          espn_tournament_name: 'Italian Grand Prix',
           blurb: "F1 — September, Monza (\"Temple of Speed\"). Tifosi territory.",
           teams: []
         },
@@ -1312,78 +1318,104 @@ module SportsCatalog
         {
           slug: 'the-masters', name: 'The Masters', sport: 'golf', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'the-masters',
+          espn_tournament_name: 'Masters Tournament',
           blurb: 'First men\'s major of the year — April, Augusta National. Green jacket.',
           teams: []
         },
         {
           slug: 'pga-championship', name: 'PGA Championship', sport: 'golf', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'pga-championship',
+          espn_tournament_name: 'PGA Championship',
           blurb: 'Second men\'s major — May. Rotates US courses.',
           teams: []
         },
         {
           slug: 'us-open-golf', name: 'US Open (Golf)', sport: 'golf', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'us-open-golf',
+          espn_tournament_name: 'U.S. Open',
           blurb: 'Third men\'s major — June, the USGA\'s flagship event.',
           teams: []
         },
         {
           slug: 'the-open', name: 'The Open Championship', sport: 'golf', women: false,
           region: 'global', country: 'United Kingdom', format: :tournament,
+          source_provider: 'espn', external_id: 'the-open',
+          espn_tournament_name: 'The Open Championship',
           blurb: 'Fourth men\'s major — July. The oldest championship in golf, played on UK / Ireland links courses.',
           teams: []
         },
         {
           slug: 'the-players', name: 'The Players Championship', sport: 'golf', women: false,
           region: 'us', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'the-players',
+          espn_tournament_name: 'The Players Championship',
           blurb: "PGA Tour's flagship non-major. March, TPC Sawgrass.",
           teams: []
         },
         {
           slug: 'ryder-cup', name: 'Ryder Cup', sport: 'golf', women: false,
           region: 'global', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'ryder-cup',
+          espn_tournament_name: 'Ryder Cup',
           blurb: 'Biennial Europe vs USA men\'s team match-play. Alternates US / Europe.',
           teams: []
         },
         {
           slug: 'presidents-cup', name: 'Presidents Cup', sport: 'golf', women: false,
           region: 'global', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'presidents-cup',
+          espn_tournament_name: 'Presidents Cup',
           blurb: "Biennial USA vs International (ex-Europe) men's team match-play. Offset from Ryder Cup years.",
           teams: []
         },
         {
           slug: 'chevron-championship', name: 'Chevron Championship', sport: 'golf', women: true,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'chevron-championship',
+          espn_tournament_name: 'Chevron Championship',
           blurb: "First LPGA major — April. Formerly the ANA Inspiration.",
           teams: []
         },
         {
           slug: 'us-womens-open', name: "U.S. Women's Open", sport: 'golf', women: true,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'us-womens-open',
+          espn_tournament_name: "U.S. Women's Open",
           blurb: 'LPGA major — May/June. USGA-run.',
           teams: []
         },
         {
           slug: 'kpmg-womens-pga', name: "KPMG Women's PGA Championship", sport: 'golf', women: true,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'kpmg-womens-pga',
+          espn_tournament_name: "KPMG Women's PGA Championship",
           blurb: 'LPGA major — June. PGA of America–run.',
           teams: []
         },
         {
           slug: 'evian-championship', name: 'The Evian Championship', sport: 'golf', women: true,
           region: 'global', country: 'France', format: :tournament,
+          source_provider: 'espn', external_id: 'evian-championship',
+          espn_tournament_name: 'The Evian Championship',
           blurb: 'LPGA major — July, Evian-les-Bains, France.',
           teams: []
         },
         {
           slug: 'aig-womens-open', name: "AIG Women's Open", sport: 'golf', women: true,
           region: 'global', country: 'United Kingdom', format: :tournament,
+          source_provider: 'espn', external_id: 'aig-womens-open',
+          espn_tournament_name: "AIG Women's Open",
           blurb: 'Final LPGA major of the year — August. UK / Ireland links courses.',
           teams: []
         },
         {
           slug: 'solheim-cup', name: 'Solheim Cup', sport: 'golf', women: true,
           region: 'global', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'solheim-cup',
+          espn_tournament_name: 'Solheim Cup',
           blurb: 'Biennial Europe vs USA women\'s team match-play (the Ryder Cup\'s LPGA counterpart).',
           teams: []
         }
@@ -1394,6 +1426,8 @@ module SportsCatalog
       name: 'Badminton',
       emoji: '🏸',
       region: 'global',
+      source_provider: 'espn', external_id: 'solheim-cup',
+      espn_tournament_name: 'Solheim Cup',
       blurb: 'BWF World Tour. Indonesia, Denmark, China, Japan dominate; talent global.',
       leagues: [
         {
@@ -1775,12 +1809,21 @@ module SportsCatalog
     'us-open-golf'            => 'U.S. Open (golf)',
     'the-open'                => 'The Open Championship',
     'ryder-cup'               => 'Ryder Cup',
+    'presidents-cup'          => 'Presidents Cup',
+    'the-players'             => 'The Players Championship',
+    'chevron-championship'    => 'Chevron Championship',
+    'us-womens-open'          => "U.S. Women's Open",
+    'kpmg-womens-pga'         => "KPMG Women's PGA Championship",
+    'evian-championship'      => 'The Evian Championship',
+    'aig-womens-open'         => "Women's British Open",
     'solheim-cup'             => 'Solheim Cup',
-    # Motorsport — single events
+    # Motorsport — single events + GPs
     'le-mans-24'              => '24 Hours of Le Mans',
     'indy-500'                => 'Indianapolis 500',
     'daytona-500'             => 'Daytona 500',
     'monaco-gp'               => 'Monaco Grand Prix',
+    'british-gp'              => 'British Grand Prix',
+    'italian-gp'              => 'Italian Grand Prix',
     'dakar-rally'             => 'Dakar Rally',
     # Cycling
     'tour-de-france'          => 'Tour de France',

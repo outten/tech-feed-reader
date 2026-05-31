@@ -126,6 +126,11 @@ module SportsSync
         upserted += sync_tennis_league_events!(league, logger: logger)
         next
       end
+      # Golf and individual motorsport GPs don't have home/away match
+      # scores — they use leaderboard or race-result formats. Follows
+      # work for Wikipedia summaries + article mentions; no match sync.
+      next if league['sport'] == 'golf'
+      next if league['sport'] == 'motorsport' && league['source_provider'] == 'espn'
 
       events = Providers::ESPN.league_scoreboard(sport_path: league['external_id'])
       events.each do |m|
