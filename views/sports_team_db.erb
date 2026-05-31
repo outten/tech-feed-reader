@@ -5,17 +5,48 @@
     sections (per-team RSS feeds, hand-written blurb, emoji): just
     name + logo + league + standings + fixtures + results + mentions. %>
 
+<%
+  is_tennis_player = @league && @league['sport'] == 'tennis'
+  ext_id = @team_row['external_id'].to_s
+  headshot_url = if is_tennis_player && !ext_id.empty? && @team_row['image_url'].to_s.empty?
+    "https://a.espncdn.com/i/headshots/tennis/players/full/#{ext_id}.png"
+  end
+  logo_url = @team_row['image_url'].to_s.empty? ? headshot_url : @team_row['image_url']
+  sport_emoji = begin
+    @league ? (SportsCatalog.find_sport(@league['sport'])&.dig(:emoji) || '🏟') : '🏟'
+  rescue
+    '🏟'
+  end
+%>
 <div class="page-header sports-team-header">
   <div>
     <h2>
-      <% if @team_row['image_url'] && !@team_row['image_url'].to_s.empty? %>
-        <img class="sports-team-logo" src="<%= h(@team_row['image_url']) %>" alt="" loading="lazy">
+      <% if logo_url %>
+        <% if headshot_url %>
+          <%# Tennis player headshot: circular avatar style %>
+          <span class="tennis-match-avatar" style="width:52px;height:52px;display:inline-flex;vertical-align:middle;margin-right:0.4rem">
+            <img src="<%= h(logo_url) %>" alt="" loading="lazy" onerror="this.style.display='none'">
+            <span class="tennis-match-initials" style="font-size:1rem">
+              <%= @team_row['name'].split.map { |w| w[0] }.first(2).join.upcase %>
+            </span>
+          </span>
+        <% else %>
+          <img class="sports-team-logo" src="<%= h(logo_url) %>" alt="" loading="lazy">
+        <% end %>
       <% end %>
       <%= h(@team_row['name']) %>
     </h2>
     <p class="subtitle">
       <% if @league %>
-        <a href="/sports/league/<%= h(@league['slug']) %>"><%= h(@league['name']) %></a>
+        <% if is_tennis_player %>
+          <span class="sports-catalog-chip">🎾 Player</span>
+          &middot;
+          <a href="/sports/league/<%= h(@league['slug']) %>">
+            <%= h(@league['name']) %> draw →
+          </a>
+        <% else %>
+          <a href="/sports/league/<%= h(@league['slug']) %>"><%= h(@league['name']) %></a>
+        <% end %>
         &middot;
       <% end %>
       <a href="/sports">&larr; All sports</a>
@@ -57,59 +88,23 @@
     matches in the table (off-season, or league not synced yet). %>
 <% if @upcoming.any? %>
   <section class="benchmark-section">
-    <h3>Upcoming fixtures</h3>
-    <ul class="whats-on-matches">
+    <h3><%= is_tennis_player ? 'Next match' : 'Upcoming fixtures' %></h3>
+    <ul class="sport-match-list">
       <% @upcoming.each do |m| %>
-        <% home = (@teams_by_id || {})[m['home_team_id']] %>
-        <% away = (@teams_by_id || {})[m['away_team_id']] %>
-        <li class="whats-on-match">
-          <span class="whats-on-time">
-            <% if m['scheduled_at'] %>
-              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%a %-l:%M %p') rescue m['scheduled_at'] %>
-            <% else %>
-              TBD
-            <% end %>
-          </span>
-          <span class="whats-on-matchup">
-            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>—<% end %>
-            <span class="muted">@</span>
-            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>—<% end %>
-          </span>
-          <% if m['venue'] && !m['venue'].to_s.empty? %>
-            <span class="muted whats-on-league"><%= h(m['venue']) %></span>
-          <% end %>
-          <% if m['status'].to_s == 'live' %>
-            <span class="badge live-badge" title="Match is live now">LIVE</span>
-          <% end %>
-        </li>
+        <%= match_card_html(m, @league ? @league['sport'] : 'team',
+                            @teams_by_id || {}, upcoming: true, sport_emoji: sport_emoji) %>
       <% end %>
     </ul>
   </section>
 <% end %>
 
-<%# Recent results. Same shape as fixtures, with final score added. %>
 <% if @recent_finals.any? %>
   <section class="benchmark-section">
-    <h3>Recent results</h3>
-    <ul class="whats-on-matches">
+    <h3><%= is_tennis_player ? 'Tournament results' : 'Recent results' %></h3>
+    <ul class="sport-match-list">
       <% @recent_finals.each do |m| %>
-        <% home = (@teams_by_id || {})[m['home_team_id']] %>
-        <% away = (@teams_by_id || {})[m['away_team_id']] %>
-        <li class="whats-on-match">
-          <span class="whats-on-time">
-            <% if m['scheduled_at'] %>
-              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%b %-d') rescue m['scheduled_at'] %>
-            <% end %>
-          </span>
-          <span class="whats-on-matchup">
-            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>—<% end %>
-            <strong><%= m['away_score'] || '—' %></strong>
-            <span class="muted">@</span>
-            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>—<% end %>
-            <strong><%= m['home_score'] || '—' %></strong>
-          </span>
-          <span class="muted whats-on-league">FT</span>
-        </li>
+        <%= match_card_html(m, @league ? @league['sport'] : 'team',
+                            @teams_by_id || {}, sport_emoji: sport_emoji) %>
       <% end %>
     </ul>
   </section>

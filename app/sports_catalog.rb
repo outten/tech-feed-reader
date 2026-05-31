@@ -691,32 +691,32 @@ module SportsCatalog
           slug: 'australian-open', name: 'Australian Open', sport: 'tennis', women: false,
           region: 'global', country: 'Australia', format: :tournament,
           source_provider: 'espn', external_id: 'tennis/atp',
-          espn_tournament_name: 'Australian Open',
-          blurb: 'First Grand Slam of the year — January, Melbourne.',
+          espn_tournament_name: 'Australian Open', espn_tours: %w[tennis/atp tennis/wta],
+          blurb: 'First Grand Slam of the year — January, Melbourne. Men\'s + women\'s draw.',
           teams: []
         },
         {
           slug: 'roland-garros', name: 'Roland Garros', sport: 'tennis', women: false,
           region: 'global', country: 'France', format: :tournament,
           source_provider: 'espn', external_id: 'tennis/atp',
-          espn_tournament_name: 'Roland Garros',
-          blurb: 'The French Open — May/June, Paris. Clay court.',
+          espn_tournament_name: 'Roland Garros', espn_tours: %w[tennis/atp tennis/wta],
+          blurb: 'The French Open — May/June, Paris. Clay court. Men\'s + women\'s draw.',
           teams: []
         },
         {
           slug: 'wimbledon', name: 'Wimbledon', sport: 'tennis', women: false,
           region: 'global', country: 'United Kingdom', format: :tournament,
           source_provider: 'espn', external_id: 'tennis/atp',
-          espn_tournament_name: 'Wimbledon',
-          blurb: 'The Championships — June/July, London. Grass court.',
+          espn_tournament_name: 'Wimbledon', espn_tours: %w[tennis/atp tennis/wta],
+          blurb: 'The Championships — June/July, London. Grass court. Men\'s + women\'s draw.',
           teams: []
         },
         {
           slug: 'us-open-tennis', name: 'US Open (Tennis)', sport: 'tennis', women: false,
           region: 'global', country: 'United States', format: :tournament,
           source_provider: 'espn', external_id: 'tennis/atp',
-          espn_tournament_name: 'US Open',
-          blurb: 'Final Grand Slam of the year — August/September, New York. Hard court.',
+          espn_tournament_name: 'US Open', espn_tours: %w[tennis/atp tennis/wta],
+          blurb: 'Final Grand Slam of the year — August/September, New York. Hard court. Men\'s + women\'s draw.',
           teams: []
         },
         # STUFF #70 follow-up — ATP Masters 1000 + WTA 1000 (the tier
@@ -728,90 +728,120 @@ module SportsCatalog
         {
           slug: 'indian-wells', name: 'Indian Wells (BNP Paribas Open)', sport: 'tennis', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Indian Wells', espn_tours: %w[tennis/atp tennis/wta],
           blurb: "ATP Masters 1000 + WTA 1000 — March, Indian Wells, CA. Outdoor hard court.",
           teams: []
         },
         {
           slug: 'miami-open', name: 'Miami Open', sport: 'tennis', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Miami Open', espn_tours: %w[tennis/atp tennis/wta],
           blurb: "ATP Masters 1000 + WTA 1000 — March/April, Miami. Outdoor hard court.",
           teams: []
         },
         {
           slug: 'monte-carlo-masters', name: 'Monte-Carlo Masters', sport: 'tennis', women: false,
           region: 'global', country: 'Monaco', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Monte-Carlo', espn_tours: %w[tennis/atp],
           blurb: "ATP Masters 1000 — April, Monaco. Clay court. (Men's only — no WTA equivalent.)",
           teams: []
         },
         {
           slug: 'madrid-open', name: 'Madrid Open', sport: 'tennis', women: false,
           region: 'global', country: 'Spain', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Madrid', espn_tours: %w[tennis/atp tennis/wta],
           blurb: "ATP Masters 1000 + WTA 1000 — April/May, Madrid. Clay court.",
           teams: []
         },
         {
           slug: 'italian-open', name: 'Italian Open (Rome)', sport: 'tennis', women: false,
           region: 'global', country: 'Italy', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Italian Open', espn_tours: %w[tennis/atp tennis/wta],
           blurb: "ATP Masters 1000 + WTA 1000 — May, Rome. Clay court. Final Slam tune-up before Roland Garros.",
           teams: []
         },
         {
           slug: 'canadian-open', name: 'Canadian Open', sport: 'tennis', women: false,
           region: 'global', country: 'Canada', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Canadian Open', espn_tours: %w[tennis/atp tennis/wta],
           blurb: "ATP Masters 1000 + WTA 1000 — August. Alternates Toronto / Montreal between the tours.",
           teams: []
         },
         {
           slug: 'cincinnati-open', name: 'Cincinnati Open', sport: 'tennis', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Cincinnati', espn_tours: %w[tennis/atp tennis/wta],
           blurb: "ATP Masters 1000 + WTA 1000 — August, Cincinnati. US Open warm-up.",
           teams: []
         },
         {
           slug: 'shanghai-masters', name: 'Shanghai Masters', sport: 'tennis', women: false,
           region: 'global', country: 'China', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Shanghai', espn_tours: %w[tennis/atp],
           blurb: "ATP Masters 1000 — October, Shanghai. (Men's only — WTA has Wuhan/Beijing in the Asian swing.)",
           teams: []
         },
         {
           slug: 'paris-masters', name: 'Paris Masters', sport: 'tennis', women: false,
           region: 'global', country: 'France', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Paris Masters', espn_tours: %w[tennis/atp],
           blurb: "ATP Masters 1000 — October/November, Paris (indoor). Final Masters event before ATP Finals.",
           teams: []
         },
         {
           slug: 'wta-dubai', name: 'Dubai Tennis Championships', sport: 'tennis', women: true,
           region: 'global', country: 'UAE', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/wta',
+          espn_tournament_name: 'Dubai', espn_tours: %w[tennis/wta],
           blurb: "WTA 1000 — February. Alternates with Qatar Open as the early-season WTA 1000.",
           teams: []
         },
         {
           slug: 'wta-doha', name: 'Qatar Open (Doha)', sport: 'tennis', women: true,
           region: 'global', country: 'Qatar', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/wta',
+          espn_tournament_name: 'Qatar', espn_tours: %w[tennis/wta],
           blurb: "WTA 1000 — February. Alternates with Dubai.",
           teams: []
         },
         {
           slug: 'wta-beijing', name: 'China Open (Beijing)', sport: 'tennis', women: true,
           region: 'global', country: 'China', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/wta',
+          espn_tournament_name: 'China Open', espn_tours: %w[tennis/wta],
           blurb: "WTA 1000 — September/October. Asian-swing flagship.",
           teams: []
         },
         {
           slug: 'wta-wuhan', name: 'Wuhan Open', sport: 'tennis', women: true,
           region: 'global', country: 'China', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/wta',
+          espn_tournament_name: 'Wuhan', espn_tours: %w[tennis/wta],
           blurb: "WTA 1000 — October. Hard court; paired with Beijing in the Asian swing.",
           teams: []
         },
         {
           slug: 'atp-finals', name: 'ATP Finals', sport: 'tennis', women: false,
           region: 'global', country: 'Italy', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'ATP Finals', espn_tours: %w[tennis/atp],
           blurb: "Year-end championship — November. Top 8 men's singles + doubles. Indoor hard court.",
           teams: []
         },
         {
           slug: 'wta-finals', name: 'WTA Finals', sport: 'tennis', women: true,
           region: 'global', country: nil, format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/wta',
+          espn_tournament_name: 'WTA Finals', espn_tours: %w[tennis/wta],
           blurb: "Year-end championship — November. Top 8 women's singles + doubles. Indoor hard court.",
           teams: []
         }
