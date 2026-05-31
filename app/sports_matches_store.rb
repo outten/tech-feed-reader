@@ -73,6 +73,16 @@ module SportsMatchesStore
     SQL
   end
 
+  # All completed matches for a league grouped by round, newest first.
+  # Used on tournament pages so every round's results are browsable.
+  def finals_by_round_for_league(league_id)
+    db.execute(<<~SQL, [league_id])
+      SELECT * FROM sports_matches
+      WHERE status = 'final' AND league_id = ?
+      ORDER BY scheduled_at DESC
+    SQL
+  end
+
   # Live matches across the whole table (used by /sports overview
   # "Live now" section once the UI ships).
   def live

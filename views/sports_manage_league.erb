@@ -28,30 +28,32 @@
   </div>
 </div>
 
-<% if (@league[:teams] || []).empty? %>
-  <% if @league[:source_provider] == 'api-sports' %>
-    <%# api-sports leagues are followed at the league level (teams populate
-        on first sync); show a Follow toggle so the user can opt in. %>
-    <%
-      followed = @followed_league_slugs.include?(@league[:slug])
-    %>
-    <div class="sports-manage-league-follow">
-      <p>
-        <%= h(@league[:name]) %> fixtures and scores sync via api-sports.io.
-        Follow this league to include it in your daily sync — teams populate automatically on the first run.
-      </p>
-      <form method="post" action="/sports/leagues/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form js-sports-follow-form">
-        <input type="hidden" name="slug" value="<%= h(@league[:slug]) %>">
-        <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(@league[:slug]) %>">
-        <button type="submit"
-                class="<%= followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if followed %>"
-                data-following-label="✓ Following"
-                data-follow-label="+ Follow league">
-          <%= followed ? '✓ Following' : '+ Follow league' %>
-        </button>
-      </form>
-    </div>
-  <% else %>
+<% league_followed = @followed_league_slugs.include?(@league[:slug]) %>
+
+<%# api-sports leagues: show a league-level Follow toggle at the top.
+    Following the league enables the daily sync; team follows below
+    surface individual score tiles on /sports. %>
+<% if @league[:source_provider] == 'api-sports' %>
+  <div class="sports-manage-league-follow">
+    <form method="post" action="/sports/leagues/<%= league_followed ? 'unfollow' : 'follow' %>" class="sports-manage-form js-sports-follow-form">
+      <input type="hidden" name="slug" value="<%= h(@league[:slug]) %>">
+      <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(@league[:slug]) %>">
+      <button type="submit"
+              class="<%= league_followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if league_followed %>"
+              data-following-label="✓ Following league"
+              data-follow-label="+ Follow league">
+        <%= league_followed ? '✓ Following league' : '+ Follow league' %>
+      </button>
+    </form>
+    <p class="muted" style="margin-top:0.4rem; font-size:0.85em;">
+      Following the league enables the daily sync.
+      Follow individual teams below to surface their scores on <a href="/sports">/sports</a>.
+    </p>
+  </div>
+<% end %>
+
+<% if (@league[:teams] || []).empty? && (@db_teams || []).empty? %>
+  <% unless @league[:source_provider] == 'api-sports' %>
     <div class="empty-state">
       <p>No teams listed in the catalog for this league yet.</p>
       <p class="muted">
@@ -61,6 +63,38 @@
       </p>
     </div>
   <% end %>
+<% elsif (@db_teams || []).any? %>
+  <%# Teams loaded from DB (api-sports leagues — populated by sync). %>
+  <ul class="sports-manage-grid">
+    <% @db_teams.each do |team| %>
+      <% followed = @followed_slugs.include?(team['slug']) %>
+      <li class="sports-manage-team <%= 'is-followed' if followed %>">
+        <% if team['image_url'] && !team['image_url'].empty? %>
+          <img src="<%= h(team['image_url']) %>" alt="" class="sports-manage-logo" loading="lazy">
+        <% else %>
+          <span class="sports-manage-logo sports-manage-logo-fallback" aria-hidden="true"><%= @sport[:emoji] || '🏟' %></span>
+        <% end %>
+        <div class="sports-manage-team-info">
+          <span class="sports-manage-team-name"><%= h(team['short_name'] || team['name']) %></span>
+          <% if team['location'] && !team['location'].empty? && team['location'] != team['name'] %>
+            <span class="muted sports-manage-team-location"><%= h(team['location']) %></span>
+          <% end %>
+        </div>
+        <form method="post" action="/sports/teams/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form js-sports-follow-form">
+          <input type="hidden" name="slug" value="<%= h(team['slug']) %>">
+          <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>/<%= h(@league[:slug]) %>">
+          <button type="submit"
+                  class="<%= followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if followed %>"
+                  data-full-name="<%= h(team['name']) %>"
+                  data-follow-label="+ Follow"
+                  data-following-label="✓ Following"
+                  title="<%= followed ? 'Stop following' : 'Follow — surfaces score tile on /sports' %>">
+            <%= followed ? '✓ Following' : '+ Follow' %>
+          </button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
 <% else %>
   <ul class="sports-manage-grid">
     <% @league[:teams].sort_by { |t| t[:name].to_s }.each do |team| %>

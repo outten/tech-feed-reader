@@ -690,24 +690,32 @@ module SportsCatalog
         {
           slug: 'australian-open', name: 'Australian Open', sport: 'tennis', women: false,
           region: 'global', country: 'Australia', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Australian Open',
           blurb: 'First Grand Slam of the year — January, Melbourne.',
           teams: []
         },
         {
           slug: 'roland-garros', name: 'Roland Garros', sport: 'tennis', women: false,
           region: 'global', country: 'France', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Roland Garros',
           blurb: 'The French Open — May/June, Paris. Clay court.',
           teams: []
         },
         {
           slug: 'wimbledon', name: 'Wimbledon', sport: 'tennis', women: false,
           region: 'global', country: 'United Kingdom', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'Wimbledon',
           blurb: 'The Championships — June/July, London. Grass court.',
           teams: []
         },
         {
           slug: 'us-open-tennis', name: 'US Open (Tennis)', sport: 'tennis', women: false,
           region: 'global', country: 'United States', format: :tournament,
+          source_provider: 'espn', external_id: 'tennis/atp',
+          espn_tournament_name: 'US Open',
           blurb: 'Final Grand Slam of the year — August/September, New York. Hard court.',
           teams: []
         },

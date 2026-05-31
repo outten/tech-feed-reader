@@ -1137,3 +1137,56 @@ API-Sports' rate limit is per-day across the account. The daily sync (`make sync
 - `API_SPORTS_KEY` absent → returns 0 immediately (safe for environments without the key).
 
 **Not covered (defer):** golf leaderboards (ESPN covers Masters/PGA via `football/golf`; no free-tier api-sports golf endpoint), MMA (niche), lower-tier soccer leagues (add catalog entries + api-sports football league IDs as needed).
+
+## [x] 75. Hockey Sports
+
+Hockey Sports management /sports/manage/hockey/nhl is not like the others. Why don't we see the leagues sports team. And allow us to see their standings and following.
+
+**Shipped (two PRs bundled):**
+- `GET /sports/manage/hockey/nhl` (and any api-sports league with `teams: []`): now loads teams from the DB via `SportsTeamsStore.for_league` and renders them with individual `+ Follow` buttons — same grid as ESPN-backed leagues. 32 NHL teams populate on first sync.
+- League-level `+ Follow league` toggle added to the manage-league page for api-sports leagues (required to enable the daily sync).
+- `@followed_league_slugs` now passed into the `/sports/manage/:sport/:league` route.
+
+## [ ] 76. Tennis / Roland Garros
+
+Both `/sports/team/tennis` and `/sports/league/roland-garros` show no match data despite the French Open being live.
+
+**Root cause:** Roland Garros had `source_provider: 'catalog'` — no live data provider. api-sports has no tennis API. ESPN *does* expose the tournament at `site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard` with 633 matches per tournament (player names, set-by-set scores in `linescores`, human-readable summary in `notes[0].text`).
+
+**Shipped:**
+- `Providers::ESPN.tennis_scoreboard(tour:, tournament_name:)` — parses the tennis-specific ESPN format (groupings → competitions → athlete competitors). Returns `TennisMatch` structs.
+- `Providers::ESPN.normalize_tennis_competition` — maps ESPN set scores, winner flag, and notes summary to our match shape.
+- `SportsSync.sync_tennis_league_events!` — new sync path for tennis leagues; stores each player as a `sports_teams` row (slug: `roland-garros-guo-hanyu`, external_id: ESPN athlete ID) so the existing fixtures view renders match cards without schema changes.
+- `SportsSync.ensure_tennis_player!` — upserts a player-as-team row per match.
+- `sync_followed_league_events!` branches on `sport == 'tennis'` to call the new path.
+- Catalog updated: `roland-garros`, `australian-open`, `wimbledon`, `us-open-tennis` → `source_provider: 'espn'`, `external_id: 'tennis/atp'`, `espn_tournament_name:` (filter string).
+- `/sports/team/tennis` (curated team page): new "Live tournament data available" callout links to any followed tennis league that has synced matches.
+- Verified live: 494 Roland Garros matches synced (433 final, 61 scheduled).
+
+## [x] 77. Match Cards
+
+Can you render the Results by Round more nicely for the user? With team or user logo? Like the "Last Game" area? And sort by most recent -- ie. most recent first.
+
+**Shipped.** Tennis results-by-round section replaced with proper match cards:
+- **Player avatar** — ESPN headshot (`a.espncdn.com/i/headshots/tennis/players/full/{id}.png`) auto-loaded from the stored ESPN athlete ID. Falls back to player initials (first letters of first + last name) in a circular avatar when the image 404s or fails to load.
+- **Winner highlight** — winning player's name is bold; sets shown in green with a 🏆 trophy icon.
+- **Sets score** — `home_score` / `away_score` are sets won (e.g. "2 – 0"), clear at a glance.
+- **Court** — venue from ESPN match data (e.g. "Paris, France — Court Chatrier") shown beneath the two player rows.
+- **Date** — compact "May 30" label in a left column.
+- **Sort order** — rounds sorted Final → Semifinal → QF → R4 → R3 → R2 → R1 → Qualifying, newest first within each round. Final and Semifinal groups start expanded (`<details open>`); deeper rounds start collapsed.
+- New `.tennis-match-card` CSS grid layout + `.tennis-match-avatar` / `.tennis-match-winner` / `.sports-round-summary` classes added to `public/style.css`.
+
+## [x] 78. Current vs. Past
+
+For example, Rolland Garros is showing last year's matches versus current which is going on now. It is OK for historical; however, we should show current if a league's tournament is current. It is ok if all of the data is not available (for exmaple, finals) if in progress. Let's add.
+
+**Shipped.** The league route now splits tennis results into current-year and historical buckets before passing them to the view:
+- `@finals_this_year` — matches whose `scheduled_at` starts with the current year (2026). These are the ongoing tournament's completed rounds.
+- `@finals_historical` — all prior-year matches (Roland Garros 2025, etc.).
+
+The view renders them in two separate `<details>` blocks:
+- **2026 Results** — open by default. Rounds sorted Final → Semifinal → QF → deeper rounds; Final + Semifinal start expanded, the rest collapsed.
+- **Previous year's results** — collapsed by default. Same round grouping inside.
+
+Both sections use the same `tennis-match-card` layout (avatars, set scores, court). This way the current tournament is prominent and historical data is available but unobtrusive.
+

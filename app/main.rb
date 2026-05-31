@@ -2294,6 +2294,14 @@ class TechFeedReader < Sinatra::Base
                                         .map { |f| f['value'] }.to_set
     @followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league')
                                                 .map { |f| f['value'] }.to_set
+    # STUFF #75 — for api-sports leagues the catalog carries teams:[]
+    # (teams auto-populate from match data on first sync). Load from DB
+    # so the manage page can show a follow grid once data exists.
+    @db_teams = []
+    if (@league[:teams] || []).empty? && @league[:source_provider] == 'api-sports'
+      league_row = SportsLeaguesStore.find_by_slug(@league[:slug])
+      @db_teams = SportsTeamsStore.for_league(league_row['id']).sort_by { |t| t['name'] } if league_row
+    end
     # STUFF #52 PR3 — curated RSS feeds for this league + which the
     # user is already subscribed to (so the button can flip).
     @league_feeds   = FeedCatalog.feeds_for_sports_league(@league[:slug])
@@ -2457,7 +2465,22 @@ class TechFeedReader < Sinatra::Base
     # 'catalog'` (most tennis Slams, golf majors, cycling) stay empty
     # until a provider lands.
     @upcoming_matches = SportsMatchesStore.upcoming_for_league(@league['id'], limit: 20)
-    @recent_finals    = SportsMatchesStore.recent_finals_for_league(@league['id'], limit: 12)
+    # Tennis tournaments: show all results grouped by round so the full
+    # draw is browsable. Other sports keep the 12-match recent window.
+    @recent_finals = if @league['sport'] == 'tennis'
+                       SportsMatchesStore.finals_by_round_for_league(@league['id'])
+                     else
+                       SportsMatchesStore.recent_finals_for_league(@league['id'], limit: 12)
+                     end
+    @results_by_round = @league['sport'] == 'tennis' &&
+                        @recent_finals.any? { |m| m['period'].to_s != '' }
+    # STUFF #78 — split tennis results into current year vs historical so
+    # the ongoing tournament leads and previous editions are secondary.
+    if @results_by_round
+      this_year = Date.today.year.to_s
+      @finals_this_year = @recent_finals.select { |m| m['scheduled_at'].to_s.start_with?(this_year) }
+      @finals_historical = @recent_finals.reject { |m| m['scheduled_at'].to_s.start_with?(this_year) }
+    end
 
     # Build a teams_by_id that covers both the standings teams and any
     # team referenced by the new match rows (some matches may involve
@@ -2546,6 +2569,20 @@ class TechFeedReader < Sinatra::Base
       )
     end
     @page_title  = @team[:name]
+    # STUFF #75 — for the tennis curated team page, surface any followed
+    # tennis leagues that have synced match data (Roland Garros, etc.)
+    # so the user can navigate directly to live tournament fixtures.
+    @tennis_tournaments = []
+    if @team[:sport] == :tennis
+      tennis_follows = SportsFollowsStore.for_kind(current_user_id, 'league').map { |f| f['value'] }
+      @tennis_tournaments = tennis_follows.filter_map do |slug|
+        row = SportsLeaguesStore.find_by_slug(slug)
+        next unless row && row['sport'] == 'tennis'
+        match_count = SportsMatchesStore.upcoming_for_league(row['id'], limit: 1).length +
+                      SportsMatchesStore.recent_finals_for_league(row['id'], limit: 1).length
+        row if match_count > 0
+      end
+    end
     erb :sports_team
   end
 

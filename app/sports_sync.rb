@@ -119,6 +119,13 @@ module SportsSync
       next unless league
       next unless league['source_provider'] == 'espn'
 
+      # STUFF #75 — tennis uses player-vs-player format; the scoreboard
+      # structure differs from team sports so it gets its own path.
+      if league['sport'] == 'tennis'
+        upserted += sync_tennis_league_events!(league, logger: logger)
+        next
+      end
+
       events = Providers::ESPN.league_scoreboard(sport_path: league['external_id'])
       events.each do |m|
         ensure_team!(m.home_team_external_id, m.home_team_name, m.home_team_logo, league: league)
@@ -146,6 +153,73 @@ module SportsSync
       logger.warn('sports_sync_league_events_error', slug: slug, message: e.message)
     end
     upserted
+  end
+
+  # STUFF #75 — pull matches for a tennis tournament league (Grand Slams
+  # etc.) via ESPN's player-based scoreboard. Each player becomes a
+  # sports_teams row keyed by their ESPN athlete ID so the existing
+  # match/fixture views can render names without schema changes.
+  # Sync a tennis tournament league. Fetches current edition plus the
+  # previous year's edition so historical results are available immediately
+  # after following a tournament.
+  def self.sync_tennis_league_events!(league, logger:)
+    catalog_entry = SportsCatalog.all_leagues.find { |lg| lg[:slug] == league['slug'] }
+    tour            = league['external_id']
+    tournament_name = catalog_entry&.dig(:espn_tournament_name)
+
+    # Current edition (no dates param = today's active events)
+    current = Providers::ESPN.tennis_scoreboard(tour: tour, tournament_name: tournament_name)
+    # Previous year's edition: use approximate month from current data or
+    # fall back to one year ago today. Deduplication is handled by the
+    # ON CONFLICT upsert so re-syncing the same matches is safe.
+    prev_dates = (Date.today << 12).strftime('%Y%m%d')
+    previous   = Providers::ESPN.tennis_scoreboard(tour: tour, tournament_name: tournament_name,
+                                                    dates: prev_dates)
+
+    count = 0
+    (current + previous).each do |m|
+      home = ensure_tennis_player!(m.home_player_id, m.home_player_name, league: league)
+      away = ensure_tennis_player!(m.away_player_id, m.away_player_name, league: league)
+      next unless home && away
+      SportsMatchesStore.upsert(
+        league_id:       league['id'],
+        source_provider: 'espn',
+        external_id:     "tennis-#{m.external_id}",
+        scheduled_at:    m.scheduled_at,
+        status:          m.status,
+        home_team_id:    home['id'],
+        away_team_id:    away['id'],
+        home_score:      m.home_sets,
+        away_score:      m.away_sets,
+        period:          [m.round, m.score_summary].compact.join('|'),
+        venue:           m.venue
+      )
+      count += 1
+    end
+    logger.info('sports_sync_tennis_events', league: league['slug'], count: count)
+    count
+  rescue StandardError => e
+    logger.warn('sports_sync_tennis_events_error', league: league['slug'], message: e.message)
+    0
+  end
+
+  # Upsert a tennis player as a sports_teams row so matches can reference
+  # both sides via FK. ESPN athlete IDs are the external_id; slug is
+  # derived from the league + player name for human-readability.
+  def self.ensure_tennis_player!(player_id, name, league:)
+    return nil if name.to_s.strip.empty?
+    name = name.strip
+    ext_id = player_id.to_s.empty? ? name.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/^-|-$/, '') : player_id.to_s
+    slug   = "#{league['slug']}-#{name.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/^-|-$/, '')}"
+    SportsTeamsStore.upsert(
+      league_id:       league['id'],
+      slug:            slug,
+      name:            name,
+      short_name:      nil,
+      source_provider: 'espn',
+      external_id:     ext_id,
+      image_url:       nil
+    )
   end
 
   def self.fetch_matches_for(team, league, logger:)
