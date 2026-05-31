@@ -525,6 +525,18 @@ class TechFeedReader < Sinatra::Base
       start_of_day = Time.new(today.year, today.month, today.day, 0, 0, 0).utc
 
       @today_matches = SportsMatchesStore.upcoming_for_followed_teams(current_user_id, days_forward: 1)
+      # Also include today's matches from followed leagues (tournaments like Roland Garros)
+      # so the home page stays useful even when only leagues (not teams) are followed.
+      followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league').map { |f| f['value'] }
+      league_today = followed_league_slugs.flat_map do |slug|
+        row = SportsLeaguesStore.find_by_slug(slug)
+        next [] unless row
+        SportsMatchesStore.upcoming_for_league(row['id'], now: Time.now.utc, limit: 5)
+      end
+      @today_matches = (@today_matches + league_today).uniq { |m| m['id'] }
+                                                      .sort_by { |m| m['scheduled_at'].to_s }
+      # Live matches right now (across all sports).
+      @live_matches_today = SportsMatchesStore.live
 
       scored = Recommendation::ForYou.score_window(current_user_id, state: :all, limit: 200, offset: 0)
       todays = scored.select { |a| a['published_at'].to_s >= start_of_day.iso8601 }
@@ -556,10 +568,12 @@ class TechFeedReader < Sinatra::Base
       @summaries_by_article_id = SummaryStore.find_for_ids(
         (@today_reading + @today_listening + @today_watching).map { |a| a['id'] }
       )
-      @teams_by_id   = build_teams_by_id_for_matches(@today_matches)
-      @leagues_by_id = build_leagues_by_id_for_matches(@today_matches)
-      @nothing_today = @today_matches.empty? && @today_reading.empty? &&
-                       @today_listening.empty? && @today_watching.empty?
+      all_match_rows = @today_matches + @live_matches_today
+      @teams_by_id   = build_teams_by_id_for_matches(all_match_rows)
+      @leagues_by_id = build_leagues_by_id_for_matches(all_match_rows)
+      @nothing_today = @today_matches.empty? && @live_matches_today.empty? &&
+                       @today_reading.empty? && @today_listening.empty? &&
+                       @today_watching.empty?
     end
 
     # Estimated reading time for an article in whole minutes, based
@@ -2268,6 +2282,12 @@ class TechFeedReader < Sinatra::Base
         sport:   catalog && SportsCatalog.find_sport(catalog[:sport_slug])
       }
     end
+    # Live matches right now — all synced sports.
+    @live_matches = SportsMatchesStore.live
+    live_team_ids    = @live_matches.flat_map { |m| [m['home_team_id'], m['away_team_id']] }.compact.uniq
+    live_league_ids  = @live_matches.map { |m| m['league_id'] }.compact.uniq
+    @live_teams_by_id   = live_team_ids.each_with_object({})   { |id, h| h[id] = SportsTeamsStore.find(id) }
+    @live_leagues_by_id = live_league_ids.each_with_object({}) { |id, h| h[id] = SportsLeaguesStore.find(id) }
     erb :sports
   end
 
@@ -2574,6 +2594,7 @@ class TechFeedReader < Sinatra::Base
 
     @page_title  = "#{@league['name']} — Standings"
     @sport       = SportsCatalog.find_sport(@league['sport']) rescue nil
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     rows = SportsStandingsStore.for_league(@league['id'])
     @standings_groups = rows.group_by { |r| r['group_name'] }
 
@@ -2617,6 +2638,20 @@ class TechFeedReader < Sinatra::Base
 
     # Followed-team highlight: which slug is in sports_follows?
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team').map { |f| f['value'] }.to_set
+    # Article bridging: surface feed articles that mention this league/tournament.
+    # Uses FTS phrase MATCH with a 1h TTL cache — same pattern as team pages.
+    begin
+      SportsEntityArticlesStore.refresh_for(
+        kind: 'league', entity_id: @league['id'], name: @league['name']
+      )
+      @league_articles = SportsEntityArticlesStore.for_entity(
+        kind: 'league', entity_id: @league['id'], limit: 15
+      )
+    rescue StandardError => e
+      AppLogger.warn('sports_league_articles_error', league: @league['slug'], message: e.message)
+      @league_articles = []
+    end
+    @summaries_by_article_id = SummaryStore.find_for_ids(@league_articles.map { |a| a['id'] })
     erb :sports_league
   end
 

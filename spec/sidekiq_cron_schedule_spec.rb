@@ -21,11 +21,11 @@ RSpec.describe 'config/sidekiq_cron.yml' do
     expect(job['cron']).to eq('0 * * * *')
   end
 
-  it 'registers the nightly sports sync job' do
+  it 'registers the hourly sports sync job' do
     expect(schedule).to have_key('sports_sync')
     job = schedule['sports_sync']
     expect(job['class']).to eq('SportsSyncWorker')
-    expect(job['cron']).to eq('0 4 * * *')
+    expect(job['cron']).to eq('30 * * * *')
   end
 
   it 'registers the daily fix-article-links job at :45 past 4am UTC' do

@@ -208,10 +208,44 @@
     <p>
       No live data synced for <strong><%= h(@league['name']) %></strong> yet.
       <% if @league['source_provider'] == 'espn' %>
-        Run <code>make sync-sports</code> on the server (the cron also fires nightly); fixtures + standings populate when the tournament is in season.
+        Fixtures + standings populate when the tournament is in season — the cron runs hourly.
       <% else %>
-        This catalog-source tournament doesn't have a live-data provider wired up yet — articles mentioning <strong><%= h(@league['name']) %></strong> are surfaced via your feed subscriptions in the meantime.
+        This tournament doesn't have a live-data provider yet — articles mentioning <strong><%= h(@league['name']) %></strong> surface below.
       <% end %>
     </p>
   </div>
+<% end %>
+
+<%# Articles from subscribed feeds that mention this league/tournament.
+    Populated by FTS phrase MATCH with a 1h TTL cache. %>
+<% if (@league_articles || []).any? %>
+  <section class="benchmark-section sports-league-articles">
+    <h3>📰 Coverage of <%= h(@league['name']) %>
+      <span class="muted" style="font-size:0.85rem; font-weight:400">(<%= @league_articles.length %>)</span>
+    </h3>
+    <ul class="sports-article-list">
+      <% @league_articles.each do |article| %>
+        <% feed        = (@feeds_by_id || {})[article['feed_id']] %>
+        <% summary_row = (@summaries_by_article_id || {})[article['id']] %>
+        <% summary     = skim_summary_for(article, summary_row) %>
+        <li class="sports-article <%= 'read' if article['read'] == 1 %>">
+          <h4 class="sports-article-title">
+            <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+          </h4>
+          <% unless summary.empty? %>
+            <p class="sports-article-summary"><%= h(summary) %></p>
+          <% end %>
+          <div class="sports-article-meta">
+            <% if feed %>
+              <a class="sports-article-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+              <span class="sports-article-meta-sep">&middot;</span>
+            <% end %>
+            <span title="<%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+            <span class="sports-article-meta-sep">&middot;</span>
+            <a class="sports-article-in-app" href="/article/<%= article['uid'] %>">Open →</a>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </section>
 <% end %>

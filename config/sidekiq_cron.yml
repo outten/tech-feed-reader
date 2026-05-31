@@ -16,10 +16,10 @@ refresh_all_feeds:
   description: "Hourly: enqueue FeedRefreshWorker for every subscribed feed."
 
 sports_sync:
-  cron: "0 4 * * *"
+  cron: "30 * * * *"
   class: "SportsSyncWorker"
   queue: default
-  description: "Nightly 04:00 UTC: ESPN match schedules + league standings + tennis rankings."
+  description: "Hourly :30 UTC: ESPN match schedules + league standings + tennis rankings. Offset from feeds cron (:00) to spread load."
 
 fix_article_links:
   cron: "45 4 * * *"
