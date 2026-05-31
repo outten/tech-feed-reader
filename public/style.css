@@ -4935,3 +4935,190 @@ html.dark .admin-support-note { background: #2c2c2e; border-left-color: #98989d;
 }
 html.dark .admin-support-actions summary { color: #0a84ff; }
 .admin-support-actions form { margin-top: 0.5rem; max-width: 540px; }
+
+/* STUFF #70 — tournament tiles on /sports + tournament cards on the
+   per-sport manage page. Tile grid borrows the visual language of
+   the existing .sports-score-tiles strip; cards reuse most of the
+   .sports-catalog-card surface with a "followed" highlight ring. */
+.sports-tournament-section { margin: 1.5rem 0 1rem; }
+.sports-tournament-section h3 { font-size: 1.1rem; margin: 0 0 0.5rem; color: #1d1d1f; }
+html.dark .sports-tournament-section h3 { color: #f5f5f7; }
+.sports-tournament-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sports-tournament-tile {
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 8px;
+  overflow: hidden;
+}
+html.dark .sports-tournament-tile { background: #1c1c1e; border-color: #2c2c2e; }
+.sports-tournament-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 0.9rem;
+  text-decoration: none;
+  color: inherit;
+  height: 100%;
+}
+.sports-tournament-link:hover { background: #f5f5f7; }
+html.dark .sports-tournament-link:hover { background: #2c2c2e; }
+.sports-tournament-emoji { font-size: 1.5rem; line-height: 1; }
+.sports-tournament-name { font-weight: 600; font-size: 0.95rem; }
+.sports-tournament-blurb { font-size: 0.82rem; color: #6e6e73; }
+html.dark .sports-tournament-blurb { color: #98989d; }
+
+/* Manage-page heading + subtitle for the Leagues / Tournaments split. */
+.sports-section-heading {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+  color: #1d1d1f;
+}
+html.dark .sports-section-heading { color: #f5f5f7; }
+.sports-section-subtitle {
+  margin: -0.25rem 0 0.75rem;
+  font-size: 0.85rem;
+  color: #6e6e73;
+}
+html.dark .sports-section-subtitle { color: #98989d; }
+
+/* Tournament catalog card on /sports/manage/:sport — same .sports-
+   catalog-card shape, with a primary-action affordance instead of
+   a drill-down link and an is-followed border ring. */
+.sports-tournament-card { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 0.9rem; }
+.sports-tournament-card.is-followed { border-color: #34c759; box-shadow: 0 0 0 1px #34c759 inset; }
+html.dark .sports-tournament-card.is-followed { border-color: #30d158; box-shadow: 0 0 0 1px #30d158 inset; }
+.sports-tournament-card form { margin-top: auto; }
+
+/* STUFF #73 — Wikipedia summary block on /sports/league/:slug. */
+.sports-league-wikipedia {
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+}
+html.dark .sports-league-wikipedia { background: #1c1c1e; border-color: #2c2c2e; }
+.sports-league-wikipedia h3 { font-size: 1rem; margin: 0 0 0.5rem; color: #1d1d1f; }
+html.dark .sports-league-wikipedia h3 { color: #f5f5f7; }
+.sports-league-wikipedia-body {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.sports-league-wikipedia-thumb {
+  flex-shrink: 0;
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f0f0f5;
+}
+html.dark .sports-league-wikipedia-thumb { background: #2c2c2e; }
+.sports-league-wikipedia-text { flex: 1; min-width: 0; }
+.sports-league-wikipedia-text p { margin: 0 0 0.5rem; line-height: 1.55; }
+@media (max-width: 600px) {
+  .sports-league-wikipedia-body { flex-direction: column; }
+  .sports-league-wikipedia-thumb { width: 100%; height: 200px; }
+}
+
+/* STUFF #77 — Tennis match cards in results-by-round section */
+.tennis-match-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.tennis-match-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e5ea);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  grid-template-rows: auto auto;
+  gap: 0 0.5rem;
+  align-items: center;
+}
+html.dark .tennis-match-card { background: #1c1c1e; border-color: #38383a; }
+.tennis-match-date {
+  grid-row: 1 / 3;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6e6e73);
+  text-align: center;
+  line-height: 1.2;
+  font-weight: 500;
+}
+.tennis-match-players { grid-column: 2; display: flex; flex-direction: column; gap: 0.2rem; }
+.tennis-match-player { display: flex; align-items: center; gap: 0.45rem; }
+.tennis-match-winner .tennis-match-name { font-weight: 600; }
+.tennis-match-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #e5e5ea; overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; font-weight: 700; color: #6e6e73;
+  position: relative;
+}
+.tennis-match-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.tennis-match-avatar[data-show-initials="1"]::after { content: attr(data-initials); }
+.tennis-match-name { flex: 1; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tennis-match-sets {
+  min-width: 1.5rem; text-align: center;
+  font-size: 0.95rem; font-weight: 500;
+  color: var(--text-muted, #6e6e73);
+}
+.tennis-match-sets-w { color: #34c759; font-weight: 700; }
+html.dark .tennis-match-sets-w { color: #30d158; }
+.tennis-match-trophy { font-size: 0.8rem; }
+.tennis-match-venue { grid-column: 2; font-size: 0.72rem; margin-top: 0.1rem; }
+.sports-round-summary { cursor: pointer; padding: 0.3rem 0; font-size: 0.9rem; font-weight: 600; list-style: none; }
+.sports-round-summary::-webkit-details-marker { display: none; }
+.sports-round-summary::before { content: '▶ '; font-size: 0.65rem; color: var(--text-muted, #6e6e73); }
+details[open] > .sports-round-summary::before { content: '▼ '; }
+@media (max-width: 600px) {
+  .tennis-match-card { grid-template-columns: 2.8rem 1fr; }
+  .tennis-match-avatar { width: 22px; height: 22px; }
+}
+.tennis-match-initials {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; font-weight: 700; color: #6e6e73;
+  pointer-events: none;
+}
+/* When image loads, hide initials */
+.tennis-match-avatar img:not([style*="display: none"]) ~ .tennis-match-initials { opacity: 0; }
+.tennis-match-score-detail { grid-column: 2; font-size: 0.75rem; font-weight: 500; margin-top: 0.05rem; }
+
+/* STUFF — unified sport-match-card (all sports) */
+.sport-match-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.sport-match-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e5ea);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+html.dark .sport-match-card { background: #1c1c1e; border-color: #38383a; }
+/* Team sports: home side — scores — away side */
+.smc-row { display: flex; align-items: center; gap: 0.5rem; }
+.smc-side { display: flex; align-items: center; gap: 0.35rem; flex: 1; }
+.smc-home { justify-content: flex-end; flex-direction: row-reverse; }
+.smc-away { justify-content: flex-start; }
+.smc-logo { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+.smc-emoji { font-size: 1.1rem; flex-shrink: 0; }
+.smc-team-name { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 10rem; }
+.smc-winner { font-weight: 700; }
+.smc-scores { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; min-width: 3.5rem; justify-content: center; }
+.smc-score { font-size: 1rem; font-weight: 600; min-width: 1.2rem; text-align: center; color: var(--text-muted, #6e6e73); }
+.smc-score-w { color: inherit; }
+.smc-dash { color: var(--text-muted, #6e6e73); font-size: 0.85rem; }
+.smc-meta { font-size: 0.72rem; color: var(--text-muted, #6e6e73); margin-top: 0.15rem; }
+/* F1 race card */
+.sport-match-card-f1 .smc-race { display: flex; align-items: center; gap: 0.4rem; }
+.smc-race-emoji { font-size: 1.2rem; }
+.smc-race-name { font-size: 0.9rem; font-weight: 500; }
+.smc-venue { font-size: 0.72rem; color: var(--text-muted, #6e6e73); margin-top: 0.1rem; }
+@media (max-width: 600px) {
+  .smc-team-name { max-width: 6rem; }
+  .smc-logo { width: 20px; height: 20px; }
+}

@@ -49,6 +49,40 @@ module SportsMatchesStore
     SQL
   end
 
+  # STUFF #70 follow-up — per-league fixtures + results. Drives the
+  # Upcoming / Recent sections on /sports/league/:slug for tournaments
+  # the user has followed (FIFA World Cup, Champions League, etc.).
+  # Mirrors the per-team helpers above but filters by league_id.
+  def upcoming_for_league(league_id, limit: 12, now: Time.now.utc)
+    db.execute(<<~SQL, [league_id, now.iso8601, limit])
+      SELECT * FROM sports_matches
+      WHERE status IN ('scheduled', 'live')
+        AND league_id = ?
+        AND scheduled_at >= ?
+      ORDER BY scheduled_at ASC
+      LIMIT ?
+    SQL
+  end
+
+  def recent_finals_for_league(league_id, limit: 12)
+    db.execute(<<~SQL, [league_id, limit])
+      SELECT * FROM sports_matches
+      WHERE status = 'final' AND league_id = ?
+      ORDER BY scheduled_at DESC
+      LIMIT ?
+    SQL
+  end
+
+  # All completed matches for a league grouped by round, newest first.
+  # Used on tournament pages so every round's results are browsable.
+  def finals_by_round_for_league(league_id)
+    db.execute(<<~SQL, [league_id])
+      SELECT * FROM sports_matches
+      WHERE status = 'final' AND league_id = ?
+      ORDER BY scheduled_at DESC
+    SQL
+  end
+
   # Live matches across the whole table (used by /sports overview
   # "Live now" section once the UI ships).
   def live

@@ -39,6 +39,7 @@ require_relative 'topic_clusters'
 require_relative 'feed_catalog'
 require_relative 'providers/itunes_lookup'
 require_relative 'providers/youtube_channel_resolver'
+require_relative 'providers/wikipedia'
 require_relative 'auth'
 
 # Phase A1 (consumer auth) — load .env in dev for SESSION_SECRET
@@ -699,6 +700,35 @@ class TechFeedReader < Sinatra::Base
       )
     end
 
+    # STUFF #70 — analog for league-shaped catalog entries (mostly
+    # tournaments). When a user follows a tournament that doesn't yet
+    # have a sports_leagues row, materialize it on demand so the
+    # follow target exists. Same idea as ensure_catalog_team_in_db
+    # but no league_id parent to resolve — leagues are the top level.
+    def ensure_catalog_league_in_db(league_slug)
+      catalog_league = SportsCatalog.all_leagues.find { |lg| lg[:slug] == league_slug.to_s }
+      return nil unless catalog_league
+
+      row = SportsLeaguesStore.upsert(
+        slug:            catalog_league[:slug],
+        name:            catalog_league[:name],
+        sport:           catalog_league[:sport],
+        source_provider: catalog_league[:source_provider] || 'catalog',
+        external_id:     catalog_league[:external_id]     || catalog_league[:slug],
+        country:         catalog_league[:country]
+      )
+      # STUFF #73 — stamp the Wikipedia title from the catalog so the
+      # summary provider can pick it up. Only writes when the catalog
+      # has a mapping AND the row doesn't already carry one (lets a
+      # human override stick).
+      wiki = SportsCatalog.wikipedia_title_for(league_slug)
+      if wiki && row['wikipedia_title'].to_s.empty?
+        SportsLeaguesStore.set_wikipedia_title!(row['id'], wiki)
+        row = SportsLeaguesStore.find(row['id'])
+      end
+      row
+    end
+
     # STUFF #52.1 — catalog players (notable-player chips on team
     # cards) live in app/sports_catalog.rb as plain strings under
     # `team[:players]`. Clicking a chip needs to land on the player
@@ -1092,6 +1122,123 @@ class TechFeedReader < Sinatra::Base
                 .map { |k| [k, merged[k]] }
                 .reject { |_, v| v.nil? || v.to_s.empty? }
       pairs.empty? ? '?' : "?#{pairs.map { |k, v| "#{k}=#{v}" }.join('&')}"
+    end
+
+    # STUFF — unified match card for /sports/league/:slug.
+    # Renders one <li> appropriate to the sport:
+    #   :tennis  — two player rows with ESPN headshots + set scores
+    #   :f1      — single race card (no teams, race name in period)
+    #   :team    — horizontal home vs away with team logos
+    # Returns an HTML-safe string; call with <%= match_card_html(...) %>
+    def match_card_html(m, sport, teams_by_id, upcoming: false, sport_emoji: '🏟')
+      home = teams_by_id[m['home_team_id']]
+      away = teams_by_id[m['away_team_id']]
+      date_str = (Time.parse(m['scheduled_at']).getlocal
+                      .strftime(upcoming ? '%a %b %-d %-l:%M %p' : '%b %-d') rescue '')
+      venue    = h(m['venue'].to_s)
+      live     = m['status'].to_s == 'live'
+
+      if sport == 'tennis'
+        tennis_match_card_html(m, home, away, date_str, venue)
+      elsif m['home_team_id'].nil? && m['away_team_id'].nil?
+        # F1 / race format — no teams, period has "Round N — Race Name"
+        f1_match_card_html(m, date_str, venue, sport_emoji)
+      else
+        team_match_card_html(m, home, away, date_str, venue, sport_emoji, upcoming: upcoming, live: live)
+      end
+    end
+
+    def tennis_match_card_html(m, home, away, date_str, venue)
+      home_won = m['home_score'].to_i > m['away_score'].to_i
+      away_won = m['away_score'].to_i > m['home_score'].to_i
+      score_detail = m['period'].to_s.split('|', 2)[1]
+      set_scores   = score_detail.to_s.scan(/\d+-\d+(?:\s*\(\d+[–-]\d+\))?/).join(', ') if score_detail
+
+      rows = [[home, m['home_score'], home_won], [away, m['away_score'], away_won]].map do |player, sets, won|
+        name     = player ? h(player['name']) : '?'
+        ext      = player ? h(player['external_id'].to_s) : ''
+        initials = (player ? player['name'] : '').split.map { |w| w[0] }.first(2).join.upcase
+        img_tag  = ext.empty? ? '' :
+          %(<img src="https://a.espncdn.com/i/headshots/tennis/players/full/#{ext}.png" ) +
+          %(alt="" loading="lazy" onerror="this.style.display='none'">)
+        winner_class = won ? ' tennis-match-winner' : ''
+        won_badge    = won ? '<span class="tennis-match-trophy" aria-label="Winner">🏆</span>' : ''
+        sets_class   = won ? ' tennis-match-sets-w' : ''
+        %(
+          <div class="tennis-match-player#{winner_class}">
+            <span class="tennis-match-avatar">#{img_tag}
+              <span class="tennis-match-initials">#{h(initials)}</span></span>
+            <span class="tennis-match-name">#{name}</span>
+            <span class="tennis-match-sets#{sets_class}">#{sets || '—'}</span>
+            #{won_badge}
+          </div>)
+      end.join
+
+      detail_line = ''
+      detail_line += %(<div class="tennis-match-score-detail muted">#{h(set_scores)}</div>) if set_scores && !set_scores.empty?
+      detail_line += %(<div class="tennis-match-venue muted">#{venue}</div>) unless venue.empty?
+
+      %(<li class="tennis-match-card">
+          <div class="tennis-match-date">#{date_str}</div>
+          <div class="tennis-match-players">#{rows}</div>
+          #{detail_line}
+        </li>)
+    end
+
+    def f1_match_card_html(m, date_str, venue, sport_emoji)
+      round_label = h(m['period'].to_s.split('|').first)
+      %(<li class="sport-match-card sport-match-card-f1">
+          <div class="smc-date">#{date_str}</div>
+          <div class="smc-race">
+            <span class="smc-race-emoji">#{sport_emoji}</span>
+            <span class="smc-race-name">#{round_label}</span>
+          </div>
+          #{ venue.empty? ? '' : %(<div class="smc-venue muted">#{venue}</div>) }
+        </li>)
+    end
+
+    def team_match_card_html(m, home, away, date_str, venue, sport_emoji, upcoming: false, live: false)
+      home_won = !upcoming && m['home_score'].to_i > m['away_score'].to_i
+      away_won = !upcoming && m['away_score'].to_i > m['home_score'].to_i
+
+      home_name  = home ? h(home['short_name'] || home['name']) : 'TBD'
+      away_name  = away ? h(away['short_name'] || away['name']) : 'TBD'
+      home_slug  = home ? h(home['slug']) : nil
+      away_slug  = away ? h(away['slug']) : nil
+      home_img   = home&.dig('image_url').to_s
+      away_img   = away&.dig('image_url').to_s
+
+      home_logo = home_img.empty? ?
+        %(<span class="smc-emoji">#{sport_emoji}</span>) :
+        %(<img class="smc-logo" src="#{h(home_img)}" alt="" loading="lazy">)
+      away_logo = away_img.empty? ?
+        %(<span class="smc-emoji">#{sport_emoji}</span>) :
+        %(<img class="smc-logo" src="#{h(away_img)}" alt="" loading="lazy">)
+
+      home_link = home_slug ? %(<a href="/sports/team/#{home_slug}" class="smc-team-name #{'smc-winner' if home_won}">#{home_name}</a>) :
+                              %(<span class="smc-team-name">#{home_name}</span>)
+      away_link = away_slug ? %(<a href="/sports/team/#{away_slug}" class="smc-team-name #{'smc-winner' if away_won}">#{away_name}</a>) :
+                              %(<span class="smc-team-name">#{away_name}</span>)
+
+      score_block = if upcoming
+        live_badge = live ? '<span class="badge live-badge">LIVE</span>' : ''
+        %(#{live_badge})
+      else
+        %(<span class="smc-score #{'smc-score-w' if home_won}">#{m['home_score'] || '—'}</span>
+          <span class="smc-dash">–</span>
+          <span class="smc-score #{'smc-score-w' if away_won}">#{m['away_score'] || '—'}</span>)
+      end
+
+      meta = [date_str, venue.empty? ? nil : venue].compact.join(' · ')
+
+      %(<li class="sport-match-card">
+          <div class="smc-row">
+            <div class="smc-side smc-home">#{home_logo}#{home_link}</div>
+            <div class="smc-scores">#{score_block}</div>
+            <div class="smc-side smc-away">#{away_link}#{away_logo}</div>
+          </div>
+          #{ meta.empty? ? '' : %(<div class="smc-meta muted">#{meta}</div>) }
+        </li>)
     end
   end
 
@@ -2105,6 +2252,22 @@ class TechFeedReader < Sinatra::Base
         'SELECT 1 FROM sports_standings WHERE league_id = ? LIMIT 1', [lg['id']]
       ).any?
     end
+    # STUFF #70 — followed tournaments (sports_follows.kind='league').
+    # Resolve each follow slug to its DB row + catalog metadata so the
+    # view can render a tile per tournament with name, sport emoji,
+    # blurb, and a link to /sports/league/:slug. Skips orphan follows
+    # (slug doesn't resolve to a sports_leagues row).
+    followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league').map { |f| f['value'] }
+    @followed_tournaments = followed_league_slugs.filter_map do |slug|
+      row     = SportsLeaguesStore.find_by_slug(slug)
+      next nil unless row
+      catalog = SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug }
+      {
+        row:     row,
+        catalog: catalog,
+        sport:   catalog && SportsCatalog.find_sport(catalog[:sport_slug])
+      }
+    end
     erb :sports
   end
 
@@ -2230,6 +2393,12 @@ class TechFeedReader < Sinatra::Base
     @page_title    = "#{@sport[:name]} — Manage"
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
                                         .map { |f| f['value'] }.to_set
+    # STUFF #70 — tournament-shape leagues are follow-toggleable on
+    # this page (vs. season leagues which drill into team grids).
+    # Pre-load the user's league follows so the button can flip
+    # state alongside the team-follow buttons in the same view.
+    @followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league')
+                                                .map { |f| f['value'] }.to_set
     erb :sports_manage_sport
   end
 
@@ -2240,6 +2409,16 @@ class TechFeedReader < Sinatra::Base
     @page_title    = "#{@league[:name]} — Manage"
     @followed_slugs = SportsFollowsStore.for_kind(current_user_id, 'team')
                                         .map { |f| f['value'] }.to_set
+    @followed_league_slugs = SportsFollowsStore.for_kind(current_user_id, 'league')
+                                                .map { |f| f['value'] }.to_set
+    # STUFF #75 — for api-sports leagues the catalog carries teams:[]
+    # (teams auto-populate from match data on first sync). Load from DB
+    # so the manage page can show a follow grid once data exists.
+    @db_teams = []
+    if (@league[:teams] || []).empty? && @league[:source_provider] == 'api-sports'
+      league_row = SportsLeaguesStore.find_by_slug(@league[:slug])
+      @db_teams = SportsTeamsStore.for_league(league_row['id']).sort_by { |t| t['name'] } if league_row
+    end
     # STUFF #52 PR3 — curated RSS feeds for this league + which the
     # user is already subscribed to (so the button can flip).
     @league_feeds   = FeedCatalog.feeds_for_sports_league(@league[:slug])
@@ -2305,6 +2484,32 @@ class TechFeedReader < Sinatra::Base
     redirect to(params['return_to'] || '/sports/manage')
   end
 
+  # STUFF #70 — league/tournament follow. Mirrors the team-follow
+  # path: ensure the catalog league has a sports_leagues row (lazy
+  # upsert via ensure_catalog_league_in_db), then add the follow
+  # with kind='league'. The /sports overview's "📅 Tournaments"
+  # section reads from this. Articles bridging happens later via
+  # SportsEntityArticlesStore (called when the league page renders).
+  post '/sports/leagues/follow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    league = SportsLeaguesStore.find_by_slug(slug) || ensure_catalog_league_in_db(slug)
+    halt 404, 'league not found' unless league
+    SportsFollowsStore.add(user_id: current_user_id, kind: 'league', value: slug)
+    AppLogger.info('league_follow', slug: slug, league_id: league['id'])
+    return sports_follow_json(slug: slug, kind: 'league', followed: true) if wants_json?
+    redirect to(params['return_to'] || '/sports')
+  end
+
+  post '/sports/leagues/unfollow' do
+    slug = params['slug'].to_s
+    halt 400, 'slug required' if slug.empty?
+    SportsFollowsStore.remove(user_id: current_user_id, kind: 'league', value: slug)
+    AppLogger.info('league_unfollow', slug: slug)
+    return sports_follow_json(slug: slug, kind: 'league', followed: false) if wants_json?
+    redirect to(params['return_to'] || '/sports')
+  end
+
   # Phase S9 — upcoming-fixtures calendar across followed teams.
   # Same data source for the HTML view and the iCal export so the
   # two stay in sync. Default 30-day window; ?days=N tunable.
@@ -2345,13 +2550,67 @@ class TechFeedReader < Sinatra::Base
     @league = SportsLeaguesStore.find_by_slug(slug)
     halt 404, erb(:article_not_found) unless @league
 
+    # STUFF #73 — stamp the Wikipedia title if catalog has one and
+    # the row hasn't been seeded yet (catches leagues materialised
+    # before the WIKIPEDIA_TITLES map existed).
+    if @league['wikipedia_title'].to_s.empty?
+      wiki = SportsCatalog.wikipedia_title_for(slug)
+      if wiki
+        SportsLeaguesStore.set_wikipedia_title!(@league['id'], wiki)
+        @league = SportsLeaguesStore.find(@league['id'])
+      end
+    end
+    # Refresh the Wikipedia summary cache (no-op if fresh OR if no
+    # title is set). 24h TTL — see Providers::Wikipedia.
+    begin
+      @league = Providers::Wikipedia.refresh_for_league(@league)
+    rescue StandardError => e
+      AppLogger.warn('wikipedia_refresh_failed', league: @league['slug'], message: e.message)
+    end
+    @wikipedia = nil
+    if @league['wikipedia_summary'].to_s != ''
+      @wikipedia = JSON.parse(@league['wikipedia_summary']) rescue nil
+    end
+
     @page_title  = "#{@league['name']} — Standings"
+    @sport       = SportsCatalog.find_sport(@league['sport']) rescue nil
     rows = SportsStandingsStore.for_league(@league['id'])
     @standings_groups = rows.group_by { |r| r['group_name'] }
 
-    # Resolve team rows so we can show name + logo + slug. Cheap —
-    # there are only ~30 teams per league.
-    team_ids = rows.map { |r| r['team_id'] }.uniq
+    # STUFF #70 follow-up — load matches for the league so the page
+    # surfaces fixtures + results, not just the standings table. Pulls
+    # whatever sync has populated; tournaments with `source_provider=
+    # 'catalog'` (most tennis Slams, golf majors, cycling) stay empty
+    # until a provider lands.
+    @upcoming_matches = SportsMatchesStore.upcoming_for_league(@league['id'], limit: 20)
+    # Tennis tournaments: show all results grouped by round so the full
+    # draw is browsable. Other sports keep the 12-match recent window.
+    @recent_finals = if @league['sport'] == 'tennis'
+                       SportsMatchesStore.finals_by_round_for_league(@league['id'])
+                     else
+                       SportsMatchesStore.recent_finals_for_league(@league['id'], limit: 12)
+                     end
+    # Round grouping: tennis (rounds stored in period) + F1 (period has
+    # "Round N — Race Name"). Other season sports have empty period so no
+    # grouping — they just show recent results as a flat list.
+    @results_by_round = @recent_finals.any? { |m| m['period'].to_s.split('|').first.to_s != '' }
+    # Year split — show current year first, prior year collapsed.
+    # Meaningful for tennis (2+ editions in DB) and any other sport
+    # that accumulates multi-season data over time.
+    this_year = Date.today.year.to_s
+    @finals_this_year  = @recent_finals.select { |m| m['scheduled_at'].to_s.start_with?(this_year) }
+    @finals_historical = @recent_finals.reject { |m| m['scheduled_at'].to_s.start_with?(this_year) }
+    # Only split when we actually have data on both sides; otherwise keep
+    # the flat list (avoids an empty "2026 Results" header for off-season).
+    @show_year_split = @finals_this_year.any? && @finals_historical.any?
+
+    # Build a teams_by_id that covers both the standings teams and any
+    # team referenced by the new match rows (some matches may involve
+    # teams not in the standings — e.g. group-stage opponents who
+    # haven't been added to the table yet).
+    team_ids  = rows.map { |r| r['team_id'] }
+    team_ids += (@upcoming_matches + @recent_finals).flat_map { |m| [m['home_team_id'], m['away_team_id']] }
+    team_ids  = team_ids.compact.uniq
     @teams_by_id = team_ids.each_with_object({}) do |tid, h|
       h[tid] = SportsTeamsStore.find(tid)
     end
@@ -2432,6 +2691,20 @@ class TechFeedReader < Sinatra::Base
       )
     end
     @page_title  = @team[:name]
+    # STUFF #75 — for the tennis curated team page, surface any followed
+    # tennis leagues that have synced match data (Roland Garros, etc.)
+    # so the user can navigate directly to live tournament fixtures.
+    @tennis_tournaments = []
+    if @team[:sport] == :tennis
+      tennis_follows = SportsFollowsStore.for_kind(current_user_id, 'league').map { |f| f['value'] }
+      @tennis_tournaments = tennis_follows.filter_map do |slug|
+        row = SportsLeaguesStore.find_by_slug(slug)
+        next unless row && row['sport'] == 'tennis'
+        match_count = SportsMatchesStore.upcoming_for_league(row['id'], limit: 1).length +
+                      SportsMatchesStore.recent_finals_for_league(row['id'], limit: 1).length
+        row if match_count > 0
+      end
+    end
     erb :sports_team
   end
 

@@ -59,30 +59,24 @@
               <% end %>
             </div>
             <div class="sports-calendar-matchup">
-              <%# Team chip — render as a link only when the team has
-                  a SportsTeams (Ruby module) entry, since /sports/team/:slug
-                  404s for structured-only opponents like "nba-team-18". %>
+              <%# Team chip. STUFF #71 — every team chip now renders
+                  as a link. The pre-#67 gate that only linked curated
+                  SportsTeams (Ruby module) entries is stale: /sports/
+                  team/:slug now falls back to SportsTeamsStore.find_
+                  by_slug for DB-only teams (see app/main.rb's DB-
+                  fallback branch added in STUFF #67), so every team
+                  in the DB has a working detail page. %>
               <% [['away', away], ['home', home]].each_with_index do |(side, team), i| %>
                 <% unless i.zero? %><span class="sports-calendar-vs muted">@</span><% end %>
                 <% if team %>
-                  <% logo = team['image_url'] %>
+                  <% logo  = team['image_url'] %>
                   <% label = team['name'] || team['short_name'] %>
-                  <% linkable = SportsTeams.find(team['slug']) %>
-                  <% if linkable %>
-                    <a class="sports-calendar-team" href="/sports/team/<%= h(team['slug']) %>">
-                      <% if logo && !logo.to_s.empty? %>
-                        <img class="sports-score-tile-logo-sm" src="<%= h(logo) %>" alt="" loading="lazy">
-                      <% end %>
-                      <%= h(label) %>
-                    </a>
-                  <% else %>
-                    <span class="sports-calendar-team">
-                      <% if logo && !logo.to_s.empty? %>
-                        <img class="sports-score-tile-logo-sm" src="<%= h(logo) %>" alt="" loading="lazy">
-                      <% end %>
-                      <%= h(label) %>
-                    </span>
-                  <% end %>
+                  <a class="sports-calendar-team" href="/sports/team/<%= h(team['slug']) %>">
+                    <% if logo && !logo.to_s.empty? %>
+                      <img class="sports-score-tile-logo-sm" src="<%= h(logo) %>" alt="" loading="lazy">
+                    <% end %>
+                    <%= h(label) %>
+                  </a>
                 <% else %>
                   <span>TBD</span>
                 <% end %>

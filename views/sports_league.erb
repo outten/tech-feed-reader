@@ -76,3 +76,142 @@
     </section>
   <% end %>
 <% end %>
+
+<%# STUFF #73 — Wikipedia summary. Renders only when the league
+    has a wikipedia_title in the catalog AND the fetch succeeded.
+    Cached on the row for 24h; the route handler calls refresh
+    on demand. %>
+<% if @wikipedia && @wikipedia['extract'].to_s != '' %>
+  <section class="sports-league-wikipedia" aria-label="About this competition">
+    <h3>About</h3>
+    <div class="sports-league-wikipedia-body">
+      <% if @wikipedia['thumbnail_url'] && !@wikipedia['thumbnail_url'].to_s.empty? %>
+        <img class="sports-league-wikipedia-thumb"
+             src="<%= h(@wikipedia['thumbnail_url']) %>"
+             alt="" loading="lazy">
+      <% end %>
+      <div class="sports-league-wikipedia-text">
+        <p><%= h(@wikipedia['extract']) %></p>
+        <% if @wikipedia['page_url'] %>
+          <p class="subtitle">
+            <a href="<%= h(@wikipedia['page_url']) %>" target="_blank" rel="noopener noreferrer">
+              Read on Wikipedia &rarr;
+            </a>
+          </p>
+        <% end %>
+      </div>
+    </div>
+  </section>
+<% end %>
+
+<%# STUFF #70 follow-up — fixtures + results via sync.
+    Cards adapt per sport: tennis = player rows, F1 = race card,
+    team sports = home vs away with logos. %>
+<% sport_emoji = @sport ? @sport[:emoji] : '🏟' %>
+<% if (@upcoming_matches || []).any? %>
+  <section class="benchmark-section">
+    <h3>Upcoming fixtures</h3>
+    <ul class="sport-match-list">
+      <% @upcoming_matches.each do |m| %>
+        <%= match_card_html(m, @league['sport'], @teams_by_id || {}, upcoming: true, sport_emoji: sport_emoji) %>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<% if (@recent_finals || []).any? %>
+  <section class="benchmark-section">
+    <%# Round grouping: tennis + F1. Flat list for season sports. %>
+    <% if @results_by_round %>
+      <%
+        round_order = {
+          'Final' => 0, 'Semifinal' => 1, 'Quarterfinal' => 2,
+          'Round of 16' => 3, 'Round of 32' => 4, 'Round of 64' => 5,
+          'Round of 128' => 6, 'Round 1' => 7, 'Round 2' => 8,
+          'Round 3' => 9, 'Round 4' => 10
+        }
+        build_rounds = ->(matches) {
+          by_round = matches.group_by { |m| m['period'].to_s.split('|').first.to_s }
+          sorted   = by_round.keys.sort_by { |r| [round_order[r] || 99, r] }
+          main     = sorted.reject { |r| r.downcase.include?('qualifying') }
+          qual     = sorted.select { |r| r.downcase.include?('qualifying') }
+          [by_round, main + qual]
+        }
+        render_rounds = ->(rounds_hash, display_list) {
+          display_list.each do |round_name|
+            matches = rounds_hash[round_name]
+        %>
+            <details <%= 'open' if (round_order[round_name] || 99) <= 2 %>>
+              <summary class="sports-round-summary">
+                <%= h(round_name.empty? ? 'Other' : round_name) %>
+                <span class="muted">(<%= matches.length %>)</span>
+              </summary>
+              <ul class="sport-match-list">
+                <% matches.each do |m| %>
+                  <%= match_card_html(m, @league['sport'], @teams_by_id || {}, sport_emoji: sport_emoji) %>
+                <% end %>
+              </ul>
+            </details>
+        <%  end
+        }
+      %>
+
+      <%# Current year first (open), historical collapsed below. %>
+      <% if @show_year_split %>
+        <details open>
+          <summary><h3 style="display:inline"><%= Date.today.year %> Results</h3>
+            <span class="muted" style="font-size:0.85rem; margin-left:0.5rem">
+              <%= @finals_this_year.count %> matches
+            </span>
+          </summary>
+          <% current_rounds, current_display = build_rounds.(@finals_this_year) %>
+          <% render_rounds.(current_rounds, current_display) %>
+        </details>
+        <details style="margin-top:1rem">
+          <summary class="sports-round-summary" style="font-size:1rem; font-weight:700">
+            Previous year's results
+            <span class="muted" style="font-weight:400; font-size:0.85rem; margin-left:0.4rem">
+              <%= @finals_historical.count %> matches
+            </span>
+          </summary>
+          <% hist_rounds, hist_display = build_rounds.(@finals_historical) %>
+          <% render_rounds.(hist_rounds, hist_display) %>
+        </details>
+      <% else %>
+        <% all_rounds, all_display = build_rounds.(@recent_finals) %>
+        <details open>
+          <summary><h3 style="display:inline">Results by round</h3>
+            <span class="muted" style="font-size:0.85rem; margin-left:0.5rem">
+              <%= @recent_finals.count %> matches
+            </span>
+          </summary>
+          <% render_rounds.(all_rounds, all_display) %>
+        </details>
+      <% end %>
+
+    <% else %>
+      <h3>Recent results</h3>
+      <ul class="sport-match-list">
+        <% @recent_finals.each do |m| %>
+          <%= match_card_html(m, @league['sport'], @teams_by_id || {}, sport_emoji: sport_emoji) %>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>
+
+<%# Empty state — when standings + fixtures + results are all
+    empty (catalog-source tournament, off-season league, never-
+    synced league). %>
+<% if @standings_groups.empty? && (@upcoming_matches || []).empty? && (@recent_finals || []).empty? %>
+  <div class="empty-state">
+    <p>
+      No live data synced for <strong><%= h(@league['name']) %></strong> yet.
+      <% if @league['source_provider'] == 'espn' %>
+        Run <code>make sync-sports</code> on the server (the cron also fires nightly); fixtures + standings populate when the tournament is in season.
+      <% else %>
+        This catalog-source tournament doesn't have a live-data provider wired up yet — articles mentioning <strong><%= h(@league['name']) %></strong> are surfaced via your feed subscriptions in the meantime.
+      <% end %>
+    </p>
+  </div>
+<% end %>

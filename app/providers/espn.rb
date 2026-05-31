@@ -259,6 +259,96 @@ module Providers
     #                                    flag, headshot, citizenshipCountry,
     #                                    age, ... } } ] } ] }
     #
+    # STUFF #75 — tennis tournament scoreboard (Roland Garros, Wimbledon,
+    # etc.). ESPN exposes these at the same base URL as other scoreboards
+    # but the response structure differs: each event has `groupings[]`
+    # containing `competitions[]` (individual matches), and competitors
+    # are athletes (not teams). Scores are set-by-set in `linescores`;
+    # the human-readable summary is in `notes[0].text`.
+    TennisMatch = Struct.new(
+      :external_id, :scheduled_at, :status,
+      :home_player_id, :home_player_name,
+      :away_player_id, :away_player_name,
+      :home_sets, :away_sets, :round, :score_summary, :venue,
+      keyword_init: true
+    )
+
+    # Returns Array<TennisMatch> for the current tournament(s) on a
+    # given tour ('tennis/atp' or 'tennis/wta'). If `tournament_name`
+    # is given, only events whose name includes that string are parsed
+    # (case-insensitive) — useful for targeting a specific Slam while
+    # ignoring concurrent lower-tier events.
+    def tennis_scoreboard(tour:, tournament_name: nil, dates: nil, http_get: nil)
+      url = "#{BASE}/#{tour}/scoreboard"
+      url += "?dates=#{dates}" if dates
+      AppLogger.debug('espn_tennis_scoreboard_start', tour: tour, dates: dates)
+      response = (http_get || method(:default_http_get)).call(url)
+      return [] unless response.code.to_s == '200'
+
+      data = JSON.parse(response.body)
+      events = Array(data['events'])
+      events = events.select { |ev| ev['name'].to_s.downcase.include?(tournament_name.downcase) } if tournament_name
+
+      # Round name lives on each competition as c['round']['displayName']
+      all_comps = events.flat_map do |ev|
+        ev.fetch('groupings', []).flat_map { |g| g['competitions'] || [] }
+      end
+
+      out = all_comps.filter_map { |c| normalize_tennis_competition(c) }
+      AppLogger.info('espn_tennis_scoreboard_done', tour: tour, count: out.length)
+      out
+    rescue JSON::ParserError => e
+      AppLogger.error('espn_tennis_scoreboard', status: :parse_error, message: e.message)
+      []
+    rescue StandardError => e
+      AppLogger.error('espn_tennis_scoreboard', status: :error, class: e.class.name, message: e.message)
+      []
+    end
+
+    def normalize_tennis_competition(c)
+      competitors = Array(c['competitors'])
+      return nil unless competitors.size == 2
+
+      home = competitors.find { |p| p['homeAway'] == 'home' } || competitors[0]
+      away = competitors.find { |p| p['homeAway'] == 'away' } || competitors[1]
+
+      home_name = home.dig('athlete', 'displayName').to_s.strip
+      away_name = away.dig('athlete', 'displayName').to_s.strip
+      return nil if home_name.empty? && away_name.empty?
+
+      status_desc = c.dig('status', 'type', 'description') || 'Scheduled'
+      status = case status_desc
+               when 'Final'       then 'final'
+               when 'In Progress' then 'live'
+               else 'scheduled'
+               end
+
+      home_sets = home.fetch('linescores', []).count { |ls| ls['winner'] }
+      away_sets = away.fetch('linescores', []).count { |ls| ls['winner'] }
+
+      venue_parts = [c.dig('venue', 'fullName'), c.dig('venue', 'court')].compact
+      venue = venue_parts.empty? ? nil : venue_parts.join(' — ')
+
+      round_name = c.dig('round', 'displayName')
+
+      TennisMatch.new(
+        external_id:       c['id'].to_s,
+        scheduled_at:      c['date'] || c['startDate'],
+        status:            status,
+        home_player_id:    home['id'].to_s,
+        home_player_name:  home_name,
+        away_player_id:    away['id'].to_s,
+        away_player_name:  away_name,
+        home_sets:         status == 'final' ? home_sets : nil,
+        away_sets:         status == 'final' ? away_sets : nil,
+        round:             round_name,
+        score_summary:     c.dig('notes', 0, 'text'),
+        venue:             venue
+      )
+    rescue StandardError
+      nil
+    end
+
     # Returns array of TennisRankingEntry structs. Empty on
     # HTTP/parse failure (defensive — same pattern as other ESPN
     # methods).

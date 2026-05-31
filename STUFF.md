@@ -1000,3 +1000,205 @@ Every NBA/NFL/WNBA team in the dev DB was affected — only the 4 hand-seeded te
 - **One-shot backfill** ([scripts/normalize_team_slugs_to_catalog.rb](scripts/normalize_team_slugs_to_catalog.rb)) — walks `SportsCatalog.all_teams`, finds DB rows whose slug differs from the catalog's, renames the row + rewrites any `sports_follows.value` entries to match (deduping per-user when both halves of the rename were followed). Dry-run by default; `--apply` to commit. Safe because matches/standings/entity_articles all FK by `team.id`. Already applied to dev — 39 renames (NFL + NBA + WNBA teams that previously lived under `<league>-team-<external_id>` auto-slugs).
 
 5 new examples in [spec/sports_team_follow_slug_rename_spec.rb](spec/sports_team_follow_slug_rename_spec.rb) cover the store-level `rename_slug!`, the POST `/sports/teams/follow` slug-rename path (with auto-slug row pre-existing), idempotence (no-op when slug already matches), and the cold-start path (no DB row at all). Full local suite: **1495 / 0**.
+
+## [x] 70. Sport Tournaments
+
+In the /sports/manage/tennis area, can we add a list of the major tennis tournaments for all over the world. Grand Slams and others. The user should be able to subscribe to a tournament and recieve articles and relevant information. For example, the French Open is happening right now. I would love to be able to see:
+
+- articles
+- current ladder
+- recent matches and scores
+
+Also, coming soon to America is the World Cup Soccer Tournament. We should add the ability to subscribe to tournaments like this in every sport.
+
+**Shipped (MVP — catalog + follow + surface; tennis bracket rendering deferred).**
+
+**Key insight.** "Tournament" maps directly onto our existing `sports_leagues` table — FIFA World Cup already lives there as `slug='fifa-world'`. The `sports_follows` table already supports `kind='league'` (`KINDS = %w[team player league]`); it was just never wired into the UI. Reused existing infrastructure rather than building a parallel table.
+
+**Catalog** ([app/sports_catalog.rb](app/sports_catalog.rb)) — added a `format:` field to league entries (`:season` default, `:tournament` for event-shaped). **60 tournament entries** across every sport in the catalog:
+
+- **Tennis (19)** — 4 Grand Slams (Australian Open / Roland Garros / Wimbledon / US Open) + 9 ATP Masters 1000 (Indian Wells, Miami, Monte-Carlo, Madrid, Rome, Canada, Cincinnati, Shanghai, Paris) + 4 women's-only WTA 1000 (Dubai, Doha, Beijing, Wuhan) + ATP/WTA Finals.
+- **Soccer (5)** — FIFA World Cup + Women's World Cup + UEFA Euro + Copa América + UEFA Champions League.
+- **Rugby (2)** — Men's + Women's Rugby World Cup.
+- **Cricket (8)** — ICC Cricket World Cup, Women's Cricket World Cup, Men's + Women's T20 World Cup, Champions Trophy, World Test Championship, The Ashes, Asia Cup.
+- **Golf (12)** — 4 men's majors (Masters, PGA Championship, US Open, The Open) + The Players + Ryder Cup + Presidents Cup + 5 LPGA majors (Chevron, US Women's Open, KPMG Women's PGA, Evian, AIG Women's Open) + Solheim Cup.
+- **Motorsport (7)** — Le Mans 24, Indy 500, Daytona 500, Monaco / British / Italian GP, Dakar Rally.
+- **Horse Racing (7)** — US Triple Crown, UK Flat, UK Jumps, Dubai World Cup (the four existing event-series leagues marked `:tournament`) + Melbourne Cup, Japan Cup, Prix de l'Arc de Triomphe.
+
+New helpers `SportsCatalog.tournaments_for(sport_slug)`, `.seasons_for(sport_slug)`, `.find_tournament(slug)`.
+
+**Follow plumbing** ([app/main.rb](app/main.rb)) — `POST /sports/leagues/follow` + `/sports/leagues/unfollow` mirror the team-follow handlers. `ensure_catalog_league_in_db(slug)` lazy-upserts the catalog league into `sports_leagues` (same pattern as `ensure_catalog_team_in_db`).
+
+**Manage UI** ([views/sports_manage_sport.erb](views/sports_manage_sport.erb)) — per-sport manage page now splits into **Leagues** (drill-down cards for ongoing seasons) and **📅 Tournaments** (inline ★ Follow toggle on each card). Followed tournaments get a green is-followed border.
+
+**`/sports` overview** ([views/sports.erb](views/sports.erb)) — new "📅 Following tournaments" section above the TOC. One tile per followed league with sport emoji + tournament name + blurb. Click → `/sports/league/:slug` (existing route — shows standings for FIFA-shape tournaments; tennis Grand Slams show empty state for now since their event-shaped data doesn't fit a standings table).
+
+**Sync wiring** ([app/sports_sync.rb](app/sports_sync.rb)) — `SportsSync.run!` now also calls a new `sync_followed_league_events!` which walks `sports_follows.kind='league'` and calls ESPN's `league_scoreboard` for each league with `source_provider='espn'`, upserting every event into `sports_matches`. Without this, following the FIFA World Cup as a tournament left the matches table empty unless the user also followed specific participating teams (since the existing `sync_team_schedules!` only iterates `kind='team'`). Verified live against ESPN: `make sync-sports` pulls 2 FIFA World Cup events on first run from the dev DB. Catalog-source tournaments (most tennis Slams, golf majors, horse-racing classics, cycling) are skipped gracefully — they'll sync when a provider lands for them. Also corrected `fifa-womens-world` to carry `source_provider: 'espn'` + `external_id: 'soccer/fifa.wwc'` so it picks up the new path. 4 new examples in [spec/sports_sync_followed_leagues_spec.rb](spec/sports_sync_followed_leagues_spec.rb).
+
+**Out of scope (Phase 2 — separate STUFF item):** tennis bracket rendering on `/sports/league/:slug` (ESPN exposes draws via the scoreboard `groupings` block, which doesn't fit the current standings template); per-tournament dashboard with live scores during ongoing tournaments; article bridging via `SportsEntityArticlesStore.refresh_for(kind: 'league', ...)`.
+
+**14 new examples** in [spec/sports_tournament_follow_spec.rb](spec/sports_tournament_follow_spec.rb) cover catalog helpers (tournaments/seasons split, cross-sport find), `POST /sports/leagues/follow` (happy path, idempotence, reuse-existing-row, 404, 400), unfollow, the manage view's Leagues/Tournaments split + followed-state button flip, and the `/sports` follow surface. Full local suite: **1509 / 0**.
+
+## [x] 71. Sports Calendar
+
+On the /sports/calendar page, each sports team appears to be a link; however, the link doesn't do anything. It should take the user to the sports team's page.
+
+**Shipped.** Stale gate from before STUFF #67. The calendar view was rendering team chips as `<a>` only when `SportsTeams.find(slug)` returned a hit — i.e. only for the 5 curated Ruby-module teams (Eagles / Sixers / Union / All Blacks / Tennis). Everything else fell through to a `<span>` non-link with the comment "_/sports/team/:slug 404s for structured-only opponents_". That hasn't been true since STUFF #67 made the team detail route fall back to `SportsTeamsStore.find_by_slug`. Removed the `linkable` gate in [views/sports_calendar.erb](views/sports_calendar.erb) — every team chip is now a link. Updated [spec/sports_calendar_spec.rb](spec/sports_calendar_spec.rb)'s linkability assertion to match the new behaviour (was: "Cowboys → span"; now: "Cowboys → href"). Full local suite: 1511 / 0.
+
+## [x] 72. Biking
+
+Biking is a popular sport. Let's add as a category. Follow the same as other sports:
+
+- subscribe to tournaments
+- follow teams
+- follow players
+
+**Shipped.** Added cycling as a new `'cycling'` sport in [app/sports_catalog.rb](app/sports_catalog.rb) (slug `cycling` — the internationally-standard term, displayed as "Cycling 🚴"). Reuses every existing route + follow path; no new code beyond catalog data.
+
+- **Two season leagues** — UCI WorldTour (Men) + UCI Women's WorldTour with **13 pro teams** total (UAE Team Emirates, Visma | Lease a Bike, INEOS Grenadiers, Soudal Quick-Step, Lidl-Trek, Red Bull–Bora–hansgrohe, Alpecin-Deceuninck, Movistar, SD Worx–ProTime, Visma Women, Lidl-Trek Women, Canyon//SRAM, Movistar Women).
+- **5 Grand Tours** as tournament-format entries — Tour de France, Giro d'Italia, Vuelta a España, Tour de France Femmes, La Vuelta Femenina.
+- **5 Monuments** — Milan–San Remo, Tour of Flanders, Paris-Roubaix, Liège–Bastogne–Liège, Il Lombardia.
+- **UCI Road World Championships** (rainbow jersey).
+- **Notable rider chips** on every team — Pogačar / Vingegaard / Evenepoel / van der Poel / Roglič / Mads Pedersen / Vollering / Kopecky / Vos / Niewiadoma / etc. Click any chip → `/sports/player/:slug` via the existing `catalog_player_slug` resolver and lazy upsert.
+
+All three asks satisfied through existing infrastructure: tournament subscriptions via `POST /sports/leagues/follow` (STUFF #70); team follows via `POST /sports/teams/follow`; player follows via the chip-click flow used by tennis + NBA.
+**Sync note.** Cycling catalog entries use `source_provider: 'catalog'` (no `external_id` mapping) because ESPN doesn't cover pro cycling. `make sync-sports` gracefully skips them — pro cycling teams + tournaments will populate via a UCI provider in a follow-up phase. Following them today still works for the article-bridging and UI-affordance dimensions; just no live match / standings data until the provider lands.
+
+5 examples in [spec/sports_cycling_catalog_spec.rb](spec/sports_cycling_catalog_spec.rb) cover sport declaration, season slugs (exhaustive contain_exactly), Grand Tours + women's stage races, Monuments + Worlds, players-chip presence on every team. Full local suite: **1516 / 0**.
+
+## [x] 73. Sources of Sports Data — Phase A
+
+Given that ESPN is limited with information, we need to identify sources of information for our new Sports Tournament areas. For each tournament and sport, we need to find sources of information: news and scores. We need to do a comprehensive review of each tournament. "make sync-sports" should incorporate these new sources.
+
+**Shipped (Phase A).** Two new providers + the Wikipedia summary surface on every league page. Phase B (`football-data.org` for non-ESPN soccer; PGA Tour leaderboards; Wikipedia infobox extraction for tournament results) deferred to a follow-up STUFF item.
+
+**Source review.** Posted as in-thread analysis (verified candidates via `curl`):
+
+- ✅ **Jolpica (Ergast successor)** — F1 races / drivers / constructors. No auth.
+- ✅ **OpenF1** — F1 live timing alternative. No auth. (Not shipped this round; Jolpica covers Phase A.)
+- ✅ **Wikipedia REST API** — summary endpoint covers every tournament in the catalog uniformly. No auth, generous free tier. WMF guidelines followed (User-Agent + 24h cache).
+- ⚠️ **football-data.org** — works but needs registered key. Deferred.
+- ❌ **ProCyclingStats / ESPNcricinfo** — return 403 to plain HTTP; would need browser fingerprinting. Deferred.
+- ❌ **ESPN golf / cycling endpoints** — return 404. Not exposed publicly.
+- 🚫 **Horse racing** — no good free source. Stays catalog-only.
+
+**F1 via Jolpica** ([app/providers/jolpica_f1.rb](app/providers/jolpica_f1.rb)) — new provider hitting `api.jolpi.ca/ergast/f1/<year>.json` (the active community mirror; the original ergast.com retired April 2025). `season(year)` returns Array<Race> with circuit + country + scheduled_at + status (past races flagged `:final`, future ones `:scheduled`). `season_results(year)` adds podium winner per race. New `SportsSync.sync_f1!` is now part of `SportsSync.run!`; gated on `f1_followed?` (skip the fetch when no user follows `formula-1` as a league) so we don't pull 22 races for a dataset nobody cares about. Races land in `sports_matches` with both `home_team_id` and `away_team_id` NULL — F1 isn't team-vs-team; `period` carries "Round 7 — Monaco Grand Prix" and `venue` carries "Circuit de Monaco, Monaco". Confirmed live: `SportsSync.sync_f1!` pulls the **22-race 2026 F1 calendar** on first invocation; the existing Fixtures + Recent results sections on `/sports/league/formula-1` render them with no further view work. 5 examples in [spec/providers_jolpica_f1_spec.rb](spec/providers_jolpica_f1_spec.rb) cover the parse paths.
+
+**Wikipedia summary** ([app/providers/wikipedia.rb](app/providers/wikipedia.rb) + [app/sports_leagues_store.rb](app/sports_leagues_store.rb) + migration `005_sports_leagues_wikipedia.sql`) — every league row now carries `wikipedia_title` (catalog metadata) + `wikipedia_summary` (cached JSON) + `wikipedia_summary_fetched_at` (TTL stamp). New `Providers::Wikipedia.summary(title)` hits `en.wikipedia.org/api/rest_v1/page/summary/{title}` with a proper User-Agent and 8s timeout per WMF guidelines. `refresh_for_league(league)` is the caller-friendly entry point — no-ops when the title isn't set (most catalog entries until I expand the map) and skips the network when the cache is fresh (TTL = 24h). Wired into the `/sports/league/:slug` route handler; renders an "About" section above Fixtures with thumbnail + extract + "Read on Wikipedia →" link. **46 catalog tournaments now have a Wikipedia title** declared in `SportsCatalog::WIKIPEDIA_TITLES` (every Grand Slam + Masters 1000 + every major soccer/rugby/cricket/golf tournament + every Monument + Grand Tour + every headline motorsport event). 8 examples in [spec/providers_wikipedia_spec.rb](spec/providers_wikipedia_spec.rb) cover summary fetch, blank-title no-op, 404 handling, percent-encoding, refresh-cache TTL behaviour. Verified live against `en.wikipedia.org/api/rest_v1/page/summary/Formula%20One` from a one-off call — returns the Formula One overview as expected.
+
+Full local suite: **1539 / 0** (13 new examples across the two provider specs + cross-cutting test coverage that exercises the refreshed `/sports/league/:slug` route).
+
+## [x] 74. Sports Data — Phase B (API-Sports paid tier)
+
+Phase B of STUFF #73 — close the gaps Phase A left (NHL, golf leaderboards, cricket live scores, lower-tier soccer leagues, MMA) via a paid multi-sport data API.
+
+**Provider:** [api-sports.io](https://api-sports.io) — $10/mo for 7,500 req/day across all their per-sport sub-APIs (football, basketball, baseball, hockey, F1, MMA, rugby). One auth key works across every sub-API. JSON, well-documented, generous free tier (100 req/day) for development.
+
+### Operator step — sign up + provide the key
+
+1. Go to https://dashboard.api-football.com/register and create an account (free; uses email + password).
+2. Confirm the email; the dashboard issues an API key under **Account → My Access → API Key**.
+3. (Optional but recommended) Upgrade to the **Pro** plan ($10/mo) for 7,500 daily requests. The free tier (100/day) is enough to develop + run the daily sync once.
+4. Drop the key into `/Users/outten/src/tech-feed-reader/.env` on your laptop AND into `/opt/app/.env` on the Droplet:
+
+   ```env
+   API_SPORTS_KEY=<paste-the-key-here>
+   ```
+
+5. Restart the dev server (`make stop && make run`) to pick up the new env var; on the Droplet, `make deploy` will roll the value into the container.
+6. Tell me the key is in place; I'll wire up the provider + sync paths. Don't paste the key into chat — the .env file is the source of truth and I'll only ever check `ENV['API_SPORTS_KEY']` from code, never log or echo it.
+
+### What this unlocks (Phase B build scope)
+
+- **`Providers::ApiSportsFootball`** — soccer fixtures/standings/lineups for leagues beyond what ESPN covers (Bundesliga 2, lower English divisions, Saudi Pro League, Eredivisie, etc.).
+- **`Providers::ApiSportsBasketball`** — NCAA + EuroLeague + WNBA detail beyond ESPN's coverage.
+- **`Providers::ApiSportsHockey`** — NHL + KHL (we currently have nothing for hockey).
+- **`Providers::ApiSportsBaseball`** — NPB + KBO depth beyond what we get for MLB today.
+- **`Providers::ApiSportsRugby`** — proper rugby fixtures (the ESPN integration is limited to standings).
+- **`Providers::ApiSportsF1`** — alternate to Jolpica; cleaner data shape for driver+constructor standings.
+- **One key, separate provider modules** — same auth header (`x-rapidapi-key` or `x-apisports-key` depending on host) wrapped in a shared `Providers::ApiSportsBase` for HTTP plumbing + retry + rate-limit awareness.
+- **Sync wiring** — extend `SportsSync.run!` with per-sport sync paths gated on follows (same pattern as `sync_f1!` from Phase A).
+- **No new schema** — re-uses sports_matches / sports_standings / sports_teams from existing schema. New `source_provider='api-sports'` value.
+
+### Cost guard
+
+API-Sports' rate limit is per-day across the account. The daily sync (`make sync-sports`) bundled across ~6 sports will burn maybe 200-500 requests per run if we're thoughtful about caching and only sync sports that have at least one follower. The $10/mo Pro plan gives us 15× headroom for ad-hoc page-load fetches if we add any. If usage spikes, the next tier is $25/mo for 75,000/day.
+
+**Shipped.** Five sport providers wired into `SportsSync.run!` via `sync_api_sports!`. Season resolution tries `Date.today.year - 1` first, then `year - 2`, so the sync stays live even when the API lags a season (the provider returns an informational error for future seasons; the fallback picks up the most recent complete season automatically).
+
+**What landed:**
+- `Providers::ApiSportsHockey` — NHL (league 57) + KHL (league 31). Verified live: 1,503 NHL 2024-season games synced on first run.
+- `Providers::ApiSportsRugby` — Six Nations (51), Super Rugby Pacific (71), United Rugby Championship (76), Rugby Championship (85). League IDs corrected from pre-key estimates; verified via live endpoint.
+- `Providers::ApiSportsBaseball` — NPB (2), KBO (5). Both verified present in 2024 season.
+- `Providers::ApiSportsBasketball` + `Providers::ApiSportsFootball` — providers present and gated; catalog entries for additional soccer leagues and WNBA can be added as follow-ups.
+- `SportsCatalog` updated: Six Nations, Super Rugby Pacific, URC, NPB, KBO carry `source_provider: 'api-sports'` + `api_sports_league_id`.
+- `SportsSync` requires `sports_catalog` (was missing, caused NameError on first run).
+- Sync is follow-gated per league — zero API calls when no api-sports leagues are followed.
+- `API_SPORTS_KEY` absent → returns 0 immediately (safe for environments without the key).
+
+**Not covered (defer):** golf leaderboards (ESPN covers Masters/PGA via `football/golf`; no free-tier api-sports golf endpoint), MMA (niche), lower-tier soccer leagues (add catalog entries + api-sports football league IDs as needed).
+
+## [x] 75. Hockey Sports
+
+Hockey Sports management /sports/manage/hockey/nhl is not like the others. Why don't we see the leagues sports team. And allow us to see their standings and following.
+
+**Shipped (two PRs bundled):**
+- `GET /sports/manage/hockey/nhl` (and any api-sports league with `teams: []`): now loads teams from the DB via `SportsTeamsStore.for_league` and renders them with individual `+ Follow` buttons — same grid as ESPN-backed leagues. 32 NHL teams populate on first sync.
+- League-level `+ Follow league` toggle added to the manage-league page for api-sports leagues (required to enable the daily sync).
+- `@followed_league_slugs` now passed into the `/sports/manage/:sport/:league` route.
+
+## [ ] 76. Tennis / Roland Garros
+
+Both `/sports/team/tennis` and `/sports/league/roland-garros` show no match data despite the French Open being live.
+
+**Root cause:** Roland Garros had `source_provider: 'catalog'` — no live data provider. api-sports has no tennis API. ESPN *does* expose the tournament at `site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard` with 633 matches per tournament (player names, set-by-set scores in `linescores`, human-readable summary in `notes[0].text`).
+
+**Shipped:**
+- `Providers::ESPN.tennis_scoreboard(tour:, tournament_name:)` — parses the tennis-specific ESPN format (groupings → competitions → athlete competitors). Returns `TennisMatch` structs.
+- `Providers::ESPN.normalize_tennis_competition` — maps ESPN set scores, winner flag, and notes summary to our match shape.
+- `SportsSync.sync_tennis_league_events!` — new sync path for tennis leagues; stores each player as a `sports_teams` row (slug: `roland-garros-guo-hanyu`, external_id: ESPN athlete ID) so the existing fixtures view renders match cards without schema changes.
+- `SportsSync.ensure_tennis_player!` — upserts a player-as-team row per match.
+- `sync_followed_league_events!` branches on `sport == 'tennis'` to call the new path.
+- Catalog updated: `roland-garros`, `australian-open`, `wimbledon`, `us-open-tennis` → `source_provider: 'espn'`, `external_id: 'tennis/atp'`, `espn_tournament_name:` (filter string).
+- `/sports/team/tennis` (curated team page): new "Live tournament data available" callout links to any followed tennis league that has synced matches.
+- Verified live: 494 Roland Garros matches synced (433 final, 61 scheduled).
+
+## [x] 77. Match Cards
+
+Can you render the Results by Round more nicely for the user? With team or user logo? Like the "Last Game" area? And sort by most recent -- ie. most recent first.
+
+**Shipped.** Tennis results-by-round section replaced with proper match cards:
+- **Player avatar** — ESPN headshot (`a.espncdn.com/i/headshots/tennis/players/full/{id}.png`) auto-loaded from the stored ESPN athlete ID. Falls back to player initials (first letters of first + last name) in a circular avatar when the image 404s or fails to load.
+- **Winner highlight** — winning player's name is bold; sets shown in green with a 🏆 trophy icon.
+- **Sets score** — `home_score` / `away_score` are sets won (e.g. "2 – 0"), clear at a glance.
+- **Court** — venue from ESPN match data (e.g. "Paris, France — Court Chatrier") shown beneath the two player rows.
+- **Date** — compact "May 30" label in a left column.
+- **Sort order** — rounds sorted Final → Semifinal → QF → R4 → R3 → R2 → R1 → Qualifying, newest first within each round. Final and Semifinal groups start expanded (`<details open>`); deeper rounds start collapsed.
+- New `.tennis-match-card` CSS grid layout + `.tennis-match-avatar` / `.tennis-match-winner` / `.sports-round-summary` classes added to `public/style.css`.
+
+## [x] 79. All-sports match cards
+
+Extend the tennis match card improvements to all sports on /sports/league/:slug.
+
+**Shipped.** Unified `match_card_html` helper in `app/main.rb` renders one `<li>` per match, adapting automatically by sport:
+- **Tennis** — player headshots (ESPN CDN) + initials fallback, bold winner, green set count, per-set score detail, court/venue.
+- **F1** — single race card with sport emoji + "Round N — Race Name" label + venue.
+- **Team sports** (NHL, rugby, soccer, baseball, basketball) — horizontal `home [logo] name | score – score | name [logo] away` with team logo from `sports_teams.image_url` (sport emoji fallback), winner name bold.
+- Round grouping (`@results_by_round`) now triggers for any sport with non-empty `period` — F1 is auto-grouped; season sports get a flat "Recent results" list.
+- Year split (`@show_year_split`) now applies to all sports when both current-year and historical matches exist.
+- Old `whats-on-match` list replaced by `sport-match-list` / `sport-match-card` CSS for both Upcoming and Recent sections. Suite: 1539 / 0.
+
+## [x] 78. Current vs. Past
+
+For example, Rolland Garros is showing last year's matches versus current which is going on now. It is OK for historical; however, we should show current if a league's tournament is current. It is ok if all of the data is not available (for exmaple, finals) if in progress. Let's add.
+
+**Shipped + extended to all sports (bundled with the "all sports" card pass).** The league route now splits tennis results into current-year and historical buckets before passing them to the view:
+- `@finals_this_year` — matches whose `scheduled_at` starts with the current year (2026). These are the ongoing tournament's completed rounds.
+- `@finals_historical` — all prior-year matches (Roland Garros 2025, etc.).
+
+The view renders them in two separate `<details>` blocks:
+- **2026 Results** — open by default. Rounds sorted Final → Semifinal → QF → deeper rounds; Final + Semifinal start expanded, the rest collapsed.
+- **Previous year's results** — collapsed by default. Same round grouping inside.
+
+Both sections use the same `tennis-match-card` layout (avatars, set scores, court). This way the current tournament is prominent and historical data is available but unobtrusive.
+

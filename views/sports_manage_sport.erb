@@ -26,48 +26,103 @@
   </div>
 <% end %>
 
-<ul class="sports-catalog-grid">
-  <% @sport[:leagues].each do |league| %>
-    <%
-      team_count = (league[:teams] || []).length
-      followed_in_league = (league[:teams] || []).count { |t| @followed_slugs.include?(t[:slug]) }
-      # STUFF #54 — tennis leagues drill into the rankings page
-      # (player-based follow surface), not a team grid. The anchor
-      # jumps to the relevant tour section.
-      card_href = if @sport[:slug] == 'tennis'
-                    "/sports/tennis#tour-#{league[:slug]}"
-                  else
-                    "/sports/manage/#{@sport[:slug]}/#{league[:slug]}"
-                  end
-    %>
-    <li class="sports-catalog-card <%= 'is-womens' if league[:women] %>">
-      <a class="sports-catalog-card-link" href="<%= h(card_href) %>">
-        <span class="sports-catalog-name"><%= h(league[:name]) %></span>
+<%
+  # STUFF #70 — split leagues into season-format (ongoing professional
+  # play — NFL, NBA, MLS, ATP) and tournament-format (event-shaped —
+  # World Cups, Grand Slams). Two separate sections so the user sees
+  # the right verbs (drill-down for seasons, ★ Follow for tournaments).
+  seasons     = @sport[:leagues].reject { |lg| lg[:format] == :tournament }
+  tournaments = @sport[:leagues].select { |lg| lg[:format] == :tournament }
+%>
+
+<% if seasons.any? %>
+  <% if tournaments.any? %><h3 class="sports-section-heading">Leagues</h3><% end %>
+  <ul class="sports-catalog-grid">
+    <% seasons.each do |league| %>
+      <%
+        team_count = (league[:teams] || []).length
+        followed_in_league = (league[:teams] || []).count { |t| @followed_slugs.include?(t[:slug]) }
+        card_href = if @sport[:slug] == 'tennis'
+                      "/sports/tennis#tour-#{league[:slug]}"
+                    else
+                      "/sports/manage/#{@sport[:slug]}/#{league[:slug]}"
+                    end
+      %>
+      <li class="sports-catalog-card <%= 'is-womens' if league[:women] %>">
+        <a class="sports-catalog-card-link" href="<%= h(card_href) %>">
+          <span class="sports-catalog-name"><%= h(league[:name]) %></span>
+          <span class="sports-catalog-chips">
+            <% if league[:women] %>
+              <span class="sports-catalog-chip women">Women's</span>
+            <% end %>
+            <% if league[:region] && league[:region] != 'global' %>
+              <span class="sports-catalog-chip region"><%= h(league[:region].tr('-', ' ')) %></span>
+            <% end %>
+            <% if league[:source_provider] == 'espn' %>
+              <span class="sports-catalog-chip live" title="Live scores + standings from ESPN">Live</span>
+            <% end %>
+          </span>
+          <span class="sports-catalog-meta">
+            <% if @sport[:slug] == 'tennis' %>
+              🎾 Browse rankings &amp; follow players &rarr;
+            <% else %>
+              <%= team_count %> team<%= 's' unless team_count == 1 %>
+              <% if followed_in_league.positive? %>
+                &middot; <strong><%= followed_in_league %> followed</strong>
+              <% end %>
+            <% end %>
+          </span>
+          <% if league[:blurb] %>
+            <span class="sports-catalog-blurb"><%= h(league[:blurb]) %></span>
+          <% end %>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+<% end %>
+
+<% if tournaments.any? %>
+  <%# STUFF #70 — tournament cards. Don't drill into a team grid
+      (tournaments don't carry a stable team list). Instead each
+      card has an inline ★ Follow toggle. Following adds the
+      league to sports_follows.kind='league' and lazy-upserts the
+      sports_leagues row from catalog. %>
+  <h3 class="sports-section-heading">📅 Tournaments</h3>
+  <p class="subtitle sports-section-subtitle">
+    Subscribe to a tournament to surface its articles on /sports
+    and (where ESPN data is available) its standings + matches.
+  </p>
+  <ul class="sports-catalog-grid">
+    <% tournaments.each do |tour| %>
+      <%
+        followed = @followed_league_slugs.include?(tour[:slug])
+      %>
+      <li class="sports-catalog-card sports-tournament-card <%= 'is-followed' if followed %> <%= 'is-womens' if tour[:women] %>">
+        <span class="sports-catalog-name"><%= h(tour[:name]) %></span>
         <span class="sports-catalog-chips">
-          <% if league[:women] %>
+          <% if tour[:women] %>
             <span class="sports-catalog-chip women">Women's</span>
           <% end %>
-          <% if league[:region] && league[:region] != 'global' %>
-            <span class="sports-catalog-chip region"><%= h(league[:region].tr('-', ' ')) %></span>
+          <% if tour[:country] %>
+            <span class="sports-catalog-chip region"><%= h(tour[:country]) %></span>
           <% end %>
-          <% if league[:source_provider] == 'espn' %>
-            <span class="sports-catalog-chip live" title="Live scores + standings from ESPN">Live</span>
-          <% end %>
-        </span>
-        <span class="sports-catalog-meta">
-          <% if @sport[:slug] == 'tennis' %>
-            🎾 Browse rankings &amp; follow players &rarr;
-          <% else %>
-            <%= team_count %> team<%= 's' unless team_count == 1 %>
-            <% if followed_in_league.positive? %>
-              &middot; <strong><%= followed_in_league %> followed</strong>
-            <% end %>
+          <% if tour[:source_provider] == 'espn' %>
+            <span class="sports-catalog-chip live" title="Live standings + scores from ESPN">Live</span>
           <% end %>
         </span>
-        <% if league[:blurb] %>
-          <span class="sports-catalog-blurb"><%= h(league[:blurb]) %></span>
+        <% if tour[:blurb] %>
+          <span class="sports-catalog-blurb"><%= h(tour[:blurb]) %></span>
         <% end %>
-      </a>
-    </li>
-  <% end %>
-</ul>
+        <form method="post" action="/sports/leagues/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form">
+          <input type="hidden" name="slug" value="<%= h(tour[:slug]) %>">
+          <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>">
+          <button type="submit"
+                  class="<%= followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if followed %>"
+                  title="<%= followed ? 'Stop following' : 'Follow — surfaces tournament articles on /sports' %>">
+            <%= followed ? '✓ Following' : '+ Follow' %>
+          </button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

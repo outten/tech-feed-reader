@@ -78,6 +78,19 @@
   <% end %>
 <% end %>
 
+<%# STUFF #75 — tennis: show live-tournament links when Roland Garros /
+    Wimbledon / etc. is followed and has synced match data. %>
+<% if (@tennis_tournaments || []).any? %>
+  <div class="sports-manage-action-callout" style="margin-bottom:1rem">
+    <p><strong>Live tournament data available:</strong></p>
+    <% @tennis_tournaments.each do |t| %>
+      <a href="/sports/league/<%= h(t['slug']) %>" class="btn-primary" style="margin-right:0.5rem">
+        🎾 <%= h(t['name']) %> — fixtures &amp; results →
+      </a>
+    <% end %>
+  </div>
+<% end %>
+
 <% if @team_feeds.empty? %>
   <div class="empty-state">
     <p>
