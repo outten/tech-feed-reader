@@ -84,6 +84,35 @@
   </form>
 </div>
 
+<%# League Wikipedia context — show a brief "About this competition"
+    blurb when the league has a cached Wikipedia summary. Useful for
+    teams like NHL Ducks where the user may not know which league
+    they're in. %>
+<%
+  league_wiki = nil
+  if @league && @league['wikipedia_summary'].to_s != ''
+    league_wiki = JSON.parse(@league['wikipedia_summary']) rescue nil
+  end
+%>
+<% if league_wiki && league_wiki['extract'].to_s != '' %>
+  <section class="sports-league-wikipedia" style="margin-bottom:1rem" aria-label="About this competition">
+    <h3>About <%= h(@league['name']) %></h3>
+    <div class="sports-league-wikipedia-body">
+      <% if league_wiki['thumbnail_url'] && !league_wiki['thumbnail_url'].to_s.empty? %>
+        <img class="sports-league-wikipedia-thumb" src="<%= h(league_wiki['thumbnail_url']) %>" alt="" loading="lazy">
+      <% end %>
+      <div class="sports-league-wikipedia-text">
+        <p><%= h(league_wiki['extract'].split('.').first(3).join('.') + '.') %></p>
+        <% if league_wiki['page_url'] %>
+          <a href="<%= h(league_wiki['page_url']) %>" target="_blank" rel="noopener noreferrer" class="muted" style="font-size:0.8rem">
+            Read on Wikipedia &rarr;
+          </a>
+        <% end %>
+      </div>
+    </div>
+  </section>
+<% end %>
+
 <%# Upcoming fixtures. Renders nothing if the team has no scheduled
     matches in the table (off-season, or league not synced yet). %>
 <% if @upcoming.any? %>

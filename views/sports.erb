@@ -15,12 +15,23 @@
         <a href="/articles?topic=sports" title="Linear chronological list of every sports article">All sports articles &rarr;</a>
       <% end %>
     </p>
-    <p class="subtitle" style="font-size:0.85rem; margin-top:0.25rem">
-      Live scores, fixtures, and league standings are <em>coming</em> in a follow-up phase
-      (see Sports Phase S3+ in <a href="/feeds">TODO.md</a>). For now this page is the news side: subscribed sources + recent stories per sport.
-    </p>
   </div>
 </div>
+
+<%# 🔴 Live now — any sport with matches currently in progress %>
+<% if (@live_matches || []).any? %>
+  <section class="benchmark-section sports-live-section">
+    <h3>🔴 Live now <span class="muted" style="font-size:0.85rem; font-weight:400">— <%= @live_matches.length %> match<%= 'es' if @live_matches.length != 1 %> in progress</span></h3>
+    <ul class="sport-match-list">
+      <% @live_matches.each do |m| %>
+        <% league = (@live_leagues_by_id || {})[m['league_id']] %>
+        <% sport  = league ? league['sport'] : 'team' %>
+        <% emoji  = begin SportsCatalog.find_sport(sport)&.dig(:emoji) rescue nil end || '🏟' %>
+        <%= match_card_html(m, sport, @live_teams_by_id || {}, upcoming: false, sport_emoji: emoji) %>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
 
 <%# Top-of-page TOC. Two rows of pill buttons:
     - Row 1 (anchors): jump to sport-section on this page

@@ -47,6 +47,21 @@
     </div>
   <% end %>
 
+  <%# Live matches right now — shown above "Sports today" when active %>
+  <% if (@live_matches_today || []).any? %>
+    <section class="benchmark-section whats-on-section">
+      <h3>🔴 Live now <span class="muted whats-on-count">(<%= @live_matches_today.length %>)</span></h3>
+      <ul class="sport-match-list">
+        <% @live_matches_today.each do |match| %>
+          <% league = (@leagues_by_id || {})[match['league_id']] %>
+          <% sport = league ? league['sport'] : 'team' %>
+          <% emoji = begin SportsCatalog.find_sport(sport)&.dig(:emoji) rescue nil end || '🏟' %>
+          <%= match_card_html(match, sport, @teams_by_id || {}, upcoming: false, sport_emoji: emoji) %>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
   <% if (@today_matches || []).any? %>
     <section class="benchmark-section whats-on-section">
       <h3>🏟 Sports today <span class="muted whats-on-count">(<%= @today_matches.length %>)</span></h3>
