@@ -153,16 +153,16 @@
           'Round of 128' => 6, 'Round 1' => 7, 'Round 2' => 8,
           'Round 3' => 9, 'Round 4' => 10
         }
-        def rounds_for(matches, round_order)
+        build_rounds = ->(matches) {
           by_round = matches.group_by { |m| m['period'].to_s.split('|').first.to_s }
-          sorted = by_round.keys.sort_by { |r| [round_order[r] || 99, r] }
-          qualifying = sorted.select { |r| r.downcase.include?('qualifying') }
-          main = sorted.reject { |r| r.downcase.include?('qualifying') }
-          [by_round, main + qualifying]
-        end
+          sorted   = by_round.keys.sort_by { |r| [round_order[r] || 99, r] }
+          main     = sorted.reject { |r| r.downcase.include?('qualifying') }
+          qual     = sorted.select { |r| r.downcase.include?('qualifying') }
+          [by_round, main + qual]
+        }
 
-        current_rounds, current_display = rounds_for(@finals_this_year || [], round_order)
-        hist_rounds,    hist_display    = rounds_for(@finals_historical || [], round_order)
+        current_rounds, current_display = build_rounds.(@finals_this_year || [])
+        hist_rounds,    hist_display    = build_rounds.(@finals_historical || [])
       %>
 
       <%# ── Current year ── %>
