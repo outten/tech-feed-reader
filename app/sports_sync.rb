@@ -53,6 +53,7 @@ module SportsSync
     # burn quota for sports nobody follows.
     matches_upserted += sync_api_sports!(logger: logger)
     standings_count  = sync_standings!(logger: logger)
+    standings_count += sync_api_sports_standings!(logger: logger)
     tennis_count     = sync_tennis_rankings!(logger: logger)
 
     {
@@ -163,18 +164,21 @@ module SportsSync
   # previous year's edition so historical results are available immediately
   # after following a tournament.
   def self.sync_tennis_league_events!(league, logger:)
-    catalog_entry = SportsCatalog.all_leagues.find { |lg| lg[:slug] == league['slug'] }
-    tour            = league['external_id']
+    catalog_entry   = SportsCatalog.all_leagues.find { |lg| lg[:slug] == league['slug'] }
     tournament_name = catalog_entry&.dig(:espn_tournament_name)
+    # espn_tours covers Grand Slams (both ATP + WTA draws) and WTA-only
+    # events (single tour). Falls back to external_id for legacy entries.
+    tours = catalog_entry&.dig(:espn_tours) || [league['external_id']]
 
-    # Current edition (no dates param = today's active events)
-    current = Providers::ESPN.tennis_scoreboard(tour: tour, tournament_name: tournament_name)
-    # Previous year's edition: use approximate month from current data or
-    # fall back to one year ago today. Deduplication is handled by the
-    # ON CONFLICT upsert so re-syncing the same matches is safe.
     prev_dates = (Date.today << 12).strftime('%Y%m%d')
-    previous   = Providers::ESPN.tennis_scoreboard(tour: tour, tournament_name: tournament_name,
-                                                    dates: prev_dates)
+    # Fetch current + previous year from every applicable tour.
+    current = tours.flat_map { |tour|
+      Providers::ESPN.tennis_scoreboard(tour: tour, tournament_name: tournament_name)
+    }
+    previous = tours.flat_map { |tour|
+      Providers::ESPN.tennis_scoreboard(tour: tour, tournament_name: tournament_name,
+                                        dates: prev_dates)
+    }
 
     count = 0
     (current + previous).each do |m|
@@ -469,6 +473,68 @@ module SportsSync
     total
   rescue StandardError => e
     logger.warn('sports_sync_api_sports_error', message: e.message)
+    0
+  end
+
+  # Sync standings for all followed api-sports leagues that have a
+  # standings endpoint. Mirrors sync_standings! which covers ESPN;
+  # this handles the api-sports side (NHL, rugby, baseball, basketball).
+  def self.sync_api_sports_standings!(logger:)
+    return 0 if ENV['API_SPORTS_KEY'].to_s.empty?
+
+    followed_slugs = SportsFollowsStore.distinct_values('league')
+    return 0 if followed_slugs.empty?
+
+    total = 0
+    followed_slugs.each do |slug|
+      league = SportsLeaguesStore.find_by_slug(slug)
+      next unless league
+      next unless league['source_provider'] == 'api-sports'
+
+      catalog_entry = SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug }
+      api_league_id = catalog_entry&.dig(:api_sports_league_id)
+      next unless api_league_id
+
+      provider = API_SPORTS_PROVIDERS[league['sport']]
+      next unless provider.respond_to?(:standings)
+
+      rows = []
+      api_sports_seasons_to_try.each do |season|
+        rows = provider.standings(league_id: api_league_id, season: season)
+        break unless rows.empty?
+      end
+      next if rows.empty?
+
+      rows.each do |row|
+        team = ensure_team!(row[:team_external_id], row[:team_name],
+                            row[:team_logo], league: league)
+        next unless team
+        SportsStandingsStore.upsert(
+          league_id:          league['id'],
+          team_id:            team['id'],
+          group_name:         row[:group_name],
+          source_provider:    'api-sports',
+          position:           row[:position],
+          wins:               row[:wins],
+          losses:             row[:losses],
+          ties:               nil,
+          win_percent:        nil,
+          points_for:         row[:points_for],
+          points_against:     row[:points_against],
+          point_differential: (row[:points_for].to_i - row[:points_against].to_i).then { |d| d.zero? ? nil : d },
+          games_behind:       nil,
+          streak:             nil,
+          playoff_seed:       nil
+        )
+        total += 1
+      end
+      logger.info('sports_sync_api_sports_standings', slug: slug, count: rows.length)
+    rescue StandardError => e
+      logger.warn('sports_sync_api_sports_standings_error', slug: slug, message: e.message)
+    end
+    total
+  rescue StandardError => e
+    logger.warn('sports_sync_api_sports_standings_error', message: e.message)
     0
   end
 

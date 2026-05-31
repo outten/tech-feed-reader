@@ -42,6 +42,31 @@ module Providers
       nil
     end
 
+    def standings(league_id:, season: Date.today.year, http_get: nil)
+      raw = ApiSportsBasketball.get('/standings',
+                                    query: { league: league_id, season: season },
+                                    http_get: http_get)
+      Array(raw).flat_map do |grp|
+        Array(grp).map do |row|
+          {
+            team_external_id: row.dig('team', 'id').to_s,
+            team_name:        row.dig('team', 'name'),
+            team_logo:        row.dig('team', 'logo'),
+            group_name:       row.dig('group', 'name'),
+            position:         row['position']&.to_i,
+            wins:             row.dig('games', 'win', 'total'),
+            losses:           row.dig('games', 'lose', 'total'),
+            points_for:       row.dig('points', 'for'),
+            points_against:   row.dig('points', 'against'),
+            points:           nil
+          }
+        end
+      end
+    rescue StandardError => e
+      AppLogger.warn('api_sports_basketball_standings', message: e.message)
+      []
+    end
+
     FINAL_CODES     = %w[FT AOT].freeze
     LIVE_CODES      = %w[Q1 Q2 Q3 Q4 OT BT].freeze
     POSTPONED_CODES = %w[POST CANC ABD].freeze
