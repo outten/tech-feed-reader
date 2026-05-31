@@ -5089,3 +5089,36 @@ details[open] > .sports-round-summary::before { content: '▼ '; }
 /* When image loads, hide initials */
 .tennis-match-avatar img:not([style*="display: none"]) ~ .tennis-match-initials { opacity: 0; }
 .tennis-match-score-detail { grid-column: 2; font-size: 0.75rem; font-weight: 500; margin-top: 0.05rem; }
+
+/* STUFF — unified sport-match-card (all sports) */
+.sport-match-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.sport-match-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e5ea);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+html.dark .sport-match-card { background: #1c1c1e; border-color: #38383a; }
+/* Team sports: home side — scores — away side */
+.smc-row { display: flex; align-items: center; gap: 0.5rem; }
+.smc-side { display: flex; align-items: center; gap: 0.35rem; flex: 1; }
+.smc-home { justify-content: flex-end; flex-direction: row-reverse; }
+.smc-away { justify-content: flex-start; }
+.smc-logo { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+.smc-emoji { font-size: 1.1rem; flex-shrink: 0; }
+.smc-team-name { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 10rem; }
+.smc-winner { font-weight: 700; }
+.smc-scores { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; min-width: 3.5rem; justify-content: center; }
+.smc-score { font-size: 1rem; font-weight: 600; min-width: 1.2rem; text-align: center; color: var(--text-muted, #6e6e73); }
+.smc-score-w { color: inherit; }
+.smc-dash { color: var(--text-muted, #6e6e73); font-size: 0.85rem; }
+.smc-meta { font-size: 0.72rem; color: var(--text-muted, #6e6e73); margin-top: 0.15rem; }
+/* F1 race card */
+.sport-match-card-f1 .smc-race { display: flex; align-items: center; gap: 0.4rem; }
+.smc-race-emoji { font-size: 1.2rem; }
+.smc-race-name { font-size: 0.9rem; font-weight: 500; }
+.smc-venue { font-size: 0.72rem; color: var(--text-muted, #6e6e73); margin-top: 0.1rem; }
+@media (max-width: 600px) {
+  .smc-team-name { max-width: 6rem; }
+  .smc-logo { width: 20px; height: 20px; }
+}

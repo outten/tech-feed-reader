@@ -1123,6 +1123,123 @@ class TechFeedReader < Sinatra::Base
                 .reject { |_, v| v.nil? || v.to_s.empty? }
       pairs.empty? ? '?' : "?#{pairs.map { |k, v| "#{k}=#{v}" }.join('&')}"
     end
+
+    # STUFF — unified match card for /sports/league/:slug.
+    # Renders one <li> appropriate to the sport:
+    #   :tennis  — two player rows with ESPN headshots + set scores
+    #   :f1      — single race card (no teams, race name in period)
+    #   :team    — horizontal home vs away with team logos
+    # Returns an HTML-safe string; call with <%= match_card_html(...) %>
+    def match_card_html(m, sport, teams_by_id, upcoming: false, sport_emoji: '🏟')
+      home = teams_by_id[m['home_team_id']]
+      away = teams_by_id[m['away_team_id']]
+      date_str = (Time.parse(m['scheduled_at']).getlocal
+                      .strftime(upcoming ? '%a %b %-d %-l:%M %p' : '%b %-d') rescue '')
+      venue    = h(m['venue'].to_s)
+      live     = m['status'].to_s == 'live'
+
+      if sport == 'tennis'
+        tennis_match_card_html(m, home, away, date_str, venue)
+      elsif m['home_team_id'].nil? && m['away_team_id'].nil?
+        # F1 / race format — no teams, period has "Round N — Race Name"
+        f1_match_card_html(m, date_str, venue, sport_emoji)
+      else
+        team_match_card_html(m, home, away, date_str, venue, sport_emoji, upcoming: upcoming, live: live)
+      end
+    end
+
+    def tennis_match_card_html(m, home, away, date_str, venue)
+      home_won = m['home_score'].to_i > m['away_score'].to_i
+      away_won = m['away_score'].to_i > m['home_score'].to_i
+      score_detail = m['period'].to_s.split('|', 2)[1]
+      set_scores   = score_detail.to_s.scan(/\d+-\d+(?:\s*\(\d+[–-]\d+\))?/).join(', ') if score_detail
+
+      rows = [[home, m['home_score'], home_won], [away, m['away_score'], away_won]].map do |player, sets, won|
+        name     = player ? h(player['name']) : '?'
+        ext      = player ? h(player['external_id'].to_s) : ''
+        initials = (player ? player['name'] : '').split.map { |w| w[0] }.first(2).join.upcase
+        img_tag  = ext.empty? ? '' :
+          %(<img src="https://a.espncdn.com/i/headshots/tennis/players/full/#{ext}.png" ) +
+          %(alt="" loading="lazy" onerror="this.style.display='none'">)
+        winner_class = won ? ' tennis-match-winner' : ''
+        won_badge    = won ? '<span class="tennis-match-trophy" aria-label="Winner">🏆</span>' : ''
+        sets_class   = won ? ' tennis-match-sets-w' : ''
+        %(
+          <div class="tennis-match-player#{winner_class}">
+            <span class="tennis-match-avatar">#{img_tag}
+              <span class="tennis-match-initials">#{h(initials)}</span></span>
+            <span class="tennis-match-name">#{name}</span>
+            <span class="tennis-match-sets#{sets_class}">#{sets || '—'}</span>
+            #{won_badge}
+          </div>)
+      end.join
+
+      detail_line = ''
+      detail_line += %(<div class="tennis-match-score-detail muted">#{h(set_scores)}</div>) if set_scores && !set_scores.empty?
+      detail_line += %(<div class="tennis-match-venue muted">#{venue}</div>) unless venue.empty?
+
+      %(<li class="tennis-match-card">
+          <div class="tennis-match-date">#{date_str}</div>
+          <div class="tennis-match-players">#{rows}</div>
+          #{detail_line}
+        </li>)
+    end
+
+    def f1_match_card_html(m, date_str, venue, sport_emoji)
+      round_label = h(m['period'].to_s.split('|').first)
+      %(<li class="sport-match-card sport-match-card-f1">
+          <div class="smc-date">#{date_str}</div>
+          <div class="smc-race">
+            <span class="smc-race-emoji">#{sport_emoji}</span>
+            <span class="smc-race-name">#{round_label}</span>
+          </div>
+          #{ venue.empty? ? '' : %(<div class="smc-venue muted">#{venue}</div>) }
+        </li>)
+    end
+
+    def team_match_card_html(m, home, away, date_str, venue, sport_emoji, upcoming: false, live: false)
+      home_won = !upcoming && m['home_score'].to_i > m['away_score'].to_i
+      away_won = !upcoming && m['away_score'].to_i > m['home_score'].to_i
+
+      home_name  = home ? h(home['short_name'] || home['name']) : 'TBD'
+      away_name  = away ? h(away['short_name'] || away['name']) : 'TBD'
+      home_slug  = home ? h(home['slug']) : nil
+      away_slug  = away ? h(away['slug']) : nil
+      home_img   = home&.dig('image_url').to_s
+      away_img   = away&.dig('image_url').to_s
+
+      home_logo = home_img.empty? ?
+        %(<span class="smc-emoji">#{sport_emoji}</span>) :
+        %(<img class="smc-logo" src="#{h(home_img)}" alt="" loading="lazy">)
+      away_logo = away_img.empty? ?
+        %(<span class="smc-emoji">#{sport_emoji}</span>) :
+        %(<img class="smc-logo" src="#{h(away_img)}" alt="" loading="lazy">)
+
+      home_link = home_slug ? %(<a href="/sports/team/#{home_slug}" class="smc-team-name #{'smc-winner' if home_won}">#{home_name}</a>) :
+                              %(<span class="smc-team-name">#{home_name}</span>)
+      away_link = away_slug ? %(<a href="/sports/team/#{away_slug}" class="smc-team-name #{'smc-winner' if away_won}">#{away_name}</a>) :
+                              %(<span class="smc-team-name">#{away_name}</span>)
+
+      score_block = if upcoming
+        live_badge = live ? '<span class="badge live-badge">LIVE</span>' : ''
+        %(#{live_badge})
+      else
+        %(<span class="smc-score #{'smc-score-w' if home_won}">#{m['home_score'] || '—'}</span>
+          <span class="smc-dash">–</span>
+          <span class="smc-score #{'smc-score-w' if away_won}">#{m['away_score'] || '—'}</span>)
+      end
+
+      meta = [date_str, venue.empty? ? nil : venue].compact.join(' · ')
+
+      %(<li class="sport-match-card">
+          <div class="smc-row">
+            <div class="smc-side smc-home">#{home_logo}#{home_link}</div>
+            <div class="smc-scores">#{score_block}</div>
+            <div class="smc-side smc-away">#{away_link}#{away_logo}</div>
+          </div>
+          #{ meta.empty? ? '' : %(<div class="smc-meta muted">#{meta}</div>) }
+        </li>)
+    end
   end
 
   # ---- Routes ---------------------------------------------------------
@@ -2456,6 +2573,7 @@ class TechFeedReader < Sinatra::Base
     end
 
     @page_title  = "#{@league['name']} — Standings"
+    @sport       = SportsCatalog.find_sport(@league['sport']) rescue nil
     rows = SportsStandingsStore.for_league(@league['id'])
     @standings_groups = rows.group_by { |r| r['group_name'] }
 
@@ -2472,15 +2590,19 @@ class TechFeedReader < Sinatra::Base
                      else
                        SportsMatchesStore.recent_finals_for_league(@league['id'], limit: 12)
                      end
-    @results_by_round = @league['sport'] == 'tennis' &&
-                        @recent_finals.any? { |m| m['period'].to_s != '' }
-    # STUFF #78 — split tennis results into current year vs historical so
-    # the ongoing tournament leads and previous editions are secondary.
-    if @results_by_round
-      this_year = Date.today.year.to_s
-      @finals_this_year = @recent_finals.select { |m| m['scheduled_at'].to_s.start_with?(this_year) }
-      @finals_historical = @recent_finals.reject { |m| m['scheduled_at'].to_s.start_with?(this_year) }
-    end
+    # Round grouping: tennis (rounds stored in period) + F1 (period has
+    # "Round N — Race Name"). Other season sports have empty period so no
+    # grouping — they just show recent results as a flat list.
+    @results_by_round = @recent_finals.any? { |m| m['period'].to_s.split('|').first.to_s != '' }
+    # Year split — show current year first, prior year collapsed.
+    # Meaningful for tennis (2+ editions in DB) and any other sport
+    # that accumulates multi-season data over time.
+    this_year = Date.today.year.to_s
+    @finals_this_year  = @recent_finals.select { |m| m['scheduled_at'].to_s.start_with?(this_year) }
+    @finals_historical = @recent_finals.reject { |m| m['scheduled_at'].to_s.start_with?(this_year) }
+    # Only split when we actually have data on both sides; otherwise keep
+    # the flat list (avoids an empty "2026 Results" header for off-season).
+    @show_year_split = @finals_this_year.any? && @finals_historical.any?
 
     # Build a teams_by_id that covers both the standings teams and any
     # team referenced by the new match rows (some matches may involve

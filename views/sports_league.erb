@@ -104,38 +104,16 @@
   </section>
 <% end %>
 
-<%# STUFF #70 follow-up — fixtures + results pulled from
-    sports_matches via SportsSync.sync_followed_league_events!
-    Sections only render when there's data, so a catalog-source
-    tournament without ESPN integration (e.g. tennis Slams)
-    keeps the standings-empty state above and stays quiet here. %>
+<%# STUFF #70 follow-up — fixtures + results via sync.
+    Cards adapt per sport: tennis = player rows, F1 = race card,
+    team sports = home vs away with logos. %>
+<% sport_emoji = @sport ? @sport[:emoji] : '🏟' %>
 <% if (@upcoming_matches || []).any? %>
   <section class="benchmark-section">
     <h3>Upcoming fixtures</h3>
-    <ul class="whats-on-matches">
+    <ul class="sport-match-list">
       <% @upcoming_matches.each do |m| %>
-        <% home = (@teams_by_id || {})[m['home_team_id']] %>
-        <% away = (@teams_by_id || {})[m['away_team_id']] %>
-        <li class="whats-on-match">
-          <span class="whats-on-time">
-            <% if m['scheduled_at'] %>
-              <%= Time.parse(m['scheduled_at']).getlocal.strftime('%a %b %-d %-l:%M %p') rescue m['scheduled_at'] %>
-            <% else %>
-              TBD
-            <% end %>
-          </span>
-          <span class="whats-on-matchup">
-            <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>TBD<% end %>
-            <span class="muted">@</span>
-            <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>TBD<% end %>
-          </span>
-          <% if m['venue'] && !m['venue'].to_s.empty? %>
-            <span class="muted whats-on-league"><%= h(m['venue']) %></span>
-          <% end %>
-          <% if m['status'].to_s == 'live' %>
-            <span class="badge live-badge" title="Match is live now">LIVE</span>
-          <% end %>
-        </li>
+        <%= match_card_html(m, @league['sport'], @teams_by_id || {}, upcoming: true, sport_emoji: sport_emoji) %>
       <% end %>
     </ul>
   </section>
@@ -143,9 +121,8 @@
 
 <% if (@recent_finals || []).any? %>
   <section class="benchmark-section">
+    <%# Round grouping: tennis + F1. Flat list for season sports. %>
     <% if @results_by_round %>
-      <%# Tennis: group results by round (Final → Semis → QFs → R16 → …)
-          STUFF #78 — current year leads; historical is a collapsed section. %>
       <%
         round_order = {
           'Final' => 0, 'Semifinal' => 1, 'Quarterfinal' => 2,
@@ -160,164 +137,63 @@
           qual     = sorted.select { |r| r.downcase.include?('qualifying') }
           [by_round, main + qual]
         }
-
-        current_rounds, current_display = build_rounds.(@finals_this_year || [])
-        hist_rounds,    hist_display    = build_rounds.(@finals_historical || [])
-      %>
-
-      <%# ── Current year ── %>
-      <% if current_display.any? %>
-        <details open>
-          <summary><h3 style="display:inline">
-            <%= Date.today.year %> Results
-          </h3>
-            <span class="muted" style="font-size:0.85rem; margin-left:0.5rem">
-              <%= (@finals_this_year || []).count %> matches completed
-            </span>
-          </summary>
-        <% current_display.each do |round_name| %>
-          <% matches = current_rounds[round_name] %>
-          <details <%= 'open' if (round_order[round_name] || 99) <= 2 %>>
-            <summary class="sports-round-summary">
-              <%= h(round_name.empty? ? 'Other' : round_name) %>
-              <span class="muted">(<%= matches.length %>)</span>
-            </summary>
-          <ul class="tennis-match-list">
-            <% matches.each do |m| %>
-              <% home = (@teams_by_id || {})[m['home_team_id']] %>
-              <% away = (@teams_by_id || {})[m['away_team_id']] %>
-              <% home_won = m['home_score'].to_i > m['away_score'].to_i %>
-              <% away_won = m['away_score'].to_i > m['home_score'].to_i %>
-              <li class="tennis-match-card">
-                <div class="tennis-match-date">
-                  <%= Time.parse(m['scheduled_at']).getlocal.strftime('%b %-d') rescue '' %>
-                </div>
-                <div class="tennis-match-players">
-                  <% [[home, m['home_score'], home_won], [away, m['away_score'], away_won]].each do |player, sets, won| %>
-                    <% name  = player ? player['name'] : '?' %>
-                    <% ext   = player ? player['external_id'].to_s : '' %>
-                    <% initials = name.split.map { |w| w[0] }.first(2).join.upcase %>
-                    <div class="tennis-match-player <%= 'tennis-match-winner' if won %>">
-                      <span class="tennis-match-avatar">
-                        <% unless ext.empty? %>
-                          <img src="https://a.espncdn.com/i/headshots/tennis/players/full/<%= h(ext) %>.png"
-                               alt="" loading="lazy"
-                               onerror="this.style.display='none'">
-                        <% end %>
-                        <span class="tennis-match-initials"><%= h(initials) %></span>
-                      </span>
-                      <span class="tennis-match-name"><%= h(name) %></span>
-                      <span class="tennis-match-sets <%= 'tennis-match-sets-w' if won %>">
-                        <%= sets || '—' %>
-                      </span>
-                      <% if won %><span class="tennis-match-trophy" aria-label="Winner">🏆</span><% end %>
-                    </div>
-                  <% end %>
-                </div>
-                <%
-                  score_detail = m['period'].to_s.split('|', 2)[1]
-                  # Extract just the set scores from the ESPN notes text
-                  # e.g. "Sinner bt Djokovic 6-3 7-5 6-4" → "6-3, 7-5, 6-4"
-                  set_scores = score_detail.to_s.scan(/\d+-\d+(?:\s*\(\d+[–-]\d+\))?/).join(', ') if score_detail
-                %>
-                <% if set_scores && !set_scores.empty? %>
-                  <div class="tennis-match-score-detail muted"><%= h(set_scores) %></div>
-                <% end %>
-                <% if m['venue'] && !m['venue'].to_s.empty? %>
-                  <div class="tennis-match-venue muted"><%= h(m['venue']) %></div>
-                <% end %>
-              </li>
-            <% end %>
-          </ul>
-        </details>
-        <% end %>
-        </details>
-      <% end %>
-
-      <%# ── Historical (previous year) ── %>
-      <% if hist_display.any? %>
-        <details style="margin-top:1rem">
-          <summary class="sports-round-summary" style="font-size:1rem; font-weight:700">
-            Previous year's results
-            <span class="muted" style="font-weight:400; font-size:0.85rem; margin-left:0.4rem">
-              <%= (@finals_historical || []).count %> matches
-            </span>
-          </summary>
-          <% hist_display.each do |round_name| %>
-            <% matches = hist_rounds[round_name] %>
-            <details>
+        render_rounds = ->(rounds_hash, display_list) {
+          display_list.each do |round_name|
+            matches = rounds_hash[round_name]
+        %>
+            <details <%= 'open' if (round_order[round_name] || 99) <= 2 %>>
               <summary class="sports-round-summary">
                 <%= h(round_name.empty? ? 'Other' : round_name) %>
                 <span class="muted">(<%= matches.length %>)</span>
               </summary>
-              <ul class="tennis-match-list">
+              <ul class="sport-match-list">
                 <% matches.each do |m| %>
-                  <% home = (@teams_by_id || {})[m['home_team_id']] %>
-                  <% away = (@teams_by_id || {})[m['away_team_id']] %>
-                  <% home_won = m['home_score'].to_i > m['away_score'].to_i %>
-                  <% away_won = m['away_score'].to_i > m['home_score'].to_i %>
-                  <li class="tennis-match-card">
-                    <div class="tennis-match-date">
-                      <%= Time.parse(m['scheduled_at']).getlocal.strftime('%b %-d') rescue '' %>
-                    </div>
-                    <div class="tennis-match-players">
-                      <% [[home, m['home_score'], home_won], [away, m['away_score'], away_won]].each do |player, sets, won| %>
-                        <% name = player ? player['name'] : '?' %>
-                        <% ext  = player ? player['external_id'].to_s : '' %>
-                        <% initials = name.split.map { |w| w[0] }.first(2).join.upcase %>
-                        <div class="tennis-match-player <%= 'tennis-match-winner' if won %>">
-                          <span class="tennis-match-avatar">
-                            <% unless ext.empty? %>
-                              <img src="https://a.espncdn.com/i/headshots/tennis/players/full/<%= h(ext) %>.png"
-                                   alt="" loading="lazy" onerror="this.style.display='none'">
-                            <% end %>
-                            <span class="tennis-match-initials"><%= h(initials) %></span>
-                          </span>
-                          <span class="tennis-match-name"><%= h(name) %></span>
-                          <span class="tennis-match-sets <%= 'tennis-match-sets-w' if won %>"><%= sets || '—' %></span>
-                          <% if won %><span class="tennis-match-trophy">🏆</span><% end %>
-                        </div>
-                      <% end %>
-                    </div>
-                    <%
-                      score_detail = m['period'].to_s.split('|', 2)[1]
-                      set_scores   = score_detail.to_s.scan(/\d+-\d+(?:\s*\(\d+[–-]\d+\))?/).join(', ') if score_detail
-                    %>
-                    <% if set_scores && !set_scores.empty? %>
-                      <div class="tennis-match-score-detail muted"><%= h(set_scores) %></div>
-                    <% end %>
-                    <% if m['venue'] && !m['venue'].to_s.empty? %>
-                      <div class="tennis-match-venue muted"><%= h(m['venue']) %></div>
-                    <% end %>
-                  </li>
+                  <%= match_card_html(m, @league['sport'], @teams_by_id || {}, sport_emoji: sport_emoji) %>
                 <% end %>
               </ul>
             </details>
-          <% end %>
+        <%  end
+        }
+      %>
+
+      <%# Current year first (open), historical collapsed below. %>
+      <% if @show_year_split %>
+        <details open>
+          <summary><h3 style="display:inline"><%= Date.today.year %> Results</h3>
+            <span class="muted" style="font-size:0.85rem; margin-left:0.5rem">
+              <%= @finals_this_year.count %> matches
+            </span>
+          </summary>
+          <% current_rounds, current_display = build_rounds.(@finals_this_year) %>
+          <% render_rounds.(current_rounds, current_display) %>
+        </details>
+        <details style="margin-top:1rem">
+          <summary class="sports-round-summary" style="font-size:1rem; font-weight:700">
+            Previous year's results
+            <span class="muted" style="font-weight:400; font-size:0.85rem; margin-left:0.4rem">
+              <%= @finals_historical.count %> matches
+            </span>
+          </summary>
+          <% hist_rounds, hist_display = build_rounds.(@finals_historical) %>
+          <% render_rounds.(hist_rounds, hist_display) %>
+        </details>
+      <% else %>
+        <% all_rounds, all_display = build_rounds.(@recent_finals) %>
+        <details open>
+          <summary><h3 style="display:inline">Results by round</h3>
+            <span class="muted" style="font-size:0.85rem; margin-left:0.5rem">
+              <%= @recent_finals.count %> matches
+            </span>
+          </summary>
+          <% render_rounds.(all_rounds, all_display) %>
         </details>
       <% end %>
 
     <% else %>
       <h3>Recent results</h3>
-      <ul class="whats-on-matches">
+      <ul class="sport-match-list">
         <% @recent_finals.each do |m| %>
-          <% home = (@teams_by_id || {})[m['home_team_id']] %>
-          <% away = (@teams_by_id || {})[m['away_team_id']] %>
-          <li class="whats-on-match">
-            <span class="whats-on-time">
-              <% if m['scheduled_at'] %>
-                <%= Time.parse(m['scheduled_at']).getlocal.strftime('%b %-d') rescue m['scheduled_at'] %>
-              <% end %>
-            </span>
-            <span class="whats-on-matchup">
-              <% if away %><a href="/sports/team/<%= h(away['slug']) %>"><%= h(away['short_name'] || away['name']) %></a><% else %>—<% end %>
-              <strong><%= m['away_score'] || '—' %></strong>
-              <span class="muted">@</span>
-              <% if home %><a href="/sports/team/<%= h(home['slug']) %>"><%= h(home['short_name'] || home['name']) %></a><% else %>—<% end %>
-              <strong><%= m['home_score'] || '—' %></strong>
-            </span>
-            <span class="muted whats-on-league">FT</span>
-          </li>
+          <%= match_card_html(m, @league['sport'], @teams_by_id || {}, sport_emoji: sport_emoji) %>
         <% end %>
       </ul>
     <% end %>

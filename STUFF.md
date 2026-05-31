@@ -1176,11 +1176,23 @@ Can you render the Results by Round more nicely for the user? With team or user 
 - **Sort order** — rounds sorted Final → Semifinal → QF → R4 → R3 → R2 → R1 → Qualifying, newest first within each round. Final and Semifinal groups start expanded (`<details open>`); deeper rounds start collapsed.
 - New `.tennis-match-card` CSS grid layout + `.tennis-match-avatar` / `.tennis-match-winner` / `.sports-round-summary` classes added to `public/style.css`.
 
+## [x] 79. All-sports match cards
+
+Extend the tennis match card improvements to all sports on /sports/league/:slug.
+
+**Shipped.** Unified `match_card_html` helper in `app/main.rb` renders one `<li>` per match, adapting automatically by sport:
+- **Tennis** — player headshots (ESPN CDN) + initials fallback, bold winner, green set count, per-set score detail, court/venue.
+- **F1** — single race card with sport emoji + "Round N — Race Name" label + venue.
+- **Team sports** (NHL, rugby, soccer, baseball, basketball) — horizontal `home [logo] name | score – score | name [logo] away` with team logo from `sports_teams.image_url` (sport emoji fallback), winner name bold.
+- Round grouping (`@results_by_round`) now triggers for any sport with non-empty `period` — F1 is auto-grouped; season sports get a flat "Recent results" list.
+- Year split (`@show_year_split`) now applies to all sports when both current-year and historical matches exist.
+- Old `whats-on-match` list replaced by `sport-match-list` / `sport-match-card` CSS for both Upcoming and Recent sections. Suite: 1539 / 0.
+
 ## [x] 78. Current vs. Past
 
 For example, Rolland Garros is showing last year's matches versus current which is going on now. It is OK for historical; however, we should show current if a league's tournament is current. It is ok if all of the data is not available (for exmaple, finals) if in progress. Let's add.
 
-**Shipped.** The league route now splits tennis results into current-year and historical buckets before passing them to the view:
+**Shipped + extended to all sports (bundled with the "all sports" card pass).** The league route now splits tennis results into current-year and historical buckets before passing them to the view:
 - `@finals_this_year` — matches whose `scheduled_at` starts with the current year (2026). These are the ongoing tournament's completed rounds.
 - `@finals_historical` — all prior-year matches (Roland Garros 2025, etc.).
 
