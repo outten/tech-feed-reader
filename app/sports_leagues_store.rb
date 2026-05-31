@@ -36,8 +36,11 @@ module SportsLeaguesStore
   # updates the human-facing fields but keeps the row id stable.
   def upsert(slug:, name:, sport:, source_provider:, external_id:,
              country: nil, season_year: nil)
-    existing = find_by_external(source_provider, external_id) ||
-               find_by_slug(slug)
+    # Slug is the primary identifier — prefer it so two catalog entries
+    # that share an external_id (e.g. multiple tennis tournaments on the
+    # same ESPN tour path) don't clobber each other.
+    existing = find_by_slug(slug) ||
+               find_by_external(source_provider, external_id)
     if existing
       db.execute(<<~SQL, [name, sport, country, season_year, source_provider.to_s, external_id.to_s, existing['id']])
         UPDATE sports_leagues
