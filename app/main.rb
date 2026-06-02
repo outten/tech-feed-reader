@@ -76,6 +76,8 @@ require_relative 'rate_limiter'
 require_relative 'dev_stats'
 require_relative 'llm_usage_store'
 require_relative 'llm_guard'
+require_relative 'games/sudoku_generator'
+require_relative 'games/sudoku_store'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -414,6 +416,12 @@ class TechFeedReader < Sinatra::Base
       | (?<=^|\s)(?<hash>\#\w+)
       | (?<=^|[\s\(\[])(?<time>\d{1,2}:\d{2}(?::\d{2})?)\b
     }x.freeze
+
+    def format_elapsed(secs)
+      m, s = secs.divmod(60)
+      h, m = m.divmod(60)
+      h > 0 ? format('%d:%02d:%02d', h, m, s) : format('%d:%02d', m, s)
+    end
 
     def format_youtube_description_html(text)
       return '' if text.to_s.strip.empty?
@@ -2091,6 +2099,46 @@ class TechFeedReader < Sinatra::Base
     @panels     = ArticlesStore.recent_for_feed(current_user_id, @feed['id'], limit: COMIC_SERIES_PANELS_LIMIT)
     erb :comic_series
   end
+
+  # ── Games ─────────────────────────────────────────────────────────────────
+
+  get '/games' do
+    redirect '/games/sudoku'
+  end
+
+  get '/games/sudoku' do
+    @page_title = 'Daily Sudoku'
+    @puzzle     = SudokuStore.ensure_today!
+    halt 500, 'Puzzle unavailable' unless @puzzle
+    @state      = SudokuStore.state_for(user_id: current_user_id, puzzle_id: @puzzle['id'])
+    @leaders    = SudokuStore.completions_today(puzzle_id: @puzzle['id'])
+    erb :games_sudoku
+  end
+
+  # AJAX save — board state + elapsed time + optional completion flag.
+  post '/games/sudoku/:id/state' do |puzzle_id|
+    content_type :json
+    body_str = request.body.read
+    data     = JSON.parse(body_str) rescue {}
+
+    board         = data['board'].to_s.gsub(/[^0-9]/, '0')[0, 81].ljust(81, '0')
+    notes         = data['notes'].is_a?(Hash) ? data['notes'] : {}
+    elapsed_secs  = data['elapsed_secs'].to_i
+    completed     = data['completed'] == true
+
+    SudokuStore.save_state!(
+      user_id:      current_user_id,
+      puzzle_id:    puzzle_id.to_i,
+      board:        board,
+      notes:        notes,
+      elapsed_secs: elapsed_secs,
+      completed:    completed
+    )
+
+    { ok: true }.to_json
+  end
+
+  # ── YouTube ───────────────────────────────────────────────────────────────
 
   get '/youtube' do
     @page_title    = 'YouTube'

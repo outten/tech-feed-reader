@@ -5122,3 +5122,176 @@ html.dark .sport-match-card { background: #1c1c1e; border-color: #38383a; }
   .smc-team-name { max-width: 6rem; }
   .smc-logo { width: 20px; height: 20px; }
 }
+
+/* ── Daily Sudoku ──────────────────────────────────────────────────────── */
+.sudoku-page { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+.sudoku-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.sudoku-header h1 { margin: 0; font-size: 1.5rem; }
+.sudoku-date { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--text-muted, #6e6e73); }
+.sudoku-header-right { display: flex; align-items: center; gap: 0.75rem; }
+.sudoku-timer {
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.sudoku-solved-badge {
+  background: #34c759;
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sudoku-layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 700px) {
+  .sudoku-layout { grid-template-columns: 1fr; }
+}
+
+/* ── board ── */
+.sudoku-board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: min(450px, 90vw);
+  aspect-ratio: 1;
+  border: 3px solid var(--text, #1c1c1e);
+  border-radius: 6px;
+  overflow: hidden;
+  user-select: none;
+}
+html.dark .sudoku-board { border-color: #f5f5f7; }
+
+.sudoku-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
+  font-weight: 400;
+  border: 1px solid var(--border, #d1d1d6);
+  cursor: pointer;
+  position: relative;
+  background: var(--card-bg, #fff);
+  color: var(--text, #1c1c1e);
+  transition: background 0.1s;
+  aspect-ratio: 1;
+}
+html.dark .sudoku-cell { background: #1c1c1e; border-color: #3a3a3c; }
+
+/* thick box borders */
+.sudoku-cell.box-top    { border-top:    2px solid var(--text, #1c1c1e); }
+.sudoku-cell.box-left   { border-left:   2px solid var(--text, #1c1c1e); }
+.sudoku-cell.box-bottom { border-bottom: 2px solid var(--text, #1c1c1e); }
+.sudoku-cell.box-right  { border-right:  2px solid var(--text, #1c1c1e); }
+html.dark .sudoku-cell.box-top,
+html.dark .sudoku-cell.box-left,
+html.dark .sudoku-cell.box-bottom,
+html.dark .sudoku-cell.box-right { border-color: #f5f5f7; }
+
+.sudoku-clue  { font-weight: 700; color: var(--text, #1c1c1e); }
+html.dark .sudoku-clue { color: #f5f5f7; }
+
+.sudoku-cell.selected       { background: #0071e3; color: #fff; }
+.sudoku-cell.sudoku-highlight  { background: #d6eaff; }
+html.dark .sudoku-cell.sudoku-highlight { background: #1a3550; }
+.sudoku-cell.sudoku-same-digit { background: #c8e6fd; }
+html.dark .sudoku-cell.sudoku-same-digit { background: #1a3f5c; }
+.sudoku-cell.sudoku-error   { color: #ff3b30; }
+.sudoku-board.sudoku-complete .sudoku-cell { background: #e9f9ef !important; }
+html.dark .sudoku-board.sudoku-complete .sudoku-cell { background: #0e2e1a !important; }
+
+/* pencil notes grid */
+.sudoku-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  padding: 1px;
+}
+.sudoku-notes-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.4rem, 1vw, 0.55rem);
+  color: #636366;
+  font-weight: 500;
+  line-height: 1;
+}
+html.dark .sudoku-notes-grid span { color: #aeaeb2; }
+
+/* ── numpad ── */
+.sudoku-numpad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  width: min(450px, 90vw);
+}
+.sudoku-numpad-btn {
+  padding: 0.55rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #d1d1d6);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.08s;
+}
+.sudoku-numpad-btn:hover  { background: #f0f0f5; }
+.sudoku-numpad-btn:active { transform: scale(0.95); }
+html.dark .sudoku-numpad-btn { background: #2c2c2e; border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .sudoku-numpad-btn:hover { background: #3a3a3c; }
+.sudoku-numpad-erase { font-size: 1rem; }
+
+/* ── controls row ── */
+.sudoku-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  width: min(450px, 90vw);
+  flex-wrap: wrap;
+}
+.sudoku-controls .btn { flex: 1; min-width: 0; font-size: 0.85rem; }
+.sudoku-btn-notes.active { background: #0071e3; color: #fff; border-color: #0071e3; }
+
+/* ── message banner ── */
+.sudoku-message { margin-top: 0.75rem; font-size: 0.9rem; min-height: 1.2em; }
+.sudoku-message-success { color: #34c759; font-weight: 600; }
+.sudoku-message-error   { color: #ff3b30; }
+.sudoku-message-info    { color: var(--text-muted, #6e6e73); }
+
+/* ── sidebar ── */
+.sudoku-sidebar { padding-top: 0.25rem; }
+.sudoku-sidebar h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+.sudoku-how ul {
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #6e6e73);
+  line-height: 1.7;
+  margin: 0;
+}
+.sudoku-leaders { margin-top: 1.5rem; }
+.sudoku-leaders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.sudoku-leaders-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border, #e5e5ea);
+}
+.sudoku-leader-time { font-variant-numeric: tabular-nums; color: var(--text-muted, #6e6e73); }

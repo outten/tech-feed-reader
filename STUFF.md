@@ -1147,7 +1147,7 @@ Hockey Sports management /sports/manage/hockey/nhl is not like the others. Why d
 - League-level `+ Follow league` toggle added to the manage-league page for api-sports leagues (required to enable the daily sync).
 - `@followed_league_slugs` now passed into the `/sports/manage/:sport/:league` route.
 
-## [ ] 76. Tennis / Roland Garros
+## [x] 76. Tennis / Roland Garros
 
 Both `/sports/team/tennis` and `/sports/league/roland-garros` show no match data despite the French Open being live.
 
@@ -1202,3 +1202,30 @@ The view renders them in two separate `<details>` blocks:
 
 Both sections use the same `tennis-match-card` layout (avatars, set scores, court). This way the current tournament is prominent and historical data is available but unobtrusive.
 
+## [x] 79. Simple Games
+
+Are there simple interactive, games we can add to the site that users can subscribe to? Some that I think of:
+
+- checkers
+- chess
+- sudoku
+- ro sham bo
+- perhaps a daily logic puzzle
+
+**Shipped (Daily Sudoku — Phase 1).** New `/games/sudoku` page with a fully playable daily puzzle. One puzzle per day generated server-side and shared across all users; progress autosaves per-user.
+
+**What landed:**
+- `SudokuGenerator` (`app/games/sudoku_generator.rb`) — backtracking generator with uniqueness verification. Three difficulties (easy/medium/hard); medium removes ~46 cells. Every generated puzzle is confirmed to have exactly one solution before being stored.
+- `SudokuStore` (`app/games/sudoku_store.rb`) — puzzle CRUD + per-user state upsert (board string, JSON pencil-mark notes, elapsed seconds, completed_at). `ensure_today!` lazy-generates on the first request; `ensure_upcoming!(days:)` pre-generates a window.
+- Migration `006_sudoku.sql` — `sudoku_puzzles` (date-keyed, one row per day) + `sudoku_states` (user × puzzle with UNIQUE constraint, idempotent upsert that never overwrites a completed_at once set).
+- Routes: `GET /games` (redirects → `/games/sudoku`), `GET /games/sudoku` (renders today's board), `POST /games/sudoku/:id/state` (AJAX save, returns `{ok: true}`).
+- `public/sudoku.js` — pure vanilla JS: 9×9 grid rendering, cell selection with row/col/box highlighting and same-digit highlighting, keyboard input (digits + arrow navigation), pencil-note mode (toggle with N or the Notes button), Check/Reset controls, live timer, AJAX autosave every ~3s and on solve, completion detection + celebration message.
+- CSS in `public/style.css` — dark-mode aware, responsive (collapses to single column under 700px), Apple-style pill numpad buttons, green completion flash.
+- **Games** added to the Browse ▾ dropdown (🎮 Games link to `/games`).
+- `GenerateSudokuWorker` + daily `01:00 UTC` sidekiq-cron entry — pre-generates next 7 days so `/games/sudoku` always has a puzzle without blocking the request.
+- `make generate-sudoku` + `scripts/generate_sudoku.rb` for on-demand pre-generation.
+- Leaderboard strip on the sidebar shows today's completions ranked by solve time.
+- `format_elapsed` helper (h:mm:ss / m:ss) shared between the sidebar leaderboard and the JS timer display.
+- **14 specs** in `spec/sudoku_spec.rb` — generator shape (length, digit range, clue⊆solution, blank count, uniqueness), store CRUD (create, idempotence, state save, completed_at preservation), route 200/302, data-attribute embedding, AJAX save, `/games` redirect. Suite: **1553 / 0**.
+
+**Deferred (Phase 2 — news trivia quiz, STUFF #79 follow-up):** see next item.

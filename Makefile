@@ -193,6 +193,10 @@ sync-sports:
 triage:
 	bundle exec ruby scripts/generate_triage.rb
 
+# Pre-generate the next 7 days of Sudoku puzzles (or DAYS=N for more).
+generate-sudoku:
+	bundle exec ruby scripts/generate_sudoku.rb
+
 # ---- Release / version bump (STUFF #33A) ------------------------------------
 # Three semver-bump targets that gate on a clean working tree + a green
 # test suite, then bump VERSION, commit the bump, tag vX.Y.Z, and push
