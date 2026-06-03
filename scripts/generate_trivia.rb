@@ -3,6 +3,7 @@
 # Usage: ruby scripts/generate_trivia.rb
 # Requires ANTHROPIC_API_KEY in the environment.
 
+require_relative '../app/credentials'
 require_relative '../app/database'
 require_relative '../app/logger'
 require_relative '../app/games/trivia_generator'
