@@ -15,10 +15,10 @@
   </div>
 </div>
 
-<% if params[:notice] == 'sudoku_queued' %>
-  <p class="notice">Sudoku regeneration queued — check Sidekiq for progress.</p>
-<% elsif params[:notice] == 'trivia_queued' %>
-  <p class="notice">Trivia regeneration queued — check Sidekiq for progress.</p>
+<% if params[:notice] == 'sudoku_done' %>
+  <p class="notice">Today's Sudoku puzzle regenerated.</p>
+<% elsif params[:notice] == 'trivia_done' %>
+  <p class="notice">Today's Trivia quiz regenerated.</p>
 <% end %>
 
 <%# Top-line: db / redis / sidekiq dots. Same data /health returns. %>

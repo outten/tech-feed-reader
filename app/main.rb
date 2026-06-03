@@ -4004,13 +4004,13 @@ class TechFeedReader < Sinatra::Base
   end
 
   post '/admin/games/sudoku/regenerate' do
-    GenerateSudokuWorker.perform_async(true)
-    redirect to('/admin/status?notice=sudoku_queued')
+    SudokuStore.ensure_upcoming!(days: 7, force: true)
+    redirect to('/admin/status?notice=sudoku_done')
   end
 
   post '/admin/games/trivia/regenerate' do
-    GenerateTriviaWorker.perform_async(true)
-    redirect to('/admin/status?notice=trivia_queued')
+    TriviaStore.ensure_today!(force: true)
+    redirect to('/admin/status?notice=trivia_done')
   end
 
   post '/admin/backgrounds/refresh' do
