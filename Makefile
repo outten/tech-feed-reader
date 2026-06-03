@@ -197,6 +197,10 @@ triage:
 generate-sudoku:
 	bundle exec ruby scripts/generate_sudoku.rb
 
+# Generate today's News Trivia quiz (requires ANTHROPIC_API_KEY).
+generate-trivia:
+	bundle exec ruby scripts/generate_trivia.rb
+
 # ---- Release / version bump (STUFF #33A) ------------------------------------
 # Three semver-bump targets that gate on a clean working tree + a green
 # test suite, then bump VERSION, commit the bump, tag vX.Y.Z, and push

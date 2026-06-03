@@ -1,0 +1,118 @@
+<section class="trivia-page">
+  <header class="trivia-header">
+    <div class="trivia-header-left">
+      <h1>📰 News Trivia</h1>
+      <p class="trivia-date"><%= Date.today.strftime('%B %-d, %Y') %></p>
+    </div>
+    <% if @quiz %>
+      <div class="trivia-score-badge" id="trivia-score-badge" aria-live="polite">
+        <span id="trivia-score-correct"><%= @score[:correct] %></span>
+        / <%= TriviaStore::QUESTIONS_PER_QUIZ %>
+      </div>
+    <% end %>
+  </header>
+
+  <% if @quiz.nil? %>
+    <div class="trivia-unavailable">
+      <% if @unavailable %>
+        <p>News Trivia requires an Anthropic API key (<code>ANTHROPIC_API_KEY</code>).</p>
+      <% else %>
+        <p>Today's quiz couldn't be generated. Check back soon or try refreshing.</p>
+        <a href="/games/trivia" class="btn btn-primary">Try again</a>
+      <% end %>
+    </div>
+
+  <% else %>
+    <div class="trivia-layout">
+      <div class="trivia-questions" id="trivia-questions">
+
+        <% @questions.each_with_index do |q, i| %>
+          <% answer_row = @answers[q['id'].to_i] %>
+          <% already_answered = !answer_row.nil? %>
+          <article
+            class="trivia-card <%= 'trivia-card-answered' if already_answered %>"
+            id="trivia-q-<%= q['id'] %>"
+            data-question-id="<%= q['id'] %>"
+            data-correct="<%= h(q['correct']) %>"
+          >
+            <p class="trivia-q-num">Question <%= i + 1 %> of <%= TriviaStore::QUESTIONS_PER_QUIZ %></p>
+            <p class="trivia-q-text"><%= h(q['question']) %></p>
+
+            <ul class="trivia-choices" aria-label="Answer choices">
+              <% %w[a b c d].each do |letter| %>
+                <% choice_text = q["choice_#{letter}"] %>
+                <% chosen     = already_answered && answer_row['answer'] == letter %>
+                <% is_correct = letter == q['correct'] %>
+                <li>
+                  <button
+                    class="trivia-choice <%= 'trivia-choice-correct' if already_answered && is_correct %>
+                                          <%= 'trivia-choice-wrong'  if chosen && !is_correct %>"
+                    data-letter="<%= letter %>"
+                    <%= 'disabled' if already_answered %>
+                    aria-label="<%= letter.upcase %>: <%= h(choice_text) %>"
+                  >
+                    <span class="trivia-choice-letter"><%= letter.upcase %></span>
+                    <span class="trivia-choice-text"><%= h(choice_text) %></span>
+                    <% if already_answered && is_correct %>
+                      <span class="trivia-choice-mark" aria-hidden="true">✓</span>
+                    <% elsif chosen && !is_correct %>
+                      <span class="trivia-choice-mark" aria-hidden="true">✗</span>
+                    <% end %>
+                  </button>
+                </li>
+              <% end %>
+            </ul>
+
+            <% if already_answered %>
+              <div class="trivia-explanation">
+                <strong><%= answer_row['correct'] ? '✓ Correct!' : '✗ Not quite.' %></strong>
+                <%= h(q['explanation'].to_s) %>
+                <% if q['article_url'].to_s != '' %>
+                  <a href="<%= h(q['article_url']) %>" target="_blank" rel="noopener noreferrer" class="trivia-source-link">Read source →</a>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="trivia-explanation trivia-explanation-hidden" aria-hidden="true"></div>
+            <% end %>
+          </article>
+        <% end %>
+
+        <% if @score[:total] >= TriviaStore::QUESTIONS_PER_QUIZ %>
+          <div class="trivia-complete" id="trivia-complete">
+            <p class="trivia-complete-score">You scored <strong><%= @score[:correct] %> / <%= TriviaStore::QUESTIONS_PER_QUIZ %></strong></p>
+            <p class="trivia-complete-msg"><%= trivia_result_message(@score[:correct]) %></p>
+            <a href="/games/sudoku" class="btn btn-secondary">Try today's Sudoku →</a>
+          </div>
+        <% end %>
+      </div>
+
+      <aside class="trivia-sidebar">
+        <section class="trivia-how">
+          <h2>How to play</h2>
+          <ul>
+            <li>5 questions about today's news.</li>
+            <li>Pick the best answer — no going back.</li>
+            <li>Each question links to the source article.</li>
+            <li>New quiz every day at midnight.</li>
+          </ul>
+        </section>
+
+        <% if @leaders.any? %>
+          <section class="trivia-leaders">
+            <h2>Today's finishers</h2>
+            <ol class="trivia-leaders-list">
+              <% @leaders.each do |row| %>
+                <li>
+                  <span class="trivia-leader-name"><%= h(row['display_name'].to_s.empty? ? row['username'] : row['display_name']) %></span>
+                  <span class="trivia-leader-score"><%= row['right_count'] %> / <%= TriviaStore::QUESTIONS_PER_QUIZ %></span>
+                </li>
+              <% end %>
+            </ol>
+          </section>
+        <% end %>
+      </aside>
+    </div>
+  <% end %>
+</section>
+
+<script src="/trivia.js" defer></script>

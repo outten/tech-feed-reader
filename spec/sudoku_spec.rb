@@ -166,11 +166,11 @@ RSpec.describe 'Daily Sudoku' do
     end
   end
 
-  describe 'GET /games redirect' do
-    it 'redirects /games to /games/sudoku' do
+  describe 'GET /games' do
+    it 'renders the games index (not a redirect)' do
       signed_in { |env| get '/games', {}, env }
-      expect(last_response.status).to eq(302)
-      expect(last_response.location).to include('/games/sudoku')
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('Daily Sudoku')
     end
   end
 end
