@@ -2,7 +2,7 @@
 
 A multi-user, passkey-authenticated web application that aggregates public, free RSS / Atom feeds for technology articles, sports news + scores, nature/YouTube channels, podcasts, and webcomics. Reading, tagging, search, summarization, AI-assisted triage, and personalised relevance ranking. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is PostgreSQL (managed DO cluster, `tsvector` + `ts_rank` for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
+> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics + daily games; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
 
 ## What it does
 
@@ -16,6 +16,7 @@ A multi-user, passkey-authenticated web application that aggregates public, free
 - **Podcasts** (`/podcasts`) — subscribed-show grid with a persistent mini-player at the bottom of every page that survives Turbo navigation; resume-where-you-left-off; 🚌 bus-mode chip for sub-15-min commute episodes.
 - **YouTube** (`/youtube`) — subscribed-channel grid with a bulk-add textarea that resolves `@PBSNewsHour`-style handles → canonical channel-feed URLs via channel-page scrape; background fetch populates new channels within ~30s.
 - **Comics** (`/comics`) — subscribed webcomic series tiles (latest panel as cover) + recent panels list; comic-aware article hero (no crop) + click-to-zoom image lightbox.
+- **Games** (`/games`) — daily puzzles and quizzes: **Sudoku** (backtracking-generated 9×9 with pencil notes, live timer, autosave) and **News Trivia** (5 Claude-generated questions from the last 24h of articles, progressive answer reveal with explanations). Both shared daily and per-user progress tracked.
 - **Topics & search** — `/topics` clusters across the recent corpus using weighted scoring (publisher categories 2× body keywords, proper-noun phrase detection like "Jannik Sinner", ubiquity ceiling, URL/site-boilerplate stopword sweep); `/search` is PG full-text with `tsvector` + `ts_headline` snippet highlighting and pre-search suggestion chips.
 - **Observability** — `/health` (liveness JSON), `/metrics` (Prometheus), `/admin/dashboard` (article counts + 7-day Activity chart), `/admin/traces` (OpenTelemetry ring buffer).
 - **CLI** — `make refresh-feed FEED=<id-or-url>`, `make refresh-feeds`, `make scheduler`, `make digest`, `make triage`, `make sync-sports`, `make run-all` / `make stop-all`.
@@ -47,6 +48,9 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | YouTube channel | `/youtube/:feed_id` | 10 most recent videos for one subscribed channel as 16:9 tiles |
 | Comics | `/comics` | Subscribed webcomic series tiles (latest panel as cover) + recent panels linear list |
 | Comic series | `/comics/:feed_id` | 30 most recent panels for one subscribed series; click any to read in /article/:uid with comic-aware hero + lightbox |
+| Games | `/games` | Daily games index — progress tiles for Sudoku and News Trivia |
+| Sudoku | `/games/sudoku` | Daily 9×9 puzzle (shared, one per day); pencil notes, live timer, AJAX autosave, leaderboard |
+| News Trivia | `/games/trivia` | 5 Claude-generated multiple-choice questions from today's articles; progressive reveal + explanations |
 | Sports | `/sports` | Followed-team score tiles + per-sport landings (NFL / NBA / soccer / rugby / tennis). Calendar + standings + per-team detail + tennis player follows nested below |
 | Sports calendar | `/sports/calendar` | Upcoming fixtures across followed teams + iCal export |
 | Triage | `/triage` | AI triage (Claude Sonnet 4.6) — classifies unread into must-read / optional / skip with rationale; per-topic chips; daily cron history |
