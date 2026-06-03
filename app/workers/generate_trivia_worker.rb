@@ -8,10 +8,12 @@ class GenerateTriviaWorker
 
   sidekiq_options queue: :default, retry: 2
 
-  def perform
-    quiz = TriviaStore.ensure_today!
+  # force=true regenerates today's quiz even if one already exists.
+  # Trigger from Sidekiq UI by passing argument: true
+  def perform(force = false)
+    quiz = TriviaStore.ensure_today!(force: force)
     if quiz
-      AppLogger.info('generate_trivia_complete', quiz_id: quiz['id'])
+      AppLogger.info('generate_trivia_complete', quiz_id: quiz['id'], force: force)
     else
       AppLogger.warn('generate_trivia_skipped', reason: 'unavailable or failed')
     end

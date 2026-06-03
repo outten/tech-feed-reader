@@ -17,10 +17,19 @@ module TriviaStore
     quiz_for_date(Date.today)
   end
 
-  # Generate and persist today's quiz if it doesn't exist yet.
+  # Generate and persist today's quiz.
+  # force: true — delete any existing quiz for today and regenerate.
   # Returns the quiz row on success, nil if generation is unavailable/failed.
-  def ensure_today!
-    return today_quiz if today_quiz
+  def ensure_today!(force: false)
+    if force
+      existing = today_quiz
+      if existing
+        db.execute('DELETE FROM trivia_quizzes WHERE id = $1', [existing['id']])
+      end
+    else
+      return today_quiz if today_quiz
+    end
+
     return nil unless TriviaGenerator.available?
 
     articles = fetch_source_articles

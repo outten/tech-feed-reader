@@ -26,7 +26,15 @@ module SudokuStore
   end
 
   # Pre-generate puzzles for the next N days (used by cron + seed script).
-  def ensure_upcoming!(days: 7)
+  # force: true — delete and regenerate today's puzzle (future days still skip if present).
+  def ensure_upcoming!(days: 7, force: false)
+    if force
+      existing = today_puzzle
+      if existing
+        db.execute('DELETE FROM sudoku_puzzles WHERE id = $1', [existing['id']])
+      end
+    end
+
     days.times do |i|
       date = Date.today + i
       next if puzzle_for_date(date)

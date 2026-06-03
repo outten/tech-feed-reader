@@ -8,8 +8,10 @@ class GenerateSudokuWorker
 
   sidekiq_options queue: :default, retry: 2
 
-  def perform
-    SudokuStore.ensure_upcoming!(days: 7)
-    AppLogger.info('generate_sudoku_complete', days: 7)
+  # force=true regenerates today's puzzle even if one already exists.
+  # Trigger from Sidekiq UI by passing argument: true
+  def perform(force = false)
+    SudokuStore.ensure_upcoming!(days: 7, force: force)
+    AppLogger.info('generate_sudoku_complete', days: 7, force: force)
   end
 end
