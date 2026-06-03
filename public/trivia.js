@@ -44,6 +44,7 @@
     const correctLetter = data.correct_letter || card.dataset.correct;
 
     card.classList.add('trivia-card-answered');
+    if (data.correct) card.classList.add('trivia-user-correct');
 
     // Style each button.
     card.querySelectorAll('.trivia-choice').forEach(btn => {
@@ -93,7 +94,9 @@
   function updateScore() {
     const scoreEl = document.getElementById('trivia-score-correct');
     if (!scoreEl) return;
-    const correct = document.querySelectorAll('.trivia-choice-correct').length;
+    // Count cards where the user's chosen answer was correct, not the
+    // number of green buttons (every answered question has one of those).
+    const correct = document.querySelectorAll('.trivia-card.trivia-user-correct').length;
     scoreEl.textContent = correct;
   }
 
@@ -101,7 +104,7 @@
     let el = document.getElementById('trivia-complete');
     if (el) { el.style.display = ''; return; }
 
-    const correct = document.querySelectorAll('.trivia-choice-correct').length;
+    const correct = document.querySelectorAll('.trivia-card.trivia-user-correct').length;
     const total   = document.querySelectorAll('.trivia-card').length;
 
     el = document.createElement('div');
