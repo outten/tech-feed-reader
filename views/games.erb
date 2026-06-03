@@ -1,0 +1,46 @@
+<section class="games-index">
+  <header class="games-index-header">
+    <h1>🎮 Games</h1>
+    <p class="games-index-sub">Daily puzzles and quizzes powered by your news feed.</p>
+  </header>
+
+  <div class="games-tiles">
+
+    <%# ── Daily Sudoku ── %>
+    <a href="/games/sudoku" class="games-tile">
+      <div class="games-tile-icon">🔢</div>
+      <div class="games-tile-body">
+        <h2>Daily Sudoku</h2>
+        <p>A fresh 9×9 puzzle every day. Your progress saves automatically.</p>
+        <% if @sudoku_state %>
+          <% if @sudoku_state['completed_at'] %>
+            <span class="badge games-badge-done">✓ Solved today</span>
+          <% else %>
+            <span class="badge games-badge-progress">In progress</span>
+          <% end %>
+        <% else %>
+          <span class="games-tile-cta">Play today's puzzle →</span>
+        <% end %>
+      </div>
+    </a>
+
+    <%# ── News Trivia ── %>
+    <a href="/games/trivia" class="games-tile <%= 'games-tile-unavailable' unless @trivia_available %>">
+      <div class="games-tile-icon">📰</div>
+      <div class="games-tile-body">
+        <h2>News Trivia</h2>
+        <p>5 questions about today's news, generated fresh each day by AI.</p>
+        <% if !@trivia_available %>
+          <span class="badge games-badge-unavail">Needs API key</span>
+        <% elsif @trivia_score && @trivia_score[:total] >= TriviaStore::QUESTIONS_PER_QUIZ %>
+          <span class="badge games-badge-done">✓ <%= @trivia_score[:correct] %> / <%= TriviaStore::QUESTIONS_PER_QUIZ %> today</span>
+        <% elsif @trivia_score && @trivia_score[:total] > 0 %>
+          <span class="badge games-badge-progress"><%= @trivia_score[:total] %> / <%= TriviaStore::QUESTIONS_PER_QUIZ %> answered</span>
+        <% else %>
+          <span class="games-tile-cta">Take today's quiz →</span>
+        <% end %>
+      </div>
+    </a>
+
+  </div>
+</section>

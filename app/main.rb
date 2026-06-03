@@ -76,6 +76,10 @@ require_relative 'rate_limiter'
 require_relative 'dev_stats'
 require_relative 'llm_usage_store'
 require_relative 'llm_guard'
+require_relative 'games/sudoku_generator'
+require_relative 'games/sudoku_store'
+require_relative 'games/trivia_generator'
+require_relative 'games/trivia_store'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -414,6 +418,22 @@ class TechFeedReader < Sinatra::Base
       | (?<=^|\s)(?<hash>\#\w+)
       | (?<=^|[\s\(\[])(?<time>\d{1,2}:\d{2}(?::\d{2})?)\b
     }x.freeze
+
+    def trivia_result_message(correct)
+      case correct
+      when 5    then 'Perfect score! You were all over the news today. 🎉'
+      when 4    then 'Great job — very well-read today!'
+      when 3    then 'Solid effort. Check the explanations for the ones you missed.'
+      when 2    then 'Not bad — two right is a start!'
+      else           "Tough day. Read those explanations and you'll crush it tomorrow."
+      end
+    end
+
+    def format_elapsed(secs)
+      m, s = secs.divmod(60)
+      h, m = m.divmod(60)
+      h > 0 ? format('%d:%02d:%02d', h, m, s) : format('%d:%02d', m, s)
+    end
 
     def format_youtube_description_html(text)
       return '' if text.to_s.strip.empty?
@@ -2091,6 +2111,86 @@ class TechFeedReader < Sinatra::Base
     @panels     = ArticlesStore.recent_for_feed(current_user_id, @feed['id'], limit: COMIC_SERIES_PANELS_LIMIT)
     erb :comic_series
   end
+
+  # ── Games ─────────────────────────────────────────────────────────────────
+
+  get '/games' do
+    @page_title   = 'Games'
+    @sudoku_state = SudokuStore.today_puzzle &&
+                    SudokuStore.state_for(user_id: current_user_id,
+                                         puzzle_id: SudokuStore.today_puzzle['id'])
+    @trivia_score = if (tq = TriviaStore.today_quiz)
+                      TriviaStore.score_for(user_id: current_user_id, quiz_id: tq['id'])
+                    end
+    @trivia_available = TriviaGenerator.available?
+    erb :games
+  end
+
+  get '/games/sudoku' do
+    @page_title = 'Daily Sudoku'
+    @puzzle     = SudokuStore.ensure_today!
+    halt 500, 'Puzzle unavailable' unless @puzzle
+    @state      = SudokuStore.state_for(user_id: current_user_id, puzzle_id: @puzzle['id'])
+    @leaders    = SudokuStore.completions_today(puzzle_id: @puzzle['id'])
+    erb :games_sudoku
+  end
+
+  # AJAX save — board state + elapsed time + optional completion flag.
+  post '/games/sudoku/:id/state' do |puzzle_id|
+    content_type :json
+    body_str = request.body.read
+    data     = JSON.parse(body_str) rescue {}
+
+    board         = data['board'].to_s.gsub(/[^0-9]/, '0')[0, 81].ljust(81, '0')
+    notes         = data['notes'].is_a?(Hash) ? data['notes'] : {}
+    elapsed_secs  = data['elapsed_secs'].to_i
+    completed     = data['completed'] == true
+
+    SudokuStore.save_state!(
+      user_id:      current_user_id,
+      puzzle_id:    puzzle_id.to_i,
+      board:        board,
+      notes:        notes,
+      elapsed_secs: elapsed_secs,
+      completed:    completed
+    )
+
+    { ok: true }.to_json
+  end
+
+  get '/games/trivia' do
+    @page_title = 'News Trivia'
+    @quiz       = TriviaStore.ensure_today!
+    if @quiz.nil?
+      @unavailable = !TriviaGenerator.available?
+      erb :games_trivia
+    else
+      @questions  = TriviaStore.questions_for(@quiz['id'])
+      @answers    = TriviaStore.answers_for(user_id: current_user_id, quiz_id: @quiz['id'])
+      @score      = TriviaStore.score_for(user_id: current_user_id, quiz_id: @quiz['id'])
+      @leaders    = TriviaStore.leaderboard_today(quiz_id: @quiz['id'])
+      erb :games_trivia
+    end
+  end
+
+  # AJAX: submit an answer for one question. Returns JSON with result.
+  post '/games/trivia/:question_id/answer' do |question_id|
+    content_type :json
+    data   = JSON.parse(request.body.read) rescue {}
+    answer = data['answer'].to_s.downcase
+    halt 400, { error: 'invalid answer' }.to_json unless %w[a b c d].include?(answer)
+
+    result = TriviaStore.submit_answer!(
+      user_id:     current_user_id,
+      question_id: question_id.to_i,
+      answer:      answer
+    )
+    halt 404, { error: 'not found' }.to_json unless result
+
+    result.to_json
+  end
+
+  # ── YouTube ───────────────────────────────────────────────────────────────
 
   get '/youtube' do
     @page_title    = 'YouTube'

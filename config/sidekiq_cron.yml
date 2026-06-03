@@ -21,6 +21,18 @@ sports_sync:
   queue: default
   description: "Hourly :30 UTC: ESPN match schedules + league standings + tennis rankings. Offset from feeds cron (:00) to spread load."
 
+generate_sudoku:
+  cron: "0 1 * * *"
+  class: "GenerateSudokuWorker"
+  queue: default
+  description: "Daily 01:00 UTC: pre-generate the next 7 days of Sudoku puzzles so /games/sudoku always has a puzzle ready."
+
+generate_trivia:
+  cron: "30 1 * * *"
+  class: "GenerateTriviaWorker"
+  queue: default
+  description: "Daily 01:30 UTC: generate today's News Trivia quiz from the last 24h of articles."
+
 fix_article_links:
   cron: "45 4 * * *"
   class: "FixArticleLinksWorker"

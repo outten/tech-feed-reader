@@ -1,0 +1,84 @@
+<section class="sudoku-page">
+  <header class="sudoku-header">
+    <div class="sudoku-header-left">
+      <h1>Daily Sudoku</h1>
+      <p class="sudoku-date"><%= Date.today.strftime('%B %-d, %Y') %></p>
+    </div>
+    <div class="sudoku-header-right">
+      <div class="sudoku-timer" id="sudoku-timer" aria-live="polite">0:00</div>
+      <% if @state && @state['completed_at'] %>
+        <span class="badge sudoku-solved-badge">✓ Solved</span>
+      <% end %>
+    </div>
+  </header>
+
+  <div class="sudoku-layout">
+    <div class="sudoku-board-wrap">
+      <div
+        class="sudoku-board"
+        id="sudoku-board"
+        data-puzzle-id="<%= @puzzle['id'] %>"
+        data-clues="<%= h(@puzzle['clues']) %>"
+        data-solution="<%= h(@puzzle['solution']) %>"
+        data-board="<%= h(@state ? @state['board'] : @puzzle['clues']) %>"
+        data-notes="<%= h(@state ? @state['notes'].to_json : '{}') %>"
+        data-elapsed="<%= @state ? @state['elapsed_secs'].to_i : 0 %>"
+        data-solved="<%= @state && @state['completed_at'] ? 'true' : 'false' %>"
+        role="grid"
+        aria-label="Sudoku grid"
+      >
+        <%# JS renders the 81 cells into this container %>
+      </div>
+
+      <div class="sudoku-numpad" id="sudoku-numpad" aria-label="Number pad">
+        <% (1..9).each do |n| %>
+          <button class="sudoku-numpad-btn" data-digit="<%= n %>" aria-label="Enter <%= n %>"><%= n %></button>
+        <% end %>
+        <button class="sudoku-numpad-btn sudoku-numpad-erase" data-digit="0" aria-label="Erase">⌫</button>
+      </div>
+
+      <div class="sudoku-controls">
+        <button class="btn btn-secondary sudoku-btn-notes" id="sudoku-notes-toggle" aria-pressed="false">
+          ✏️ Notes
+        </button>
+        <button class="btn btn-secondary sudoku-btn-check" id="sudoku-check">
+          Check
+        </button>
+        <button class="btn btn-secondary sudoku-btn-reset" id="sudoku-reset">
+          Reset
+        </button>
+      </div>
+
+      <div class="sudoku-message" id="sudoku-message" aria-live="assertive"></div>
+    </div>
+
+    <aside class="sudoku-sidebar">
+      <section class="sudoku-how">
+        <h2>How to play</h2>
+        <ul>
+          <li>Fill every row, column, and 3×3 box with the digits 1–9.</li>
+          <li>Each digit may appear only once per row, column, and box.</li>
+          <li>Click a cell, then press a key or use the numpad to enter a digit.</li>
+          <li>Toggle <strong>Notes</strong> to pencil in candidates.</li>
+          <li>Your progress saves automatically.</li>
+        </ul>
+      </section>
+
+      <% if @leaders.any? %>
+        <section class="sudoku-leaders">
+          <h2>Today's completions</h2>
+          <ol class="sudoku-leaders-list">
+            <% @leaders.each do |row| %>
+              <li>
+                <span class="sudoku-leader-name"><%= h(row['display_name'].to_s.empty? ? row['username'] : row['display_name']) %></span>
+                <span class="sudoku-leader-time"><%= format_elapsed(row['elapsed_secs'].to_i) %></span>
+              </li>
+            <% end %>
+          </ol>
+        </section>
+      <% end %>
+    </aside>
+  </div>
+</section>
+
+<script src="/sudoku.js" defer></script>
