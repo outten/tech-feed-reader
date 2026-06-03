@@ -4003,6 +4003,16 @@ class TechFeedReader < Sinatra::Base
     erb :admin_backgrounds
   end
 
+  post '/admin/games/sudoku/regenerate' do
+    SudokuStore.ensure_upcoming!(days: 7, force: true)
+    redirect to('/admin/status?notice=sudoku_done')
+  end
+
+  post '/admin/games/trivia/regenerate' do
+    TriviaStore.ensure_today!(force: true)
+    redirect to('/admin/status?notice=trivia_done')
+  end
+
   post '/admin/backgrounds/refresh' do
     inserted = BackgroundPool.refresh!
     redirect to("/admin/backgrounds?notice=refreshed&count=#{inserted}")
