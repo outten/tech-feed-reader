@@ -15,6 +15,12 @@
   </div>
 </div>
 
+<% if params[:notice] == 'sudoku_queued' %>
+  <p class="notice">Sudoku regeneration queued — check Sidekiq for progress.</p>
+<% elsif params[:notice] == 'trivia_queued' %>
+  <p class="notice">Trivia regeneration queued — check Sidekiq for progress.</p>
+<% end %>
+
 <%# Top-line: db / redis / sidekiq dots. Same data /health returns. %>
 <section class="benchmark-section">
   <h3>System</h3>
@@ -81,6 +87,7 @@
           <th>Class</th>
           <th>Schedule</th>
           <th>Last enqueued</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -96,6 +103,17 @@
                 </span>
               <% else %>
                 <span class="muted">never</span>
+              <% end %>
+            </td>
+            <td>
+              <% if j[:name] == 'generate_sudoku' %>
+                <form method="post" action="/admin/games/sudoku/regenerate" style="display:inline">
+                  <button class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem" title="Delete today's puzzle and generate a new one">Force run</button>
+                </form>
+              <% elsif j[:name] == 'generate_trivia' %>
+                <form method="post" action="/admin/games/trivia/regenerate" style="display:inline">
+                  <button class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem" title="Delete today's quiz and generate a new one from current articles">Force run</button>
+                </form>
               <% end %>
             </td>
           </tr>

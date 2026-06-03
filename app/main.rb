@@ -4003,6 +4003,16 @@ class TechFeedReader < Sinatra::Base
     erb :admin_backgrounds
   end
 
+  post '/admin/games/sudoku/regenerate' do
+    GenerateSudokuWorker.perform_async(true)
+    redirect to('/admin/status?notice=sudoku_queued')
+  end
+
+  post '/admin/games/trivia/regenerate' do
+    GenerateTriviaWorker.perform_async(true)
+    redirect to('/admin/status?notice=trivia_queued')
+  end
+
   post '/admin/backgrounds/refresh' do
     inserted = BackgroundPool.refresh!
     redirect to("/admin/backgrounds?notice=refreshed&count=#{inserted}")
