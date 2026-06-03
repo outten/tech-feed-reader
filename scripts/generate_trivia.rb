@@ -8,7 +8,6 @@ require_relative '../app/logger'
 require_relative '../app/games/trivia_generator'
 require_relative '../app/games/trivia_store'
 
-Database.connect! rescue nil
 Database.migrate!
 
 if TriviaStore.today_quiz

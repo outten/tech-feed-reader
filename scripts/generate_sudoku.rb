@@ -8,7 +8,6 @@ require_relative '../app/database'
 require_relative '../app/games/sudoku_generator'
 require_relative '../app/games/sudoku_store'
 
-Database.connect!
 Database.migrate!
 
 days = (ENV['DAYS'] || 7).to_i
