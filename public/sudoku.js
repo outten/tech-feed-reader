@@ -190,6 +190,7 @@
       }
 
       renderCell(null, selected);
+      revalidateBoard();
       selectCell(selected);
       scheduleSave();
 
@@ -294,34 +295,40 @@
       el.textContent = text;
       el.className = `sudoku-message sudoku-message-${type}`;
     }
-  }
 
-  // Returns true if placing `digit` at `idx` duplicates it in the same
-  // row, column, or 3×3 box (ignoring the cell itself).
-  function conflictsWithRules(cells, idx, digit) {
-    if (digit === '0') return false;
-    const r = Math.floor(idx / 9), c = idx % 9;
-    const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
-    for (let i = 0; i < 81; i++) {
-      if (i === idx || cells[i] !== digit) continue;
-      const ir = Math.floor(i / 9), ic = i % 9;
-      if (ir === r || ic === c ||
-          (Math.floor(ir / 3) * 3 === br && Math.floor(ic / 3) * 3 === bc)) {
-        return true;
+    // After any digit change, re-check every user-filled cell so that
+    // cells that became conflicted (or cleared) by the change turn red/white.
+    function revalidateBoard() {
+      for (let i = 0; i < 81; i++) {
+        if (clues[i] !== '0') continue;  // skip given clues
+        const el = cellEl(i);
+        if (!el) continue;
+        // Empty cells can never be in conflict; filled cells checked against rules.
+        if (cells[i] === '0' || !conflictsWithRules(cells, i, cells[i])) {
+          el.classList.remove('sudoku-error');
+        } else {
+          el.classList.add('sudoku-error');
+        }
       }
     }
-    return false;
-  }
 
-  // Clear the board before Turbo snapshots the page so that on cache
-  // restoration init() re-runs and re-wires all cell event listeners.
-  document.addEventListener('turbo:before-cache', function () {
-    const board = document.getElementById('sudoku-board');
-    if (!board) return;
-    clearInterval(timerHandle);
-    delete board.dataset.sudokuWired;
-    board.innerHTML = '';
-  });
+    // Returns true if placing `digit` at `idx` duplicates it in the same
+    // row, column, or 3×3 box (ignoring the cell itself).
+    function conflictsWithRules(cells, idx, digit) {
+      if (digit === '0') return false;
+      const r = Math.floor(idx / 9), c = idx % 9;
+      const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+      for (let i = 0; i < 81; i++) {
+        if (i === idx || cells[i] !== digit) continue;
+        const ir = Math.floor(i / 9), ic = i % 9;
+        if (ir === r || ic === c ||
+            (Math.floor(ir / 3) * 3 === br && Math.floor(ic / 3) * 3 === bc)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
 
   document.addEventListener('DOMContentLoaded', init);
   document.addEventListener('turbo:load', init);
