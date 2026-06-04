@@ -75,13 +75,13 @@
     <% if signed_in? %>
       <%
         ai_paths      = %w[/topics /triage /digests]
-        manage_paths  = %w[/feeds /tags /sports/manage]
+        manage_paths  = %w[/feeds /tags /sports/manage /radio]
         # STUFF #65 — Browse ▾ consolidates the per-content-type
         # destinations (Podcasts / YouTube / Sports / Comics) under
         # one parent so adding new content types doesn't keep growing
         # the horizontal nav. /sports/manage is excluded so it lights
         # up Manage ▾ instead of Browse ▾.
-        browse_paths  = %w[/podcasts /youtube /sports /comics /games]
+        browse_paths  = %w[/podcasts /youtube /sports /comics /games /radio]
         ai_active     = ai_paths.any?     { |p| request.path_info == p || request.path_info.start_with?(p + '/') }
         manage_active = manage_paths.any? { |p| request.path_info == p }
         browse_active = !manage_active && browse_paths.any? { |p|
@@ -105,6 +105,7 @@
             <a href="/sports"   class="<%= 'active' if (request.path_info == '/sports' || request.path_info.start_with?('/sports/')) && request.path_info != '/sports/manage' %>" role="menuitem">Sports</a>
             <a href="/comics"   class="<%= 'active' if request.path_info == '/comics' || request.path_info.start_with?('/comics/') %>" role="menuitem">Comics</a>
             <a href="/games"    class="<%= 'active' if request.path_info.start_with?('/games') %>" role="menuitem">🎮 Games</a>
+            <a href="/radio"    class="<%= 'active' if request.path_info.start_with?('/radio') %>" role="menuitem">📻 Radio</a>
           </div>
         </div>
 
@@ -123,6 +124,7 @@
             <a href="/feeds"          class="<%= 'active' if request.path_info == '/feeds' %>"          role="menuitem">Feeds</a>
             <a href="/tags"           class="<%= 'active' if request.path_info == '/tags'  %>"          role="menuitem">Tags</a>
             <a href="/sports/manage"  class="<%= 'active' if request.path_info == '/sports/manage' %>"  role="menuitem">Sports</a>
+            <a href="/radio"          class="<%= 'active' if request.path_info.start_with?('/radio') %>" role="menuitem">📻 Radio</a>
           </div>
         </div>
 
@@ -342,5 +344,6 @@
   <script src="/image-lightbox.js?v=<%= asset_mtime('public/image-lightbox.js') %>"></script>
   <script src="/sudoku.js?v=<%= asset_mtime('public/sudoku.js') %>"></script>
   <script src="/trivia.js?v=<%= asset_mtime('public/trivia.js') %>"></script>
+  <script src="/radio.js?v=<%= asset_mtime('public/radio.js') %>"></script>
 </body>
 </html>
