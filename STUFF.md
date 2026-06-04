@@ -1300,3 +1300,18 @@ Create a branch for this. Follow our process of manual checks and manual approva
 - **Browse ▾ nav** — 📻 Radio added alongside Podcasts / YouTube / Sports / Comics / Games.
 - **`make seed-radio`** + `scripts/seed_radio.rb` for initial catalog seeding on deploy.
 - **19 specs** in `spec/radio_spec.rb` — catalog structure (size, fields, URL uniqueness, groups), store (seed idempotence, follow/unfollow/following?/followed_stations), routes (page render, empty state, follow/unfollow JSON, 404 on bad station, nav link). Suite: **1592 / 0**.
+
+## [x] 82. Correct Answer in News Trivia
+
+It appears that the correct answer fo the news trivia quizz is generally the same:
+
+- in production, choice A is correct across all five questions
+- in development, choice B is four out of five, the remaining being C
+
+Can you check and shuffle the deck better?
+
+**Shipped.** Root cause: Claude consistently places the correct answer in early positions (typically 'a' or 'b') — a well-known LLM bias in multiple-choice generation. The generator was storing Claude's ordering verbatim. Fix: added `shuffle_choices` in [app/games/trivia_generator.rb](app/games/trivia_generator.rb) that extracts the four answer texts, shuffles them randomly, remaps to letters a–d, then records whichever letter now contains the originally-correct text. Applied in `parse_questions` before any question is returned. The correct answer text is always preserved; only its position changes. Suite: **1592 / 0**.
+
+## [ ] 83. Test Coverage
+
+Let's add /admin/covera

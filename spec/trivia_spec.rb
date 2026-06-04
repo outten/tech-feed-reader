@@ -85,13 +85,16 @@ RSpec.describe 'News Trivia' do
         expect(TriviaGenerator.send(:parse_questions, 'not json')).to be_nil
       end
 
-      it 'normalises correct letter to lowercase' do
+      it 'shuffles choices so the correct letter points to the right answer text' do
         raw = JSON.generate([
-          { 'question' => 'Q?', 'a' => 'A', 'b' => 'B', 'c' => 'C', 'd' => 'D',
+          { 'question' => 'Q?', 'a' => 'Alpha', 'b' => 'Beta', 'c' => 'Gamma', 'd' => 'Delta',
             'correct' => 'C', 'explanation' => 'E', 'article_title' => 'T', 'article_url' => 'U' }
         ])
         q = TriviaGenerator.send(:parse_questions, raw).first
-        expect(q['correct']).to eq('c')
+        # After shuffle the correct letter may be any of a-d, but it must
+        # point to the originally-correct answer text ('Gamma').
+        expect(%w[a b c d]).to include(q['correct'])
+        expect(q[q['correct']]).to eq('Gamma')
       end
 
       it 'filters out entries with missing required keys' do

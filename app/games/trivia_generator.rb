@@ -102,6 +102,18 @@ module TriviaGenerator
   REQUIRED_KEYS = %w[question a b c d correct explanation].freeze
   VALID_LETTERS = %w[a b c d].freeze
 
+  # Randomly reorder the four answer choices so the correct letter is
+  # uniformly distributed rather than always being whichever position
+  # Claude favours (typically 'a' or 'b').
+  def shuffle_choices(q)
+    correct_text   = q[q['correct']]
+    shuffled_texts = VALID_LETTERS.map { |l| q[l] }.shuffle
+    new_map        = VALID_LETTERS.zip(shuffled_texts).to_h
+    new_correct    = VALID_LETTERS.find { |l| new_map[l] == correct_text }
+    q.merge(new_map).merge('correct' => new_correct)
+  end
+  private_class_method :shuffle_choices
+
   def parse_questions(raw)
     # Strip optional markdown code fences
     json_str = raw.gsub(/\A```(?:json)?\s*/i, '').gsub(/\s*```\z/, '').strip
@@ -113,7 +125,7 @@ module TriviaGenerator
         REQUIRED_KEYS.all? { |k| q[k].is_a?(String) && !q[k].strip.empty? } &&
         VALID_LETTERS.include?(q['correct'].downcase)
     end.map do |q|
-      q.merge('correct' => q['correct'].downcase)
+      shuffle_choices(q.merge('correct' => q['correct'].downcase))
     end
   rescue JSON::ParserError
     nil
