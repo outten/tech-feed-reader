@@ -1276,3 +1276,27 @@ Can you cbeck?
 2. **Sudoku — empty board on Turbo navigation return.** Turbo snapshots the page before navigating away. The snapshot included `data-sudoku-wired='1'` on the board element, so on cache restoration `init()` returned early and the board appeared empty (cells rendered but JS listeners gone). Added a `turbo:before-cache` handler that clears `innerHTML` and the sentinel before the snapshot so restoration triggers a clean `init()`. `timerHandle` hoisted to IIFE scope so the handler can also clear the interval.
 
 3. **Trivia — score badge always showing 5/5.** `updateScore()` and `showComplete()` counted `.trivia-choice-correct` elements — but every answered question adds one green button (the correct answer), so the count was always equal to the number of answered questions. Fixed by adding `.trivia-user-correct` to the card in `revealResult` when `data.correct` is true, then counting `.trivia-card.trivia-user-correct` for the score (only cards where the user's chosen answer was right). Suite: **1573 / 0**.
+
+## [x] 81. Internet, Commercial Free Radio
+
+Let's add a new content section: Internet, Commercial Free Radio.
+
+I personally like https://somafm.com/ and would like to have them and their channels represented in the application. And allow the user to subscribe. Outside of the channels, there will be nothing to download as these feeds are MP3, AAC, etc. streams that are live.
+
+In addition, I would like to recommend KCRW, Santa Monica, CA music channels and shows: https://www.kcrw.com/music
+
+Also, suggest other popular Internet streams that technologies like.
+
+Create a branch for this. Follow our process of manual checks and manual approvals for PRs and deployment.
+
+**Shipped.** New dedicated `/radio` section — browse and manage commercial-free internet radio from one place.
+
+- **`radio_stations`** + **`radio_follows`** tables (migration `008_radio.sql`). `radio_stations` is seeded from the catalog; `radio_follows` is per-user.
+- **`RadioCatalog`** (`app/radio_catalog.rb`) — 16 curated stations in 3 groups: **SomaFM** (10 channels: Groove Salad, Drone Zone, Secret Agent, DEF CON Radio, Space Station Soma, Indie Pop Rocks, Underground 80s, Lush, Fluid, Cliqhop IDM), **Public Radio** (KCRW, KEXP, WFMU), **Independent** (Radio Paradise Main Mix, Radio Paradise Mellow Mix, NTS Radio 1). All stream URLs verified live.
+- **`RadioStore`** (`app/radio_store.rb`) — `seed_catalog!`, `followed_stations`, `follow!`, `unfollow!`, `following?`, `stations_by_group`.
+- **`/radio`** page — two sections: **My Stations** (subscribed, with ▶ Play + ✓ Following/+ Follow per card) and **Browse Catalog** (all stations grouped by provider with art, genre chip, description, and play/follow actions). Empty state guides new users to the catalog.
+- **Global player live-stream mode** — when a radio station is loaded (`live: true`), the player hides the scrubber, skip-back, skip-fwd, and playback-rate controls; shows "● LIVE" in red instead of elapsed time. CSS scoped to `#global-player.is-live-stream`. Resume-position logic skipped for live streams.
+- **`public/radio.js`** — loaded from `layout.erb`; wires play buttons (calls `window.Player.load({…, live: true})`) and follow/unfollow toggle (AJAX POST, updates button text in-place). Currently-playing card gets a blue border accent.
+- **Browse ▾ nav** — 📻 Radio added alongside Podcasts / YouTube / Sports / Comics / Games.
+- **`make seed-radio`** + `scripts/seed_radio.rb` for initial catalog seeding on deploy.
+- **19 specs** in `spec/radio_spec.rb` — catalog structure (size, fields, URL uniqueness, groups), store (seed idempotence, follow/unfollow/following?/followed_stations), routes (page render, empty state, follow/unfollow JSON, 404 on bad station, nav link). Suite: **1592 / 0**.

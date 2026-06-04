@@ -80,6 +80,9 @@ require_relative 'games/sudoku_generator'
 require_relative 'games/sudoku_store'
 require_relative 'games/trivia_generator'
 require_relative 'games/trivia_store'
+require_relative 'radio_catalog'
+require_relative 'radio_store'
+require_relative 'radio_recommender/claude'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -2188,6 +2191,45 @@ class TechFeedReader < Sinatra::Base
     halt 404, { error: 'not found' }.to_json unless result
 
     result.to_json
+  end
+
+  # ── Radio ─────────────────────────────────────────────────────────────────
+
+  get '/radio' do
+    @page_title = 'Internet Radio'
+    RadioStore.seed_catalog!
+    @followed         = RadioStore.followed_stations(current_user_id)
+    @followed_ids     = @followed.map { |s| s['id'].to_i }.to_set
+    @stations_by_group = RadioStore.stations_by_group
+    @popular          = RadioStore.popular_stations(limit: 5)
+
+    # Claude recommendations — only when API key present; skip on errors.
+    @recommendations = []
+    if RadioRecommender::Claude.available?
+      unfollowed = RadioStore.all_stations.reject { |s| @followed_ids.include?(s['id'].to_i) }
+      result = RadioRecommender::Claude.recommend(
+        followed_stations: @followed,
+        catalog_stations:  unfollowed
+      )
+      @recommendations = result.picks if result.status == :ok
+    end
+
+    erb :radio
+  end
+
+  post '/radio/follow' do
+    content_type :json
+    station_id = params[:station_id].to_i
+    halt 404, { error: 'not found' }.to_json unless RadioStore.find(station_id)
+    RadioStore.follow!(current_user_id, station_id)
+    { ok: true, following: true }.to_json
+  end
+
+  post '/radio/unfollow' do
+    content_type :json
+    station_id = params[:station_id].to_i
+    RadioStore.unfollow!(current_user_id, station_id)
+    { ok: true, following: false }.to_json
   end
 
   # ── YouTube ───────────────────────────────────────────────────────────────

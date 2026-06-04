@@ -192,6 +192,11 @@
 
     // ---- paint ----
     function paintTime() {
+      if (state && state.live) {
+        currentEl.textContent = '● LIVE';
+        durationEl.textContent = '';
+        return;
+      }
       currentEl.textContent = fmt(audio.currentTime);
       var d = isFinite(audio.duration) ? audio.duration : (state && state.duration);
       durationEl.textContent = fmt(d);
@@ -339,14 +344,20 @@
     function loadEpisode(ep, opts) {
       opts = opts || {};
       var sameEpisode = state && state.uid === ep.uid;
+      var isLive      = !!ep.live;
       state = {
         uid:        ep.uid,
         url:        ep.url,
         mime:       ep.mime || '',
         title:      ep.title || '',
         articleUrl: ep.articleUrl || '',
-        duration:   parseFloat(ep.duration) || 0
+        duration:   parseFloat(ep.duration) || 0,
+        live:       isLive
       };
+
+      // Live streams: hide scrubber + skip buttons, show LIVE badge.
+      root.classList.toggle('is-live-stream', isLive);
+
       paintTitle();
       show();
 
@@ -355,21 +366,20 @@
         audio.src = ep.url;
         audio.load();
 
-        var resumeFrom = (opts.resumeFrom != null) ? opts.resumeFrom : readPosition(ep.uid);
-        if (isFinite(resumeFrom) && resumeFrom > 0) {
-          // Wait for metadata so we know duration and the seek doesn't
-          // get clamped to 0 prematurely.
-          var seekOnce = function () {
-            audio.removeEventListener('loadedmetadata', seekOnce);
-            var max = isFinite(audio.duration) ? audio.duration : Infinity;
-            if (resumeFrom < max - RESUME_TAIL_S) audio.currentTime = resumeFrom;
-          };
-          audio.addEventListener('loadedmetadata', seekOnce);
+        // Skip resume logic for live streams — you always join mid-stream.
+        if (!isLive) {
+          var resumeFrom = (opts.resumeFrom != null) ? opts.resumeFrom : readPosition(ep.uid);
+          if (isFinite(resumeFrom) && resumeFrom > 0) {
+            var seekOnce = function () {
+              audio.removeEventListener('loadedmetadata', seekOnce);
+              var max = isFinite(audio.duration) ? audio.duration : Infinity;
+              if (resumeFrom < max - RESUME_TAIL_S) audio.currentTime = resumeFrom;
+            };
+            audio.addEventListener('loadedmetadata', seekOnce);
+          }
         }
       } else {
-        // Same episode re-loaded by user click. If it already played
-        // through, rewind so play() actually starts playback.
-        rewindIfAtEnd();
+        if (!isLive) rewindIfAtEnd();
       }
 
       if (opts.autoplay !== false) {

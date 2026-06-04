@@ -1,0 +1,38 @@
+<div class="radio-card" id="radio-card-<%= s['id'] %>">
+  <div class="radio-card-art">
+    <% if s['image_url'].to_s != '' %>
+      <img src="<%= h(s['image_url']) %>" alt="<%= h(s['name']) %>" loading="lazy">
+    <% else %>
+      <span class="radio-card-art-fallback">📻</span>
+    <% end %>
+  </div>
+
+  <div class="radio-card-body">
+    <p class="radio-card-genre"><%= h(s['genre'].to_s) %></p>
+    <h3 class="radio-card-name">
+      <% if s['home_url'].to_s != '' %>
+        <a href="<%= h(s['home_url']) %>" target="_blank" rel="noopener noreferrer"><%= h(s['name']) %></a>
+      <% else %>
+        <%= h(s['name']) %>
+      <% end %>
+    </h3>
+    <p class="radio-card-desc"><%= h(s['description'].to_s) %></p>
+
+    <div class="radio-card-actions">
+      <button
+        class="btn btn-primary radio-play-btn"
+        data-station-id="<%= s['id'] %>"
+        data-stream-url="<%= h(s['stream_url']) %>"
+        data-station-name="<%= h(s['name']) %>"
+        data-station-image="<%= h(s['image_url'].to_s) %>"
+        aria-label="Play <%= h(s['name']) %>"
+      >▶ Play</button>
+
+      <button
+        class="btn <%= following ? 'btn-secondary radio-following-btn' : 'btn-secondary radio-follow-btn' %>"
+        data-station-id="<%= s['id'] %>"
+        aria-label="<%= following ? 'Unfollow' : 'Follow' %> <%= h(s['name']) %>"
+      ><%= following ? '✓ Following' : '+ Follow' %></button>
+    </div>
+  </div>
+</div>

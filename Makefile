@@ -193,6 +193,10 @@ sync-sports:
 triage:
 	bundle exec ruby scripts/generate_triage.rb
 
+# Seed internet radio station catalog into the database.
+seed-radio:
+	bundle exec ruby scripts/seed_radio.rb
+
 # Pre-generate the next 7 days of Sudoku puzzles (or DAYS=N for more).
 generate-sudoku:
 	bundle exec ruby scripts/generate_sudoku.rb

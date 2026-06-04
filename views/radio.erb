@@ -1,0 +1,80 @@
+<section class="radio-page">
+  <header class="radio-page-header">
+    <h1>📻 Internet Radio</h1>
+    <p class="radio-page-sub">Commercial-free, live streams. Click ▶ to play in the player bar below.</p>
+  </header>
+
+  <%# ── AI Recommendations ── %>
+  <% if @recommendations.any? %>
+    <section class="radio-section">
+      <h2>✨ Recommended for you</h2>
+      <div class="radio-grid">
+        <% @recommendations.each do |s| %>
+          <div class="radio-card">
+            <div class="radio-card-art">
+              <% if s['image_url'].to_s != '' %>
+                <img src="<%= h(s['image_url']) %>" alt="<%= h(s['name']) %>" loading="lazy">
+              <% else %>
+                <span class="radio-card-art-fallback">📻</span>
+              <% end %>
+            </div>
+            <div class="radio-card-body">
+              <p class="radio-card-genre"><%= h(s['genre'].to_s) %></p>
+              <h3 class="radio-card-name"><%= h(s['name']) %></h3>
+              <p class="radio-card-desc radio-rationale"><em><%= h(s['rationale'].to_s) %></em></p>
+              <div class="radio-card-actions">
+                <button class="btn btn-primary radio-play-btn"
+                  data-station-id="<%= s['id'] %>"
+                  data-stream-url="<%= h(s['stream_url']) %>"
+                  data-station-name="<%= h(s['name']) %>"
+                  data-station-image="<%= h(s['image_url'].to_s) %>">▶ Play</button>
+                <button class="btn btn-secondary radio-follow-btn" data-station-id="<%= s['id'] %>">+ Follow</button>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <%# ── Popular with listeners ── %>
+  <% if @popular.any? %>
+    <section class="radio-section">
+      <h2>🔥 Popular with listeners</h2>
+      <div class="radio-grid">
+        <% @popular.each do |s| %>
+          <% following = @followed_ids.include?(s['id'].to_i) %>
+          <%= erb :_radio_station_card, locals: { s: s, following: following } %>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <%# ── My Stations ── %>
+  <section class="radio-section">
+    <h2>My Stations</h2>
+    <% if @followed.empty? %>
+      <p class="radio-empty">You haven't followed any stations yet. Browse the catalog below and click <strong>+ Follow</strong> to add one.</p>
+    <% else %>
+      <div class="radio-grid">
+        <% @followed.each do |s| %>
+          <%= erb :_radio_station_card, locals: { s: s, following: true } %>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+
+  <%# ── Browse Catalog ── %>
+  <section class="radio-section">
+    <h2>Browse Catalog</h2>
+    <% RadioCatalog::GROUPS.each do |group| %>
+      <% stations = @stations_by_group[group] || [] %>
+      <h3 class="radio-group-heading"><%= h(group) %></h3>
+      <div class="radio-grid">
+        <% stations.each do |s| %>
+          <%= erb :_radio_station_card, locals: { s: s, following: @followed_ids.include?(s['id'].to_i) } %>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+</section>
