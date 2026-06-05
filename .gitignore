@@ -7,3 +7,4 @@ tmp/
 # Safe to delete; the app no longer reads them. Kept ignored here so
 # they don't accidentally land in a commit before you do.
 data/
+coverage/

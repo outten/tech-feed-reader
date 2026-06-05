@@ -3735,6 +3735,73 @@ class TechFeedReader < Sinatra::Base
   # stats + sidekiq-cron job state + corpus counts into one
   # at-a-glance view. Same Basic Auth + WebAuthn gate as the rest
   # of /admin/*.
+  # Serve the SimpleCov HTML report (and its assets) through the admin auth
+  # wall so the raw coverage/ directory isn't publicly accessible.
+  get '/admin/coverage/report' do
+    report_dir = File.expand_path('../../coverage', __FILE__)
+    file_path  = File.join(report_dir, 'index.html')
+    halt 404, 'Coverage report not found — run make test first.' unless File.exist?(file_path)
+    content_type 'text/html'
+    File.read(file_path)
+  end
+
+  get '/admin/coverage/assets/:file' do |filename|
+    report_dir = File.expand_path('../../coverage/assets', __FILE__)
+    file_path  = File.join(report_dir, File.basename(filename))
+    halt 404 unless File.exist?(file_path)
+    ext = File.extname(filename).downcase
+    content_type({ '.css' => 'text/css', '.js' => 'application/javascript',
+                   '.png' => 'image/png', '.svg' => 'image/svg+xml' }[ext] || 'text/plain')
+    File.read(file_path)
+  end
+
+  get '/admin/coverage' do
+    @page_title    = 'Test Coverage'
+    root           = File.expand_path('../../', __FILE__)
+    last_run_path  = File.join(root, 'coverage', '.last_run.json')
+    resultset_path = File.join(root, 'coverage', '.resultset.json')
+    report_path    = File.join(root, 'coverage', 'index.html')
+
+    unless File.exist?(last_run_path)
+      @last_run = nil
+      next erb(:admin_coverage)
+    end
+
+    summary        = JSON.parse(File.read(last_run_path))
+    @generated_at  = File.mtime(last_run_path).utc
+    @line_pct      = summary.dig('result', 'line')&.round(2)
+    @branch_pct    = summary.dig('result', 'branch')&.round(2)
+    @report_exists = File.exist?(report_path)
+
+    # Per-file breakdown from .resultset.json
+    @files = []
+    if File.exist?(resultset_path)
+      resultset = JSON.parse(File.read(resultset_path))
+      # resultset has one key per suite runner (e.g. "RSpec")
+      all_coverage = resultset.values.first&.fetch('coverage', {}) || {}
+      @files = all_coverage.map do |path, data|
+        lines   = (data.is_a?(Hash) ? data['lines'] : data) || []
+        relevant = lines.compact
+        covered  = relevant.count { |n| n.to_i > 0 }
+        total    = relevant.length
+        pct      = total > 0 ? (covered.to_f / total * 100).round(1) : 100.0
+        {
+          path:    path.sub(root + '/', ''),
+          covered: covered,
+          total:   total,
+          pct:     pct
+        }
+      end.sort_by { |f| f[:pct] }
+
+      total_lines   = @files.sum { |f| f[:total] }
+      covered_lines = @files.sum { |f| f[:covered] }
+      @covered_lines = covered_lines
+      @total_lines   = total_lines
+    end
+
+    erb :admin_coverage
+  end
+
   get '/admin/status' do
     @page_title = 'Status'
     @now        = Time.now.utc

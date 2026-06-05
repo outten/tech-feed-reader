@@ -19,11 +19,20 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 1. Branch off main into `outten/TODO-NNN`. Don't push to `main` directly.
 2. Implement + write tests + update docs in the same change.
 3. `make test` locally → must be 0 failures.
-4. **Pause.** Show the user the diff / commit message; wait for explicit approval before staging.
-5. Commit, push the branch, open the PR (`gh pr create`).
+4. **Pause — user approval required before committing.** Show the diff / commit message and wait for explicit go-ahead. For UI changes, the user must also manually verify the page in the browser before approving.
+5. Commit, push the branch, open the PR (`gh pr create`). **Opening a PR also requires explicit user approval** — do not auto-open after every task. Ask first; bundle related items into one PR.
 6. **Wait for CI green** on the PR before claiming "shipped" — CI is at [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs RSpec + script syntax check on every push to `main` and every PR.
-7. **Pause.** Wait for the user to merge the PR (or to grant explicit authority to merge after green CI).
-8. After merge, sync local: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
+7. **Only the user merges PRs.** Never call `gh pr merge` unless the user explicitly instructs it for this specific PR. A previous merge approval does not carry over to the next PR.
+8. **Only the user deploys to production.** Never run `make deploy-*`, `make publish-image`, or `make _remote_deploy` unless the user explicitly says to deploy. After merge, sync local only: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
+
+**Summary of the four gates — each requires its own explicit user instruction:**
+
+| Gate | Action blocked until approved |
+|---|---|
+| Code review | `git commit` (+ browser verify for UI changes) |
+| PR creation | `gh pr create` |
+| PR merge | Only the user merges on GitHub |
+| Production deploy | Only the user triggers `make deploy-*` |
 
 **UI approval gate** — for any change that affects what a human sees in a browser (views/, public/*.js, public/*.css, anything click-driven), the "pause before staging" in step 4 means: **green specs are not enough**. The user must manually verify in the browser and explicitly approve before `git commit`. Specs caught the data-layer plumbing on STUFF #23 but missed two JS/CSS bugs (a `hidden` attribute overridden by a `display: inline-flex` rule; a `button.disabled = true` inside the submit handler that cancelled the form submission) — both only visible by clicking the actual button. Backend-only changes (stores, migrations, scripts) don't trigger the gate.
 

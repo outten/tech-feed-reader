@@ -1,3 +1,27 @@
+require 'simplecov'
+SimpleCov.start do
+  add_filter '/spec/'
+  add_filter '/vendor/'
+  add_group 'Models / Stores', %w[app/articles_store.rb app/feeds_store.rb app/read_state_store.rb
+                                   app/tags_store.rb app/summary_store.rb app/digest_store.rb
+                                   app/triage_store.rb app/pageviews_store.rb app/llm_usage_store.rb
+                                   app/sports_teams_store.rb app/sports_matches_store.rb
+                                   app/sports_leagues_store.rb app/sports_standings_store.rb
+                                   app/sports_players_store.rb app/sports_follows_store.rb
+                                   app/sports_entity_articles_store.rb app/users_store.rb
+                                   app/feed_feedback_store.rb app/mute_rules_store.rb
+                                   app/support_messages_store.rb app/games/sudoku_store.rb
+                                   app/games/trivia_store.rb app/radio_store.rb]
+  add_group 'Routes',          'app/main.rb'
+  add_group 'Providers',       'app/providers/'
+  add_group 'Games',           'app/games/'
+  add_group 'Radio',           'app/radio'
+  add_group 'Workers',         'app/workers/'
+  add_group 'Auth',            'app/auth.rb'
+  add_group 'Database',        'app/database'
+  enable_coverage :branch
+end
+
 require 'rspec'
 require 'rack/test'
 

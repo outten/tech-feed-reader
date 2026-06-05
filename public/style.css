@@ -5569,3 +5569,31 @@ html.dark .radio-card { background: #1c1c1e; border-color: #3a3a3c; }
   letter-spacing: 0.04em;
 }
 
+
+/* ── Admin Coverage ──────────────────────────────────────────────────────── */
+.admin-coverage-missing { padding: 2rem; color: var(--text-muted, #6e6e73); }
+.admin-coverage-missing code { background: var(--border, #e5e5ea); padding: 0.1em 0.4em; border-radius: 4px; }
+
+.admin-coverage-bar-wrap {
+  height: 10px;
+  background: var(--border, #e5e5ea);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+.admin-coverage-bar {
+  height: 100%;
+  background: #34c759;
+  border-radius: 9999px;
+  transition: width 0.4s;
+}
+
+.admin-coverage-file { font-size: 0.78rem; word-break: break-all; }
+.admin-coverage-pct  { font-weight: 600; }
+.admin-coverage-pct.green  { color: #34c759; }
+.admin-coverage-pct.yellow { color: #ff9f0a; }
+.admin-coverage-pct.red    { color: #ff3b30; }
+
+.summary-num.green  { color: #34c759; }
+.summary-num.yellow { color: #ff9f0a; }
+.summary-num.red    { color: #ff3b30; }
