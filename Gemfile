@@ -13,6 +13,7 @@ gem 'rackup', '~> 2.3'
 group :test do
   gem 'rspec'
   gem 'rack-test'
+  gem 'simplecov', require: false
 end
 
 # Dev-only request profiler — injects a small badge in the top-left of

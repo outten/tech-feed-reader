@@ -65,20 +65,24 @@ RSpec.describe 'News Trivia' do
     describe 'parse_questions (private via send)' do
       it 'parses a well-formed JSON array' do
         raw = JSON.generate([
-          { 'question' => 'Q?', 'a' => 'A', 'b' => 'B', 'c' => 'C', 'd' => 'D',
+          { 'question' => 'Q?', 'a' => 'A', 'b' => 'B is right', 'c' => 'C', 'd' => 'D',
             'correct' => 'b', 'explanation' => 'B is right.',
             'article_title' => 'Title', 'article_url' => 'http://x.com' }
         ])
         questions = TriviaGenerator.send(:parse_questions, raw)
         expect(questions).to be_an(Array)
-        expect(questions.first['correct']).to eq('b')
+        q = questions.first
+        # After shuffle the correct letter may be any of a-d, but must point to the right text.
+        expect(%w[a b c d]).to include(q['correct'])
+        expect(q[q['correct']]).to eq('B is right')
       end
 
       it 'strips markdown code fences before parsing' do
-        raw = "```json\n[{\"question\":\"Q?\",\"a\":\"A\",\"b\":\"B\",\"c\":\"C\",\"d\":\"D\",\"correct\":\"a\",\"explanation\":\"E\",\"article_title\":\"T\",\"article_url\":\"U\"}]\n```"
+        raw = "```json\n[{\"question\":\"Q?\",\"a\":\"Alpha\",\"b\":\"B\",\"c\":\"C\",\"d\":\"D\",\"correct\":\"a\",\"explanation\":\"E\",\"article_title\":\"T\",\"article_url\":\"U\"}]\n```"
         questions = TriviaGenerator.send(:parse_questions, raw)
         expect(questions).not_to be_nil
         expect(questions.length).to eq(1)
+        expect(questions.first[questions.first['correct']]).to eq('Alpha')
       end
 
       it 'returns nil for invalid JSON' do

@@ -1312,6 +1312,19 @@ Can you check and shuffle the deck better?
 
 **Shipped.** Root cause: Claude consistently places the correct answer in early positions (typically 'a' or 'b') — a well-known LLM bias in multiple-choice generation. The generator was storing Claude's ordering verbatim. Fix: added `shuffle_choices` in [app/games/trivia_generator.rb](app/games/trivia_generator.rb) that extracts the four answer texts, shuffles them randomly, remaps to letters a–d, then records whichever letter now contains the originally-correct text. Applied in `parse_questions` before any question is returned. The correct answer text is always preserved; only its position changes. Suite: **1592 / 0**.
 
-## [ ] 83. Test Coverage
+## [x] 83. Test Coverage
 
 Let's add /admin/covera
+
+**Shipped.** New `/admin/coverage` page backed by SimpleCov. Added `simplecov` gem to the test group; configured in `spec_helper.rb` (with branch coverage enabled and group filters for stores, routes, providers, workers, games, radio). After any `make test` run, `/admin/coverage` shows overall line % and branch %, a colour-coded progress bar, and a per-file table sorted by lowest coverage first. The full SimpleCov HTML report is served at `/admin/coverage/report` (auth-gated, not publicly accessible). Current numbers: **85% line / 67% branch**. `coverage/` added to `.gitignore`.
+
+## [x] 84. Agents Update
+
+Can you update the AGENTS.md file with the deployment process:
+
+- manually changes need to be approved by me before making a PR
+- PR creation needs to be approved by me
+- only I can do PR merges after the GitHub actions run
+- deployment to production needs to be deployed by me
+
+**Shipped.** `AGENTS.md` Standard flow section rewritten to make all four gates unambiguous: (1) commit requires explicit approval + browser verify for UI; (2) PR creation requires explicit approval; (3) only the user merges PRs — no `gh pr merge` without direct instruction; (4) only the user deploys — no `make deploy-*` without direct instruction. Added a summary table of the four gates for quick reference.
