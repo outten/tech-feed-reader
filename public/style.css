@@ -210,8 +210,19 @@ nav a.active { color: #0071e3; font-weight: 600; }
   display: none;
   z-index: 200;
 }
+/* Invisible bridge covers the 4px gap between trigger and menu so the
+   cursor can travel downward without losing :hover and closing the menu. */
+.nav-dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
 .nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu { display: block; }
+.nav-dropdown:focus-within .nav-dropdown-menu,
+.nav-dropdown.open .nav-dropdown-menu { display: block; }
 .nav-dropdown-menu a {
   display: block;
   padding: 0.4rem 0.7rem;
