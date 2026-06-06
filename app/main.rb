@@ -4175,6 +4175,12 @@ class TechFeedReader < Sinatra::Base
     redirect to('/admin/status?notice=trivia_done')
   end
 
+  post '/admin/stocks/index-sync' do
+    require_relative 'workers/index_sync_worker'
+    IndexSyncWorker.perform_async
+    redirect to('/admin/status?notice=index_sync_enqueued')
+  end
+
   post '/admin/backgrounds/refresh' do
     inserted = BackgroundPool.refresh!
     redirect to("/admin/backgrounds?notice=refreshed&count=#{inserted}")

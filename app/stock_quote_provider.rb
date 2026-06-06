@@ -14,18 +14,20 @@ module StockQuoteProvider
   BASE = 'https://finnhub.io/api/v1'
 
   # Major world indices presented to users on the stocks browse page.
-  # Finnhub uses the exchange-prefixed format for non-US tickers.
+  # Finnhub free tier doesn't support CFD index symbols (^GSPC etc.),
+  # so we use liquid US-listed ETFs that track each index.  The display
+  # name still says "S&P 500" — the ETF ticker is shown as a subtitle.
   MAJOR_INDICES = [
-    { symbol: '^GSPC',  name: 'S&P 500',            exchange: 'INDEX' },
-    { symbol: '^DJI',   name: 'Dow Jones Industrial', exchange: 'INDEX' },
-    { symbol: '^IXIC',  name: 'NASDAQ Composite',    exchange: 'INDEX' },
-    { symbol: '^RUT',   name: 'Russell 2000',        exchange: 'INDEX' },
-    { symbol: '^FTSE',  name: 'FTSE 100',            exchange: 'INDEX' },
-    { symbol: '^GDAXI', name: 'DAX (Germany)',        exchange: 'INDEX' },
-    { symbol: '^N225',  name: 'Nikkei 225',           exchange: 'INDEX' },
-    { symbol: '^HSI',   name: 'Hang Seng',            exchange: 'INDEX' },
-    { symbol: '^FCHI',  name: 'CAC 40 (France)',      exchange: 'INDEX' },
-    { symbol: '^STOXX', name: 'Euro Stoxx 50',        exchange: 'INDEX' }
+    { symbol: 'SPY',  name: 'S&P 500',             exchange: 'INDEX' },
+    { symbol: 'DIA',  name: 'Dow Jones Industrial', exchange: 'INDEX' },
+    { symbol: 'QQQ',  name: 'NASDAQ Composite',     exchange: 'INDEX' },
+    { symbol: 'IWM',  name: 'Russell 2000',         exchange: 'INDEX' },
+    { symbol: 'EWU',  name: 'FTSE 100 (UK)',        exchange: 'INDEX' },
+    { symbol: 'EWG',  name: 'DAX (Germany)',         exchange: 'INDEX' },
+    { symbol: 'EWJ',  name: 'Nikkei 225 (Japan)',    exchange: 'INDEX' },
+    { symbol: 'EWH',  name: 'Hang Seng (HK)',        exchange: 'INDEX' },
+    { symbol: 'EWQ',  name: 'CAC 40 (France)',       exchange: 'INDEX' },
+    { symbol: 'FEZ',  name: 'Euro Stoxx 50',         exchange: 'INDEX' }
   ].freeze
 
   module_function

@@ -44,3 +44,9 @@ stock_sync:
   class: "StockSyncWorker"
   queue: default
   description: "Every 15 min: refresh cached stock quotes for all followed symbols via Finnhub API."
+
+index_sync:
+  cron: "5 * * * *"
+  class: "IndexSyncWorker"
+  queue: default
+  description: "Hourly :05 UTC: refresh cached quotes for the 10 major world indices (S&P 500, Dow, NASDAQ, FTSE, DAX, Nikkei, etc.). Offset from feeds cron (:00) and sports cron (:30) to spread load."
