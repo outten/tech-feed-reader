@@ -59,6 +59,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       API_SPORTS_KEY: ${API_SPORTS_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     expose:
       - "4567"
 
@@ -82,6 +83,7 @@ services:
       LLM_ENABLED: ${LLM_ENABLED:-true}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       API_SPORTS_KEY: ${API_SPORTS_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     command: ["bundle", "exec", "sidekiq", "-r", "./app/sidekiq_boot.rb", "-c", "5"]
 
   caddy:
