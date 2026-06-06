@@ -1,7 +1,7 @@
 <%# STUFF #65 — Comics index. Mirrors /podcasts + /youtube in shape:
-    a "Subscribed series" tile grid keyed by feed, plus a "Recent panels"
-    list of the latest individual strips. Empty state points at /feeds
-    catalog browse so users can subscribe to xkcd / SMBC / etc. %>
+    a "Recent panels" list of the latest individual strips, plus a
+    "Subscribed series" tile grid keyed by feed. Empty state points at
+    /feeds catalog browse so users can subscribe to xkcd / SMBC / etc. %>
 <div class="page-header">
   <div>
     <h2>Comics</h2>
@@ -26,37 +26,6 @@
     </p>
   </div>
 <% else %>
-  <section class="benchmark-section">
-    <h3>Subscribed series</h3>
-    <div class="podcast-shows">
-      <% @series.each do |s| %>
-        <%
-          # Prefer the latest panel as cover art so the page looks alive
-          # (every feed shares its own logo otherwise); fall back to the
-          # feed's image_url if no panel image was captured.
-          cover = s['latest_image'].to_s.empty? ? s['image_url'] : s['latest_image']
-          # STUFF #66 — tile goes to the series archive (/comics/:id)
-          # so users can pick which panel to read; was the latest
-          # article uid before, which felt like a dead-end.
-          target = "/comics/#{s['id']}"
-        %>
-        <a class="podcast-show-card" href="<%= h(target) %>"
-           title="See all panels from <%= h(s['title'] || s['url']) %>">
-          <% if cover && !cover.to_s.empty? %>
-            <img class="podcast-show-cover" src="<%= h(cover) %>" alt="" loading="lazy">
-          <% end %>
-          <span class="podcast-show-title"><%= h(s['title'] || s['url']) %></span>
-          <span class="podcast-show-meta">
-            <%= s['panel_count'] %> panel<%= 's' unless s['panel_count'] == 1 %>
-            <% if s['latest_at'] %>
-              &middot; latest <%= relative_time(s['latest_at']) %>
-            <% end %>
-          </span>
-        </a>
-      <% end %>
-    </div>
-  </section>
-
   <section class="benchmark-section">
     <h3>Recent panels</h3>
     <% if @recent_comics.empty? %>
@@ -100,5 +69,36 @@
         <% end %>
       </ul>
     <% end %>
+  </section>
+
+  <section class="benchmark-section">
+    <h3>Subscribed series</h3>
+    <div class="podcast-shows">
+      <% @series.each do |s| %>
+        <%
+          # Prefer the latest panel as cover art so the page looks alive
+          # (every feed shares its own logo otherwise); fall back to the
+          # feed's image_url if no panel image was captured.
+          cover = s['latest_image'].to_s.empty? ? s['image_url'] : s['latest_image']
+          # STUFF #66 — tile goes to the series archive (/comics/:id)
+          # so users can pick which panel to read; was the latest
+          # article uid before, which felt like a dead-end.
+          target = "/comics/#{s['id']}"
+        %>
+        <a class="podcast-show-card" href="<%= h(target) %>"
+           title="See all panels from <%= h(s['title'] || s['url']) %>">
+          <% if cover && !cover.to_s.empty? %>
+            <img class="podcast-show-cover" src="<%= h(cover) %>" alt="" loading="lazy">
+          <% end %>
+          <span class="podcast-show-title"><%= h(s['title'] || s['url']) %></span>
+          <span class="podcast-show-meta">
+            <%= s['panel_count'] %> panel<%= 's' unless s['panel_count'] == 1 %>
+            <% if s['latest_at'] %>
+              &middot; latest <%= relative_time(s['latest_at']) %>
+            <% end %>
+          </span>
+        </a>
+      <% end %>
+    </div>
   </section>
 <% end %>

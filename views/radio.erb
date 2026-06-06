@@ -4,6 +4,20 @@
     <p class="radio-page-sub">Commercial-free, live streams. Click ▶ to play in the player bar below.</p>
   </header>
 
+  <%# ── My Stations ── %>
+  <section class="radio-section">
+    <h2>My Stations</h2>
+    <% if @followed.empty? %>
+      <p class="radio-empty">You haven't followed any stations yet. Browse the catalog below and click <strong>+ Follow</strong> to add one.</p>
+    <% else %>
+      <div class="radio-grid">
+        <% @followed.each do |s| %>
+          <%= erb :_radio_station_card, locals: { s: s, following: true } %>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+
   <%# ── AI Recommendations ── %>
   <% if @recommendations.any? %>
     <section class="radio-section">
@@ -49,20 +63,6 @@
       </div>
     </section>
   <% end %>
-
-  <%# ── My Stations ── %>
-  <section class="radio-section">
-    <h2>My Stations</h2>
-    <% if @followed.empty? %>
-      <p class="radio-empty">You haven't followed any stations yet. Browse the catalog below and click <strong>+ Follow</strong> to add one.</p>
-    <% else %>
-      <div class="radio-grid">
-        <% @followed.each do |s| %>
-          <%= erb :_radio_station_card, locals: { s: s, following: true } %>
-        <% end %>
-      </div>
-    <% end %>
-  </section>
 
   <%# ── Browse Catalog ── %>
   <section class="radio-section">

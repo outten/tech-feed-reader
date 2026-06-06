@@ -5677,6 +5677,49 @@ html.dark .stock-search-input:focus {
 .stock-price-value { font-weight: 600; }
 .stock-change { font-size: 0.85rem; }
 
+/* Day range bar — low/high spread with current-price marker */
+.stock-day-range {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.stock-day-range-label {
+  font-size: 0.7rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  white-space: nowrap;
+}
+.stock-day-range-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  position: relative;
+}
+.stock-day-range-fill {
+  height: 100%;
+  border-radius: 2px;
+  min-width: 2px;
+}
+.stock-day-range-marker {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: var(--card-bg, var(--bg));
+  transform: translate(-50%, -50%);
+}
+
+/* Intraday sparkline canvas inside index cards */
+.stock-spark {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin-top: 0.4rem;
+}
+
 /* --- Stock detail page ----------------------------------------------- */
 .stock-detail-logo {
   width: 28px;

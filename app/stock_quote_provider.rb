@@ -111,6 +111,39 @@ module StockQuoteProvider
     nil
   end
 
+  # Intraday sparkline via Yahoo Finance (free, no key needed).
+  # Returns an array of close prices (5-min intervals, ~78 points for a
+  # full trading day) or [] on failure.  Used for the index card charts.
+  YAHOO_CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart'
+
+  def sparkline(symbol, range: '1d', interval: '5m')
+    sym = symbol.to_s.upcase
+    uri = URI("#{YAHOO_CHART_URL}/#{ERB::Util.url_encode(sym)}")
+    uri.query = URI.encode_www_form(range: range, interval: interval)
+
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 5, read_timeout: 10) do |http|
+      req = Net::HTTP::Get.new(uri.request_uri)
+      req['User-Agent'] = 'Mozilla/5.0'
+      http.request(req)
+    end
+
+    return [] unless response.code.to_i == 200
+
+    data = JSON.parse(response.body)
+    closes = data.dig('chart', 'result', 0, 'indicators', 'quote', 0, 'close') || []
+    closes.compact.map { |c| c.round(2) }
+  rescue StandardError => e
+    AppLogger.warn('stock_provider', message: "sparkline failed for #{sym}", error: e.message)
+    []
+  end
+
+  # Batch sparklines for all major indices.  Returns { "SPY" => [...], ... }.
+  def sparklines_for_indices
+    MAJOR_INDICES.each_with_object({}) do |idx, h|
+      h[idx[:symbol]] = sparkline(idx[:symbol])
+    end
+  end
+
   # --- private HTTP helper -----------------------------------------------
 
   def get(path, **params)
