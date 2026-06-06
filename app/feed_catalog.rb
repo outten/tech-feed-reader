@@ -20,7 +20,11 @@ module FeedCatalog
     technology: 'Technology',
     sports:     'Sports',
     nature:     'Nature & Documentary',
-    humor:      'Humor'
+    humor:      'Humor',
+    finance:    'Finance & Markets',
+    world_news: 'World News',
+    science:    'Science',
+    gaming:     'Gaming'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -59,7 +63,16 @@ module FeedCatalog
     # STUFF.md #18 — mythology / classical history (Greek / Roman / Norse).
     mythos:      'Mythology & classical history',
     # STUFF #65 — daily-ish webcomics + humor (xkcd, SMBC, Oatmeal, etc.).
-    webcomics:   'Webcomics & humor'
+    webcomics:   'Webcomics & humor',
+    # Finance & Markets (STUFF #85)
+    markets_news:  'Market news',
+    # World News (STUFF #85)
+    world:         'World news',
+    # Science (STUFF #85)
+    science_pub:   'Science publishers',
+    space:         'Space & astronomy',
+    # Gaming (STUFF #85)
+    gaming_pub:    'Gaming publishers'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -89,7 +102,12 @@ module FeedCatalog
     youtube_nature: :nature,
     youtube_sports: :sports,
     mythos:      :technology,
-    webcomics:   :humor
+    webcomics:   :humor,
+    markets_news:  :finance,
+    world:         :world_news,
+    science_pub:   :science,
+    space:         :science,
+    gaming_pub:    :gaming
   }.freeze
 
   CATALOG = [
@@ -593,7 +611,140 @@ module FeedCatalog
     { url: 'https://feeds.feedburner.com/Explosm',
       title: 'Cyanide & Happiness', category: :webcomics,
       interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
-      blurb: "Explosm.net's absurd stick-figure black-comedy strip." }
+      blurb: "Explosm.net's absurd stick-figure black-comedy strip." },
+
+    # ---- Finance & Markets (6) ------------------------------------------
+    # STUFF #85. Major financial news publishers. PUBLISHER_INTERVAL (1h)
+    # since markets move continuously during trading hours.
+    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',
+      title: 'CNBC Top News', category: :markets_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Breaking business news and market coverage from CNBC.' },
+    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069',
+      title: 'CNBC Investing', category: :markets_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Investment news, portfolio strategy, and stock picks.' },
+    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258',
+      title: 'CNBC Economy', category: :markets_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'US and global economic data, Fed policy, jobs, and inflation.' },
+    { url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',
+      title: 'MarketWatch Top Stories', category: :markets_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Top market stories from MarketWatch — equities, bonds, commodities.' },
+    { url: 'https://seekingalpha.com/feed.xml',
+      title: 'Seeking Alpha', category: :markets_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Crowd-sourced stock analysis and breaking market news.' },
+    { url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB',
+      title: 'Google News — Business', category: :markets_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Aggregated business news from Google — Bloomberg, WSJ, Reuters, and more.' },
+
+    # ---- World News (8) -------------------------------------------------
+    # STUFF #85. Major global news outlets with working RSS feeds.
+    { url: 'https://www.aljazeera.com/xml/rss/all.xml',
+      title: 'Al Jazeera', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International news from Al Jazeera — Middle East, Africa, Asia, and global affairs.' },
+    { url: 'https://feeds.npr.org/1001/rss.xml',
+      title: 'NPR News', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'National and international news from NPR.' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+      title: 'NYT World News', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New York Times world coverage — conflict, diplomacy, and global trends.' },
+    { url: 'https://feeds.washingtonpost.com/rss/world',
+      title: 'Washington Post — World', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International reporting from the Washington Post.' },
+    { url: 'https://feeds.theguardian.com/theguardian/world/rss',
+      title: 'The Guardian — World', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Global news and analysis from The Guardian.' },
+    { url: 'https://www.cbsnews.com/latest/rss/world',
+      title: 'CBS News — World', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'World news headlines from CBS News.' },
+    { url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml',
+      title: 'UN News', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official United Nations news — humanitarian, climate, peace, and development.' },
+    { url: 'https://www.france24.com/en/rss',
+      title: 'France 24', category: :world,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International news from France 24 in English.' },
+
+    # ---- Science (8) ----------------------------------------------------
+    # STUFF #85. Top science and space publishers.
+    { url: 'https://www.nature.com/nature.rss',
+      title: 'Nature', category: :science_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Latest research and news from Nature — the world\'s leading multidisciplinary science journal.' },
+    { url: 'https://www.newscientist.com/section/news/feed/',
+      title: 'New Scientist', category: :science_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Science and technology news from New Scientist.' },
+    { url: 'https://www.sciencedaily.com/rss/all.xml',
+      title: 'ScienceDaily', category: :science_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Breaking science research news — biology, chemistry, physics, earth science.' },
+    { url: 'https://feeds.arstechnica.com/arstechnica/science',
+      title: 'Ars Technica — Science', category: :science_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Ars Technica\'s science desk — peer-reviewed research explained for tech readers.' },
+    { url: 'https://www.quantamagazine.org/feed/',
+      title: 'Quanta Magazine', category: :science_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'In-depth science and math journalism from the Simons Foundation.' },
+    { url: 'https://www.livescience.com/feeds/all',
+      title: 'Live Science', category: :science_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Science news, discoveries, and explainers for a general audience.' },
+    { url: 'https://www.nasa.gov/news-release/feed/',
+      title: 'NASA News', category: :space,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official NASA press releases — missions, discoveries, and launches.' },
+    { url: 'https://www.space.com/feeds/all',
+      title: 'Space.com', category: :space,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Space exploration, astronomy, and stargazing news.' },
+
+    # ---- Gaming (8) -----------------------------------------------------
+    # STUFF #85. Major gaming news publishers.
+    { url: 'https://kotaku.com/rss',
+      title: 'Kotaku', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Gaming news, reviews, and culture from Kotaku.' },
+    { url: 'https://feeds.feedburner.com/ign/all',
+      title: 'IGN', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Games, movies, and entertainment news from IGN.' },
+    { url: 'https://www.pcgamer.com/rss/',
+      title: 'PC Gamer', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'PC gaming news, hardware, and reviews.' },
+    { url: 'https://www.rockpapershotgun.com/feed',
+      title: 'Rock Paper Shotgun', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'PC gaming news and criticism with a sharp editorial voice.' },
+    { url: 'https://www.eurogamer.net/feed',
+      title: 'Eurogamer', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'European gaming news and Digital Foundry tech analysis.' },
+    { url: 'https://www.polygon.com/rss/index.xml',
+      title: 'Polygon', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Gaming, entertainment, and pop culture from Polygon.' },
+    { url: 'https://www.gamespot.com/feeds/mashup/',
+      title: 'GameSpot', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Game reviews, trailers, and news from GameSpot.' },
+    { url: 'https://www.destructoid.com/feed/',
+      title: 'Destructoid', category: :gaming_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Indie and mainstream gaming news from Destructoid.' }
   ].freeze
 
   module_function
@@ -683,6 +834,26 @@ module FeedCatalog
       https://existentialcomics.com/rss.xml
       https://www.qwantz.com/rssfeed.php
       https://poorlydrawnlines.com/feed/
+    ].freeze,
+    finance: %w[
+      https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114
+      https://feeds.content.dowjones.io/public/rss/mw_topstories
+      https://seekingalpha.com/feed.xml
+    ].freeze,
+    world_news: %w[
+      https://www.aljazeera.com/xml/rss/all.xml
+      https://feeds.npr.org/1001/rss.xml
+      https://rss.nytimes.com/services/xml/rss/nyt/World.xml
+    ].freeze,
+    science: %w[
+      https://www.nature.com/nature.rss
+      https://www.nasa.gov/news-release/feed/
+      https://www.quantamagazine.org/feed/
+    ].freeze,
+    gaming: %w[
+      https://kotaku.com/rss
+      https://www.pcgamer.com/rss/
+      https://www.polygon.com/rss/index.xml
     ].freeze
   }.freeze
 
@@ -694,7 +865,11 @@ module FeedCatalog
     sports:     { label: 'Sports',      blurb: 'NFL / NBA / soccer / rugby / tennis news.',       emoji: '🏟' },
     nature:     { label: 'Nature',      blurb: 'BBC Earth, Nat Geo, PBS Nature documentaries.',   emoji: '📺' },
     podcasts:   { label: 'Podcasts',    blurb: 'Long-form audio: Changelog, Lex Fridman, more.',  emoji: '🎧' },
-    humor:      { label: 'Humor',       blurb: 'xkcd, SMBC, The Oatmeal, and friends — daily-ish webcomics.', emoji: '😂' }
+    humor:      { label: 'Humor',       blurb: 'xkcd, SMBC, The Oatmeal, and friends — daily-ish webcomics.', emoji: '😂' },
+    finance:    { label: 'Finance',    blurb: 'CNBC, MarketWatch, Seeking Alpha — market headlines.',        emoji: '📈' },
+    world_news: { label: 'World News', blurb: 'NPR, NYT, Al Jazeera, The Guardian — global coverage.',      emoji: '🌍' },
+    science:    { label: 'Science',    blurb: 'Nature, NASA, Quanta Magazine — research & discovery.',       emoji: '🔬' },
+    gaming:     { label: 'Gaming',     blurb: 'Kotaku, IGN, PC Gamer, Polygon — game news & reviews.',      emoji: '🎮' }
   }.freeze
 
   def starters_for_topic(topic)

@@ -203,6 +203,7 @@ module Database
       article_tags
       sports_entity_articles
       summaries
+      stock_quotes
     ].to_set.freeze
 
     def insert_without_returning?(sql)

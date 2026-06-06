@@ -1328,3 +1328,16 @@ Can you update the AGENTS.md file with the deployment process:
 - deployment to production needs to be deployed by me
 
 **Shipped.** `AGENTS.md` Standard flow section rewritten to make all four gates unambiguous: (1) commit requires explicit approval + browser verify for UI; (2) PR creation requires explicit approval; (3) only the user merges PRs — no `gh pr merge` without direct instruction; (4) only the user deploys — no `make deploy-*` without direct instruction. Added a summary table of the four gates for quick reference.
+
+## [ ] 85. Finance / Markets + New Content Categories + Stock Ticker
+
+Add four new content topics (Finance & Markets, World News, Science, Gaming) with ~30 curated RSS feeds. Plus a stock symbol feature: users can search for symbols (via Finnhub API), view a detail page with price/change/market cap, and follow symbols. Followed symbols display in a scrolling ticker bar on the dashboard. Background sync refreshes quotes every 15 minutes via Sidekiq cron.
+
+New topics: `finance`, `world_news`, `science`, `gaming`.
+New categories: `markets_news`, `world`, `science_pub`, `space`, `gaming_pub`.
+New tables: `stock_follows`, `stock_quotes`.
+New routes: `GET /stocks`, `GET /stocks/:symbol`, `POST /stocks/follow`, `POST /stocks/unfollow`.
+New files: `app/stock_follows_store.rb`, `app/stock_quotes_store.rb`, `app/stock_quote_provider.rb`, `app/workers/stock_quote_fetch_worker.rb`, `app/workers/stock_sync_worker.rb`, `views/stocks.erb`, `views/stock_detail.erb`, `views/_stock_ticker.erb`, `public/stock-follow.js`.
+Environment: `FINNHUB_API_KEY` required in `.env` / `.credentials` for stock features; app degrades gracefully without it.
+
+**Status: tests**

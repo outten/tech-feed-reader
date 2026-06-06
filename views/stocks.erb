@@ -1,0 +1,138 @@
+<div class="page-header">
+  <div>
+    <h2>Stocks</h2>
+    <p class="subtitle">
+      Search for stock symbols, view quotes, and follow tickers for your dashboard.
+    </p>
+  </div>
+</div>
+
+<%# Search box %>
+<section class="benchmark-section">
+  <form method="get" action="/stocks" class="stock-search-form">
+    <div class="stock-search-row">
+      <input type="text" name="q" value="<%= h(@query || '') %>"
+             placeholder="Search by company name or ticker symbol…"
+             class="stock-search-input" autofocus autocomplete="off" />
+      <button type="submit" class="btn-primary">Search</button>
+    </div>
+  </form>
+</section>
+
+<%# Search results %>
+<% if @query && !@query.empty? %>
+  <section class="benchmark-section">
+    <h3>Results for "<%= h(@query) %>"</h3>
+    <% if @results && @results.any? %>
+      <table class="data-table stock-results-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @results.each do |r| %>
+            <tr>
+              <td><a href="/stocks/<%= h(r[:symbol]) %>" class="stock-symbol-link"><%= h(r[:symbol]) %></a></td>
+              <td><%= h(r[:description]) %></td>
+              <td class="muted"><%= h(r[:type]) %></td>
+              <td><a href="/stocks/<%= h(r[:symbol]) %>" class="btn-secondary btn-sm">View →</a></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="muted">No results found. Try a different search term.</p>
+    <% end %>
+  </section>
+<% end %>
+
+<%# Major indices %>
+<section class="benchmark-section">
+  <h3>Major indices</h3>
+  <p class="muted" style="margin-bottom: 0.75rem; font-size: 0.85rem;">
+    Follow world market indices to track them on your dashboard ticker.
+  </p>
+  <div class="stock-indices-grid">
+    <% @indices.each do |idx| %>
+      <% quote = @index_quotes[idx[:symbol]] %>
+      <% followed = @followed_symbols.include?(idx[:symbol]) %>
+      <div class="stock-index-card">
+        <div class="stock-index-header">
+          <span class="stock-index-name"><%= h(idx[:name]) %></span>
+          <span class="stock-index-symbol muted"><%= h(idx[:symbol]) %></span>
+        </div>
+        <% if quote && quote['price'] %>
+          <div class="stock-index-price">
+            <span class="stock-price-value"><%= format_price(quote['price']) %></span>
+            <span class="stock-change <%= quote['change'].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= quote['change'].to_f >= 0 ? '▲' : '▼' %>
+              <%= format_change(quote['change']) %> (<%= format_pct(quote['change_pct']) %>)
+            </span>
+          </div>
+        <% else %>
+          <div class="stock-index-price muted">—</div>
+        <% end %>
+        <form method="post" action="/stocks/<%= followed ? 'unfollow' : 'follow' %>"
+              class="stock-manage-form js-stock-follow-form" style="margin-top: 0.5rem;">
+          <input type="hidden" name="symbol" value="<%= h(idx[:symbol]) %>" />
+          <input type="hidden" name="name" value="<%= h(idx[:name]) %>" />
+          <input type="hidden" name="return_to" value="/stocks" />
+          <button type="submit"
+                  class="btn-sm <%= followed ? 'btn-secondary is-following' : 'btn-primary' %> stock-follow-toggle"
+                  data-follow-label="+ Follow"
+                  data-following-label="✓ Following">
+            <%= followed ? '✓ Following' : '+ Follow' %>
+          </button>
+        </form>
+      </div>
+    <% end %>
+  </div>
+</section>
+
+<%# Currently followed symbols %>
+<% if @followed_quotes && @followed_quotes.any? %>
+  <section class="benchmark-section">
+    <h3>Your followed stocks</h3>
+    <table class="data-table stock-followed-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th class="num">Price</th>
+          <th class="num">Change</th>
+          <th class="num">%</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @followed_quotes.each do |q| %>
+          <tr>
+            <td><a href="/stocks/<%= h(q['symbol']) %>" class="stock-symbol-link"><%= h(q['symbol']) %></a></td>
+            <td><%= h(q['name'] || '—') %></td>
+            <td class="num"><%= format_price(q['price']) %></td>
+            <td class="num <%= q['change'].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= q['change'].to_f >= 0 ? '▲' : '▼' %> <%= format_change(q['change']) %>
+            </td>
+            <td class="num <%= q['change_pct'].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= format_pct(q['change_pct']) %>
+            </td>
+            <td>
+              <form method="post" action="/stocks/unfollow"
+                    class="stock-manage-form js-stock-follow-form" style="display:inline;">
+                <input type="hidden" name="symbol" value="<%= h(q['symbol']) %>" />
+                <input type="hidden" name="return_to" value="/stocks" />
+                <button type="submit" class="btn-sm btn-secondary is-following stock-follow-toggle"
+                        data-follow-label="+ Follow"
+                        data-following-label="✓ Following">✓ Following</button>
+              </form>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>

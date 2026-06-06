@@ -19,6 +19,8 @@ require_relative 'workers/generate_sudoku_worker'
 require_relative 'games/trivia_generator'
 require_relative 'games/trivia_store'
 require_relative 'workers/generate_trivia_worker'
+require_relative 'workers/stock_quote_fetch_worker'
+require_relative 'workers/stock_sync_worker'
 
 # Recurring jobs (hourly feed refresh, nightly sports sync). Loaded
 # server-side only so the web process doesn't double-register the

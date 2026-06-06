@@ -81,7 +81,7 @@
         # one parent so adding new content types doesn't keep growing
         # the horizontal nav. /sports/manage is excluded so it lights
         # up Manage ▾ instead of Browse ▾.
-        browse_paths  = %w[/podcasts /youtube /sports /comics /games /radio]
+        browse_paths  = %w[/podcasts /youtube /sports /comics /games /radio /stocks]
         ai_active     = ai_paths.any?     { |p| request.path_info == p || request.path_info.start_with?(p + '/') }
         manage_active = manage_paths.any? { |p| request.path_info == p }
         browse_active = !manage_active && browse_paths.any? { |p|
@@ -106,6 +106,7 @@
             <a href="/comics"   class="<%= 'active' if request.path_info == '/comics' || request.path_info.start_with?('/comics/') %>" role="menuitem">Comics</a>
             <a href="/games"    class="<%= 'active' if request.path_info.start_with?('/games') %>" role="menuitem">🎮 Games</a>
             <a href="/radio"    class="<%= 'active' if request.path_info.start_with?('/radio') %>" role="menuitem">📻 Radio</a>
+            <a href="/stocks"   class="<%= 'active' if request.path_info.start_with?('/stocks') %>" role="menuitem">📈 Stocks</a>
           </div>
         </div>
 
@@ -341,6 +342,7 @@
   <script src="/chat-widget.js?v=<%= asset_mtime('public/chat-widget.js') %>"></script>
   <script src="/search-shortcut.js?v=<%= asset_mtime('public/search-shortcut.js') %>"></script>
   <script src="/sports-follow.js?v=<%= asset_mtime('public/sports-follow.js') %>"></script>
+  <script src="/stock-follow.js?v=<%= asset_mtime('public/stock-follow.js') %>"></script>
   <script src="/image-lightbox.js?v=<%= asset_mtime('public/image-lightbox.js') %>"></script>
   <script src="/sudoku.js?v=<%= asset_mtime('public/sudoku.js') %>"></script>
   <script src="/trivia.js?v=<%= asset_mtime('public/trivia.js') %>"></script>

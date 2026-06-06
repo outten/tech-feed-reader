@@ -2,13 +2,13 @@
 
 A multi-user, passkey-authenticated web application that aggregates public, free RSS / Atom feeds for technology articles, sports news + scores, nature/YouTube channels, podcasts, and webcomics. Reading, tagging, search, summarization, AI-assisted triage, and personalised relevance ranking. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is PostgreSQL (managed DO cluster, `tsvector` + `ts_rank` for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics + daily games; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
+> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics + finance + world news + science + gaming + daily games + stock ticker; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
 
 ## What it does
 
 - **Multi-user, passkey-only auth** (Phase A1) — WebAuthn sign-up + sign-in with 10 single-use recovery codes; an auth-wall middleware on every protected route; `/account` for display name + passkeys + recovery-code regeneration + account deletion. No passwords, no email.
 - **Per-user data, shared catalog** (Phase A2) — every signed-in user has their own `read_state` / bookmarks / tags / mute rules / sports follows / digests / triages; the `feeds` catalog stays shared via a `user_feed_subscriptions` bridge so one fetch keeps every subscriber up to date.
-- **Discovery on `/feeds`** — 108 curated catalog entries with a client-side filter toolbar (search + topic chips); recommended-for-you + 🔥 popular-with-other-readers top charts; AI feed recommender (Claude) from a free-text prompt; Apple Podcasts URLs auto-resolve to the underlying RSS.
+- **Discovery on `/feeds`** — 138 curated catalog entries with a client-side filter toolbar (search + topic chips); recommended-for-you + 🔥 popular-with-other-readers top charts; AI feed recommender (Claude) from a free-text prompt; Apple Podcasts URLs auto-resolve to the underlying RSS.
 - **Home & onboarding** — `/` shows a marketing pitch to first-time visitors, the `/welcome` topic-chip onboarding (Tech / Sports / Nature / Podcasts / Humor) to newly signed-in users with zero subscriptions, and **What's On Today** (today's sports fixtures, top reads ranked by For You, podcast episodes, YouTube videos) to everyone else.
 - **Unified reading list** (`/articles`) — mixes 📄 articles, 🎧 podcasts, 📺 videos with day-group dividers, left-anchored thumbnails (per-article → YouTube → feed-cover fallback), source-cluster ribbons, and a 📖 reading-time pill.
 - **AI triage** (`/triage`) — Claude Sonnet 4.6 classifies your unread queue into must-read / optional / skip with rationale; daily cron emits one triage per topic.
@@ -16,6 +16,7 @@ A multi-user, passkey-authenticated web application that aggregates public, free
 - **Podcasts** (`/podcasts`) — subscribed-show grid with a persistent mini-player at the bottom of every page that survives Turbo navigation; resume-where-you-left-off; 🚌 bus-mode chip for sub-15-min commute episodes.
 - **YouTube** (`/youtube`) — subscribed-channel grid with a bulk-add textarea that resolves `@PBSNewsHour`-style handles → canonical channel-feed URLs via channel-page scrape; background fetch populates new channels within ~30s.
 - **Comics** (`/comics`) — subscribed webcomic series tiles (latest panel as cover) + recent panels list; comic-aware article hero (no crop) + click-to-zoom image lightbox.
+- **Stocks** (`/stocks`) — search for stock symbols via Finnhub API, view company profiles + real-time quotes, follow symbols. Followed symbols display in a scrolling ticker bar on the dashboard. Major world indices (S&P 500, DOW, NASDAQ, FTSE, Nikkei, etc.) available to follow. Background sync every 15 min via Sidekiq cron.
 - **Games** (`/games`) — daily puzzles and quizzes: **Sudoku** (backtracking-generated 9×9 with pencil notes, live timer, autosave) and **News Trivia** (5 Claude-generated questions from the last 24h of articles, progressive answer reveal with explanations). Both shared daily and per-user progress tracked.
 - **Topics & search** — `/topics` clusters across the recent corpus using weighted scoring (publisher categories 2× body keywords, proper-noun phrase detection like "Jannik Sinner", ubiquity ceiling, URL/site-boilerplate stopword sweep); `/search` is PG full-text with `tsvector` + `ts_headline` snippet highlighting and pre-search suggestion chips.
 - **Observability** — `/health` (liveness JSON), `/metrics` (Prometheus), `/admin/dashboard` (article counts + 7-day Activity chart), `/admin/traces` (OpenTelemetry ring buffer).
@@ -53,6 +54,8 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | News Trivia | `/games/trivia` | 5 Claude-generated multiple-choice questions from today's articles; progressive reveal + explanations |
 | Sports | `/sports` | Followed-team score tiles + per-sport landings (NFL / NBA / soccer / rugby / tennis). Calendar + standings + per-team detail + tennis player follows nested below |
 | Sports calendar | `/sports/calendar` | Upcoming fixtures across followed teams + iCal export |
+| Stocks | `/stocks` | Stock symbol search (Finnhub), major indices grid with follow buttons. Followed symbols show in a scrolling ticker on the dashboard |
+| Stock detail | `/stocks/:symbol` | Company profile, real-time quote (price, change, day range, market cap), follow/unfollow |
 | Triage | `/triage` | AI triage (Claude Sonnet 4.6) — classifies unread into must-read / optional / skip with rationale; per-topic chips; daily cron history |
 | Digests | `/digests` | Daily snapshots of unread articles + summaries (produced by `make digest`) |
 | Digest detail | `/digests/:id` | Inline render of a stored digest + opt-in "Summarize with Claude" |

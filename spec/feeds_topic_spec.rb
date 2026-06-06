@@ -37,8 +37,11 @@ RSpec.describe FeedsStore, '.add (Phase S1)' do
 end
 
 RSpec.describe FeedCatalog, 'Phase S1 + S2' do
-  it 'declares a TOPICS constant covering technology + sports + nature + humor' do
-    expect(FeedCatalog::TOPICS.keys).to contain_exactly(:technology, :sports, :nature, :humor)
+  it 'declares a TOPICS constant covering all content verticals' do
+    expect(FeedCatalog::TOPICS.keys).to contain_exactly(
+      :technology, :sports, :nature, :humor,
+      :finance, :world_news, :science, :gaming
+    )
   end
 
   it 'every category in CATEGORIES has a topic mapping' do
