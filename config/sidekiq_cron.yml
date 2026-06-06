@@ -38,3 +38,15 @@ fix_article_links:
   class: "FixArticleLinksWorker"
   queue: default
   description: "Daily 04:45 UTC: re-scrub any article content_html flagged content_scrubbed = FALSE. Steady-state no-op; safety net for imports that bypass Sanitizer's base_url path."
+
+stock_sync:
+  cron: "*/15 * * * *"
+  class: "StockSyncWorker"
+  queue: default
+  description: "Every 15 min: refresh cached stock quotes for all followed symbols via Finnhub API."
+
+index_sync:
+  cron: "5 * * * *"
+  class: "IndexSyncWorker"
+  queue: default
+  description: "Hourly :05 UTC: refresh cached quotes for the 10 major world indices (S&P 500, Dow, NASDAQ, FTSE, DAX, Nikkei, etc.). Offset from feeds cron (:00) and sports cron (:30) to spread load."

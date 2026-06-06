@@ -5597,3 +5597,157 @@ html.dark .radio-card { background: #1c1c1e; border-color: #3a3a3c; }
 .summary-num.green  { color: #34c759; }
 .summary-num.yellow { color: #ff9f0a; }
 .summary-num.red    { color: #ff3b30; }
+
+/* ====================================================================
+   STUFF #85 — Stock ticker, search, detail, follow
+   ==================================================================== */
+
+/* --- Colour helpers for price changes -------------------------------- */
+.positive { color: #34c759; }
+.negative { color: #ff3b30; }
+html.dark .positive { color: #30d158; }
+html.dark .negative { color: #ff453a; }
+
+/* --- Stock search page ----------------------------------------------- */
+.stock-search-form { margin: 0; }
+.stock-search-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.stock-search-input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--bg);
+  color: var(--text);
+}
+.stock-search-input:focus {
+  outline: none;
+  border-color: #0071e3;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+}
+html.dark .stock-search-input:focus {
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.35);
+}
+
+.stock-symbol-link {
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.stock-results-table .num,
+.stock-followed-table .num { text-align: right; }
+
+/* --- Major indices grid ---------------------------------------------- */
+.stock-indices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.stock-index-card {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg, var(--bg));
+}
+.stock-index-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.3rem;
+}
+.stock-index-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.stock-index-symbol {
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.stock-index-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.stock-price-value { font-weight: 600; }
+.stock-change { font-size: 0.85rem; }
+
+/* --- Stock detail page ----------------------------------------------- */
+.stock-detail-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  vertical-align: middle;
+  margin-right: 0.3rem;
+}
+.stock-price-large {
+  font-size: 1.8rem !important;
+}
+
+/* --- Follow toggle (reuses sports pattern) --------------------------- */
+.stock-follow-toggle.is-following {
+  opacity: 0.85;
+}
+
+/* --- Dashboard ticker bar -------------------------------------------- */
+.stock-ticker-section {
+  margin-bottom: 1.2rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg, var(--bg));
+}
+.stock-ticker-bar {
+  overflow: hidden;
+  position: relative;
+  height: 2.5rem;
+}
+.stock-ticker-track {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  white-space: nowrap;
+  animation: ticker-scroll 30s linear infinite;
+  will-change: transform;
+}
+.stock-ticker-track:hover {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.stock-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 1.2rem;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  border-right: 1px solid var(--border);
+  height: 100%;
+}
+.stock-ticker-item:last-child { border-right: none; }
+.stock-ticker-symbol {
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+}
+.stock-ticker-price {
+  font-weight: 500;
+}
+.stock-ticker-change {
+  font-size: 0.8rem;
+}
+
+/* btn-sm helper (if not already defined) */
+.btn-sm {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}

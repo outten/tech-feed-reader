@@ -3,13 +3,10 @@ require_relative '../app/feed_catalog'
 
 RSpec.describe FeedCatalog do
   describe '.all' do
-    it 'returns 108 curated entries (Phase 2 sports YouTube + STUFF #52 PR3 + #52.3 NPB/KBO/BWF + STUFF #65 webcomics)' do
-      # 72 (per #18) + 7 (Phase 2 :youtube_sports) + 16 (#52 PR3) +
-      # 5 (#52.3 — BBC Baseball, MyKBO, Yonhap, BWF Badminton,
-      # Badzine) + 8 (STUFF #65 :webcomics — xkcd, SMBC, Oatmeal,
-      # Existential, Dinosaur, Poorly Drawn Lines, Wondermark, C&H)
-      # = 108.
-      expect(FeedCatalog.all.length).to eq(108)
+    it 'returns 138 curated entries (STUFF #85 — finance, world news, science, gaming adds 30 feeds)' do
+      # 108 (previous) + 6 (markets_news) + 8 (world) + 8 (science_pub
+      # + space) + 8 (gaming_pub) = 138.
+      expect(FeedCatalog.all.length).to eq(138)
     end
 
     it 'every entry has the required keys' do

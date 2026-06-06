@@ -83,6 +83,9 @@ require_relative 'games/trivia_store'
 require_relative 'radio_catalog'
 require_relative 'radio_store'
 require_relative 'radio_recommender/claude'
+require_relative 'stock_follows_store'
+require_relative 'stock_quotes_store'
+require_relative 'stock_quote_provider'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -513,6 +516,51 @@ class TechFeedReader < Sinatra::Base
     def sports_follow_json(slug:, kind:, followed:)
       content_type :json
       { ok: true, slug: slug, kind: kind, followed: followed }.to_json
+    end
+
+    # STUFF #85 — stock follow JSON response shape.
+    def stock_follow_json(symbol:, followed:)
+      content_type :json
+      { ok: true, symbol: symbol, followed: followed }.to_json
+    end
+
+    # Stock price formatting helpers used by views/stocks.erb,
+    # views/stock_detail.erb, and views/_stock_ticker.erb.
+    def format_price(val)
+      return '—' if val.nil?
+      format('%.2f', val.to_f)
+    end
+
+    def format_change(val)
+      return '—' if val.nil?
+      v = val.to_f
+      (v >= 0 ? '+' : '') + format('%.2f', v)
+    end
+
+    def format_pct(val)
+      return '—' if val.nil?
+      v = val.to_f
+      (v >= 0 ? '+' : '') + format('%.2f%%', v)
+    end
+
+    def format_volume(val)
+      return '—' if val.nil?
+      v = val.to_i
+      if v >= 1_000_000_000 then format('%.1fB', v / 1_000_000_000.0)
+      elsif v >= 1_000_000 then format('%.1fM', v / 1_000_000.0)
+      elsif v >= 1_000     then format('%.1fK', v / 1_000.0)
+      else v.to_s
+      end
+    end
+
+    def format_market_cap(val)
+      return '—' if val.nil?
+      v = val.to_i
+      if v >= 1_000_000_000_000 then format('$%.2fT', v / 1_000_000_000_000.0)
+      elsif v >= 1_000_000_000  then format('$%.2fB', v / 1_000_000_000.0)
+      elsif v >= 1_000_000      then format('$%.2fM', v / 1_000_000.0)
+      else "$#{v}"
+      end
     end
 
     def relative_time(iso)
@@ -1930,6 +1978,11 @@ class TechFeedReader < Sinatra::Base
     @top_feeds        = ArticlesStore.counts_by_feed(current_user_id, limit: 10)
     @top_tags_week    = TagsStore.top_in_window(current_user_id, days: 7, limit: 8)
     @topic_clusters   = TopicClusters.recent(days: 14, limit: 8)
+
+    # STUFF #85 — stock ticker on dashboard (cache-only, no API calls)
+    followed_syms = StockFollowsStore.all(current_user_id).map { |r| r['symbol'] }
+    @stock_quotes = followed_syms.any? ? StockQuotesStore.find_many(followed_syms) : []
+
     erb :dashboard
   end
 
@@ -4122,6 +4175,12 @@ class TechFeedReader < Sinatra::Base
     redirect to('/admin/status?notice=trivia_done')
   end
 
+  post '/admin/stocks/index-sync' do
+    require_relative 'workers/index_sync_worker'
+    IndexSyncWorker.perform_async
+    redirect to('/admin/status?notice=index_sync_enqueued')
+  end
+
   post '/admin/backgrounds/refresh' do
     inserted = BackgroundPool.refresh!
     redirect to("/admin/backgrounds?notice=refreshed&count=#{inserted}")
@@ -4151,6 +4210,77 @@ class TechFeedReader < Sinatra::Base
     FeedRefreshWorker.perform_async(feed['id'])
     AppLogger.info('refresh_one_enqueued', feed_id: feed['id'], title: feed['title'])
     redirect to("/feeds?notice=queued&feed_id=#{feed['id']}")
+  end
+
+  # ==================================================================
+  # STUFF #85 — Stock symbol search, detail, follow/unfollow, ticker
+  # ==================================================================
+
+  get '/stocks' do
+    @page_title = 'Stocks'
+    @query = params['q'].to_s.strip
+    @results = @query.empty? ? nil : StockQuoteProvider.search(@query)
+
+    # Major indices for the browse grid
+    @indices = StockQuoteProvider::MAJOR_INDICES
+    @followed_symbols = StockFollowsStore.all(current_user_id).map { |r| r['symbol'] }.to_set
+
+    # Try to show cached quotes for indices
+    all_index_symbols = @indices.map { |i| i[:symbol] }
+    @index_quotes = StockQuotesStore.find_many(all_index_symbols)
+                      .each_with_object({}) { |q, h| h[q['symbol']] = q }
+
+    # Show user's followed stocks with quote data
+    followed_symbols = StockFollowsStore.all(current_user_id).map { |r| r['symbol'] }
+    @followed_quotes = followed_symbols.any? ? StockQuotesStore.find_many(followed_symbols) : []
+
+    erb :stocks
+  end
+
+  get '/stocks/:symbol' do |symbol|
+    @page_title = symbol.upcase
+    @symbol = symbol.upcase
+
+    # Fetch + cache if stale or missing
+    if StockQuotesStore.stale?(@symbol, max_age_seconds: 300)
+      StockQuoteProvider.fetch_and_cache(@symbol)
+    end
+
+    @quote = StockQuotesStore.find(@symbol)
+    @profile = @quote  # profile data is merged into the quote row
+    @followed = StockFollowsStore.follow?(current_user_id, @symbol)
+
+    erb :stock_detail
+  end
+
+  post '/stocks/follow' do
+    symbol = params['symbol'].to_s.strip.upcase
+    halt 400, 'symbol required' if symbol.empty?
+    name = params['name'].to_s.strip
+    name = nil if name.empty?
+
+    StockFollowsStore.add(user_id: current_user_id, symbol: symbol, name: name)
+
+    # Eager fetch so the ticker has data immediately
+    begin
+      require_relative 'workers/stock_quote_fetch_worker'
+      StockQuoteFetchWorker.perform_async(symbol)
+    rescue StandardError => e
+      AppLogger.warn('stock_follow_enqueue_failed', symbol: symbol, message: e.message)
+    end
+
+    AppLogger.info('stock_follow', symbol: symbol)
+    return stock_follow_json(symbol: symbol, followed: true) if wants_json?
+    redirect to(params['return_to'] || '/stocks')
+  end
+
+  post '/stocks/unfollow' do
+    symbol = params['symbol'].to_s.strip.upcase
+    halt 400, 'symbol required' if symbol.empty?
+    StockFollowsStore.remove(user_id: current_user_id, symbol: symbol)
+    AppLogger.info('stock_unfollow', symbol: symbol)
+    return stock_follow_json(symbol: symbol, followed: false) if wants_json?
+    redirect to(params['return_to'] || '/stocks')
   end
 
   # ---- Boot -----------------------------------------------------------

@@ -39,6 +39,10 @@ RSpec.describe 'config/sidekiq_cron.yml' do
     require_relative '../app/workers/refresh_all_feeds_worker'
     require_relative '../app/workers/sports_sync_worker'
     require_relative '../app/workers/fix_article_links_worker'
+    require_relative '../app/workers/generate_sudoku_worker'
+    require_relative '../app/workers/generate_trivia_worker'
+    require_relative '../app/workers/stock_quote_fetch_worker'
+    require_relative '../app/workers/stock_sync_worker'
 
     schedule.each do |name, job|
       klass_name = job['class']

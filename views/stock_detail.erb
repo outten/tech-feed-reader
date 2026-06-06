@@ -1,0 +1,80 @@
+<div class="page-header">
+  <div>
+    <h2>
+      <% if @profile && @profile['logo'] && !@profile['logo'].empty? %>
+        <img src="<%= h(@profile['logo']) %>" alt="" class="stock-detail-logo" />
+      <% end %>
+      <%= h(@quote ? @quote['name'] || @symbol : @symbol) %>
+      <span class="muted" style="font-weight:400; font-size:1rem; margin-left:0.3em;">(<%= h(@symbol) %>)</span>
+    </h2>
+    <p class="subtitle">
+      <% if @quote && @quote['exchange'] %><%= h(@quote['exchange']) %> · <% end %>
+      <% if @quote && @quote['sector'] %><%= h(@quote['sector']) %><% end %>
+      <a href="/stocks" style="margin-left:1em;">← Back to search</a>
+    </p>
+  </div>
+  <div>
+    <% followed = @followed %>
+    <form method="post" action="/stocks/<%= followed ? 'unfollow' : 'follow' %>"
+          class="stock-manage-form js-stock-follow-form">
+      <input type="hidden" name="symbol" value="<%= h(@symbol) %>" />
+      <input type="hidden" name="name" value="<%= h(@quote ? @quote['name'] : @symbol) %>" />
+      <input type="hidden" name="return_to" value="/stocks/<%= h(@symbol) %>" />
+      <button type="submit"
+              class="<%= followed ? 'btn-secondary is-following' : 'btn-primary' %> stock-follow-toggle"
+              data-follow-label="+ Follow"
+              data-following-label="✓ Following">
+        <%= followed ? '✓ Following' : '+ Follow' %>
+      </button>
+    </form>
+  </div>
+</div>
+
+<% if @quote && @quote['price'] %>
+  <div class="stat-cards">
+    <div class="summary-card">
+      <span class="summary-label">Price</span>
+      <span class="summary-value stock-price-large"><%= format_price(@quote['price']) %></span>
+      <span class="summary-sub <%= @quote['change'].to_f >= 0 ? 'positive' : 'negative' %>">
+        <%= @quote['change'].to_f >= 0 ? '▲' : '▼' %>
+        <%= format_change(@quote['change']) %> (<%= format_pct(@quote['change_pct']) %>)
+      </span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Open</span>
+      <span class="summary-value"><%= format_price(@quote['open']) %></span>
+      <span class="summary-sub">Previous close: <%= format_price(@quote['prev_close']) %></span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label">Day range</span>
+      <span class="summary-value"><%= format_price(@quote['day_low']) %> — <%= format_price(@quote['day_high']) %></span>
+      <span class="summary-sub">Volume: <%= format_volume(@quote['volume']) %></span>
+    </div>
+    <% if @quote['market_cap'] %>
+      <div class="summary-card">
+        <span class="summary-label">Market cap</span>
+        <span class="summary-value"><%= format_market_cap(@quote['market_cap']) %></span>
+        <% if @quote['industry'] %>
+          <span class="summary-sub"><%= h(@quote['industry']) %></span>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="benchmark-section">
+    <p class="muted">
+      Quote data not yet available for this symbol.
+      <% if StockQuoteProvider.available? %>
+        The data will be fetched shortly.
+      <% else %>
+        Set <code>FINNHUB_API_KEY</code> in your credentials to enable stock quotes.
+      <% end %>
+    </p>
+  </div>
+<% end %>
+
+<% if @quote && @quote['updated_at'] %>
+  <p class="muted" style="text-align:right; font-size:0.8rem; margin-top:1rem;">
+    Last updated: <%= relative_time(@quote['updated_at']) %>
+  </p>
+<% end %>

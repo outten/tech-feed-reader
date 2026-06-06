@@ -19,6 +19,8 @@
   <p class="notice">Today's Sudoku puzzle regenerated.</p>
 <% elsif params[:notice] == 'trivia_done' %>
   <p class="notice">Today's Trivia quiz regenerated.</p>
+<% elsif params[:notice] == 'index_sync_enqueued' %>
+  <p class="notice">Index sync job enqueued — major indices will refresh momentarily.</p>
 <% end %>
 
 <%# Top-line: db / redis / sidekiq dots. Same data /health returns. %>
@@ -113,6 +115,10 @@
               <% elsif j[:name] == 'generate_trivia' %>
                 <form method="post" action="/admin/games/trivia/regenerate" style="display:inline">
                   <button class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem" title="Delete today's quiz and generate a new one from current articles">Force run</button>
+                </form>
+              <% elsif j[:name] == 'index_sync' %>
+                <form method="post" action="/admin/stocks/index-sync" style="display:inline">
+                  <button class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem" title="Enqueue an immediate refresh of all 10 major world indices">Force run</button>
                 </form>
               <% end %>
             </td>

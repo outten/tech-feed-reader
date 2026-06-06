@@ -32,6 +32,9 @@
   </div>
 </div>
 
+<%# STUFF #85 — Stock ticker bar (dashboard-only) %>
+<%= erb :_stock_ticker %>
+
 <% if @article_count.positive? %>
   <section class="benchmark-section">
     <h3>Activity (last <%= @activity_window %> day<%= 's' unless @activity_window == 1 %>)</h3>
