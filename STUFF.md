@@ -1329,7 +1329,7 @@ Can you update the AGENTS.md file with the deployment process:
 
 **Shipped.** `AGENTS.md` Standard flow section rewritten to make all four gates unambiguous: (1) commit requires explicit approval + browser verify for UI; (2) PR creation requires explicit approval; (3) only the user merges PRs — no `gh pr merge` without direct instruction; (4) only the user deploys — no `make deploy-*` without direct instruction. Added a summary table of the four gates for quick reference.
 
-## [ ] 85. Finance / Markets + New Content Categories + Stock Ticker
+## [x] 85. Finance / Markets + New Content Categories + Stock Ticker
 
 Add four new content topics (Finance & Markets, World News, Science, Gaming) with ~30 curated RSS feeds. Plus a stock symbol feature: users can search for symbols (via Finnhub API), view a detail page with price/change/market cap, and follow symbols. Followed symbols display in a scrolling ticker bar on the dashboard. Background sync refreshes quotes every 15 minutes via Sidekiq cron.
 
@@ -1340,4 +1340,24 @@ New routes: `GET /stocks`, `GET /stocks/:symbol`, `POST /stocks/follow`, `POST /
 New files: `app/stock_follows_store.rb`, `app/stock_quotes_store.rb`, `app/stock_quote_provider.rb`, `app/workers/stock_quote_fetch_worker.rb`, `app/workers/stock_sync_worker.rb`, `views/stocks.erb`, `views/stock_detail.erb`, `views/_stock_ticker.erb`, `public/stock-follow.js`.
 Environment: `FINNHUB_API_KEY` required in `.env` / `.credentials` for stock features; app degrades gracefully without it.
 
-**Status: tests**
+**Status: merged** — PR #182 (index sync + ETF symbols + landing page), commit `774915e`. Also: `IndexSyncWorker` added for hourly major-index refresh; Finnhub free-tier `^` symbols swapped to ETF proxies (SPY/DIA/QQQ/etc.); `FINNHUB_API_KEY` wired into `docker-compose.yml` for production; visitor landing page updated with Stocks and Games feature cards.
+
+## [x] 86. Force-run buttons on /admin/status
+
+Added "Force run" button for `index_sync` on `/admin/status` (same pattern as sudoku/trivia regenerate). Route: `POST /admin/stocks/index-sync`.
+
+**Status: merged** — shipped as part of PR #182.
+
+## [ ] 87. Beauty Pass
+
+Let's do a beauty pass and fix minor issues in UI/UX. Items are:
+
+- on the podcasts page, let's put "Recent episodes" above "Subscribed shows"
+- on the comics page, let's put "Recent panels" above "Subscribed series"
+- on the radio page, let's put "My Stations" above "Recommended for you"
+- on the stocks page, in the "Major indices" area:
+  - can you put each index in a panel element like the other pages
+  - can you put a chart of the ups and downs of the day like you did for the Weather Application
+- in the AI menu, can you put Triage first
+
+**Status: tests** — all six items implemented. Podcasts/Comics/Radio section reorders; stock index cards get a day-range bar (low→high with current-price marker, green/red); AI dropdown reordered to Triage → Topics → Digests.

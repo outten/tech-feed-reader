@@ -73,6 +73,28 @@
               <%= format_change(quote['change']) %> (<%= format_pct(quote['change_pct']) %>)
             </span>
           </div>
+          <%# Day range bar — shows low/high spread with current price marker %>
+          <%
+            day_low  = quote['day_low'].to_f
+            day_high = quote['day_high'].to_f
+            cur      = quote['price'].to_f
+            spread   = day_high - day_low
+            if spread > 0
+              pct = ((cur - day_low) / spread * 100).clamp(0, 100)
+              bar_color = quote['change'].to_f >= 0 ? 'var(--green, #34c759)' : 'var(--red, #ff3b30)'
+            end
+          %>
+          <% if spread > 0 %>
+            <div class="stock-day-range">
+              <span class="stock-day-range-label muted"><%= format_price(day_low) %></span>
+              <div class="stock-day-range-track">
+                <div class="stock-day-range-fill" style="width: <%= pct %>%; background: <%= bar_color %>;"></div>
+                <div class="stock-day-range-marker" style="left: <%= pct %>%; border-color: <%= bar_color %>;"></div>
+              </div>
+              <span class="stock-day-range-label muted"><%= format_price(day_high) %></span>
+            </div>
+          <% end %>
+          <canvas class="stock-spark" data-symbol="<%= h(idx[:symbol]) %>" width="180" height="40"></canvas>
         <% else %>
           <div class="stock-index-price muted">—</div>
         <% end %>
@@ -136,3 +158,5 @@
     </table>
   </section>
 <% end %>
+
+<script src="/stock-sparklines.js?v=<%= asset_mtime('public/stock-sparklines.js') %>"></script>

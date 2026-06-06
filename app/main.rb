@@ -4237,6 +4237,15 @@ class TechFeedReader < Sinatra::Base
     erb :stocks
   end
 
+  # API: intraday sparklines for all major indices (Yahoo Finance, no key needed).
+  # Called client-side from stock-sparklines.js after page load so the initial
+  # render isn't blocked by 10 sequential HTTP calls to Yahoo.
+  get '/api/stocks/sparklines' do
+    content_type :json
+    sparklines = StockQuoteProvider.sparklines_for_indices
+    JSON.generate(sparklines)
+  end
+
   get '/stocks/:symbol' do |symbol|
     @page_title = symbol.upcase
     @symbol = symbol.upcase

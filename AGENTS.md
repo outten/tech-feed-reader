@@ -68,7 +68,7 @@ Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [
 | `RETENTION_DAYS` | Article retention window for [`Pruner`](app/pruner.rb). Default `7`. Sweep runs at the end of `make refresh-feeds` and standalone via `make prune`. |
 | `PRUNE_KEEP_UNREAD` | Set to `1` to preserve unread articles past the retention window (default sweeps unread + read). Bookmarked articles are always kept. |
 | `PRUNE_ON_REFRESH` | Set to `0` to skip the post-refresh sweep on a given `make refresh-feeds` run. |
-| `FINNHUB_API_KEY` | Finnhub stock API (free tier, 60 req/min). Powers `/stocks` search, detail, and the dashboard ticker. Optional — stock features hide when unset. |
+| `FINNHUB_API_KEY` | Finnhub stock API (free tier, 60 req/min). Powers `/stocks` search, detail, the dashboard ticker, and the hourly `IndexSyncWorker`. Optional — stock features hide when unset. **Production**: must be in both `.env` and `docker-compose.yml` environment blocks (app + sidekiq). |
 
 **Logging**: every HTTP request, feed fetch, refresh, Claude call, chat turn, digest run, and Sidekiq job emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Per-request lines come from [`app/request_log_middleware.rb`](app/request_log_middleware.rb), which sits at the Rack layer so it sees static assets too (Sinatra `after` filters skip them). Defaults: `debug` in dev, `info` in `RACK_ENV=staging` / `production`, `fatal` in `test`. `LOG_LEVEL=debug|info|warn|error|fatal` overrides. Pipe through `jq` for pretty-printing: `make run | jq -c`.
 
@@ -173,7 +173,7 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `sports_entity_articles` | Sports Phase S7 follow-up: bridge for "articles mentioning Sinner / Eagles" on per-entity pages. |
 | `background_pool` | Pool of Picsum image IDs powering the per-page background. STUFF #21 doubled the pool to 100. |
 | `stock_follows` | STUFF #85: per-user stock symbol follows. Mirrors sports_follows pattern. (user_id, symbol, name). |
-| `stock_quotes` | STUFF #85: cached quote snapshots. One row per symbol, refreshed every 15 min by StockSyncWorker. Primary key is `symbol` (no id column). |
+| `stock_quotes` | STUFF #85: cached quote snapshots. One row per symbol, refreshed every 15 min by StockSyncWorker (followed symbols) and hourly by IndexSyncWorker (10 major indices via ETF proxies: SPY, DIA, QQQ, IWM, EWU, EWG, EWJ, EWH, EWQ, FEZ). Primary key is `symbol` (no id column). |
 
 **Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (PG `ts_rank` over websearch_to_tsquery, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the full-text path when the corpus is cold.
 

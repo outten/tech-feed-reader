@@ -113,8 +113,8 @@
         <div class="nav-dropdown <%= 'active' if ai_active %>">
           <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">AI <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>
           <div class="nav-dropdown-menu" role="menu">
-            <a href="/topics"  class="<%= 'active' if request.path_info == '/topics' || request.path_info.start_with?('/topics/') %>" role="menuitem">Topics</a>
             <a href="/triage"  class="<%= 'active' if request.path_info == '/triage' || request.path_info.start_with?('/triage/') %>" role="menuitem">Triage</a>
+            <a href="/topics"  class="<%= 'active' if request.path_info == '/topics' || request.path_info.start_with?('/topics/') %>" role="menuitem">Topics</a>
             <a href="/digests" class="<%= 'active' if request.path_info.start_with?('/digests') %>" role="menuitem">Digests</a>
           </div>
         </div>

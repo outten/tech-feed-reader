@@ -23,25 +23,6 @@
   </div>
 <% else %>
   <section class="benchmark-section">
-    <h3>Subscribed shows</h3>
-    <div class="podcast-shows">
-      <% @shows.each do |show| %>
-        <a class="podcast-show-card" href="/articles?feed_id=<%= show['id'] %>&kind=podcast"
-           title="See all episodes from <%= h(show['title'] || show['url']) %>">
-          <% if show['image_url'] && !show['image_url'].to_s.empty? %>
-            <img class="podcast-show-cover" src="<%= h(show['image_url']) %>" alt="" loading="lazy">
-          <% end %>
-          <span class="podcast-show-title"><%= h(show['title'] || show['url']) %></span>
-          <span class="podcast-show-meta">
-            <%= show['episode_count'] %> episode<%= 's' unless show['episode_count'] == 1 %>
-            &middot; latest <%= relative_time(show['latest_at']) %>
-          </span>
-        </a>
-      <% end %>
-    </div>
-  </section>
-
-  <section class="benchmark-section">
     <h3>Recent episodes</h3>
     <% if @recent_episodes.empty? %>
       <p class="muted">No episodes ingested yet — feeds refresh hourly, so new episodes will appear within the next hour.</p>
@@ -80,5 +61,24 @@
         <% end %>
       </ul>
     <% end %>
+  </section>
+
+  <section class="benchmark-section">
+    <h3>Subscribed shows</h3>
+    <div class="podcast-shows">
+      <% @shows.each do |show| %>
+        <a class="podcast-show-card" href="/articles?feed_id=<%= show['id'] %>&kind=podcast"
+           title="See all episodes from <%= h(show['title'] || show['url']) %>">
+          <% if show['image_url'] && !show['image_url'].to_s.empty? %>
+            <img class="podcast-show-cover" src="<%= h(show['image_url']) %>" alt="" loading="lazy">
+          <% end %>
+          <span class="podcast-show-title"><%= h(show['title'] || show['url']) %></span>
+          <span class="podcast-show-meta">
+            <%= show['episode_count'] %> episode<%= 's' unless show['episode_count'] == 1 %>
+            &middot; latest <%= relative_time(show['latest_at']) %>
+          </span>
+        </a>
+      <% end %>
+    </div>
   </section>
 <% end %>
