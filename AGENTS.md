@@ -20,7 +20,7 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 2. Implement + write tests + update docs in the same change.
 3. `make test` locally → must be 0 failures.
 4. **Pause — user approval required before committing.** Show the diff / commit message and wait for explicit go-ahead. For UI changes, the user must also manually verify the page in the browser before approving.
-5. Commit, push the branch, open the PR (`gh pr create`). **Opening a PR also requires explicit user approval** — do not auto-open after every task. Ask first; bundle related items into one PR.
+5. Commit, push the branch, open the PR (`gh pr create`). **Opening a PR also requires explicit user approval** — do not auto-open after every task. Ask first; bundle related items into one PR. **Exception: doc-only changes** (STUFF.md, README.md, AGENTS.md, about.erb, etc. — no code, no tests) may be committed on a branch and merged directly to main without a PR.
 6. **Wait for CI green** on the PR before claiming "shipped" — CI is at [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs RSpec + script syntax check on every push to `main` and every PR.
 7. **Only the user merges PRs.** Never call `gh pr merge` unless the user explicitly instructs it for this specific PR. A previous merge approval does not carry over to the next PR.
 8. **Only the user deploys to production.** Never run `make deploy-*`, `make publish-image`, or `make _remote_deploy` unless the user explicitly says to deploy. After merge, sync local only: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
