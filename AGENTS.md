@@ -284,6 +284,8 @@ The singleton player API lives in [`public/global-player.js`](public/global-play
 
 **Turbo migration notes** — body-level `<script>` tags re-execute on every Turbo body swap. Scripts that should bind once need a guard (see `window.__playerInited` in `global-player.js` and the `dataset.inited` check in `chat-widget.js`). Scripts that should rebind every nav (e.g. the article-page hookup of the play-episode button) can run unconditionally.
 
+**Nav-dropdown hover gap + click-to-toggle** — the Browse ▾ / AI ▾ / Manage ▾ dropdowns use CSS `:hover`/`:focus-within`. There is a 4 px gap between the trigger and the menu panel; without a bridge the hover state breaks when the cursor moves downward and the menu vanishes before the user reaches it. Fix is a `::before` pseudo-element on `.nav-dropdown` with `padding-top` matching the gap — invisible but keeps the hover active. A JS click-to-toggle (`.open` class) is also wired in [`public/nav-dropdown.js`](public/nav-dropdown.js): click pins the menu open; closes on outside click, Escape, or any menu-item selection. Don't remove the `::before` bridge or the `open` class without checking both paths.
+
 **Turbo opt-out for heavy-JS pages** — for pages that initialize a complex JS component (Chart.js on `/admin/dashboard`, the YouTube IFrame API on `/article/:uid` for video articles) OR that submit a form to a long-running endpoint (the `/triage` Generate button calls Claude for ~30s), Turbo's silent background fetch is the wrong default. Either the click looks dead, the canvas is stuck stale, or the body-replace races the script's first run. Mark the *link* or *form* with `data-turbo="false"` for those targets. PR #62 / #65 / #69 cover the three real-world incidents that taught us this — when in doubt, opt out.
 
 ## Project structure
@@ -339,6 +341,11 @@ app/
   recommendation.rb                # ts_rank-overlap "Related" panel + top_keywords + top_phrases (#28.4)
   recommendation/for_you.rb        # personalised ranker for /articles?sort=relevance
   topic_clusters.rb                # /topics weighted-scoring clustering (STUFF #28)
+
+  # Radio (STUFF #81)
+  radio_catalog.rb                 # 32 curated commercial-free stations in 5 groups (SomaFM, FIP/Radio France, Swiss Radio, Public Radio, Independent)
+  radio_store.rb                   # radio_stations + radio_follows; seed_catalog!, follow!, unfollow!
+  radio_recommender/claude.rb      # AI station recommendations from a free-text prompt
 
   # Sports
   sports_teams_store.rb / sports_leagues_store.rb / sports_matches_store.rb
