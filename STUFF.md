@@ -1348,7 +1348,7 @@ Added "Force run" button for `index_sync` on `/admin/status` (same pattern as su
 
 **Status: merged** — shipped as part of PR #182.
 
-## [ ] 87. Beauty Pass
+## [x] 87. Beauty Pass
 
 Let's do a beauty pass and fix minor issues in UI/UX. Items are:
 
@@ -1358,6 +1358,14 @@ Let's do a beauty pass and fix minor issues in UI/UX. Items are:
 - on the stocks page, in the "Major indices" area:
   - can you put each index in a panel element like the other pages
   - can you put a chart of the ups and downs of the day like you did for the Weather Application
-- in the AI menu, can you put Triage first
+- in the AI menu, can you put Triage firstGH
 
-**Status: tests** — all six items implemented. Podcasts/Comics/Radio section reorders; stock index cards get a day-range bar (low→high with current-price marker, green/red); AI dropdown reordered to Triage → Topics → Digests.
+**Shipped on PR #183.** Five UX polish items across four pages:
+- **Podcasts / Comics / Radio** — section order flipped: "Recent episodes" now leads `/podcasts`; "Recent panels" leads `/comics`; "My Stations" leads `/radio`.
+- **Stocks major-indices sparklines** — each index card now renders an intraday price chart via `GET /api/stocks/sparklines` (Yahoo Finance free API, ~78 data points). Canvas-drawn green/red line with gradient fill + a day-range bar (low → high with current-price marker). New `StockQuoteProvider.sparkline` / `sparklines_for_indices`; drawing logic in [`public/stock-sparklines.js`](public/stock-sparklines.js).
+- **AI nav dropdown reordered** — Triage first, then Topics, then Digests.
+
+A follow-up PR (#184) fixed a nav-dropdown hover gap (CSS `::before` invisible bridge covers the 4 px gap between trigger and menu so hover doesn't break mid-cursor-move) and added click-to-toggle (`.open` class pinned on click; closed on outside click / Escape / menu-item selection via [`public/nav-dropdown.js`](public/nav-dropdown.js)).
+## [ ] 88. Food & Cooking
+
+Add a new "Food & Cooking" content category with curated feeds covering recipe blogs, food journalism, and food podcasts. Should show up in the `/feeds` catalog, the `/welcome` onboarding chip picker, and `?topic=food` filtering on `/articles`.

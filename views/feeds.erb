@@ -7,6 +7,28 @@
   </div>
 </div>
 
+<%# Jump-nav TOC — grouped by topic, one link per category in the catalog. %>
+<nav class="catalog-toc" aria-label="Jump to catalog category">
+  <%
+    toc_groups = {}
+    FeedCatalog::TOPICS.each do |topic_key, topic_label|
+      cats = FeedCatalog::CATEGORY_TO_TOPIC
+        .select { |_c, t| t == topic_key }
+        .keys
+        .select { |c| (@catalog[c] || []).any? }
+      toc_groups[topic_label] = cats unless cats.empty?
+    end
+  %>
+  <% toc_groups.each do |topic_label, cats| %>
+    <div class="catalog-toc-group">
+      <span class="catalog-toc-topic"><%= h(topic_label) %></span>
+      <% cats.each do |cat| %>
+        <a href="#cat-<%= cat %>" class="catalog-toc-link"><%= h(FeedCatalog::CATEGORIES[cat]) %></a>
+      <% end %>
+    </div>
+  <% end %>
+</nav>
+
 <div id="flash-mount" aria-live="polite"></div>
 
 <% if @notice == 'added' %>
@@ -378,7 +400,7 @@
     <% next if entries.empty? %>
     <%# data-topic on the category header lets feeds-filter.js hide
         the whole heading when every row beneath it is filtered out. %>
-    <h4 class="catalog-category" data-topic="<%= h(FeedCatalog::CATEGORY_TO_TOPIC[key].to_s) %>"><%= label %></h4>
+    <h4 id="cat-<%= key %>" class="catalog-category" data-topic="<%= h(FeedCatalog::CATEGORY_TO_TOPIC[key].to_s) %>"><%= label %></h4>
     <ul class="catalog-list">
       <% entries.each do |entry| %>
         <% subscribed = @subscribed.include?(entry[:url]) %>

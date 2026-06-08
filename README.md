@@ -2,7 +2,7 @@
 
 A multi-user, passkey-authenticated web application that aggregates public, free RSS / Atom feeds for technology articles, sports news + scores, nature/YouTube channels, podcasts, and webcomics. Reading, tagging, search, summarization, AI-assisted triage, and personalised relevance ranking. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is PostgreSQL (managed DO cluster, `tsvector` + `ts_rank` for search) instead of `t-money`'s file-per-store JSON.
 
-> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics + finance + world news + science + gaming + daily games + stock ticker; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
+> **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics + internet radio + finance + world news + science + gaming + daily games + stock ticker; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
 
 ## What it does
 
@@ -54,7 +54,8 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | News Trivia | `/games/trivia` | 5 Claude-generated multiple-choice questions from today's articles; progressive reveal + explanations |
 | Sports | `/sports` | Followed-team score tiles + per-sport landings (NFL / NBA / soccer / rugby / tennis). Calendar + standings + per-team detail + tennis player follows nested below |
 | Sports calendar | `/sports/calendar` | Upcoming fixtures across followed teams + iCal export |
-| Stocks | `/stocks` | Stock symbol search (Finnhub), major indices grid with follow buttons. Followed symbols show in a scrolling ticker on the dashboard |
+| Radio | `/radio` | Browse + follow 32 curated commercial-free internet radio stations (SomaFM, KCRW, KEXP, WFMU, FIP, Swiss Radio, NTS, Radio Paradise, …). Live-stream mode in the global player (LIVE badge, no scrubber) |
+| Stocks | `/stocks` | Stock symbol search (Finnhub), major indices grid with intraday sparkline charts + day-range bars (Yahoo Finance, no key required), follow buttons. Followed symbols show in a scrolling ticker on the dashboard |
 | Stock detail | `/stocks/:symbol` | Company profile, real-time quote (price, change, day range, market cap), follow/unfollow |
 | Triage | `/triage` | AI triage (Claude Sonnet 4.6) — classifies unread into must-read / optional / skip with rationale; per-topic chips; daily cron history |
 | Digests | `/digests` | Daily snapshots of unread articles + summaries (produced by `make digest`) |
