@@ -53,7 +53,7 @@ RSpec.describe 'feed filter bar markup (STUFF #27)' do
 
     it 'annotates each category heading with its top-level data-topic' do
       get '/feeds'
-      expect(last_response.body).to match(/<h4 class="catalog-category" data-topic="(technology|sports|nature)">/)
+      expect(last_response.body).to match(/<h4[^>]* class="catalog-category"[^>]* data-topic="(technology|sports|nature)">/)
     end
   end
 
