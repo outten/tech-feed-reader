@@ -1366,3 +1366,6 @@ Let's do a beauty pass and fix minor issues in UI/UX. Items are:
 - **AI nav dropdown reordered** — Triage first, then Topics, then Digests.
 
 A follow-up PR (#184) fixed a nav-dropdown hover gap (CSS `::before` invisible bridge covers the 4 px gap between trigger and menu so hover doesn't break mid-cursor-move) and added click-to-toggle (`.open` class pinned on click; closed on outside click / Escape / menu-item selection via [`public/nav-dropdown.js`](public/nav-dropdown.js)).
+## [ ] 88. Food & Cooking
+
+Add a new "Food & Cooking" content category with curated feeds covering recipe blogs, food journalism, and food podcasts. Should show up in the `/feeds` catalog, the `/welcome` onboarding chip picker, and `?topic=food` filtering on `/articles`.

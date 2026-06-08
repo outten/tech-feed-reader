@@ -24,7 +24,8 @@ module FeedCatalog
     finance:    'Finance & Markets',
     world_news: 'World News',
     science:    'Science',
-    gaming:     'Gaming'
+    gaming:     'Gaming',
+    food:       'Food & Cooking'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -72,7 +73,11 @@ module FeedCatalog
     science_pub:   'Science publishers',
     space:         'Space & astronomy',
     # Gaming (STUFF #85)
-    gaming_pub:    'Gaming publishers'
+    gaming_pub:    'Gaming publishers',
+    # Food & Cooking (STUFF #88)
+    food_recipes:  'Recipe blogs & cooking',
+    food_news:     'Food journalism',
+    food_podcasts: 'Food podcasts'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -107,7 +112,10 @@ module FeedCatalog
     world:         :world_news,
     science_pub:   :science,
     space:         :science,
-    gaming_pub:    :gaming
+    gaming_pub:    :gaming,
+    food_recipes:  :food,
+    food_news:     :food,
+    food_podcasts: :food
   }.freeze
 
   CATALOG = [
@@ -744,7 +752,56 @@ module FeedCatalog
     { url: 'https://www.destructoid.com/feed/',
       title: 'Destructoid', category: :gaming_pub,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Indie and mainstream gaming news from Destructoid.' }
+      blurb: 'Indie and mainstream gaming news from Destructoid.' },
+
+    # ---- food & cooking (STUFF #88) ---------------------------------------
+    # Recipe blogs & cooking
+    { url: 'https://feeds.feedburner.com/seriouseats/recipes',
+      title: 'Serious Eats', category: :food_recipes,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Rigorously tested recipes and food science from J. Kenji López-Alt and team.' },
+    { url: 'https://smittenkitchen.com/feed/',
+      title: 'Smitten Kitchen', category: :food_recipes,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Deb Perelman\'s beloved home-cooking blog — unfussy recipes with real results.' },
+    { url: 'https://www.epicurious.com/feed/rss',
+      title: 'Epicurious', category: :food_recipes,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Recipes, cooking techniques, and kitchen guides from Condé Nast.' },
+    { url: 'https://www.101cookbooks.com/feed',
+      title: '101 Cookbooks', category: :food_recipes,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Heidi Swanson\'s vegetarian and whole-food recipes — beautifully photographed.' },
+    # Food journalism
+    { url: 'https://www.eater.com/rss/index.xml',
+      title: 'Eater', category: :food_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Restaurant news, openings, food culture, and where to eat from Vox Media.' },
+    { url: 'https://www.bonappetit.com/feed/rss',
+      title: 'Bon Appétit', category: :food_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Recipes, restaurant guides, and food culture journalism from Condé Nast.' },
+    { url: 'https://feeds.npr.org/1057/rss.xml',
+      title: 'NPR Food (The Salt)', category: :food_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR\'s food desk — the intersection of food, farming, culture, and science.' },
+    { url: 'https://civileats.com/feed/',
+      title: 'Civil Eats', category: :food_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent reporting on food systems, agriculture, and food justice.' },
+    { url: 'https://www.davidlebovitz.com/feed/',
+      title: 'David Lebovitz', category: :food_news,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Paris-based pastry chef and author — recipes, travel, and French food culture.' },
+    # Food podcasts
+    { url: 'https://feeds.megaphone.fm/VMP6255701211',
+      title: 'Gastropod', category: :food_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Cynthia Graber and Nicola Twilley explore food through the lens of science and history.' },
+    { url: 'https://feeds.simplecast.com/n91GPFY5',
+      title: 'The Sporkful', category: :food_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Dan Pashman\'s food podcast — not for foodies, for eaters.' }
   ].freeze
 
   module_function
@@ -854,6 +911,14 @@ module FeedCatalog
       https://kotaku.com/rss
       https://www.pcgamer.com/rss/
       https://www.polygon.com/rss/index.xml
+    ].freeze,
+    food: %w[
+      https://www.eater.com/rss/index.xml
+      https://feeds.feedburner.com/seriouseats/recipes
+      https://smittenkitchen.com/feed/
+      https://www.bonappetit.com/feed/rss
+      https://feeds.megaphone.fm/VMP6255701211
+      https://feeds.simplecast.com/n91GPFY5
     ].freeze
   }.freeze
 
@@ -869,7 +934,8 @@ module FeedCatalog
     finance:    { label: 'Finance',    blurb: 'CNBC, MarketWatch, Seeking Alpha — market headlines.',        emoji: '📈' },
     world_news: { label: 'World News', blurb: 'NPR, NYT, Al Jazeera, The Guardian — global coverage.',      emoji: '🌍' },
     science:    { label: 'Science',    blurb: 'Nature, NASA, Quanta Magazine — research & discovery.',       emoji: '🔬' },
-    gaming:     { label: 'Gaming',     blurb: 'Kotaku, IGN, PC Gamer, Polygon — game news & reviews.',      emoji: '🎮' }
+    gaming:     { label: 'Gaming',     blurb: 'Kotaku, IGN, PC Gamer, Polygon — game news & reviews.',      emoji: '🎮' },
+    food:       { label: 'Food & Cooking', blurb: 'Serious Eats, Eater, Bon Appétit + food podcasts.', emoji: '🍳' }
   }.freeze
 
   def starters_for_topic(topic)
