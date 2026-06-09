@@ -9,26 +9,67 @@
   </div>
 </div>
 
-<% if @my_feeds.any? %>
-  <section class="benchmark-section" style="margin-top:1.5rem">
-    <h3>My NPR <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @my_feeds.length %>)</span></h3>
-    <ul class="catalog-list">
-      <% @my_feeds.each do |feed| %>
-        <li class="catalog-row">
-          <div class="catalog-meta">
-            <span class="catalog-title"><%= h(feed['title'] || feed['url']) %></span>
-            <span class="muted catalog-url"><%= h(feed['url']) %></span>
+<section class="benchmark-section" style="margin-top:1.5rem">
+  <h3>Recent from NPR <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @recent.length %>)</span></h3>
+  <% if @recent.empty? %>
+    <p class="muted">No articles yet — subscribe to some feeds below, then check back after the next fetch.</p>
+  <% else %>
+    <ul class="podcast-episodes">
+      <% @recent.each do |item| %>
+        <%
+          feed_row  = (@feeds_by_id || {})[item['feed_id']]
+          item_image = item['image_url'].to_s.empty? ? (feed_row && feed_row['image_url']) : item['image_url']
+        %>
+        <li class="podcast-card <%= item['read'] == 1 ? 'read' : '' %> <%= 'has-image' if item_image && !item_image.to_s.empty? %>">
+          <% if item_image && !item_image.to_s.empty? %>
+            <a class="podcast-card-image" href="/article/<%= item['uid'] %>" title="Open article"><img src="<%= h(item_image) %>" alt="" loading="lazy"></a>
+          <% end %>
+          <div class="podcast-card-body">
+            <div class="podcast-card-meta">
+              <% if feed_row %>
+                <a class="podcast-card-show" href="/articles?topic=npr" title="All NPR articles"><%= h(feed_row['title'] || feed_row['url']) %></a>
+              <% end %>
+              <span class="podcast-card-date" title="Published <%= h(item['published_at']) %>"><%= relative_time(item['published_at']) %></span>
+              <% if (dur = fmt_duration(item['audio_duration_seconds'])) %>
+                <span class="podcast-card-duration"><%= dur %></span>
+              <% end %>
+            </div>
+            <a class="podcast-card-title" href="/article/<%= item['uid'] %>"><%= h(item['title']) %></a>
+            <% if item['content_text'] && !item['content_text'].to_s.empty? %>
+              <p class="podcast-card-excerpt"><%= h(item['content_text'].to_s.gsub(/\s+/, ' ').strip[0, 240]) %><%= '…' if item['content_text'].to_s.length > 240 %></p>
+            <% end %>
+            <div class="podcast-card-actions">
+              <% if item['audio_url'] && !item['audio_url'].to_s.empty? %>
+                <a class="btn-primary" href="/article/<%= item['uid'] %>" title="Listen to this episode">▶ Listen</a>
+              <% else %>
+                <a class="btn-secondary" href="/article/<%= item['uid'] %>" title="Read this article">Read →</a>
+              <% end %>
+            </div>
           </div>
-          <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed">
-            <button type="submit" class="danger" title="Unsubscribe from this feed">Remove</button>
-          </form>
         </li>
       <% end %>
     </ul>
-  </section>
-<% end %>
+  <% end %>
+</section>
 
-<section class="benchmark-section" style="margin-top:2rem">
+<section class="benchmark-section my-feeds-section" style="margin-top:1.5rem<%= '; display:none' if @my_feeds.empty? %>">
+  <h3>My NPR <span class="muted" style="font-size:0.85rem; font-weight:normal">(<span class="my-feeds-count"><%= @my_feeds.length %></span>)</span></h3>
+  <ul class="catalog-list">
+    <% @my_feeds.each do |feed| %>
+      <li class="catalog-row" data-catalog-url="<%= h(feed['url']) %>">
+        <div class="catalog-meta">
+          <span class="catalog-title"><%= h(feed['title'] || feed['url']) %></span>
+          <span class="muted catalog-url"><%= h(feed['url']) %></span>
+        </div>
+        <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed">
+          <button type="submit" class="danger" title="Unsubscribe from this feed">Remove</button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
+</section>
+
+<section class="benchmark-section catalog-section" style="margin-top:2rem">
   <h3>Browse NPR</h3>
   <p class="subtitle">
     <%= FeedCatalog.by_category.slice(:npr_news, :npr_podcasts).values.sum(&:length) %> programs across news and podcasts.

@@ -2288,10 +2288,12 @@ class TechFeedReader < Sinatra::Base
   # ── NPR ───────────────────────────────────────────────────────────────────
 
   get '/npr' do
-    @page_title = 'NPR'
-    @feeds      = FeedsStore.for_user(current_user_id)
-    @subscribed = @feeds.map { |f| f['url'] }.to_set
-    @my_feeds   = @feeds.select { |f| f['topic'] == 'npr' }
+    @page_title  = 'NPR'
+    @feeds       = FeedsStore.for_user(current_user_id)
+    @subscribed  = @feeds.map { |f| f['url'] }.to_set
+    @my_feeds    = @feeds.select { |f| f['topic'] == 'npr' }
+    @recent      = ArticlesStore.recent(current_user_id, limit: 20, topic: 'npr')
+    @feeds_by_id = @feeds.each_with_object({}) { |f, h| h[f['id']] = f }
     @catalog_by_cat = {
       npr_news:     FeedCatalog.by_category[:npr_news]     || [],
       npr_podcasts: FeedCatalog.by_category[:npr_podcasts] || []
@@ -2302,10 +2304,12 @@ class TechFeedReader < Sinatra::Base
   # ── PBS ───────────────────────────────────────────────────────────────────
 
   get '/pbs' do
-    @page_title = 'PBS'
-    @feeds      = FeedsStore.for_user(current_user_id)
-    @subscribed = @feeds.map { |f| f['url'] }.to_set
-    @my_feeds   = @feeds.select { |f| f['topic'] == 'pbs' }
+    @page_title  = 'PBS'
+    @feeds       = FeedsStore.for_user(current_user_id)
+    @subscribed  = @feeds.map { |f| f['url'] }.to_set
+    @my_feeds    = @feeds.select { |f| f['topic'] == 'pbs' }
+    @recent      = ArticlesStore.recent(current_user_id, limit: 20, topic: 'pbs')
+    @feeds_by_id = @feeds.each_with_object({}) { |f, h| h[f['id']] = f }
     @catalog_by_cat = {
       pbs_news:  FeedCatalog.by_category[:pbs_news]  || [],
       pbs_shows: FeedCatalog.by_category[:pbs_shows] || []
