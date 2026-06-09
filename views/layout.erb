@@ -81,7 +81,7 @@
         # one parent so adding new content types doesn't keep growing
         # the horizontal nav. /sports/manage is excluded so it lights
         # up Manage ▾ instead of Browse ▾.
-        browse_paths  = %w[/podcasts /youtube /sports /comics /games /radio /stocks]
+        browse_paths  = %w[/podcasts /youtube /sports /comics /games /radio /stocks /npr /pbs]
         ai_active     = ai_paths.any?     { |p| request.path_info == p || request.path_info.start_with?(p + '/') }
         manage_active = manage_paths.any? { |p| request.path_info == p }
         browse_active = !manage_active && browse_paths.any? { |p|
@@ -107,6 +107,8 @@
             <a href="/games"    class="<%= 'active' if request.path_info.start_with?('/games') %>" role="menuitem">🎮 Games</a>
             <a href="/radio"    class="<%= 'active' if request.path_info.start_with?('/radio') %>" role="menuitem">📻 Radio</a>
             <a href="/stocks"   class="<%= 'active' if request.path_info.start_with?('/stocks') %>" role="menuitem">📈 Stocks</a>
+            <a href="/npr"      class="<%= 'active' if request.path_info.start_with?('/npr') %>"   role="menuitem">NPR</a>
+            <a href="/pbs"      class="<%= 'active' if request.path_info.start_with?('/pbs') %>"   role="menuitem">PBS</a>
           </div>
         </div>
 

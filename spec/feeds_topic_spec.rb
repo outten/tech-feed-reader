@@ -40,7 +40,8 @@ RSpec.describe FeedCatalog, 'Phase S1 + S2' do
   it 'declares a TOPICS constant covering all content verticals' do
     expect(FeedCatalog::TOPICS.keys).to contain_exactly(
       :technology, :sports, :nature, :humor,
-      :finance, :world_news, :science, :gaming, :food
+      :finance, :world_news, :science, :gaming, :food,
+      :npr, :pbs
     )
   end
 

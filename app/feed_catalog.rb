@@ -25,7 +25,10 @@ module FeedCatalog
     world_news: 'World News',
     science:    'Science',
     gaming:     'Gaming',
-    food:       'Food & Cooking'
+    food:       'Food & Cooking',
+    # STUFF #89
+    npr:        'NPR',
+    pbs:        'PBS'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -77,7 +80,12 @@ module FeedCatalog
     # Food & Cooking (STUFF #88)
     food_recipes:  'Recipe blogs & cooking',
     food_news:     'Food journalism',
-    food_podcasts: 'Food podcasts'
+    food_podcasts: 'Food podcasts',
+    # NPR & PBS (STUFF #89)
+    npr_news:      'NPR News',
+    npr_podcasts:  'NPR Podcasts',
+    pbs_news:      'PBS NewsHour',
+    pbs_shows:     'PBS Shows & Documentaries'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -115,7 +123,11 @@ module FeedCatalog
     gaming_pub:    :gaming,
     food_recipes:  :food,
     food_news:     :food,
-    food_podcasts: :food
+    food_podcasts: :food,
+    npr_news:      :npr,
+    npr_podcasts:  :npr,
+    pbs_news:      :pbs,
+    pbs_shows:     :pbs
   }.freeze
 
   CATALOG = [
@@ -801,7 +813,107 @@ module FeedCatalog
     { url: 'https://feeds.simplecast.com/n91GPFY5',
       title: 'The Sporkful', category: :food_podcasts,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Dan Pashman\'s food podcast — not for foodies, for eaters.' }
+      blurb: 'Dan Pashman\'s food podcast — not for foodies, for eaters.' },
+
+    # ---- NPR news topics (5) — STUFF #89 ----------------------------------
+    { url: 'https://feeds.npr.org/1001/rss.xml',
+      title: 'NPR News', category: :npr_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Top stories from NPR\'s national newsroom.' },
+    { url: 'https://feeds.npr.org/1014/rss.xml',
+      title: 'NPR Politics', category: :npr_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Political reporting and analysis from NPR\'s Washington desk.' },
+    { url: 'https://feeds.npr.org/1004/rss.xml',
+      title: 'NPR World', category: :npr_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International coverage from NPR\'s global correspondents.' },
+    { url: 'https://feeds.npr.org/1003/rss.xml',
+      title: 'NPR National', category: :npr_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Domestic news: communities, policy, and American life.' },
+    { url: 'https://feeds.npr.org/1007/rss.xml',
+      title: 'NPR Science', category: :npr_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Science and environment reporting from NPR.' },
+
+    # ---- NPR podcasts (9) -------------------------------------------------
+    { url: 'https://feeds.npr.org/381444908/podcast.xml',
+      title: 'Fresh Air', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Terry Gross\'s landmark interviews with artists, writers, and thinkers.' },
+    { url: 'https://feeds.npr.org/510289/podcast.xml',
+      title: 'Planet Money', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'The economy explained — with stories and wit.' },
+    { url: 'https://feeds.npr.org/510308/podcast.xml',
+      title: 'Hidden Brain', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Shankar Vedantam on the unconscious patterns that drive human behavior.' },
+    { url: 'https://feeds.npr.org/510313/podcast.xml',
+      title: 'How I Built This', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Guy Raz interviews the founders behind the world\'s most well-known companies.' },
+    { url: 'https://feeds.npr.org/344098539/podcast.xml',
+      title: "Wait Wait… Don't Tell Me!", category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR\'s weekly news quiz — funny, irreverent, and surprisingly informative.' },
+    { url: 'https://feeds.npr.org/510312/podcast.xml',
+      title: 'Code Switch', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Race, identity, and culture in America, hosted by journalists of color.' },
+    { url: 'https://feeds.npr.org/510351/podcast.xml',
+      title: 'Short Wave', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Daily science news in under 15 minutes.' },
+    { url: 'https://feeds.npr.org/510306/podcast.xml',
+      title: 'Tiny Desk Concerts', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Bob Boilen\'s legendary office concert series in audio form.' },
+    { url: 'https://feeds.npr.org/510310/podcast.xml',
+      title: 'NPR Politics Podcast', category: :npr_podcasts,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR\'s politics reporters break down the week\'s news in conversation.' },
+
+    # ---- PBS NewsHour (5) — STUFF #89 -------------------------------------
+    { url: 'https://www.pbs.org/newshour/feeds/rss/headlines',
+      title: 'PBS NewsHour', category: :pbs_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Daily in-depth news from America\'s most-watched evening newscast.' },
+    { url: 'https://www.pbs.org/newshour/feeds/rss/politics',
+      title: 'PBS NewsHour – Politics', category: :pbs_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Political coverage and analysis from PBS NewsHour.' },
+    { url: 'https://www.pbs.org/newshour/feeds/rss/world',
+      title: 'PBS NewsHour – World', category: :pbs_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International news and foreign policy from PBS NewsHour.' },
+    { url: 'https://www.pbs.org/newshour/feeds/rss/science',
+      title: 'PBS NewsHour – Science', category: :pbs_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Science, health, and technology reporting from PBS NewsHour.' },
+    { url: 'https://www.pbs.org/newshour/feeds/rss/health',
+      title: 'PBS NewsHour – Health', category: :pbs_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Health and medicine reporting from PBS NewsHour.' },
+
+    # ---- PBS shows & documentaries (4) ------------------------------------
+    { url: 'https://www.pbs.org/wgbh/nova/rss/nova.xml',
+      title: 'NOVA', category: :pbs_shows,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'PBS\'s flagship science documentary series — episodes and previews.' },
+    { url: 'https://feeds.feedburner.com/FrontlineAudiocastPbs',
+      title: 'Frontline', category: :pbs_shows,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Award-winning investigative journalism from PBS — audio companion track.' },
+    { url: 'https://feeds.wgbh.org/322/feed-rss.xml',
+      title: 'NOVA Presents', category: :pbs_shows,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Podcast companion to the NOVA documentary series.' },
+    { url: 'https://feeds.wgbh.org/3195/feed-rss.xml',
+      title: 'American Experience', category: :pbs_shows,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Podcast companion to PBS\'s landmark American history documentary series.' }
   ].freeze
 
   module_function
@@ -919,6 +1031,18 @@ module FeedCatalog
       https://www.bonappetit.com/feed/rss
       https://feeds.megaphone.fm/VMP6255701211
       https://feeds.simplecast.com/n91GPFY5
+    ].freeze,
+    npr: %w[
+      https://feeds.npr.org/1001/rss.xml
+      https://feeds.npr.org/381444908/podcast.xml
+      https://feeds.npr.org/510289/podcast.xml
+      https://feeds.npr.org/510308/podcast.xml
+    ].freeze,
+    pbs: %w[
+      https://www.pbs.org/newshour/feeds/rss/headlines
+      https://www.pbs.org/wgbh/nova/rss/nova.xml
+      https://feeds.feedburner.com/FrontlineAudiocastPbs
+      https://feeds.wgbh.org/3195/feed-rss.xml
     ].freeze
   }.freeze
 
@@ -935,7 +1059,9 @@ module FeedCatalog
     world_news: { label: 'World News', blurb: 'NPR, NYT, Al Jazeera, The Guardian — global coverage.',      emoji: '🌍' },
     science:    { label: 'Science',    blurb: 'Nature, NASA, Quanta Magazine — research & discovery.',       emoji: '🔬' },
     gaming:     { label: 'Gaming',     blurb: 'Kotaku, IGN, PC Gamer, Polygon — game news & reviews.',      emoji: '🎮' },
-    food:       { label: 'Food & Cooking', blurb: 'Serious Eats, Eater, Bon Appétit + food podcasts.', emoji: '🍳' }
+    food:       { label: 'Food & Cooking', blurb: 'Serious Eats, Eater, Bon Appétit + food podcasts.', emoji: '🍳' },
+    npr:        { label: 'NPR',            blurb: 'Fresh Air, Planet Money, news, politics + more.', emoji: '📻' },
+    pbs:        { label: 'PBS',            blurb: 'NewsHour, NOVA, Frontline, American Experience.',  emoji: '🎬' }
   }.freeze
 
   def starters_for_topic(topic)

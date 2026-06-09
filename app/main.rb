@@ -2285,6 +2285,34 @@ class TechFeedReader < Sinatra::Base
     { ok: true, following: false }.to_json
   end
 
+  # ── NPR ───────────────────────────────────────────────────────────────────
+
+  get '/npr' do
+    @page_title = 'NPR'
+    @feeds      = FeedsStore.for_user(current_user_id)
+    @subscribed = @feeds.map { |f| f['url'] }.to_set
+    @my_feeds   = @feeds.select { |f| f['topic'] == 'npr' }
+    @catalog_by_cat = {
+      npr_news:     FeedCatalog.by_category[:npr_news]     || [],
+      npr_podcasts: FeedCatalog.by_category[:npr_podcasts] || []
+    }
+    erb :npr
+  end
+
+  # ── PBS ───────────────────────────────────────────────────────────────────
+
+  get '/pbs' do
+    @page_title = 'PBS'
+    @feeds      = FeedsStore.for_user(current_user_id)
+    @subscribed = @feeds.map { |f| f['url'] }.to_set
+    @my_feeds   = @feeds.select { |f| f['topic'] == 'pbs' }
+    @catalog_by_cat = {
+      pbs_news:  FeedCatalog.by_category[:pbs_news]  || [],
+      pbs_shows: FeedCatalog.by_category[:pbs_shows] || []
+    }
+    erb :pbs
+  end
+
   # ── YouTube ───────────────────────────────────────────────────────────────
 
   get '/youtube' do

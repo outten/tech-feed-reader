@@ -1,0 +1,64 @@
+<div class="page-header">
+  <div>
+    <h2>PBS</h2>
+    <p class="subtitle">
+      Public Broadcasting Service — NewsHour, NOVA, Frontline, and American Experience.
+      Subscribe to any program below to get new episodes and articles in your
+      <a href="/articles">Articles feed</a>.
+      Video episodes link directly to PBS.org to watch.
+    </p>
+  </div>
+</div>
+
+<% if @my_feeds.any? %>
+  <section class="benchmark-section" style="margin-top:1.5rem">
+    <h3>My PBS <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @my_feeds.length %>)</span></h3>
+    <ul class="catalog-list">
+      <% @my_feeds.each do |feed| %>
+        <li class="catalog-row">
+          <div class="catalog-meta">
+            <span class="catalog-title"><%= h(feed['title'] || feed['url']) %></span>
+            <span class="muted catalog-url"><%= h(feed['url']) %></span>
+          </div>
+          <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed">
+            <button type="submit" class="danger" title="Unsubscribe from this feed">Remove</button>
+          </form>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>
+
+<section class="benchmark-section" style="margin-top:2rem">
+  <h3>Browse PBS</h3>
+  <p class="subtitle">
+    <%= FeedCatalog.by_category.slice(:pbs_news, :pbs_shows).values.sum(&:length) %> programs across news and documentaries.
+    Already-subscribed entries are marked.
+  </p>
+
+  <% @catalog_by_cat.each do |cat_key, entries| %>
+    <% next if entries.empty? %>
+    <h4 class="catalog-category"><%= h(FeedCatalog::CATEGORIES[cat_key]) %></h4>
+    <ul class="catalog-list">
+      <% entries.each do |entry| %>
+        <% subscribed = @subscribed.include?(entry[:url]) %>
+        <li class="catalog-row <%= 'subscribed' if subscribed %>"
+            data-catalog-url="<%= h(entry[:url]) %>">
+          <div class="catalog-meta">
+            <span class="catalog-title"><%= h(entry[:title]) %></span>
+            <span class="catalog-blurb"><%= h(entry[:blurb]) %></span>
+            <span class="muted catalog-url"><%= h(entry[:url]) %></span>
+          </div>
+          <% if subscribed %>
+            <span class="badge subscribed-badge" title="Already in your subscriptions">✓ Subscribed</span>
+          <% else %>
+            <form method="post" action="/feeds/catalog/add" class="js-catalog-add">
+              <input type="hidden" name="url" value="<%= h(entry[:url]) %>">
+              <button type="submit" class="btn-primary" title="Subscribe to <%= h(entry[:title]) %>">+ Add</button>
+            </form>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
