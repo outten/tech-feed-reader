@@ -3,9 +3,10 @@ require_relative '../app/feed_catalog'
 
 RSpec.describe FeedCatalog do
   describe '.all' do
-    it 'returns 172 curated entries (STUFF #89 — NPR + PBS adds 23 feeds)' do
-      # 149 (previous) + 5 (npr_news) + 9 (npr_podcasts) + 5 (pbs_news) + 4 (pbs_shows) = 172.
-      expect(FeedCatalog.all.length).to eq(172)
+    it 'returns 171 curated entries (STUFF #89 — NPR + PBS adds 22 feeds)' do
+      # 149 (previous) + 5 (npr_news) + 9 (npr_podcasts) + 5 (pbs_news) + 4 (pbs_shows) = 172,
+      # minus 1 (NPR News moved from :world to :npr_news, deduped) = 171.
+      expect(FeedCatalog.all.length).to eq(171)
     end
 
     it 'every entry has the required keys' do

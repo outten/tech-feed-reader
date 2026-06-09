@@ -667,10 +667,6 @@ module FeedCatalog
       title: 'Al Jazeera', category: :world,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'International news from Al Jazeera — Middle East, Africa, Asia, and global affairs.' },
-    { url: 'https://feeds.npr.org/1001/rss.xml',
-      title: 'NPR News', category: :world,
-      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'National and international news from NPR.' },
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
       title: 'NYT World News', category: :world,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
@@ -1011,7 +1007,6 @@ module FeedCatalog
     ].freeze,
     world_news: %w[
       https://www.aljazeera.com/xml/rss/all.xml
-      https://feeds.npr.org/1001/rss.xml
       https://rss.nytimes.com/services/xml/rss/nyt/World.xml
     ].freeze,
     science: %w[
