@@ -1371,3 +1371,15 @@ A follow-up PR (#184) fixed a nav-dropdown hover gap (CSS `::before` invisible b
 Add a new "Food & Cooking" content category with curated feeds covering recipe blogs, food journalism, and food podcasts. Should show up in the `/feeds` catalog, the `/welcome` onboarding chip picker, and `?topic=food` filtering on `/articles`.
 
 **Shipped.** PR #185. Added `food` topic with three sub-categories — `food_recipes` (Serious Eats, Smitten Kitchen, Epicurious, 101 Cookbooks), `food_news` (Eater, Bon Appétit, NPR/The Salt, Civil Eats, David Lebovitz), `food_podcasts` (Gastropod, The Sporkful) — totalling 11 new catalog entries (138 → 149). Wired into onboarding with a 🍳 chip and starter URLs. Also shipped as part of this PR: a jump-nav TOC at the top of `/feeds` that groups all catalog categories by topic with anchor links to each heading.
+
+## [x] 89. NPR and PBS
+
+I feel like we have limited representation of NPR and PBS, which has some extremely broad content categories with amazing content that users love. Let's manage them under their own areas, as well as have categories under Browse. Allow the user to subscribe and unsubscribe to podcasts, news articles, and video shows. Video shows should play in an embedded player on our side or allow the user to view on PBS' site.
+
+**Shipped.** PR #186, v0.23.0. Added dedicated `/npr` and `/pbs` browse pages, each with a "Recent" section (scoped to that topic), a "My NPR/PBS" section showing current subscriptions with AJAX unsubscribe, and a "Browse" catalog section with AJAX subscribe — all staying on-page via `source-page.js`. Added 22 new catalog entries: `npr_news` (5 feeds — NPR News, Politics, World, National, Science), `npr_podcasts` (9 — Fresh Air, Planet Money, Hidden Brain, How I Built This, Wait Wait, Code Switch, Short Wave, Tiny Desk, NPR Politics), `pbs_news` (5 — NewsHour headlines/politics/world/science/health), `pbs_shows` (4 — NOVA, Frontline, NOVA Presents, American Experience). Both topics wired into onboarding with 📻/🎬 chips. Catalog total: 149 → 171 (net +22 after dedup of one NPR News URL previously in `:world`).
+
+## [x] 90. Radio Page Icons
+
+Another beauty pass. A bunch of the radio page elements have broken links for the elements image. I'm seeing 404 errors as the links are relative, which our site doesn't help. Similar to other pages, can you check and fix those links. And be sure to add the ability to scan and fix already existing radio content to check and fix the links.
+
+**Shipped.** Updated 13 broken `image_url` entries in `app/radio_catalog.rb`. Replaced 404/410 URLs for KEXP, WFMU, NTS Radio (×2), TSF Jazz, FIP family (×6), France Musique, Radio Swiss Jazz/Classic/Pop (×3), The Current, WXPN, WNYC, and Triple J with verified working URLs sourced from each station's `og:image` or logo assets. KCRW's URL returned 429 (WAF rate-limiting for bots) and was kept — it loads correctly in browsers. DB rows self-heal on next `/radio` visit since `RadioStore.seed_catalog!` runs on every request with `ON CONFLICT DO UPDATE`. Note: Radio Swiss URLs use Nuxt build-artifact paths and may need refreshing if their site redeploys with a changed logo.
