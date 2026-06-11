@@ -3,9 +3,9 @@ require_relative '../app/feed_catalog'
 
 RSpec.describe FeedCatalog do
   describe '.all' do
-    it 'returns 200 curated entries (new topics: environment, business)' do
-      # 190 (previous) + 6 (env_news) + 3 (biz_news) + 2 (biz_strategy) - 1 (Axios deduped) = 200
-      expect(FeedCatalog.all.length).to eq(200)
+    it 'returns 216 curated entries (new topics: travel, social/mastodon)' do
+      # 200 (previous) + 7 (travel_general) + 5 (travel_cruise) + 4 (mastodon) = 216
+      expect(FeedCatalog.all.length).to eq(216)
     end
 
     it 'every entry has the required keys' do
