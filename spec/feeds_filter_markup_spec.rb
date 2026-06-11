@@ -15,13 +15,12 @@ RSpec.describe 'feed filter bar markup (STUFF #27)' do
     it 'renders the filter bar above the table when feeds exist' do
       FeedsStore.add(url: 'https://hn.example/rss', title: 'HN', topic: 'technology')
       get '/feeds'
-      expect(last_response.body).to include('data-target="feeds-table"')
-      expect(last_response.body).to include('class="feeds-filter-search"')
-      # All / Tech / Sports / Nature / General chips are present.
-      expect(last_response.body).to include('data-topic="technology"')
-      expect(last_response.body).to include('data-topic="sports"')
-      expect(last_response.body).to include('data-topic="nature"')
-      expect(last_response.body).to include('data-topic="general"')
+      body = last_response.body
+      expect(body).to include('data-target="feeds-table"')
+      expect(body).to include('class="feeds-filter-search"')
+      # Dynamic chips — only renders chips for topics the user actually has.
+      # With a technology feed, the tech chip should appear.
+      expect(body).to include('data-topic="technology"')
     end
 
     it 'omits the filter bar when there are no subscribed feeds' do

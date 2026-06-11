@@ -41,7 +41,7 @@ RSpec.describe FeedCatalog, 'Phase S1 + S2' do
     expect(FeedCatalog::TOPICS.keys).to contain_exactly(
       :technology, :sports, :nature, :humor,
       :finance, :world_news, :science, :gaming, :food,
-      :npr, :pbs
+      :npr, :pbs, :health, :arts, :history
     )
   end
 

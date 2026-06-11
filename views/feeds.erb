@@ -296,18 +296,31 @@
 
 <%# STUFF #27 — filter toolbar for the subscribed feeds table. Pure
     client-side filter (public/feeds-filter.js): the search input filters
-    by title/url substring, the chips narrow by topic. Hidden when
-    there's nothing to filter (no rows yet). %>
+    by title/url substring, the chips narrow by topic. Only shows chips
+    for topics the user actually has feeds in — no phantom categories. %>
 <% if @feeds.any? %>
+  <%
+    # Build the set of topics the user actually has, in TOPICS order.
+    user_topics = @feeds.map { |f| f['topic'].to_s }.uniq
+    topic_labels = {
+      'technology' => 'Tech', 'sports' => 'Sports', 'nature' => 'Nature',
+      'humor' => 'Humor', 'finance' => 'Finance', 'world_news' => 'News',
+      'science' => 'Science', 'gaming' => 'Gaming', 'food' => 'Food',
+      'health' => 'Health', 'arts' => 'Arts', 'history' => 'History',
+      'npr' => 'NPR', 'pbs' => 'PBS', 'general' => 'General'
+    }
+    # Keep catalog topic order; fall back to 'general' for unmapped topics
+    ordered_user_topics = (FeedCatalog::TOPICS.keys.map(&:to_s) + ['general'])
+                            .select { |t| user_topics.include?(t) }
+  %>
   <div class="feeds-filter-bar" data-target="feeds-table">
     <input type="search" class="feeds-filter-search" placeholder="Filter your feeds…"
            aria-label="Filter your subscribed feeds by title or URL">
     <div class="feeds-filter-chips" role="tablist" aria-label="Filter by topic">
       <button type="button" class="feeds-filter-chip is-active" data-topic="">All</button>
-      <button type="button" class="feeds-filter-chip" data-topic="technology">Tech</button>
-      <button type="button" class="feeds-filter-chip" data-topic="sports">Sports</button>
-      <button type="button" class="feeds-filter-chip" data-topic="nature">Nature</button>
-      <button type="button" class="feeds-filter-chip" data-topic="general">General</button>
+      <% ordered_user_topics.each do |t| %>
+        <button type="button" class="feeds-filter-chip" data-topic="<%= h(t) %>"><%= h(topic_labels[t] || t.capitalize) %></button>
+      <% end %>
     </div>
     <span class="feeds-filter-count" aria-live="polite"></span>
   </div>
@@ -382,15 +395,16 @@
   </p>
 
   <%# STUFF #27 — filter toolbar mirroring the one above the subscribed
-      feeds table. Same JS module handles both via the data-target pair. %>
+      feeds table. Same JS module handles both via the data-target pair.
+      Shows all catalog topics so users can discover new categories. %>
   <div class="feeds-filter-bar" data-target="catalog">
     <input type="search" class="feeds-filter-search" placeholder="Filter the catalog…"
            aria-label="Filter catalog feeds by title, blurb, or URL">
     <div class="feeds-filter-chips" role="tablist" aria-label="Filter by topic">
       <button type="button" class="feeds-filter-chip is-active" data-topic="">All</button>
-      <button type="button" class="feeds-filter-chip" data-topic="technology">Tech</button>
-      <button type="button" class="feeds-filter-chip" data-topic="sports">Sports</button>
-      <button type="button" class="feeds-filter-chip" data-topic="nature">Nature</button>
+      <% FeedCatalog::TOPICS.each do |key, label| %>
+        <button type="button" class="feeds-filter-chip" data-topic="<%= h(key) %>"><%= h(label) %></button>
+      <% end %>
     </div>
     <span class="feeds-filter-count" aria-live="polite"></span>
   </div>
