@@ -1,0 +1,82 @@
+name: Deploy
+
+# Trigger on version tags pushed by `make release-patch/minor/major`.
+# The local Makefile still bumps VERSION, commits, tags, and pushes —
+# this workflow picks up from there and handles the slow parts
+# (cross-compile, push to DOCR, SSH deploy) so your laptop is free.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# Only one deploy at a time — queue newer tags behind the running one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: registry.digitalocean.com/tfr
+  IMAGE: tech-feed-reader
+
+jobs:
+  deploy:
+    name: Build → Push → Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DOCR
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: APP_VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Droplet
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: cd /opt/app && make deploy
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Deploy ${{ github.ref_name }}"
+            echo ""
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "✅ v${{ steps.version.outputs.version }} deployed to production."
+            else
+              echo "❌ Deploy failed — check logs above."
+            fi
+            echo ""
+            echo "_Tag: \`${{ github.ref_name }}\` · Commit: \`${{ github.sha }}\`_"
+          } >> "$GITHUB_STEP_SUMMARY"
