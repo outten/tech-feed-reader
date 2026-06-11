@@ -1383,3 +1383,15 @@ I feel like we have limited representation of NPR and PBS, which has some extrem
 Another beauty pass. A bunch of the radio page elements have broken links for the elements image. I'm seeing 404 errors as the links are relative, which our site doesn't help. Similar to other pages, can you check and fix those links. And be sure to add the ability to scan and fix already existing radio content to check and fix the links.
 
 **Shipped.** Updated 13 broken `image_url` entries in `app/radio_catalog.rb`. Replaced 404/410 URLs for KEXP, WFMU, NTS Radio (×2), TSF Jazz, FIP family (×6), France Musique, Radio Swiss Jazz/Classic/Pop (×3), The Current, WXPN, WNYC, and Triple J with verified working URLs sourced from each station's `og:image` or logo assets. KCRW's URL returned 429 (WAF rate-limiting for bots) and was kept — it loads correctly in browsers. DB rows self-heal on next `/radio` visit since `RadioStore.seed_catalog!` runs on every request with `ON CONFLICT DO UPDATE`. Note: Radio Swiss URLs use Nuxt build-artifact paths and may need refreshing if their site redeploys with a changed logo.
+
+## [ ] 91. Content categories expansion — Health, Arts, History + UX
+
+High-impact items from content analysis:
+
+- **Fix /feeds filter bar**: subscribed-feeds chips are now dynamic — only show topics the user actually has feeds in (no phantom categories). Catalog chips show all topics so users can discover new content.
+- **History topic**: `:mythos` category (previously under `:technology`) reclassified to `:history` with proper sub-categories `history_pub` / `history_podcast`. Smithsonian added. Existing Aeon, Daily Stoic, Myths & Legends, Stuff You Missed entries migrated.
+- **Health & Wellness** topic: STAT News, Vox Health, NPR Health, WHO News, ZOE Science & Nutrition, Axios Health. Onboarding chip (🩺).
+- **Arts & Culture** topic: Variety, NYT Movies, Guardian Film (film); Rolling Stone, Guardian Music, NPR Music, All Songs Considered (music); Literary Hub, Book Riot, NYT Books, Guardian Books (books). Onboarding chip (🎭).
+- Catalog grows from 171 → 190 entries across 14 topics.
+
+**Status: tests**

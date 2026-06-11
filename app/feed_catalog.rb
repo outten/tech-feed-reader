@@ -28,7 +28,11 @@ module FeedCatalog
     food:       'Food & Cooking',
     # STUFF #89
     npr:        'NPR',
-    pbs:        'PBS'
+    pbs:        'PBS',
+    # New topics
+    health:     'Health & Wellness',
+    arts:       'Arts & Culture',
+    history:    'History'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -64,7 +68,7 @@ module FeedCatalog
     # game highlights / league channels surface in /whats-on's "To
     # watch today" alongside nature.
     youtube_sports: 'Sports (YouTube)',
-    # STUFF.md #18 — mythology / classical history (Greek / Roman / Norse).
+    # STUFF.md #18 — :mythos kept for DB backward-compat; new entries use :history_pub/:history_podcast
     mythos:      'Mythology & classical history',
     # STUFF #65 — daily-ish webcomics + humor (xkcd, SMBC, Oatmeal, etc.).
     webcomics:   'Webcomics & humor',
@@ -85,7 +89,18 @@ module FeedCatalog
     npr_news:      'NPR News',
     npr_podcasts:  'NPR Podcasts',
     pbs_news:      'PBS NewsHour',
-    pbs_shows:     'PBS Shows & Documentaries'
+    pbs_shows:     'PBS Shows & Documentaries',
+    # Health & Wellness
+    health_news:   'Health & medicine',
+    health_mental: 'Mental health & psychology',
+    health_podcast: 'Health podcasts',
+    # Arts & Culture
+    arts_film:     'Film & TV',
+    arts_music:    'Music',
+    arts_books:    'Books & literature',
+    # History
+    history_pub:   'History publishers',
+    history_podcast: 'History podcasts'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -114,7 +129,7 @@ module FeedCatalog
     horse_racing:  :sports,
     youtube_nature: :nature,
     youtube_sports: :sports,
-    mythos:      :technology,
+    mythos:      :history,
     webcomics:   :humor,
     markets_news:  :finance,
     world:         :world_news,
@@ -127,7 +142,18 @@ module FeedCatalog
     npr_news:      :npr,
     npr_podcasts:  :npr,
     pbs_news:      :pbs,
-    pbs_shows:     :pbs
+    pbs_shows:     :pbs,
+    # Health & Wellness
+    health_news:   :health,
+    health_mental: :health,
+    health_podcast: :health,
+    # Arts & Culture
+    arts_film:     :arts,
+    arts_music:    :arts,
+    arts_books:    :arts,
+    # History
+    history_pub:   :history,
+    history_podcast: :history
   }.freeze
 
   CATALOG = [
@@ -239,20 +265,21 @@ module FeedCatalog
       blurb: 'Jeff Atwood (Stack Overflow co-founder) on programming and developer culture.' },
 
     # ---- mythology & classical history (4) ---------------------------
-    # STUFF.md #18 — mythos. Greek / Roman / Norse mythology and the
+    # STUFF.md #18 — mythos/history. Greek / Roman / Norse mythology and the
     # adjacent classical-history / philosophy corner. Mix of essay
     # publishers and podcasts. Verified live 2026-05-11.
-    { url: 'https://aeon.co/feed.rss', title: 'Aeon', category: :mythos,
+    # Category updated from :mythos → :history_podcast / :history_pub
+    { url: 'https://aeon.co/feed.rss', title: 'Aeon', category: :history_podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Long-form essays on philosophy, classics, and mythology among other areas.' },
-    { url: 'https://dailystoic.com/feed/', title: 'Daily Stoic', category: :mythos,
+    { url: 'https://dailystoic.com/feed/', title: 'Daily Stoic', category: :history_podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Ryan Holiday — daily reflections drawn from Roman / Greek Stoic philosophy.' },
-    { url: 'https://feeds.feedburner.com/mythsandlegends', title: 'Myths and Legends', category: :mythos,
+    { url: 'https://feeds.feedburner.com/mythsandlegends', title: 'Myths and Legends', category: :history_pub,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Jason Weiser\'s podcast retelling classical Greek, Norse, and global myths.' },
     { url: 'https://omny.fm/shows/stuff-you-missed-in-history-class/playlists/podcast.rss',
-      title: 'Stuff You Missed in History Class', category: :mythos,
+      title: 'Stuff You Missed in History Class', category: :history_pub,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'iHeart Media\'s long-running history podcast — mythology, ancient world, and lesser-known stories.' },
 
@@ -909,7 +936,83 @@ module FeedCatalog
     { url: 'https://feeds.wgbh.org/3195/feed-rss.xml',
       title: 'American Experience', category: :pbs_shows,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Podcast companion to PBS\'s landmark American history documentary series.' }
+      blurb: 'Podcast companion to PBS\'s landmark American history documentary series.' },
+
+    # ---- Health & medicine (4) -------------------------------------------
+    { url: 'https://www.statnews.com/feed/', title: 'STAT News', category: :health_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Rigorous health, medicine, and biotech journalism.' },
+    { url: 'https://www.vox.com/rss/health/index.xml', title: 'Vox Health', category: :health_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Vox\'s explainer-driven health and medicine coverage.' },
+    { url: 'https://feeds.npr.org/1128/rss.xml', title: 'NPR Health', category: :health_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR\'s health and medicine beat — science, policy, and personal stories.' },
+    { url: 'https://www.who.int/rss-feeds/news-english.xml', title: 'WHO News', category: :health_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'World Health Organization official news and updates.' },
+
+    # ---- Mental health & psychology (1) ----------------------------------
+    # Note: Hidden Brain is also in :npr_podcasts; NPR Health feed covers the overlap.
+
+    # ---- Health podcasts (2) -----------------------------------------------
+    { url: 'https://feeds.simplecast.com/8IFNzdVd', title: 'ZOE Science & Nutrition', category: :health_podcast,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Science-backed nutrition and gut health research, with Prof. Tim Spector.' },
+    { url: 'https://api.axios.com/feed/', title: 'Axios Health', category: :health_podcast,
+      interval: FeedsStore::HIGH_FREQUENCY_INTERVAL, seed: false,
+      blurb: 'Axios\'s concise health policy and pharma briefing.' },
+
+    # ---- Film & TV (4) ---------------------------------------------------
+    { url: 'https://pitchfork.com/feed/feed-news/rss', title: 'Pitchfork', category: :arts_film,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Music news, reviews, and features from the authority on independent music.' },
+    { url: 'https://variety.com/feed/', title: 'Variety', category: :arts_film,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Film, TV, and entertainment industry news.' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Movies.xml', title: 'NYT Movies', category: :arts_film,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New York Times film reviews and cinema coverage.' },
+    { url: 'https://www.theguardian.com/film/rss', title: 'The Guardian Film', category: :arts_film,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Film reviews, interviews, and industry news from The Guardian.' },
+
+    # ---- Music (4) -------------------------------------------------------
+    { url: 'https://www.rollingstone.com/feed/', title: 'Rolling Stone', category: :arts_music,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Music, culture, and entertainment from the iconic magazine.' },
+    { url: 'https://www.theguardian.com/music/rss', title: 'The Guardian Music', category: :arts_music,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Music reviews, features, and live coverage from The Guardian.' },
+    { url: 'https://feeds.npr.org/1039/rss.xml', title: 'NPR Music', category: :arts_music,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR\'s music coverage — reviews, interviews, Tiny Desk concerts.' },
+    { url: 'https://feeds.npr.org/510019/podcast.xml', title: 'All Songs Considered', category: :arts_music,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR Music\'s flagship show — new music discoveries and recommendations.' },
+
+    # ---- Books & literature (4) -----------------------------------------
+    { url: 'https://lithub.com/feed/', title: 'Literary Hub', category: :arts_books,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Daily literary journalism — essays, reviews, and author interviews.' },
+    { url: 'https://bookriot.com/feed/', title: 'Book Riot', category: :arts_books,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Book recommendations, reviews, and reading culture.' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Books.xml', title: 'NYT Books', category: :arts_books,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New York Times book reviews and publishing news.' },
+    { url: 'https://www.theguardian.com/books/rss', title: 'The Guardian Books', category: :arts_books,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Book reviews, author interviews, and literary features from The Guardian.' },
+
+    # ---- History publishers (1 new + existing moved above) ----------------
+    # Aeon, Daily Stoic, Myths and Legends, and Stuff You Missed are
+    # already in the catalog above (migrated from :mythos).
+    { url: 'https://www.smithsonianmag.com/rss/latest_articles/', title: 'Smithsonian Magazine', category: :history_pub,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'History, science, arts, and culture from the Smithsonian Institution.' },
+
+    # ---- History podcasts — already in catalog above (Aeon, Daily Stoic) --
   ].freeze
 
   module_function
@@ -1038,6 +1141,25 @@ module FeedCatalog
       https://www.pbs.org/wgbh/nova/rss/nova.xml
       https://feeds.feedburner.com/FrontlineAudiocastPbs
       https://feeds.wgbh.org/3195/feed-rss.xml
+    ].freeze,
+    health: %w[
+      https://www.statnews.com/feed/
+      https://www.vox.com/rss/health/index.xml
+      https://feeds.npr.org/1128/rss.xml
+      https://feeds.npr.org/510308/podcast.xml
+    ].freeze,
+    arts: %w[
+      https://variety.com/feed/
+      https://www.rollingstone.com/feed/
+      https://lithub.com/feed/
+      https://rss.nytimes.com/services/xml/rss/nyt/Movies.xml
+      https://feeds.npr.org/510019/podcast.xml
+    ].freeze,
+    history: %w[
+      https://www.smithsonianmag.com/rss/latest_articles/
+      https://feeds.feedburner.com/mythsandlegends
+      https://omny.fm/shows/stuff-you-missed-in-history-class/playlists/podcast.rss
+      https://aeon.co/feed.rss
     ].freeze
   }.freeze
 
@@ -1056,7 +1178,10 @@ module FeedCatalog
     gaming:     { label: 'Gaming',     blurb: 'Kotaku, IGN, PC Gamer, Polygon — game news & reviews.',      emoji: '🎮' },
     food:       { label: 'Food & Cooking', blurb: 'Serious Eats, Eater, Bon Appétit + food podcasts.', emoji: '🍳' },
     npr:        { label: 'NPR',            blurb: 'Fresh Air, Planet Money, news, politics + more.', emoji: '📻' },
-    pbs:        { label: 'PBS',            blurb: 'NewsHour, NOVA, Frontline, American Experience.',  emoji: '🎬' }
+    pbs:        { label: 'PBS',            blurb: 'NewsHour, NOVA, Frontline, American Experience.',  emoji: '🎬' },
+    health:     { label: 'Health',         blurb: 'STAT News, Vox Health, NPR Health — medicine, wellness + research.', emoji: '🩺' },
+    arts:       { label: 'Arts & Culture', blurb: 'Film, music, books — Variety, Rolling Stone, Literary Hub.', emoji: '🎭' },
+    history:    { label: 'History',        blurb: 'Smithsonian, Myths & Legends, Stuff You Missed in History Class.', emoji: '🏛️' }
   }.freeze
 
   def starters_for_topic(topic)

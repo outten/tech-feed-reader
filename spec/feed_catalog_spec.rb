@@ -3,10 +3,12 @@ require_relative '../app/feed_catalog'
 
 RSpec.describe FeedCatalog do
   describe '.all' do
-    it 'returns 171 curated entries (STUFF #89 — NPR + PBS adds 22 feeds)' do
-      # 149 (previous) + 5 (npr_news) + 9 (npr_podcasts) + 5 (pbs_news) + 4 (pbs_shows) = 172,
-      # minus 1 (NPR News moved from :world to :npr_news, deduped) = 171.
-      expect(FeedCatalog.all.length).to eq(171)
+    it 'returns 190 curated entries (new topics: health, arts, history)' do
+      # 171 (previous) + 4 (health_news) + 2 (health_podcast) + 4 (arts_film) +
+      # 4 (arts_music) + 4 (arts_books) + 1 (history_pub/Smithsonian) = 190.
+      # Existing :mythos entries (Aeon, Daily Stoic, Myths+Legends, Stuff You Missed)
+      # were recategorised to :history_pub/:history_podcast — no net count change.
+      expect(FeedCatalog.all.length).to eq(190)
     end
 
     it 'every entry has the required keys' do
