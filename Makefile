@@ -243,7 +243,8 @@ _release_bump:
 	  git add VERSION && \
 	  git commit -m "chore: release v$$new_version" && \
 	  git tag "v$$new_version" && \
-	  git push --follow-tags origin main && \
+	  git push origin main && \
+	  git push origin "v$$new_version" && \
 	  echo "Released v$$new_version."
 
 # ---- Container registry publishing (STUFF #33B) -----------------------------
