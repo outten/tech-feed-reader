@@ -32,7 +32,9 @@ module FeedCatalog
     # New topics
     health:     'Health & Wellness',
     arts:       'Arts & Culture',
-    history:    'History'
+    history:    'History',
+    environment: 'Environment & Climate',
+    business:   'Business'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -100,7 +102,13 @@ module FeedCatalog
     arts_books:    'Books & literature',
     # History
     history_pub:   'History publishers',
-    history_podcast: 'History podcasts'
+    history_podcast: 'History podcasts',
+    # Environment & Climate
+    env_news:      'Climate & environment news',
+    env_podcast:   'Environment podcasts',
+    # Business
+    biz_news:      'Business news',
+    biz_strategy:  'Strategy & management'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -153,7 +161,13 @@ module FeedCatalog
     arts_books:    :arts,
     # History
     history_pub:   :history,
-    history_podcast: :history
+    history_podcast: :history,
+    # Environment & Climate
+    env_news:      :environment,
+    env_podcast:   :environment,
+    # Business
+    biz_news:      :business,
+    biz_strategy:  :business
   }.freeze
 
   CATALOG = [
@@ -955,13 +969,10 @@ module FeedCatalog
     # ---- Mental health & psychology (1) ----------------------------------
     # Note: Hidden Brain is also in :npr_podcasts; NPR Health feed covers the overlap.
 
-    # ---- Health podcasts (2) -----------------------------------------------
+    # ---- Health podcasts (1) -----------------------------------------------
     { url: 'https://feeds.simplecast.com/8IFNzdVd', title: 'ZOE Science & Nutrition', category: :health_podcast,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Science-backed nutrition and gut health research, with Prof. Tim Spector.' },
-    { url: 'https://api.axios.com/feed/', title: 'Axios Health', category: :health_podcast,
-      interval: FeedsStore::HIGH_FREQUENCY_INTERVAL, seed: false,
-      blurb: 'Axios\'s concise health policy and pharma briefing.' },
 
     # ---- Film & TV (4) ---------------------------------------------------
     { url: 'https://pitchfork.com/feed/feed-news/rss', title: 'Pitchfork', category: :arts_film,
@@ -1013,6 +1024,46 @@ module FeedCatalog
       blurb: 'History, science, arts, and culture from the Smithsonian Institution.' },
 
     # ---- History podcasts — already in catalog above (Aeon, Daily Stoic) --
+
+    # ---- Climate & environment news (6) ----------------------------------
+    { url: 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
+      title: 'BBC Science & Environment', category: :env_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC\'s science and environment beat — climate, nature, and earth science.' },
+    { url: 'https://insideclimatenews.org/feed/', title: 'Inside Climate News', category: :env_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Pulitzer Prize-winning nonprofit climate journalism.' },
+    { url: 'https://www.theguardian.com/environment/climate-crisis/rss', title: 'Guardian Climate Crisis', category: :env_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'The Guardian\'s dedicated climate crisis coverage.' },
+    { url: 'https://feeds.npr.org/1025/rss.xml', title: 'NPR Environment', category: :env_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'NPR\'s environment and energy beat.' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Climate.xml', title: 'NYT Climate', category: :env_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New York Times climate and environment coverage.' },
+    { url: 'https://grist.org/feed/', title: 'Grist', category: :env_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent nonprofit media covering climate solutions and justice.' },
+
+    # ---- Business news (3) -----------------------------------------------
+    { url: 'https://www.fastcompany.com/latest/rss', title: 'Fast Company', category: :biz_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Business, innovation, and design from one of America\'s leading business media brands.' },
+    { url: 'https://www.inc.com/rss/', title: 'Inc. Magazine', category: :biz_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Entrepreneurship, startups, and small business — Inc. Magazine.' },
+    { url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml', title: 'WSJ Business', category: :biz_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Wall Street Journal US business news.' },
+
+    # ---- Strategy & management (2) ---------------------------------------
+    { url: 'https://stratechery.com/feed/', title: 'Stratechery', category: :biz_strategy,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Ben Thompson\'s analysis of technology and business strategy. One of the best.' },
+    { url: 'https://api.axios.com/feed/', title: 'Axios', category: :biz_strategy,
+      interval: FeedsStore::HIGH_FREQUENCY_INTERVAL, seed: false,
+      blurb: 'Concise business, tech, and politics briefings from Axios.' }
   ].freeze
 
   module_function
@@ -1160,6 +1211,18 @@ module FeedCatalog
       https://feeds.feedburner.com/mythsandlegends
       https://omny.fm/shows/stuff-you-missed-in-history-class/playlists/podcast.rss
       https://aeon.co/feed.rss
+    ].freeze,
+    environment: %w[
+      https://feeds.bbci.co.uk/news/science_and_environment/rss.xml
+      https://insideclimatenews.org/feed/
+      https://www.theguardian.com/environment/climate-crisis/rss
+      https://grist.org/feed/
+    ].freeze,
+    business: %w[
+      https://www.fastcompany.com/latest/rss
+      https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml
+      https://stratechery.com/feed/
+      https://api.axios.com/feed/
     ].freeze
   }.freeze
 
@@ -1181,7 +1244,9 @@ module FeedCatalog
     pbs:        { label: 'PBS',            blurb: 'NewsHour, NOVA, Frontline, American Experience.',  emoji: '🎬' },
     health:     { label: 'Health',         blurb: 'STAT News, Vox Health, NPR Health — medicine, wellness + research.', emoji: '🩺' },
     arts:       { label: 'Arts & Culture', blurb: 'Film, music, books — Variety, Rolling Stone, Literary Hub.', emoji: '🎭' },
-    history:    { label: 'History',        blurb: 'Smithsonian, Myths & Legends, Stuff You Missed in History Class.', emoji: '🏛️' }
+    history:    { label: 'History',        blurb: 'Smithsonian, Myths & Legends, Stuff You Missed in History Class.', emoji: '🏛️' },
+    environment: { label: 'Environment',   blurb: 'BBC, Guardian, NPR, Grist — climate news and solutions.', emoji: '🌱' },
+    business:   { label: 'Business',       blurb: 'Fast Company, WSJ, Stratechery — strategy and entrepreneurship.', emoji: '💼' }
   }.freeze
 
   def starters_for_topic(topic)
