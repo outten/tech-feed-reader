@@ -331,28 +331,21 @@ deploy:
 	fi
 
 # ---- One-shot release + deploy (laptop) -------------------------------------
-# Full ship cycle in one command. `make deploy-patch` does:
-#   1. release-patch gate: clean tree, on main, full test suite green.
-#   2. Bump VERSION, commit, tag, push to origin (--follow-tags).
-#   3. publish-image: buildx cross-compile linux/amd64, push :ver +
-#      :latest to DOCR.
-#   4. SSH the Droplet (IP from `terraform output -raw droplet_ipv4`)
-#      and trigger `make deploy` there.
-# Bails on the first failure — tests red → no bump, no publish, no
-# remote.
+# `make deploy-patch` bumps VERSION, commits, tags, and pushes.
+# The GitHub Actions workflow (.github/workflows/deploy.yml) picks up
+# the tag and handles the slow parts: buildx cross-compile → push to
+# DOCR → SSH deploy to the Droplet.
 #
-# DROPLET_USER + DROPLET_IP can be overridden on the command line:
-#   make deploy-patch DROPLET_IP=1.2.3.4
-# The terraform-output lookup runs in a subshell every invocation —
-# adds ~150ms, but means a fresh `terraform apply` immediately
-# propagates without operator-side coordination.
+# The old publish-image + _remote_deploy targets are still available as
+# manual fallbacks if GH Actions is down:
+#   make publish-image && make _remote_deploy DROPLET_IP=1.2.3.4
 
 DROPLET_USER ?= deploy
 DROPLET_IP   ?= $(shell cd terraform && terraform output -raw droplet_ipv4 2>/dev/null)
 
-deploy-major: release-major publish-image _remote_deploy
-deploy-minor: release-minor publish-image _remote_deploy
-deploy-patch: release-patch publish-image _remote_deploy
+deploy-major: release-major
+deploy-minor: release-minor
+deploy-patch: release-patch
 
 _remote_deploy:
 	@if [ -z "$(DROPLET_IP)" ]; then \
