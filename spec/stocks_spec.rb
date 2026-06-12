@@ -2,6 +2,8 @@ require_relative 'spec_helper'
 require_relative '../app/stock_follows_store'
 require_relative '../app/stock_quotes_store'
 require_relative '../app/stock_quote_provider'
+require_relative '../app/stock_news_feed'
+require_relative '../app/feeds_store'
 require_relative '../app/main'
 
 RSpec.describe 'Stock follows & quotes' do
@@ -111,6 +113,33 @@ RSpec.describe 'Stock follows & quotes' do
     end
   end
 
+  # --- StockNewsFeed ------------------------------------------------------
+
+  describe StockNewsFeed do
+    it 'url_for upcases the symbol and points at Yahoo headline RSS' do
+      url = StockNewsFeed.url_for('cmcsa')
+      expect(url).to start_with('https://feeds.finance.yahoo.com/rss/2.0/headline?s=CMCSA')
+    end
+
+    it 'stock_feed? recognises its own URLs and not others' do
+      expect(StockNewsFeed.stock_feed?(StockNewsFeed.url_for('AAPL'))).to be true
+      expect(StockNewsFeed.stock_feed?('https://news.ycombinator.com/rss')).to be false
+    end
+
+    it 'ensure_feed! creates a finance feed and is idempotent' do
+      feed = StockNewsFeed.ensure_feed!('CMCSA', 'Comcast')
+      expect(feed['topic']).to eq('finance')
+      expect(feed['title']).to include('Comcast (CMCSA)')
+      again = StockNewsFeed.ensure_feed!('CMCSA', 'Comcast')
+      expect(again['id']).to eq(feed['id'])
+    end
+
+    it 'ensure_feed! falls back to the bare symbol when name is blank' do
+      feed = StockNewsFeed.ensure_feed!('TSLA', nil)
+      expect(feed['title']).to eq('TSLA — News')
+    end
+  end
+
   # --- Stock routes (via Rack::Test) --------------------------------------
 
   describe 'Stock routes' do
@@ -118,6 +147,12 @@ RSpec.describe 'Stock follows & quotes' do
 
     def app
       TechFeedReader
+    end
+
+    # The detail + follow routes enqueue a background FeedRefreshWorker
+    # to populate symbol news; stub it so route specs stay off Redis.
+    before do
+      allow(FeedRefreshWorker).to receive(:perform_async)
     end
 
     it 'GET /stocks renders the search page' do
@@ -167,6 +202,39 @@ RSpec.describe 'Stock follows & quotes' do
     it 'POST /stocks/follow with empty symbol returns 400' do
       post '/stocks/follow', symbol: ''
       expect(last_response.status).to eq(400)
+    end
+
+    it 'GET /stocks/:symbol renders the Recent news section' do
+      StockQuotesStore.upsert(symbol: 'CMCSA', name: 'Comcast', price: 40.0)
+      allow(StockQuotesStore).to receive(:stale?).and_return(false)
+      get '/stocks/CMCSA'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('Recent news')
+    end
+
+    it 'POST /stocks/follow subscribes the user to the symbol news feed' do
+      post '/stocks/follow', symbol: 'CMCSA', name: 'Comcast'
+      feed = FeedsStore.find_by_url(StockNewsFeed.url_for('CMCSA'))
+      expect(feed).not_to be_nil
+      expect(FeedsStore.subscribed?(1, feed['id'])).to be true
+    end
+
+    it 'POST /stocks/unfollow unsubscribes from the symbol news feed' do
+      post '/stocks/follow', symbol: 'CMCSA', name: 'Comcast'
+      feed = FeedsStore.find_by_url(StockNewsFeed.url_for('CMCSA'))
+      post '/stocks/unfollow', symbol: 'CMCSA'
+      expect(FeedsStore.subscribed?(1, feed['id'])).to be false
+    end
+
+    it 'GET /feeds hides stock-symbol feeds from the subscriptions list' do
+      # A symbol feed the user is subscribed to should not appear...
+      post '/stocks/follow', symbol: 'CMCSA', name: 'Comcast'
+      # ...while a normal subscribed feed should.
+      FeedsStore.add_for_user(user_id: 1, url: 'https://example.com/tech.xml', title: 'Tech Daily', topic: 'technology')
+      get '/feeds'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('Tech Daily')
+      expect(last_response.body).not_to include('Comcast (CMCSA)')
     end
   end
 end
