@@ -167,6 +167,13 @@ prune:
 backfill-podcast-images:
 	bundle exec ruby scripts/backfill_podcast_images.rb
 
+# Reconcile pre-existing stock follows with the per-symbol news feature:
+# ensure each followed symbol's Yahoo RSS feed exists, subscribe the
+# follower, and prime cold feeds. Idempotent. See
+# scripts/backfill_stock_news_feeds.rb.
+backfill-stock-news:
+	bundle exec ruby scripts/backfill_stock_news_feeds.rb
+
 # STUFF #61 — re-sanitize every article's content_html with the
 # article's own URL as the absolute-link base. Fixes relative <a>
 # and <img> from rows imported before #61 landed. Idempotent;

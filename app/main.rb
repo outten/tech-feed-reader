@@ -86,6 +86,7 @@ require_relative 'radio_recommender/claude'
 require_relative 'stock_follows_store'
 require_relative 'stock_quotes_store'
 require_relative 'stock_quote_provider'
+require_relative 'stock_news_feed'
 
 # Sidekiq client config + the worker class. Loading the config only
 # registers Sidekiq.configure_client/server blocks — no Redis
@@ -522,6 +523,19 @@ class TechFeedReader < Sinatra::Base
     def stock_follow_json(symbol:, followed:)
       content_type :json
       { ok: true, symbol: symbol, followed: followed }.to_json
+    end
+
+    # True when a symbol's news feed has never been fetched or is older
+    # than 30 minutes — drives the one-time synchronous refresh on the
+    # /stocks/:symbol page so the "Recent news" section isn't empty.
+    STOCK_NEWS_TTL = 1800
+    def stock_news_stale?(feed)
+      last = feed && feed['last_fetched_at']
+      return true if last.nil? || last.to_s.empty?
+
+      (Time.now - Time.parse(last.to_s)) > STOCK_NEWS_TTL
+    rescue ArgumentError
+      true
     end
 
     # Stock price formatting helpers used by views/stocks.erb,
@@ -3482,7 +3496,9 @@ class TechFeedReader < Sinatra::Base
 
   get '/feeds' do
     @page_title  = 'Feeds'
-    @feeds       = FeedsStore.for_user(current_user_id)
+    # Stock-symbol news feeds are managed via the /stocks follow toggle,
+    # not here — keep them out of the subscriptions list.
+    @feeds       = FeedsStore.for_user(current_user_id).reject { |f| StockNewsFeed.stock_feed?(f['url']) }
     @notice      = params['notice']
     @error       = params['error']
     @catalog     = FeedCatalog.by_category
@@ -3508,7 +3524,7 @@ class TechFeedReader < Sinatra::Base
   post '/feeds/ai-recommend' do
     @page_title  = 'Feeds'
     @ai_prompt   = params['prompt'].to_s.strip
-    @feeds       = FeedsStore.for_user(current_user_id)
+    @feeds       = FeedsStore.for_user(current_user_id).reject { |f| StockNewsFeed.stock_feed?(f['url']) }
     @notice      = params['notice']
     @error       = params['error']
     @catalog     = FeedCatalog.by_category
@@ -4319,6 +4335,22 @@ class TechFeedReader < Sinatra::Base
     @profile = @quote  # profile data is merged into the quote row
     @followed = StockFollowsStore.follow?(current_user_id, @symbol)
 
+    # Recent news via the symbol's Yahoo RSS feed. Cache-only read — the
+    # page never blocks on a feed fetch (import runs per-article
+    # readability upgrades that take seconds). A stale/cold feed is
+    # refreshed in the background; warm feeds render instantly, and
+    # followed symbols are primed by the eager refresh on follow + the
+    # hourly RefreshAllFeedsWorker.
+    feed = StockNewsFeed.ensure_feed!(@symbol, @quote && @quote['name'])
+    if stock_news_stale?(feed)
+      begin
+        FeedRefreshWorker.perform_async(feed['id'])
+      rescue StandardError => e
+        AppLogger.warn('stock_news_refresh_enqueue_failed', symbol: @symbol, message: e.message)
+      end
+    end
+    @news = ArticlesStore.recent_for_feed(current_user_id, feed['id'], limit: 12)
+
     erb :stock_detail
   end
 
@@ -4329,6 +4361,17 @@ class TechFeedReader < Sinatra::Base
     name = nil if name.empty?
 
     StockFollowsStore.add(user_id: current_user_id, symbol: symbol, name: name)
+
+    # Subscribe the user to the symbol's news feed so its articles surface
+    # in /articles + the home page, and eager-fetch it so news is there
+    # within seconds. Quote eager-fetch follows.
+    begin
+      feed = StockNewsFeed.ensure_feed!(symbol, name)
+      FeedsStore.subscribe(current_user_id, feed['id'])
+      FeedRefreshWorker.perform_async(feed['id'])
+    rescue StandardError => e
+      AppLogger.warn('stock_news_subscribe_failed', symbol: symbol, message: e.message)
+    end
 
     # Eager fetch so the ticker has data immediately
     begin
@@ -4347,6 +4390,16 @@ class TechFeedReader < Sinatra::Base
     symbol = params['symbol'].to_s.strip.upcase
     halt 400, 'symbol required' if symbol.empty?
     StockFollowsStore.remove(user_id: current_user_id, symbol: symbol)
+
+    # Unsubscribe from the symbol's news feed. Leave the catalog row +
+    # articles in place — reused by other followers or on re-follow.
+    begin
+      feed = FeedsStore.find_by_url(StockNewsFeed.url_for(symbol))
+      FeedsStore.unsubscribe(current_user_id, feed['id']) if feed
+    rescue StandardError => e
+      AppLogger.warn('stock_news_unsubscribe_failed', symbol: symbol, message: e.message)
+    end
+
     AppLogger.info('stock_unfollow', symbol: symbol)
     return stock_follow_json(symbol: symbol, followed: false) if wants_json?
     redirect to(params['return_to'] || '/stocks')
