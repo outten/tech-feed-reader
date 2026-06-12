@@ -1384,7 +1384,7 @@ Another beauty pass. A bunch of the radio page elements have broken links for th
 
 **Shipped.** Updated 13 broken `image_url` entries in `app/radio_catalog.rb`. Replaced 404/410 URLs for KEXP, WFMU, NTS Radio (×2), TSF Jazz, FIP family (×6), France Musique, Radio Swiss Jazz/Classic/Pop (×3), The Current, WXPN, WNYC, and Triple J with verified working URLs sourced from each station's `og:image` or logo assets. KCRW's URL returned 429 (WAF rate-limiting for bots) and was kept — it loads correctly in browsers. DB rows self-heal on next `/radio` visit since `RadioStore.seed_catalog!` runs on every request with `ON CONFLICT DO UPDATE`. Note: Radio Swiss URLs use Nuxt build-artifact paths and may need refreshing if their site redeploys with a changed logo.
 
-## [ ] 91. Content categories expansion — Health, Arts, History + UX
+## [x] 91. Content categories expansion — Health, Arts, History + UX
 
 High-impact items from content analysis:
 
@@ -1394,4 +1394,19 @@ High-impact items from content analysis:
 - **Arts & Culture** topic: Variety, NYT Movies, Guardian Film (film); Rolling Stone, Guardian Music, NPR Music, All Songs Considered (music); Literary Hub, Book Riot, NYT Books, Guardian Books (books). Onboarding chip (🎭).
 - Catalog grows from 171 → 190 entries across 14 topics.
 
-**Status: tests**
+**Status: merged** — PR #189, v0.23.3. Also covers #92 (Environment, Business) and #93 (Travel, Mastodon, Politics) — all shipped through v0.23.5.
+
+## [ ] 94. Scroll position preservation — AJAX for remaining full-reload actions
+
+Several button actions still do a full page POST + redirect, which reloads the page and drops the user back at the top. On long pages (/articles, /feeds, /stocks) this requires significant scrolling to get back to where you were.
+
+Actions to convert to AJAX (in-place DOM update, no scroll loss):
+
+- **👍/👎 thumbs on `/articles` list** — highest priority, longest page. Route already returns JSON when `Accept: application/json` is set; just needs a JS handler.
+- **Sports manage page** — league follow/unfollow on `/sports/manage/:sport` reloads
+- **Mutes add/delete** on `/feeds` — currently full reload
+- **Tags add/delete** on `/feeds` — currently full reload
+
+Already AJAX (no action needed): feeds catalog add/remove/weight, sports follow/unfollow, stock follow/unfollow, NPR/PBS subscribe/unsubscribe.
+
+**Status: not implemented**
