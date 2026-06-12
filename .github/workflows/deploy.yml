@@ -1,9 +1,8 @@
 name: Deploy
 
 # Trigger on version tags pushed by `make release-patch/minor/major`.
-# The local Makefile still bumps VERSION, commits, tags, and pushes —
-# this workflow picks up from there and handles the slow parts
-# (cross-compile, push to DOCR, SSH deploy) so your laptop is free.
+# The local Makefile bumps VERSION, commits, tags, and pushes —
+# this workflow runs tests first, then builds and deploys only if they pass.
 on:
   push:
     tags: ['v*']
@@ -21,10 +20,60 @@ env:
   IMAGE: tech-feed-reader
 
 jobs:
+  test:
+    name: RSpec
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RACK_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/tfr_test
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER:     postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB:       tfr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Ruby syntax check (scripts)
+        run: |
+          set +e
+          fail=0
+          if [ -d scripts ]; then
+            while IFS= read -r f; do
+              out=$(ruby -c "$f" 2>&1)
+              if [ $? -ne 0 ]; then
+                echo "::error file=$f::$out"
+                fail=1
+              fi
+            done < <(find scripts -name '*.rb' -type f)
+          fi
+          exit $fail
+
+      - name: Run RSpec
+        run: bundle exec rspec --color --format progress
+
   deploy:
     name: Build → Push → Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: test
 
     steps:
       - name: Checkout
