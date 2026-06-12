@@ -42,7 +42,7 @@ RSpec.describe FeedCatalog, 'Phase S1 + S2' do
       :technology, :sports, :nature, :humor,
       :finance, :world_news, :science, :gaming, :food,
       :npr, :pbs, :health, :arts, :history,
-      :environment, :business
+      :environment, :business, :travel, :social, :politics
     )
   end
 

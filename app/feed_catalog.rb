@@ -34,7 +34,10 @@ module FeedCatalog
     arts:       'Arts & Culture',
     history:    'History',
     environment: 'Environment & Climate',
-    business:   'Business'
+    business:   'Business',
+    travel:     'Travel',
+    social:     'Social & Newsletters',
+    politics:   'Politics & Policy'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -108,7 +111,16 @@ module FeedCatalog
     env_podcast:   'Environment podcasts',
     # Business
     biz_news:      'Business news',
-    biz_strategy:  'Strategy & management'
+    biz_strategy:  'Strategy & management',
+    # Travel
+    travel_general: 'Travel guides & inspiration',
+    travel_cruise:  'Cruises',
+    # Social & Newsletters
+    mastodon:      'Mastodon',
+    # Politics & Policy
+    politics_us:   'US politics',
+    politics_intl: 'International affairs',
+    politics_pod:  'Politics podcasts'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -167,7 +179,16 @@ module FeedCatalog
     env_podcast:   :environment,
     # Business
     biz_news:      :business,
-    biz_strategy:  :business
+    biz_strategy:  :business,
+    # Travel
+    travel_general: :travel,
+    travel_cruise:  :travel,
+    # Social & Newsletters
+    mastodon:      :social,
+    # Politics & Policy
+    politics_us:   :politics,
+    politics_intl: :politics,
+    politics_pod:  :politics
   }.freeze
 
   CATALOG = [
@@ -1063,7 +1084,105 @@ module FeedCatalog
       blurb: 'Ben Thompson\'s analysis of technology and business strategy. One of the best.' },
     { url: 'https://api.axios.com/feed/', title: 'Axios', category: :biz_strategy,
       interval: FeedsStore::HIGH_FREQUENCY_INTERVAL, seed: false,
-      blurb: 'Concise business, tech, and politics briefings from Axios.' }
+      blurb: 'Concise business, tech, and politics briefings from Axios.' },
+
+    # ---- Travel guides & inspiration (7) ---------------------------------
+    { url: 'https://www.nomadicmatt.com/travel-blog/feed/', title: 'Nomadic Matt', category: :travel_general,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Budget travel tips, destination guides, and how to travel the world affordably.' },
+    { url: 'https://www.atlasobscura.com/feeds/latest', title: 'Atlas Obscura', category: :travel_general,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'The world\'s most unusual, hidden, and wondrous places.' },
+    { url: 'https://www.cntraveler.com/feed/rss', title: 'Condé Nast Traveler', category: :travel_general,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Luxury travel, destination inspiration, and honest hotel reviews.' },
+    { url: 'https://thepointsguy.com/feed/', title: 'The Points Guy', category: :travel_general,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Maximise travel rewards — miles, points, credit cards, and flight deals.' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Travel.xml', title: 'NYT Travel', category: :travel_general,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New York Times travel section — destination essays, tips, and 36 Hours.' },
+    { url: 'https://www.theguardian.com/uk/travel/rss', title: 'The Guardian Travel', category: :travel_general,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Guardian travel features, destination guides, and readers\' tips.' },
+    { url: 'https://matadornetwork.com/feed/', title: 'Matador Network', category: :travel_general,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Adventure travel, culture, and independent traveller stories.' },
+
+    # ---- Cruises (5) ------------------------------------------------------
+    { url: 'https://www.cruisehive.com/feed', title: 'Cruise Hive', category: :travel_cruise,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Cruise news, reviews, and tips — ship launches, itineraries, and industry updates.' },
+    { url: 'https://cruiseradio.net/feed/', title: 'Cruise Radio', category: :travel_cruise,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Weekly cruise podcast — news, reviews, ship tours, and destination guides.' },
+    { url: 'https://cruiseindustrynews.com/feed/', title: 'Cruise Industry News', category: :travel_cruise,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Trade-level cruise industry news — ship orders, fleet updates, and port developments.' },
+    { url: 'https://www.vacationstogo.com/rss/cruise_news.cfm', title: 'Vacations To Go — Cruise News', category: :travel_cruise,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Cruise deals, last-minute sailings, and industry news from the cruise booking specialist.' },
+    { url: 'https://worldcruisesociety.com/feed/', title: 'World Cruise Society', category: :travel_cruise,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'World cruise reviews, tips, and port guides for extended voyages.' },
+
+    # ---- Mastodon (4 curated starter accounts) ----------------------------
+    # Mastodon profiles publish standard RSS at /@username.rss — no special
+    # support needed. These are curated starter accounts; users can add any
+    # Mastodon profile URL manually via the "Add a feed" box.
+    { url: 'https://mastodon.social/@gruber.rss', title: 'John Gruber (Mastodon)', category: :mastodon,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Daring Fireball author on Mastodon — Apple, tech, and culture.' },
+    { url: 'https://mastodon.social/@dhh.rss', title: 'DHH (Mastodon)', category: :mastodon,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Rails creator, Basecamp co-founder — programming, business, and politics.' },
+    { url: 'https://mastodon.social/@kottke.rss', title: 'Jason Kottke (Mastodon)', category: :mastodon,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'kottke.org curator on Mastodon — internet culture, links, and ideas.' },
+    { url: 'https://mastodon.social/@Mastodon.rss', title: 'Mastodon (official)', category: :mastodon,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Official Mastodon account — platform news and updates.' },
+
+    # ---- US politics (6) -------------------------------------------------
+    # Note: NPR Politics feed also lives under :npr_news (cross-topic).
+    { url: 'https://rss.politico.com/politics-news.xml', title: 'Politico', category: :politics_us,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Essential US politics coverage — Congress, White House, campaigns.' },
+    { url: 'https://rss.politico.com/playbook.xml', title: 'Politico Playbook', category: :politics_us,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'The morning briefing that drives Washington — who\'s up, who\'s down, what\'s next.' },
+    { url: 'https://thehill.com/news/feed/', title: 'The Hill', category: :politics_us,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Capitol Hill-focused news — Congress, lobbying, campaigns, and White House.' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml', title: 'NYT Politics', category: :politics_us,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New York Times politics section.' },
+    { url: 'https://www.theguardian.com/politics/rss', title: 'The Guardian Politics', category: :politics_us,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'UK and international politics from The Guardian.' },
+    { url: 'https://talkingpointsmemo.com/feed/', title: 'Talking Points Memo', category: :politics_us,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent political news and analysis with an investigative edge.' },
+
+    # ---- International affairs (4) ---------------------------------------
+    { url: 'https://www.foreignaffairs.com/rss.xml', title: 'Foreign Affairs', category: :politics_intl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'The definitive journal of international relations and foreign policy.' },
+    { url: 'https://foreignpolicy.com/feed/', title: 'Foreign Policy', category: :politics_intl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Global politics, economics, and ideas — Foreign Policy magazine.' },
+    { url: 'https://feeds.bbci.co.uk/news/politics/rss.xml', title: 'BBC Politics', category: :politics_intl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'BBC\'s UK politics coverage — Westminster, parties, and policy.' },
+    { url: 'https://www.the-dispatch.com/feed', title: 'The Dispatch', category: :politics_intl,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Conservative-leaning policy and politics journalism — fact-driven, not partisan.' },
+
+    # ---- Politics podcasts (1) -------------------------------------------
+    # Note: NPR Politics Podcast also lives under :npr_podcasts.
+    { url: 'https://crooked.com/feed/', title: 'Crooked Media', category: :politics_pod,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Pod Save America and sister shows — progressive politics, interviews, and analysis.' }
   ].freeze
 
   module_function
@@ -1223,6 +1342,24 @@ module FeedCatalog
       https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml
       https://stratechery.com/feed/
       https://api.axios.com/feed/
+    ].freeze,
+    travel: %w[
+      https://www.atlasobscura.com/feeds/latest
+      https://www.nomadicmatt.com/travel-blog/feed/
+      https://rss.nytimes.com/services/xml/rss/nyt/Travel.xml
+      https://www.cruisehive.com/feed
+      https://cruiseradio.net/feed/
+    ].freeze,
+    social: %w[
+      https://mastodon.social/@gruber.rss
+      https://mastodon.social/@dhh.rss
+      https://mastodon.social/@kottke.rss
+    ].freeze,
+    politics: %w[
+      https://rss.politico.com/politics-news.xml
+      https://feeds.npr.org/1014/rss.xml
+      https://www.foreignaffairs.com/rss.xml
+      https://crooked.com/feed/
     ].freeze
   }.freeze
 
@@ -1246,7 +1383,10 @@ module FeedCatalog
     arts:       { label: 'Arts & Culture', blurb: 'Film, music, books — Variety, Rolling Stone, Literary Hub.', emoji: '🎭' },
     history:    { label: 'History',        blurb: 'Smithsonian, Myths & Legends, Stuff You Missed in History Class.', emoji: '🏛️' },
     environment: { label: 'Environment',   blurb: 'BBC, Guardian, NPR, Grist — climate news and solutions.', emoji: '🌱' },
-    business:   { label: 'Business',       blurb: 'Fast Company, WSJ, Stratechery — strategy and entrepreneurship.', emoji: '💼' }
+    business:   { label: 'Business',       blurb: 'Fast Company, WSJ, Stratechery — strategy and entrepreneurship.', emoji: '💼' },
+    travel:     { label: 'Travel',         blurb: 'Atlas Obscura, Nomadic Matt, NYT Travel + cruise news.', emoji: '✈️' },
+    social:     { label: 'Mastodon',       blurb: 'Follow people on Mastodon — any profile works as an RSS feed.', emoji: '🐘' },
+    politics:   { label: 'Politics',       blurb: 'Politico, NPR Politics, Foreign Affairs, The Guardian.', emoji: '🏛' }
   }.freeze
 
   def starters_for_topic(topic)
