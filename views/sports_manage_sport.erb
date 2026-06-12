@@ -113,7 +113,7 @@
         <% if tour[:blurb] %>
           <span class="sports-catalog-blurb"><%= h(tour[:blurb]) %></span>
         <% end %>
-        <form method="post" action="/sports/leagues/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form">
+        <form method="post" action="/sports/leagues/<%= followed ? 'unfollow' : 'follow' %>" class="sports-manage-form js-sports-follow-form">
           <input type="hidden" name="slug" value="<%= h(tour[:slug]) %>">
           <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>">
           <button type="submit"
