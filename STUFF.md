@@ -1409,4 +1409,4 @@ Actions to convert to AJAX (in-place DOM update, no scroll loss):
 
 Already AJAX (no action needed): feeds catalog add/remove/weight, sports follow/unfollow, stock follow/unfollow, NPR/PBS subscribe/unsubscribe.
 
-**Status: not implemented**
+**Status: tests** — all four items implemented. Sports manage sport got `js-sports-follow-form` class (one-liner — already AJAX-capable, just missing the class). Mutes and tags routes now return JSON when `Accept: application/json`. New `public/mutes-tags.js` handles AJAX add/delete for both, with in-place DOM updates and flash messages. No scroll loss on any of these actions.

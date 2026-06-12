@@ -3344,6 +3344,10 @@ class TechFeedReader < Sinatra::Base
 
     added = MuteRulesStore.add(user_id: current_user_id, kind: kind, value: value)
     AppLogger.info('mute_rule_add', kind: kind, value: value, added: added)
+    if wants_json?
+      content_type :json
+      return { ok: true, added: added, kind: kind, value: value }.to_json
+    end
     redirect to(params['return_to'] || "/feeds?notice=#{added ? 'mute-added' : 'mute-duplicate'}&kind=#{kind}&value=#{CGI.escape(value)}")
   end
 
@@ -3354,6 +3358,10 @@ class TechFeedReader < Sinatra::Base
 
     removed = MuteRulesStore.remove(user_id: current_user_id, kind: kind, value: value)
     AppLogger.info('mute_rule_remove', kind: kind, value: value, removed: removed)
+    if wants_json?
+      content_type :json
+      return { ok: true, removed: removed.positive?, kind: kind, value: value }.to_json
+    end
     redirect to(params['return_to'] || "/feeds?notice=#{removed.positive? ? 'mute-removed' : 'mute-not-found'}")
   end
 
@@ -3745,6 +3753,24 @@ class TechFeedReader < Sinatra::Base
     kind = params['match_kind'].to_s.strip
     val  = params['match_value'].to_s.strip
 
+    if wants_json?
+      halt 400, { ok: false, error: 'missing-fields' }.to_json  if name.empty? || val.empty?
+      halt 400, { ok: false, error: 'invalid-kind'   }.to_json  unless TagsStore::KINDS.include?(kind)
+      if kind == 'regex'
+        begin; Regexp.new(val); rescue RegexpError
+          halt 400, { ok: false, error: 'invalid-regex' }.to_json
+        end
+      end
+      begin
+        tag    = TagsStore.add(user_id: current_user_id, name: name, match_kind: kind, match_value: val)
+        tagged = TagsApplier.apply_to_existing(tag)
+        content_type :json
+        return { ok: true, tag: tag, tagged: tagged }.to_json
+      rescue PG::UniqueViolation
+        halt 409, { ok: false, error: 'duplicate-name' }.to_json
+      end
+    end
+
     redirect to('/tags?error=missing-fields') if name.empty? || val.empty?
     redirect to('/tags?error=invalid-kind')   unless TagsStore::KINDS.include?(kind)
 
@@ -3761,14 +3787,16 @@ class TechFeedReader < Sinatra::Base
       tagged = TagsApplier.apply_to_existing(tag)
       redirect to("/tags?notice=added&tagged=#{tagged}")
     rescue PG::UniqueViolation
-      # UNIQUE(user_id, name) index. UniqueViolation descends from
-      # PG::IntegrityConstraintViolation but we name it explicitly here
-      # to avoid swallowing unrelated PG errors.
       redirect to('/tags?error=duplicate-name')
     end
   end
 
   post '/tags/:id/delete' do |id|
+    if wants_json?
+      removed = TagsStore.remove(current_user_id, id.to_i)
+      content_type :json
+      return { ok: removed, id: id.to_i }.to_json
+    end
     if TagsStore.remove(current_user_id, id.to_i)
       redirect to('/tags?notice=removed')
     else

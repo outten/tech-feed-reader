@@ -9,6 +9,8 @@
   </div>
 </div>
 
+<div id="flash-mount" aria-live="polite"></div>
+
 <% if @notice == 'added' %>
   <div class="notice">
     Tag added.
@@ -34,7 +36,7 @@
 
 <div class="portfolio-add">
   <h3>Add a tag rule</h3>
-  <form method="post" action="/tags" class="portfolio-form">
+  <form method="post" action="/tags" class="portfolio-form js-tag-add">
     <label>
       Name
       <input type="text" name="name" required placeholder="e.g. ai, rust, hn">
@@ -80,7 +82,7 @@
           </td>
           <td class="num"><%= @article_counts[tag['id']] || 0 %></td>
           <td>
-            <form method="post" action="/tags/<%= tag['id'] %>/delete" style="display:inline" onsubmit="return confirm('Remove this tag and all its associations?');">
+            <form method="post" action="/tags/<%= tag['id'] %>/delete" style="display:inline" class="js-tag-delete">
               <button type="submit" class="danger" title="Delete this tag rule and unlink it from every article">Remove</button>
             </form>
           </td>
@@ -89,3 +91,5 @@
     </tbody>
   </table>
 <% end %>
+
+<script src="/mutes-tags.js?v=<%= asset_mtime('public/mutes-tags.js') %>"></script>
