@@ -16,14 +16,14 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 
 **Standard flow** (per [CONTRIBUTING.md](CONTRIBUTING.md)):
 
-1. Branch off main into `outten/TODO-NNN`. Don't push to `main` directly.
+1. Branch off main into `outten/feature-description-NN` (e.g. `outten/stock-sparklines-87`). The older `outten/TODO-NNN` form also works. Don't push to `main` directly.
 2. Implement + write tests + update docs in the same change.
 3. `make test` locally → must be 0 failures.
 4. **Pause — user approval required before committing.** Show the diff / commit message and wait for explicit go-ahead. For UI changes, the user must also manually verify the page in the browser before approving.
 5. Commit, push the branch, open the PR (`gh pr create`). **Opening a PR also requires explicit user approval** — do not auto-open after every task. Ask first; bundle related items into one PR. **Exception: doc-only changes** (STUFF.md, README.md, AGENTS.md, about.erb, etc. — no code, no tests) may be committed on a branch and merged directly to main without a PR.
 6. **Wait for CI green** on the PR before claiming "shipped" — CI is at [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs RSpec + script syntax check on every push to `main` and every PR.
 7. **Only the user merges PRs.** Never call `gh pr merge` unless the user explicitly instructs it for this specific PR. A previous merge approval does not carry over to the next PR.
-8. **Only the user deploys to production.** Never run `make deploy-*`, `make publish-image`, or `make _remote_deploy` unless the user explicitly says to deploy. After merge, sync local only: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
+8. **Production deploy** — the user says "deploy" or "go" and the agent runs `make deploy-patch` (or minor/major). This bumps VERSION, commits, tags, pushes, and the GitHub Actions deploy workflow handles the build + SSH. The agent may execute this step on explicit instruction; it may not decide to deploy on its own. Never run `make deploy-*` speculatively. After a deploy, sync local: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
 
 **Summary of the four gates — each requires its own explicit user instruction:**
 
@@ -32,7 +32,7 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 | Code review | `git commit` (+ browser verify for UI changes) |
 | PR creation | `gh pr create` |
 | PR merge | Only the user merges on GitHub |
-| Production deploy | Only the user triggers `make deploy-*` |
+| Production deploy | User says "deploy" → agent runs `make deploy-patch` → GH Actions builds + ships |
 
 **UI approval gate** — for any change that affects what a human sees in a browser (views/, public/*.js, public/*.css, anything click-driven), the "pause before staging" in step 4 means: **green specs are not enough**. The user must manually verify in the browser and explicitly approve before `git commit`. Specs caught the data-layer plumbing on STUFF #23 but missed two JS/CSS bugs (a `hidden` attribute overridden by a `display: inline-flex` rule; a `button.disabled = true` inside the submit handler that cancelled the form submission) — both only visible by clicking the actual button. Backend-only changes (stores, migrations, scripts) don't trigger the gate.
 
@@ -309,7 +309,7 @@ app/
   # Feeds + articles core
   feed_fetcher.rb                  # conditional GET → parse → update FeedsStore (OTel feed.fetch span)
   feed_parser.rb                   # feedjira wrapper; normalises RSS 2.0 / RSS 1.0 / Atom; extracts entry.categories
-  feed_catalog.rb                  # curated 108-feed catalog + seed_defaults + recommend_for personalisation
+  feed_catalog.rb                  # curated 227-entry catalog across 19 topics + seed_defaults + recommend_for personalisation
   feeds_store.rb                   # feeds + user_feed_subscriptions bridge; popular_by_type for #24 top charts
   articles_store.rb                # articles + tsvector search + audio + categories backfill; podcast_feeds + youtube_channels
   read_state_store.rb              # per-user-per-article read / bookmark / archive / feedback
@@ -362,6 +362,9 @@ app/
   scheduler.rb                     # due-feed picker + refresh_one helper
   sidekiq_boot.rb / sidekiq_config.rb  # worker boot + middleware wiring
   workers/feed_refresh_worker.rb   # background job that refreshes a single feed
+  workers/stock_sync_worker.rb     # every 15 min: refresh followed stock symbols via Finnhub
+  workers/stock_quote_fetch_worker.rb  # eager single-symbol fetch on follow
+  workers/index_sync_worker.rb     # hourly (:05): refresh 10 major world indices (ETF proxies)
 
 db/
   migrations/                      # 23 migrations; runner in app/database.rb applies in filename order
@@ -377,6 +380,9 @@ public/
   feeds.js / feeds-ai.js / feeds-filter.js  # /feeds: add feed / AI recommender / search+chip toolbar
   auth.js                          # WebAuthn ceremony driver (signup / signin / recovery / +add passkey)
   youtube-watch.js                 # YouTube IFrame API watch-progress tracking
+  nav-dropdown.js                  # Browse/AI/Manage dropdown: hover bridge + click-to-toggle (.open class)
+  stock-sparklines.js              # fetch /api/stocks/sparklines, draw canvas intraday charts on index cards
+  mutes-tags.js                    # AJAX add/delete for mute rules (/feeds) and tag rules (/tags); no scroll loss
 
 scripts/
   migrate.rb / seed_feeds.rb / seed_user.rb / scheduler.rb
@@ -390,6 +396,7 @@ scripts/
 
 spec/                              # RSpec (test env: PG via TEST_DATABASE_URL, no real HTTP, auth wall OFF by default)
 .github/workflows/ci.yml           # RSpec + scripts syntax check on push to main + every PR
+.github/workflows/deploy.yml       # tag-triggered (v*): test job → build linux/amd64 image → push to DOCR → SSH deploy
 ```
 
 ## Testing
@@ -421,6 +428,73 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 7. **Summarizer cache.** LLM summaries are EXPENSIVE and should be permanent for a given article id. Don't invalidate them on feed re-fetch — only on explicit user "re-summarize" action.
 
 8. **Conditional-GET freshness.** `If-Modified-Since` honours feed-publisher clocks, which can be wrong. Always also check the parsed feed's most-recent entry date — if it's newer than what we have, accept the feed even when the server returned 200 with stale headers.
+
+## Deploy pipeline
+
+`make deploy-patch` (or `release-minor` / `release-major`) is the one command to ship:
+
+1. Gates: clean tree, on `main`, full RSpec suite green.
+2. Bumps `VERSION`, commits `chore: release vX.Y.Z`, tags, pushes commit + tag to origin.
+3. GitHub Actions picks up the `v*` tag → runs the **deploy workflow** (`.github/workflows/deploy.yml`):
+   - **test job** — full RSpec suite in CI (same as `ci.yml`) — deploy is cancelled if this fails.
+   - **deploy job** (`needs: test`) — builds `linux/amd64` Docker image via `buildx`, pushes `:X.Y.Z` + `:latest` to DOCR, SSHs to the Droplet and runs `make deploy` (git pull + image pull + `docker compose up --force-recreate`).
+4. Agent watches with `gh run watch` and reports when live.
+
+**Secrets required** (set in GitHub repo Settings → Secrets → Actions):
+
+| Secret | Value |
+|---|---|
+| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token for DOCR login |
+| `DEPLOY_SSH_KEY` | Private key for `deploy@<droplet-ip>` (`~/.ssh/id_rsa`) |
+| `DROPLET_IP` | `64.225.58.12` |
+
+**Rollback**: set `IMAGE_TAG=X.Y.Z` in `/opt/app/.env` on the Droplet, then `make deploy` there.
+
+**Manual fallback** if GH Actions is down: `make publish-image && make _remote_deploy DROPLET_IP=64.225.58.12`.
+
+## AJAX pattern
+
+Many interactive elements use in-place AJAX to avoid full-page reloads (which scroll back to top on long pages). The convention:
+
+1. **Route** — add a `wants_json?` branch that returns `content_type :json` + a hash with `ok:` and relevant fields. The redirect/HTML branch stays for no-JS fallback.
+2. **Form** — add a `js-*` class (e.g. `js-mute-add`, `js-catalog-add`) so the JS handler can identify it via `e.target.closest('form.js-*')`.
+3. **JS handler** — listen on `document` with event delegation (not per-element), `e.preventDefault()`, `fetch(url, { headers: { Accept: 'application/json' } })`, update DOM in place, show flash via `document.getElementById('flash-mount')`.
+
+**Existing AJAX surfaces** (do not accidentally convert back to full reload):
+
+| Surface | JS file | Class hook |
+|---|---|---|
+| Feeds: add/remove/weight/refresh | `feeds.js` | `js-add-feed`, `js-remove-feed`, `js-catalog-add`, `js-feed-weight-form`, `js-refresh-feed` |
+| NPR / PBS subscribe | `source-page.js` | `js-catalog-add` (guarded by `.my-feeds-section` presence) |
+| Sports follow/unfollow | `sports-follow.js` | `js-sports-follow-form` |
+| Stock follow/unfollow | `stock-follow.js` | `js-stock-follow-form` |
+| Article 👍/👎 | `article-feedback.js` | `.news-list` delegated click on `.feedback-row-btn` |
+| Mutes add/delete | `mutes-tags.js` | `js-mute-add`, `js-mute-delete` |
+| Tags add/delete | `mutes-tags.js` | `js-tag-add`, `js-tag-delete` |
+
+## Sidekiq cron schedule
+
+Managed via `config/sidekiq_cron.yml`, loaded at Sidekiq boot. View registered jobs at `/admin/sidekiq/cron`. Force-run buttons for key jobs live on `/admin/status`.
+
+| Job name | Cron | Worker | Purpose |
+|---|---|---|---|
+| `refresh_all_feeds` | `0 * * * *` | `RefreshAllFeedsWorker` | Hourly fan-out: enqueue `FeedRefreshWorker` per subscribed feed |
+| `sports_sync` | `30 * * * *` | `SportsSyncWorker` | Hourly :30 — ESPN match schedules + standings + rankings |
+| `stock_sync` | `*/15 * * * *` | `StockSyncWorker` | Every 15 min — refresh cached quotes for followed stock symbols |
+| `index_sync` | `5 * * * *` | `IndexSyncWorker` | Hourly :05 — refresh 10 major world indices (ETF proxies via Yahoo Finance + Finnhub) |
+| `generate_sudoku` | `0 1 * * *` | `GenerateSudokuWorker` | Daily 01:00 UTC — pre-generate next 7 days of puzzles |
+| `generate_trivia` | `30 1 * * *` | `GenerateTriviaWorker` | Daily 01:30 UTC — generate News Trivia quiz from last 24h articles |
+| `fix_article_links` | `45 4 * * *` | `FixArticleLinksWorker` | Daily 04:45 UTC — re-scrub articles with `content_scrubbed = FALSE` |
+
+## UX and design philosophy
+
+These principles apply to every new feature and are load-bearing for the product's feel:
+
+- **Apple-style UI** — clean typography, generous whitespace, progressive disclosure. New features should feel like they were always there, not bolted on.
+- **Never drown users in choice** — as the catalog grows, surface what's relevant. The `/feeds` filter bar shows only topics the user has subscribed to. Onboarding chips auto-populate from `FeedCatalog::TOPICS` so adding a topic is one place. Catalog chips in the browse bar auto-enumerate topics — no hardcoded lists to update.
+- **Personalization over completeness** — the right 5 results > an exhaustive 50. Recommendation, triage, For You ranking, and the topic filter bar all serve this.
+- **Scroll position is precious** — on long pages (`/articles`, `/feeds`, `/stocks`) a full-page reload after a button tap is a bad experience. Convert actions to AJAX (see AJAX pattern above). If a new interactive element would cause a full-page reload on a long page, it needs an AJAX path.
+- **User's content comes first** — on every content page (Podcasts, Comics, Radio, etc.) the user's own subscriptions and recent items render above discovery/catalog sections. "Recent episodes" before "Subscribed shows"; "My Stations" before "Recommended for you".
 
 ## Documentation files
 
