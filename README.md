@@ -2,6 +2,8 @@
 
 A multi-user, passkey-authenticated web application that aggregates public, free RSS / Atom feeds for technology articles, sports news + scores, nature/YouTube channels, podcasts, and webcomics. Reading, tagging, search, summarization, AI-assisted triage, and personalised relevance ranking. Conventions inherited from [t-money-terminal](https://github.com/outten/t-money-terminal) — Ruby / Sinatra / ERB / RSpec, cache-only render contract, scheduled background refresh — but storage is PostgreSQL (managed DO cluster, `tsvector` + `ts_rank` for search) instead of `t-money`'s file-per-store JSON.
 
+> **🎉 v1.0.0 — the MVP phase is complete.** Feeder is feature-complete for its original goals and now enters a contributor-driven, open-source phase under [AGPL-3.0](LICENSE). This release is the handoff from "users" to "contributors": if you're here to build, start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 > **Status: multi-user behind a passkey auth wall; covers tech + sports + nature/YouTube + podcasts + webcomics + internet radio + finance + world news + science + gaming + daily games + stock ticker; ranked + triaged + summarized; popular-with-other-readers discovery on /feeds.**
 
 ## What it does

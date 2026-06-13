@@ -12,6 +12,8 @@ A multi-user web application that aggregates public, free RSS / Atom feeds **acr
 
 The sections below this one are the v1 brief as written at kickoff. Things have moved since — recording the deltas explicitly so SPEC.md doesn't read as untrue.
 
+> **Milestone — v1.0.0 (MVP concluded).** With v1.0.0 the MVP phase is done: the original brief plus every delta recorded below is shipped and running in production. From here the project is open-source under [AGPL-3.0](LICENSE) and shifts from solo, feature-driven building to **contributor-driven** development. Ongoing work lives in [TODO.md](TODO.md) / [STUFF.md](STUFF.md) and the PR history; new contributors should start at [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ### Multi-category aggregation (sports broadens the surface)
 
 The original brief was "technology articles". As of v1.x the user's interests broadened to sports — **Philadelphia Eagles, Sixers, Union; New Zealand All Blacks + Black Ferns; Tennis (ATP/WTA broadly)**. The 10-phase Sports rollout is captured in [TODO.md](TODO.md) (Sports Phases S1–S10). Architecturally:

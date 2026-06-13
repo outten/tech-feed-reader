@@ -1,5 +1,7 @@
 # TODOs
 
+> **Milestone — v1.0.0 (MVP phase concluded).** The MVP roadmap is shipped and in production. Items below are the historical phase log plus ongoing ideas; from v1.0.0 onward the project is open-source (AGPL-3.0) and contributor-driven. New work flows through the [CONTRIBUTING.md](CONTRIBUTING.md) PR process.
+
 Informal scratch list of UI / UX / feature ideas. Add new items at the bottom; status moves left → right as work progresses.
 
 **Status lifecycle**: `not implemented` → `in implementation` → `implemented` → `tests` → `merged`

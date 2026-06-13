@@ -1,5 +1,7 @@
 # Contributing
 
+> **As of v1.0.0 the MVP is complete and Feeder is open to contributors** (AGPL-3.0). Welcome! Get the shape of the system from [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), then follow the workflow below.
+
 The PR workflow we use for this repo. Follow this for every change that lands on `main`. Inherited verbatim from [t-money-terminal](https://github.com/outten/t-money-terminal); change here only when this project's needs genuinely diverge.
 
 ## TL;DR
