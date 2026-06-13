@@ -538,6 +538,24 @@ class TechFeedReader < Sinatra::Base
       true
     end
 
+    # Cached quote rows for the global stock ticker (rendered in the
+    # layout on every page for signed-in users): the symbols the user
+    # follows first, then the major world indices, deduped. Cache-only —
+    # reads stock_quotes, never the Finnhub API. Memoized per request and
+    # ordered (find_many sorts alphabetically, so re-order in Ruby).
+    def ticker_quotes
+      return [] unless signed_in?
+
+      @ticker_quotes ||= begin
+        followed = StockFollowsStore.all(current_user_id).map { |r| r['symbol'] }
+        indices  = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
+        ordered  = (followed + indices).uniq
+        by_sym   = StockQuotesStore.find_many(ordered)
+                                   .each_with_object({}) { |q, h| h[q['symbol']] = q }
+        ordered.filter_map { |s| by_sym[s] }
+      end
+    end
+
     # Stock price formatting helpers used by views/stocks.erb,
     # views/stock_detail.erb, and views/_stock_ticker.erb.
     def format_price(val)
@@ -1992,10 +2010,6 @@ class TechFeedReader < Sinatra::Base
     @top_feeds        = ArticlesStore.counts_by_feed(current_user_id, limit: 10)
     @top_tags_week    = TagsStore.top_in_window(current_user_id, days: 7, limit: 8)
     @topic_clusters   = TopicClusters.recent(days: 14, limit: 8)
-
-    # STUFF #85 — stock ticker on dashboard (cache-only, no API calls)
-    followed_syms = StockFollowsStore.all(current_user_id).map { |r| r['symbol'] }
-    @stock_quotes = followed_syms.any? ? StockQuotesStore.find_many(followed_syms) : []
 
     erb :dashboard
   end
@@ -4352,6 +4366,17 @@ class TechFeedReader < Sinatra::Base
     @news = ArticlesStore.recent_for_feed(current_user_id, feed['id'], limit: 12)
 
     erb :stock_detail
+  end
+
+  # Poll endpoint for stock-news.js — re-renders just the news section so
+  # a cold feed fills in without a page reload once the background refresh
+  # imports articles. Returns the same partial the detail page renders.
+  get '/stocks/:symbol/news' do |symbol|
+    @symbol   = symbol.upcase
+    @followed = StockFollowsStore.follow?(current_user_id, @symbol)
+    feed      = StockNewsFeed.ensure_feed!(@symbol)
+    @news     = ArticlesStore.recent_for_feed(current_user_id, feed['id'], limit: 12)
+    erb :_stock_news, layout: false
   end
 
   post '/stocks/follow' do

@@ -226,6 +226,23 @@ RSpec.describe 'Stock follows & quotes' do
       expect(FeedsStore.subscribed?(1, feed['id'])).to be false
     end
 
+    it 'GET /stocks/:symbol/news returns a pending section when the feed is cold' do
+      get '/stocks/CMCSA/news'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('Recent news')
+      expect(last_response.body).to include('data-stock-news-pending="CMCSA"')
+    end
+
+    it 'GET /stocks/:symbol/news renders items and drops the pending attr once articles exist' do
+      allow(ArticlesStore).to receive(:recent_for_feed).and_return([
+        { 'uid' => 'abc123', 'title' => 'CMCSA jumps 5%', 'published_at' => '2026-06-12T10:00:00Z', 'read' => 0, 'content_text' => '' }
+      ])
+      get '/stocks/CMCSA/news'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('CMCSA jumps 5%')
+      expect(last_response.body).not_to include('data-stock-news-pending')
+    end
+
     it 'GET /feeds hides stock-symbol feeds from the subscriptions list' do
       # A symbol feed the user is subscribed to should not appear...
       post '/stocks/follow', symbol: 'CMCSA', name: 'Comcast'
@@ -235,6 +252,32 @@ RSpec.describe 'Stock follows & quotes' do
       expect(last_response).to be_ok
       expect(last_response.body).to include('Tech Daily')
       expect(last_response.body).not_to include('Comcast (CMCSA)')
+    end
+  end
+
+  # --- Global stock ticker (layout) --------------------------------------
+
+  describe 'Global stock ticker' do
+    include Rack::Test::Methods
+
+    def app
+      TechFeedReader
+    end
+
+    it 'renders on a signed-in page when the user has quotes to show' do
+      StockFollowsStore.add(user_id: 1, symbol: 'AAPL', name: 'Apple')
+      StockQuotesStore.upsert(symbol: 'AAPL', name: 'Apple Inc', price: 200.0, change: 1.0, change_pct: 0.5)
+      get '/articles'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('stock-ticker-track')
+      expect(last_response.body).to include('AAPL')
+    end
+
+    it 'is omitted when there are no cached quotes to show' do
+      # No follows and no index quotes seeded → nothing to render.
+      get '/articles'
+      expect(last_response).to be_ok
+      expect(last_response.body).not_to include('stock-ticker-track')
     end
   end
 end
