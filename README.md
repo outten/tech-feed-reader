@@ -14,7 +14,7 @@ A multi-user, passkey-authenticated web application that aggregates public, free
 
 - **Multi-user, passkey-only auth** (Phase A1) — WebAuthn sign-up + sign-in with 10 single-use recovery codes; an auth-wall middleware on every protected route; `/account` for display name + passkeys + recovery-code regeneration + account deletion. No passwords, no email.
 - **Per-user data, shared catalog** (Phase A2) — every signed-in user has their own `read_state` / bookmarks / tags / mute rules / sports follows / digests / triages; the `feeds` catalog stays shared via a `user_feed_subscriptions` bridge so one fetch keeps every subscriber up to date.
-- **Discovery on `/feeds`** — 138 curated catalog entries with a client-side filter toolbar (search + topic chips); recommended-for-you + 🔥 popular-with-other-readers top charts; AI feed recommender (Claude) from a free-text prompt; Apple Podcasts URLs auto-resolve to the underlying RSS.
+- **Discovery on `/feeds`** — 227 curated catalog entries with a client-side filter toolbar (search + topic chips); recommended-for-you + 🔥 popular-with-other-readers top charts; AI feed recommender (Claude) from a free-text prompt; Apple Podcasts URLs auto-resolve to the underlying RSS.
 - **Home & onboarding** — `/` shows a marketing pitch to first-time visitors, the `/welcome` topic-chip onboarding (Tech / Sports / Nature / Podcasts / Humor) to newly signed-in users with zero subscriptions, and **What's On Today** (today's sports fixtures, top reads ranked by For You, podcast episodes, YouTube videos) to everyone else.
 - **Unified reading list** (`/articles`) — mixes 📄 articles, 🎧 podcasts, 📺 videos with day-group dividers, left-anchored thumbnails (per-article → YouTube → feed-cover fallback), source-cluster ribbons, and a 📖 reading-time pill.
 - **AI triage** (`/triage`) — Claude Sonnet 4.6 classifies your unread queue into must-read / optional / skip with rationale; daily cron emits one triage per topic.
@@ -32,7 +32,7 @@ A multi-user, passkey-authenticated web application that aggregates public, free
 
 ```bash
 make install
-make seed-feeds # optional: insert the 5 starter feeds (browse 103 more on /feeds)
+make seed-feeds # optional: insert the 5 starter feeds (browse 222 more on /feeds)
 make run        # dev server with rerun auto-reload → http://localhost:4567
 make test       # RSpec — smoke suite passes out of the box
 ```

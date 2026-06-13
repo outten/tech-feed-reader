@@ -5809,6 +5809,13 @@ html.dark .stock-search-input:focus {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+/* Respect the user's reduced-motion preference — stop the ticker
+   auto-scrolling (it already pauses on hover; this opts out entirely)
+   and let it scroll manually on overflow instead. */
+@media (prefers-reduced-motion: reduce) {
+  .stock-ticker-track { animation: none; }
+  .stock-ticker-bar { overflow-x: auto; }
+}
 .stock-ticker-item {
   display: inline-flex;
   align-items: center;
