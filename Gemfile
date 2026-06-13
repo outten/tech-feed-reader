@@ -16,6 +16,12 @@ group :test do
   gem 'simplecov', require: false
 end
 
+# Dependency vulnerability audit — `bundle exec bundle-audit check --update`
+# runs in CI (.github/workflows/ci.yml) to catch known-vuln gems.
+group :development, :test do
+  gem 'bundler-audit', require: false
+end
+
 # Dev-only request profiler — injects a small badge in the top-left of
 # every HTML response with per-request timing + per-SQL-query breakdown
 # (auto-instruments `pg` when loaded). Loaded only in development; not
@@ -70,8 +76,10 @@ gem 'sidekiq', '~> 8.0'
 
 # Recurring background jobs (hourly feed refresh, nightly sports sync).
 # Schedule is loaded at sidekiq_boot in the server process only; jobs
-# fire via the standard Sidekiq queue + retry pipeline.
-gem 'sidekiq-cron', '~> 1.12'
+# fire via the standard Sidekiq queue + retry pipeline. 2.x is the
+# Sidekiq 8-compatible line and fixes GHSA-xv9c-mjw8-79gf (XSS in the
+# Web cron UI).
+gem 'sidekiq-cron', '~> 2.4'
 
 # Pin connection_pool to the 2.x line — Sidekiq 7.3 declares
 # `connection_pool >= 2.3.0` but is incompatible with the 3.x rewrite
