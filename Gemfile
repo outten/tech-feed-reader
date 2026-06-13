@@ -71,7 +71,7 @@ gem 'sidekiq', '~> 8.0'
 # Recurring background jobs (hourly feed refresh, nightly sports sync).
 # Schedule is loaded at sidekiq_boot in the server process only; jobs
 # fire via the standard Sidekiq queue + retry pipeline.
-gem 'sidekiq-cron', '~> 1.12'
+gem 'sidekiq-cron', '~> 2.4'
 
 # Pin connection_pool to the 2.x line — Sidekiq 7.3 declares
 # `connection_pool >= 2.3.0` but is incompatible with the 3.x rewrite
