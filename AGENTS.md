@@ -68,7 +68,7 @@ Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [
 | `RETENTION_DAYS` | Article retention window for [`Pruner`](app/pruner.rb). Default `7`. Sweep runs at the end of `make refresh-feeds` and standalone via `make prune`. |
 | `PRUNE_KEEP_UNREAD` | Set to `1` to preserve unread articles past the retention window (default sweeps unread + read). Bookmarked articles are always kept. |
 | `PRUNE_ON_REFRESH` | Set to `0` to skip the post-refresh sweep on a given `make refresh-feeds` run. |
-| `FINNHUB_API_KEY` | Finnhub stock API (free tier, 60 req/min). Powers `/stocks` search, detail, the dashboard ticker, and the hourly `IndexSyncWorker`. Optional — stock features hide when unset. **Production**: must be in both `.env` and `docker-compose.yml` environment blocks (app + sidekiq). |
+| `FINNHUB_API_KEY` | Finnhub stock API (free tier, 60 req/min). Powers `/stocks` search, detail, the global ticker (every signed-in page, via the `ticker_quotes` helper), and the hourly `IndexSyncWorker`. Optional — stock quote features hide when unset (per-symbol news via Yahoo RSS needs no key). **Production**: must be in both `.env` and `docker-compose.yml` environment blocks (app + sidekiq). |
 
 **Logging**: every HTTP request, feed fetch, refresh, Claude call, chat turn, digest run, and Sidekiq job emits a single-line JSON event to STDOUT via [`app/logger.rb`](app/logger.rb). Per-request lines come from [`app/request_log_middleware.rb`](app/request_log_middleware.rb), which sits at the Rack layer so it sees static assets too (Sinatra `after` filters skip them). Defaults: `debug` in dev, `info` in `RACK_ENV=staging` / `production`, `fatal` in `test`. `LOG_LEVEL=debug|info|warn|error|fatal` overrides. Pipe through `jq` for pretty-printing: `make run | jq -c`.
 
@@ -174,6 +174,7 @@ Hard test will live in `spec/articles_perf_spec.rb` (mirrors `t-money`'s `portfo
 | `background_pool` | Pool of Picsum image IDs powering the per-page background. STUFF #21 doubled the pool to 100. |
 | `stock_follows` | STUFF #85: per-user stock symbol follows. Mirrors sports_follows pattern. (user_id, symbol, name). |
 | `stock_quotes` | STUFF #85: cached quote snapshots. One row per symbol, refreshed every 15 min by StockSyncWorker (followed symbols) and hourly by IndexSyncWorker (10 major indices via ETF proxies: SPY, DIA, QQQ, IWM, EWU, EWG, EWJ, EWH, EWQ, FEZ). Primary key is `symbol` (no id column). |
+| *(stock news)* | Per-symbol news has **no new table** — `StockNewsFeed` (app/stock_news_feed.rb) maps a symbol to its Yahoo Finance per-symbol RSS feed (topic `finance`) in the existing `feeds` catalog, so its headlines flow through the ordinary feed→article pipeline. Following a symbol subscribes the user to that feed (surfacing its news in `/articles` + home); `GET /stocks/:symbol/news` re-renders just the section for the `stock-news.js` cold-start poller. |
 
 **Recommendation modules** (Phase 6): `Recommendation` is the per-article "Articles like this" surfaced on `/article/:uid` (PG `ts_rank` over websearch_to_tsquery, no personalization). `Recommendation::ForYou` ([app/recommendation/for_you.rb](app/recommendation/for_you.rb)) is the personalised relevance ranker on `/articles?sort=relevance` — blends recency × per-feed weight × ±corpus overlap. Pure compute; no background job. Empty corpus collapses to chronological so a brand-new install is unaffected. `next_after(article)` (Phase 7) returns one suggestion for the Read-next card on `/article/:uid`, falling back to the full-text path when the corpus is cold.
 
@@ -365,6 +366,7 @@ app/
   workers/stock_sync_worker.rb     # every 15 min: refresh followed stock symbols via Finnhub
   workers/stock_quote_fetch_worker.rb  # eager single-symbol fetch on follow
   workers/index_sync_worker.rb     # hourly (:05): refresh 10 major world indices (ETF proxies)
+  stock_news_feed.rb               # symbol → Yahoo per-symbol RSS feed; followed-symbol news rides the feed→article pipeline
 
 db/
   migrations/                      # 23 migrations; runner in app/database.rb applies in filename order
@@ -382,6 +384,7 @@ public/
   youtube-watch.js                 # YouTube IFrame API watch-progress tracking
   nav-dropdown.js                  # Browse/AI/Manage dropdown: hover bridge + click-to-toggle (.open class)
   stock-sparklines.js              # fetch /api/stocks/sparklines, draw canvas intraday charts on index cards
+  stock-news.js                    # /stocks/:symbol cold-start poller — polls /stocks/:symbol/news, swaps the section in when the feed warms
   mutes-tags.js                    # AJAX add/delete for mute rules (/feeds) and tag rules (/tags); no scroll loss
 
 scripts/
@@ -390,6 +393,7 @@ scripts/
   generate_digest.rb / prune_articles.rb / generate_triage.rb
   seed_sports_data.rb / sync_sports.rb / backfill_podcast_images.rb / backfill_audio.rb
   dedup_sports_teams.rb / normalize_team_slugs_to_catalog.rb  # STUFF #68 + #69 one-shot data fixes
+  backfill_stock_news_feeds.rb    # one-shot: subscribe pre-existing stock follows to their Yahoo news feed
   capture_home_screenshots.rb     # marketing screenshot capture (boots app on :4569 with auth bypassed)
   bump_version.rb                  # VERSION bump for release-{major,minor,patch}
   run_all.sh / stop_all.sh         # orchestrate Jaeger + Redis + web + sidekiq for one-command dev

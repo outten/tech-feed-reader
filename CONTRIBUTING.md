@@ -19,6 +19,27 @@ git checkout main && git pull --ff-only origin main && git remote prune origin
 
 ---
 
+## Prerequisites
+
+- **Ruby 3.4.1** (pinned in `.ruby-version`) + Bundler.
+- **PostgreSQL** — the app and the test suite both need a Postgres database. The
+  suite requires `TEST_DATABASE_URL` pointing at a *disposable* database (it
+  truncates between examples):
+
+  ```bash
+  createdb tfr_dev tfr_test            # one-time
+  make install                         # bundle install
+  make migrate                         # apply db/migrations-postgres/*.sql
+  TEST_DATABASE_URL=postgres://localhost/tfr_test make test   # full suite, must be 0 failures
+  ```
+
+- **Redis** is needed only to run Sidekiq workers locally (`make redis`, `make sidekiq`), not for the test suite.
+- **No external API keys** are required to boot or to run tests. Anthropic / Finnhub keys are optional; features degrade gracefully when unset.
+
+New to the codebase? Start with **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the system map, then [AGENTS.md](AGENTS.md) for conventions.
+
+---
+
 ## 1. Branch off `main`
 
 ```bash
@@ -27,6 +48,8 @@ git checkout -b outten/TODO-NNN
 ```
 
 Branch naming: `outten/TODO-NNN` where `NNN` is the next sequential number (latest merged → look at `git log --oneline -10` and increment). One branch per PR; we don't keep long-lived feature branches.
+
+> **External contributors:** fork the repository and open a PR from a branch on your fork (any descriptive branch name is fine — the `outten/…` prefix is the maintainer's convention for direct pushes). Everything else below applies the same.
 
 ## 2. Implement
 
@@ -143,6 +166,34 @@ git remote prune origin   # drop the deleted-remote-branch ref
 
 ---
 
+## Releasing (maintainers)
+
+Releases are tag-driven and ship to production via GitHub Actions. From a clean
+`main`:
+
+```bash
+make deploy-patch   # or deploy-minor / deploy-major
+```
+
+This runs the full suite, bumps `VERSION`, commits `chore: release vX.Y.Z`, tags,
+and pushes. Pushing the `v*` tag triggers [.github/workflows/deploy.yml](.github/workflows/deploy.yml),
+which re-runs the suite, builds a `linux/amd64` image, pushes it to the registry,
+and SSH-deploys the host. See [docs/ARCHITECTURE.md §9](docs/ARCHITECTURE.md) and
+[DEPLOYMENT.md](DEPLOYMENT.md).
+
+## License of contributions
+
+This project is licensed under **[AGPL-3.0](LICENSE)**. By contributing, you agree
+your contributions are licensed under those same terms. Please sign off your
+commits to certify the [Developer Certificate of Origin](https://developercertificate.org/):
+
+```bash
+git commit -s -m "..."     # adds a Signed-off-by: trailer
+```
+
+Be kind in issues, reviews, and discussion — assume good faith and keep it
+collaborative.
+
 ## Memory-backed workflow rules
 
 These are saved in agent memory so future sessions honour them (inherited from `t-money-terminal` — same rules apply here):
@@ -157,7 +208,8 @@ These are saved in agent memory so future sessions honour them (inherited from `
 | What | Where |
 |---|---|
 | Project brief | [SPEC.md](SPEC.md) |
-| Architecture / caching contract / store inventory | [AGENTS.md](AGENTS.md) |
+| System architecture + diagrams | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Caching contract / store inventory / gotchas | [AGENTS.md](AGENTS.md) |
 | Feature surface / page list | README.md |
 | Roadmap (shipped / open / dropped) | SPEC.md tier list + PR history |
 | Cache-only render contract enforcer | `spec/articles_perf_spec.rb` |

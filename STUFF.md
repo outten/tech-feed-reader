@@ -1410,3 +1410,21 @@ Actions to convert to AJAX (in-place DOM update, no scroll loss):
 Already AJAX (no action needed): feeds catalog add/remove/weight, sports follow/unfollow, stock follow/unfollow, NPR/PBS subscribe/unsubscribe.
 
 **Status: tests** — all four items implemented. Sports manage sport got `js-sports-follow-form` class (one-liner — already AJAX-capable, just missing the class). Mutes and tags routes now return JSON when `Accept: application/json`. New `public/mutes-tags.js` handles AJAX add/delete for both, with in-place DOM updates and flash messages. No scroll loss on any of these actions.
+
+## [x] 95. Welcome-page feature cards for Stocks & Daily Games
+
+The anonymous home page feature cards for "Stocks & indices" and "Daily games" rendered as plain text while the eight cards above them all carried a screenshot — breaking the alternating image/text rhythm.
+
+**Status: merged** — PR #194, shipped in v0.24.0. Both cards promoted to `home-feature-with-image` in `views/home.erb` (no CSS change — `:nth-child(odd)` handles left/right placement); added two 1280×900 light-mode screenshots (`public/img/home/stocks.png`, `games.png`).
+
+## [x] 96. Per-symbol stock news on /stocks/:symbol + in Articles/home
+
+The `/stocks/:symbol` page was sparse (quote + stat cards only). Show recent news for the symbol, and when a user follows a symbol, route its news into the Articles section and the home page.
+
+**Status: merged** — PR #195, v0.24.0. Yahoo Finance publishes a standard per-symbol RSS feed (no key, works for ETF index tickers too). `StockNewsFeed` (app/stock_news_feed.rb) maps a symbol to one feed in the existing catalog (topic `finance`), so its headlines flow through the ordinary feed→article pipeline. Following a symbol subscribes the user (news surfaces in `/articles?topic=finance` + home "To read today"); a "Recent news" section renders on the detail page. `scripts/backfill_stock_news_feeds.rb` reconciles follows created before the feature. No new table.
+
+## [x] 97. Stock news cold-start fill + global ticker on every page
+
+Two follow-ups: (a) a never-before-viewed symbol showed a static "Fetching…" placeholder until reload; (b) the followed-symbols ticker only appeared on the admin dashboard, not site-wide.
+
+**Status: merged** — PR #196, v0.25.0. (a) The detail-page news section is now a partial (`views/_stock_news.erb`) that carries `data-stock-news-pending` when cold; `GET /stocks/:symbol/news` re-renders just that section and `public/stock-news.js` polls it, swapping in headlines the moment the background refresh imports them — no reload. (b) The scrolling ticker (followed symbols + major indices, via the `ticker_quotes` helper) now renders in `layout.erb` on every signed-in page; the dashboard-only inline render was removed.

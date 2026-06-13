@@ -16,7 +16,7 @@ A multi-user, passkey-authenticated web application that aggregates public, free
 - **Podcasts** (`/podcasts`) — subscribed-show grid with a persistent mini-player at the bottom of every page that survives Turbo navigation; resume-where-you-left-off; 🚌 bus-mode chip for sub-15-min commute episodes.
 - **YouTube** (`/youtube`) — subscribed-channel grid with a bulk-add textarea that resolves `@PBSNewsHour`-style handles → canonical channel-feed URLs via channel-page scrape; background fetch populates new channels within ~30s.
 - **Comics** (`/comics`) — subscribed webcomic series tiles (latest panel as cover) + recent panels list; comic-aware article hero (no crop) + click-to-zoom image lightbox.
-- **Stocks** (`/stocks`) — search for stock symbols via Finnhub API, view company profiles + real-time quotes, follow symbols. Followed symbols display in a scrolling ticker bar on the dashboard. 10 major world indices (S&P 500, DOW, NASDAQ, Russell 2000, FTSE, DAX, Nikkei, Hang Seng, CAC 40, Euro Stoxx 50) tracked via ETF proxies with hourly refresh. User-followed symbols sync every 15 min via Sidekiq cron.
+- **Stocks** (`/stocks`) — search for stock symbols via Finnhub API, view company profiles + real-time quotes, follow symbols. A scrolling ticker bar (followed symbols + the major indices) rides along the top of **every signed-in page**. Each symbol/index page carries a **Recent news** section sourced from that symbol's Yahoo Finance RSS feed (no key required), and following a symbol routes its news into `/articles` and the home page. 10 major world indices (S&P 500, DOW, NASDAQ, Russell 2000, FTSE, DAX, Nikkei, Hang Seng, CAC 40, Euro Stoxx 50) tracked via ETF proxies with hourly refresh. User-followed symbols sync every 15 min via Sidekiq cron.
 - **Games** (`/games`) — daily puzzles and quizzes: **Sudoku** (backtracking-generated 9×9 with pencil notes, live timer, autosave) and **News Trivia** (5 Claude-generated questions from the last 24h of articles, progressive answer reveal with explanations). Both shared daily and per-user progress tracked.
 - **Topics & search** — `/topics` clusters across the recent corpus using weighted scoring (publisher categories 2× body keywords, proper-noun phrase detection like "Jannik Sinner", ubiquity ceiling, URL/site-boilerplate stopword sweep); `/search` is PG full-text with `tsvector` + `ts_headline` snippet highlighting and pre-search suggestion chips.
 - **Observability** — `/health` (liveness JSON), `/metrics` (Prometheus), `/admin/dashboard` (article counts + 7-day Activity chart), `/admin/traces` (OpenTelemetry ring buffer).
@@ -55,8 +55,9 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 | Sports | `/sports` | Followed-team score tiles + per-sport landings (NFL / NBA / soccer / rugby / tennis). Calendar + standings + per-team detail + tennis player follows nested below |
 | Sports calendar | `/sports/calendar` | Upcoming fixtures across followed teams + iCal export |
 | Radio | `/radio` | Browse + follow 32 curated commercial-free internet radio stations (SomaFM, KCRW, KEXP, WFMU, FIP, Swiss Radio, NTS, Radio Paradise, …). Live-stream mode in the global player (LIVE badge, no scrubber) |
-| Stocks | `/stocks` | Stock symbol search (Finnhub), major indices grid with intraday sparkline charts + day-range bars (Yahoo Finance, no key required), follow buttons. Followed symbols show in a scrolling ticker on the dashboard |
-| Stock detail | `/stocks/:symbol` | Company profile, real-time quote (price, change, day range, market cap), follow/unfollow |
+| Stocks | `/stocks` | Stock symbol search (Finnhub), major indices grid with intraday sparkline charts + day-range bars (Yahoo Finance, no key required), follow buttons. A scrolling ticker (followed symbols + indices) shows on every signed-in page |
+| Stock detail | `/stocks/:symbol` | Company profile, real-time quote (price, change, day range, market cap), follow/unfollow, and a **Recent news** section from the symbol's Yahoo RSS feed |
+| Stock news (fragment) | `/stocks/:symbol/news` | Renders just the Recent-news section; polled by `public/stock-news.js` so a cold feed fills in without a reload |
 | Triage | `/triage` | AI triage (Claude Sonnet 4.6) — classifies unread into must-read / optional / skip with rationale; per-topic chips; daily cron history |
 | Digests | `/digests` | Daily snapshots of unread articles + summaries (produced by `make digest`) |
 | Digest detail | `/digests/:id` | Inline render of a stored digest + opt-in "Summarize with Claude" |
@@ -79,10 +80,16 @@ Runs on Ruby 3.4.1 (`.ruby-version` pinned). No API keys required to boot — An
 
 ## Documentation
 
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system topology, request lifecycle, ingestion pipeline, data model, and deploy pipeline, with Mermaid diagrams.
 - **[SPEC.md](SPEC.md)** — project brief: goals, non-goals, data model, page list, roadmap.
 - **[AGENTS.md](AGENTS.md)** — architecture, caching contract, store inventory, common gotchas.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — PR workflow (branch / commit / tests / CI / merge).
 - **[DEVELOPER.md](DEVELOPER.md)** — pointer doc for new contributors.
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — production runbook (Docker Compose, Caddy, DigitalOcean).
+
+## License
+
+Licensed under the **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0). You're free to use, study, modify, and self-host it; if you run a modified version as a network service, the AGPL requires you to offer that version's source to its users. See [LICENSE](LICENSE) for the full terms.
 
 ## Conventions inherited from `t-money-terminal`
 

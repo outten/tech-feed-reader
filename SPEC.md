@@ -52,11 +52,20 @@ The original brief was explicit: "**Single-user**, web-based." That ran its cour
 - **Tracing + observability** — OpenTelemetry SDK, `/admin/traces`, optional OTLP exporter. Multiple commits.
 - **PostgreSQL replaces SQLite** (Phase 5 → STUFF #47) — production cut over to a DigitalOcean Managed PG cluster (`tsvector` + `ts_rank` for search). SQLite stayed as the dev/test default during the dual-backend period; STUFF #47 dropped SQLite entirely — the `gem 'sqlite3'` dep, the `data/app.db` file, the `db/migrations/` directory, the adapter abstraction, and the CI sqlite leg are all gone. Tests now require `TEST_DATABASE_URL`.
 
+### Finance — stocks as a new content category
+
+The original brief was "technology articles". Post-launch, a finance surface landed (STUFF #85) — the second genuinely new content domain after sports:
+
+- **Quotes & follows** — `/stocks` symbol search + company profiles + real-time quotes via the **Finnhub** API (`StockQuoteProvider`), follow/unfollow, and 10 major world indices tracked through ETF proxies. New tables `stock_follows` + `stock_quotes`; refreshed by `StockSyncWorker` (every 15 min) + `IndexSyncWorker` (hourly). Degrades gracefully when `FINNHUB_API_KEY` is unset. Initial drop PR #182; intraday **sparkline** beauty pass (Yahoo Finance, no key) followed.
+- **Per-symbol news** (PR #195) — each symbol/index page gained a **Recent news** section sourced from that symbol's **Yahoo Finance per-symbol RSS feed**. Rather than a parallel pipeline, a symbol maps to one feed in the existing catalog (`StockNewsFeed`, topic `finance`), so following a symbol subscribes the user and its news flows into `/articles` + the home page through the ordinary feed→article path. No new table.
+- **Cold-start fill + global ticker** (PR #196) — `GET /stocks/:symbol/news` re-renders just the news section; `public/stock-news.js` polls it so a cold feed fills in without a reload. The scrolling ticker (followed symbols + indices, via the `ticker_quotes` helper) moved from the dashboard to **every signed-in page** in `layout.erb`.
+
 ### Where to read what
 
 | Question | File |
 |---|---|
 | What was the original v1 vision? | rest of this file (sections below this one) |
+| What's the system architecture (with diagrams)? | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | What has actually shipped + what's queued next? | [TODO.md](TODO.md) |
 | What architectural patterns are load-bearing today? | [AGENTS.md](AGENTS.md) |
 | What user-facing asks did we resolve along the way? | [STUFF.md](STUFF.md) |
