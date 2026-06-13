@@ -1,0 +1,33 @@
+<%# Recent-news section for a stock/index symbol. Rendered both inline on
+    /stocks/:symbol and on its own by GET /stocks/:symbol/news (the poll
+    endpoint). When the feed is cold (no cached articles yet) the section
+    carries data-stock-news-pending so stock-news.js polls until the
+    background refresh imports articles, then swaps this block in. %>
+<section class="benchmark-section whats-on-section" id="stock-news"<%= (@news || []).any? ? '' : %Q( data-stock-news-pending="#{h(@symbol)}") %>>
+  <h3>📰 Recent news</h3>
+  <% if (@news || []).any? %>
+    <ul class="sports-article-list">
+      <% @news.each do |article| %>
+        <% summary_text = skim_summary_for(article, nil) %>
+        <li class="sports-article <%= 'read' if article['read'] == 1 %>">
+          <h4 class="sports-article-title">
+            <a href="/article/<%= article['uid'] %>"><%= h(article['title']) %></a>
+          </h4>
+          <% unless summary_text.empty? %>
+            <p class="sports-article-summary"><%= h(summary_text) %></p>
+          <% end %>
+          <div class="sports-article-meta">
+            <span title="Published <%= h(article['published_at']) %>"><%= relative_time(article['published_at']) %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+    <% unless @followed %>
+      <p class="subtitle whats-on-foot">
+        <a href="/articles?topic=finance">Follow this symbol to add its news to your queue &rarr;</a>
+      </p>
+    <% end %>
+  <% else %>
+    <p class="muted">Fetching the latest <%= h(@symbol) %> news — this will appear in a moment.</p>
+  <% end %>
+</section>

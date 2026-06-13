@@ -1,35 +1,29 @@
-<%# Stock ticker bar — included on the dashboard when the user
-    follows at least one stock symbol. Reads from @stock_quotes
-    (cached DB data, no API calls on render). %>
-<% if @stock_quotes && @stock_quotes.any? %>
+<%# Global stock ticker bar — rendered in the layout on every page for
+    signed-in users. Shows the user's followed symbols then the major
+    world indices (see the ticker_quotes helper). Reads cached DB rows,
+    no API calls on render. Renders nothing when there are no quotes. %>
+<% quotes = ticker_quotes %>
+<% if quotes.any? %>
   <section class="stock-ticker-section" aria-label="Stock ticker">
     <div class="stock-ticker-bar">
       <div class="stock-ticker-track">
-        <% @stock_quotes.each do |q| %>
-          <a href="/stocks/<%= h(q['symbol']) %>" class="stock-ticker-item" title="<%= h(q['name'] || q['symbol']) %>">
-            <span class="stock-ticker-symbol"><%= h(q['symbol']) %></span>
-            <% if q['price'] %>
-              <span class="stock-ticker-price"><%= format_price(q['price']) %></span>
-              <span class="stock-ticker-change <%= q['change'].to_f >= 0 ? 'positive' : 'negative' %>">
-                <%= q['change'].to_f >= 0 ? '▲' : '▼' %>
-                <%= format_pct(q['change_pct']) %>
-              </span>
-            <% end %>
-          </a>
-        <% end %>
-        <%# Duplicate for seamless scroll loop %>
-        <% @stock_quotes.each do |q| %>
-          <a href="/stocks/<%= h(q['symbol']) %>" class="stock-ticker-item" aria-hidden="true" tabindex="-1"
-             title="<%= h(q['name'] || q['symbol']) %>">
-            <span class="stock-ticker-symbol"><%= h(q['symbol']) %></span>
-            <% if q['price'] %>
-              <span class="stock-ticker-price"><%= format_price(q['price']) %></span>
-              <span class="stock-ticker-change <%= q['change'].to_f >= 0 ? 'positive' : 'negative' %>">
-                <%= q['change'].to_f >= 0 ? '▲' : '▼' %>
-                <%= format_pct(q['change_pct']) %>
-              </span>
-            <% end %>
-          </a>
+        <%# Rendered twice (the second pass aria-hidden) so the track can
+            scroll a seamless -50% loop. %>
+        <% 2.times do |pass| %>
+          <% quotes.each do |q| %>
+            <a href="/stocks/<%= h(q['symbol']) %>" class="stock-ticker-item"
+               <%= 'aria-hidden="true" tabindex="-1"' if pass == 1 %>
+               title="<%= h(q['name'] || q['symbol']) %>">
+              <span class="stock-ticker-symbol"><%= h(q['symbol']) %></span>
+              <% if q['price'] %>
+                <span class="stock-ticker-price"><%= format_price(q['price']) %></span>
+                <span class="stock-ticker-change <%= q['change'].to_f >= 0 ? 'positive' : 'negative' %>">
+                  <%= q['change'].to_f >= 0 ? '▲' : '▼' %>
+                  <%= format_pct(q['change_pct']) %>
+                </span>
+              <% end %>
+            </a>
+          <% end %>
         <% end %>
       </div>
     </div>
