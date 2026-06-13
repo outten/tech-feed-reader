@@ -27,7 +27,7 @@ GEM
     cbor (0.5.10.2)
     cgi (0.5.1)
     concurrent-ruby (1.3.6)
-    connection_pool (2.5.5)
+    connection_pool (3.0.2)
     cose (1.3.1)
       cbor (~> 0.5.9)
       openssl-signature_algorithm (~> 1.0)
@@ -405,7 +405,7 @@ PLATFORMS
 DEPENDENCIES
   anthropic
   bundler-audit
-  connection_pool (~> 2.4)
+  connection_pool (~> 3.0)
   csv
   dotenv
   feedjira

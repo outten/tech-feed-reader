@@ -86,7 +86,7 @@ gem 'sidekiq-cron', '~> 2.4'
 # (Sidekiq::Scheduled::Poller#initial_wait calls TimedStack#pop with a
 # timeout arg, which 3.0 dropped). Without this pin Bundler picks up
 # 3.x and the scheduled-job poller crashes on boot.
-gem 'connection_pool', '~> 2.4'
+gem 'connection_pool', '~> 3.0'
 
 # Prometheus client — exposes /metrics in the Prometheus exposition
 # format (text/plain; version=0.0.4). Pure-Ruby in-memory registry;
