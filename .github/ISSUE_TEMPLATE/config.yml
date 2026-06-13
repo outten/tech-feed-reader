@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/outten/tech-feed-reader/security/advisories/new
+    about: Report security issues privately — please do not file them as public issues.
+  - name: Question or idea (Discussions)
+    url: https://github.com/outten/tech-feed-reader/discussions
+    about: Ask a question or float an idea before opening an issue.
+  - name: Contributing guide
+    url: https://github.com/outten/tech-feed-reader/blob/main/CONTRIBUTING.md
+    about: How to set up, test, and open a PR.

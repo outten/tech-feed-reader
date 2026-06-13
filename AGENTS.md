@@ -450,11 +450,11 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 |---|---|
 | `DIGITALOCEAN_ACCESS_TOKEN` | DO API token for DOCR login |
 | `DEPLOY_SSH_KEY` | Private key for `deploy@<droplet-ip>` (`~/.ssh/id_rsa`) |
-| `DROPLET_IP` | `64.225.58.12` |
+| `DROPLET_IP` | the Droplet's public IP (resolve with `terraform output -raw droplet_ipv4`) |
 
 **Rollback**: set `IMAGE_TAG=X.Y.Z` in `/opt/app/.env` on the Droplet, then `make deploy` there.
 
-**Manual fallback** if GH Actions is down: `make publish-image && make _remote_deploy DROPLET_IP=64.225.58.12`.
+**Manual fallback** if GH Actions is down: `make publish-image && make _remote_deploy DROPLET_IP=<droplet-ip>`.
 
 ## AJAX pattern
 
