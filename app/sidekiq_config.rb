@@ -1,5 +1,6 @@
 require 'sidekiq'
 require_relative 'sidekiq_metrics_middleware'
+require_relative 'sidekiq_database_middleware'
 
 # Shared Sidekiq configuration loaded by both the web process (when it
 # enqueues jobs / mounts Sidekiq::Web) and the worker process (started
@@ -16,6 +17,8 @@ module SidekiqConfig
   Sidekiq.configure_server do |config|
     config.redis = { url: REDIS_URL }
     config.server_middleware do |chain|
+      # Outermost: give each job its own pooled DB connection.
+      chain.add SidekiqDatabaseMiddleware
       chain.add SidekiqMetricsMiddleware
     end
   end

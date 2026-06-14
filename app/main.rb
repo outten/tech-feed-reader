@@ -10,6 +10,7 @@ require_relative 'credentials'
 
 require_relative 'logger'
 require_relative 'database'
+require_relative 'database/connection_middleware'
 require_relative 'feeds_store'
 require_relative 'articles_store'
 require_relative 'read_state_store'
@@ -4477,6 +4478,9 @@ if __FILE__ == $PROGRAM_NAME
       run Sidekiq::Web
     end
     map '/' do
+      # Outermost: bind one pooled DB connection per request before any
+      # middleware (RequestLogMiddleware writes pageviews) or route runs.
+      use Database::ConnectionMiddleware
       use RequestLogMiddleware::App
       use MetricsMiddleware
       use RateLimiter
