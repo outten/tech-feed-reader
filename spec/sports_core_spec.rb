@@ -213,3 +213,29 @@ RSpec.describe SportsFollowsStore do
     end
   end
 end
+
+# Batch lookups added to avoid the home-page N+1 in
+# build_teams_by_id_for_matches / build_leagues_by_id_for_matches.
+RSpec.describe 'batch find_many' do
+  it 'SportsLeaguesStore.find_many returns rows for the given ids only' do
+    a = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football',
+                                  source_provider: 'espn', external_id: 'football/nfl')
+    b = SportsLeaguesStore.upsert(slug: 'nba', name: 'NBA', sport: 'basketball',
+                                  source_provider: 'espn', external_id: 'basketball/nba')
+    expect(SportsLeaguesStore.find_many([a['id'], b['id'], 999_999]).map { |r| r['id'] })
+      .to contain_exactly(a['id'], b['id'])
+    expect(SportsLeaguesStore.find_many([])).to eq([])
+  end
+
+  it 'SportsTeamsStore.find_many returns rows for the given ids only' do
+    lg = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football',
+                                   source_provider: 'espn', external_id: 'football/nfl')
+    a = SportsTeamsStore.upsert(league_id: lg['id'], slug: 'eagles', name: 'Eagles',
+                                source_provider: 'espn', external_id: 'e1')
+    b = SportsTeamsStore.upsert(league_id: lg['id'], slug: 'sixers', name: 'Sixers',
+                                source_provider: 'espn', external_id: 's1')
+    expect(SportsTeamsStore.find_many([a['id'], b['id']]).map { |r| r['slug'] })
+      .to contain_exactly('eagles', 'sixers')
+    expect(SportsTeamsStore.find_many(nil)).to eq([])
+  end
+end

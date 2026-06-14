@@ -58,12 +58,21 @@ module ReadStateStore
     upsert(user_id, article_id, passive_feedback: value)
   end
 
+  # Count of unread articles in the user's *subscribed* feeds. The
+  # subscription EXISTS clause both fixes correctness (an unsubscribed
+  # feed's articles aren't "your unread") and avoids a full Seq Scan of
+  # the whole articles corpus — it bounds the count to the user's feeds.
+  # Same scoping pattern as ArticlesStore.state_query.
   def unread_count(user_id)
-    db.execute(<<~SQL, [user_id]).first['c']
+    db.execute(<<~SQL, [user_id, user_id]).first['c']
       SELECT COUNT(*) AS c
       FROM articles a
       LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
       WHERE COALESCE(rs.read, 0) = 0
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
     SQL
   end
 
