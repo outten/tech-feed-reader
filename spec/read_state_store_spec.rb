@@ -74,7 +74,8 @@ RSpec.describe ReadStateStore do
   end
 
   describe '.unread_count' do
-    it 'counts articles with no read_state row OR read=0' do
+    it 'counts unread articles in subscribed feeds (no read_state row OR read=0)' do
+      FeedsStore.subscribe(1, feed['id'])
       ArticlesStore.import(feed_id: feed['id'], entries: [{
         uid: 'b' * 12, title: 'Two',
         url: 'https://example.com/2', author: nil,
@@ -84,6 +85,20 @@ RSpec.describe ReadStateStore do
 
       expect(ReadStateStore.unread_count(1)).to eq(2)
       ReadStateStore.mark_read(1, article_id)
+      expect(ReadStateStore.unread_count(1)).to eq(1)
+    end
+
+    it 'excludes articles from feeds the user is NOT subscribed to' do
+      # `feed` (from the outer let!) is subscribed via FeedsStore.add. Add a
+      # catalog-only feed (no subscription) and an unread article in it.
+      unsub = FeedsStore.add_to_catalog(url: 'https://example.com/unsub.rss')
+      ArticlesStore.import(feed_id: unsub['id'], entries: [{
+        uid: 'c' * 12, title: 'Not subscribed',
+        url: 'https://example.com/3', author: nil,
+        published_at: '2026-05-01T12:00:00Z',
+        content_html: '<p>z</p>', content_text: 'z'
+      }])
+      # Only the subscribed feed's article (article_id) counts.
       expect(ReadStateStore.unread_count(1)).to eq(1)
     end
   end

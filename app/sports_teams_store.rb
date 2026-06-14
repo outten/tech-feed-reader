@@ -24,6 +24,15 @@ module SportsTeamsStore
     db.execute('SELECT * FROM sports_teams WHERE id = ?', [id]).first
   end
 
+  # Batch lookup by id — one query instead of N .find() calls. Used to
+  # build a teams-by-id map for a set of matches without an N+1.
+  def find_many(ids)
+    ids = Array(ids).compact.uniq
+    return [] if ids.empty?
+    placeholders = (['?'] * ids.length).join(', ')
+    db.execute("SELECT * FROM sports_teams WHERE id IN (#{placeholders})", ids)
+  end
+
   def find_by_slug(slug)
     db.execute('SELECT * FROM sports_teams WHERE slug = ?', [slug.to_s]).first
   end

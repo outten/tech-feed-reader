@@ -116,6 +116,11 @@ class TechFeedReader < Sinatra::Base
   set :root, File.expand_path('../..', __FILE__)
   set :views, File.expand_path('../../views', __FILE__)
   set :public_folder, File.expand_path('../../public', __FILE__)
+  # Far-future cache headers for static assets (CSS / JS / images). Safe
+  # because every asset reference is cache-busted by `?v=<mtime>` via the
+  # asset_mtime helper, so a changed file gets a new URL. Applies only to
+  # files served from public_folder — never to dynamic HTML responses.
+  set :static_cache_control, [:public, max_age: 31_536_000]
   set :port, 4567
   set :bind, '0.0.0.0' if ENV['RACK_ENV'] == 'production'
 
@@ -903,12 +908,12 @@ class TechFeedReader < Sinatra::Base
     # rows so the calendar view doesn't N+1 across 30+ rows.
     def build_teams_by_id_for_matches(matches)
       ids = matches.flat_map { |m| [m['home_team_id'], m['away_team_id']] }.compact.uniq
-      ids.each_with_object({}) { |id, h| h[id] = SportsTeamsStore.find(id) }
+      SportsTeamsStore.find_many(ids).each_with_object({}) { |t, h| h[t['id']] = t }
     end
 
     def build_leagues_by_id_for_matches(matches)
       ids = matches.map { |m| m['league_id'] }.compact.uniq
-      ids.each_with_object({}) { |id, h| h[id] = SportsLeaguesStore.find(id) }
+      SportsLeaguesStore.find_many(ids).each_with_object({}) { |l, h| h[l['id']] = l }
     end
 
     # Group matches by local-day key (YYYY-MM-DD in the user's
