@@ -1,6 +1,8 @@
 require_relative '../database'
 require_relative '../recommendation'
 require_relative '../feed_feedback_store'
+require_relative '../articles_store'
+require_relative '../cache'
 
 # Phase 6 — personalised "For You" ranker.
 #
@@ -53,32 +55,51 @@ module Recommendation
     # candidate window so a 👍 on an Eagles article doesn't boost
     # tech rankings (and vice versa). nil = unscoped (legacy
     # behaviour, used when no topic filter is in effect).
+    RANKING_TTL = 300 # seconds — recency half-life is 48h, so a 5-min-stale ranking is fine
+
     def score_window(user_id, state: :unread, kind: :all, limit:, offset:, topic: nil, now: Time.now.utc)
+      # The expensive pipeline (candidate fetch + corpus queries + Ruby
+      # scoring of CANDIDATE_WINDOW rows) is cached as a sorted id-list;
+      # here we just slice it and re-hydrate the rows with CURRENT
+      # per-user state (so read/unread stays fresh under the cache).
+      ranked = ranked_ids(user_id, state: state, kind: kind, topic: topic, now: now)
+      slice  = ranked.drop(offset).first(limit)
+      return [] if slice.empty?
+
+      rows_by_id = ArticlesStore.by_ids_for_user(user_id, slice.map(&:first), state: state)
+                                .each_with_object({}) { |r, h| h[r['id']] = r }
+      slice.filter_map { |id, score| (row = rows_by_id[id]) && row.merge('_score' => score) }
+    end
+
+    # Cached full ranking of the candidate window as [[article_id, score], …],
+    # keyed by (user_id, state, kind, topic). Cache miss runs the full
+    # scoring pipeline; hit returns the parsed list. Degrades to a fresh
+    # compute if Redis is unavailable (Cache.fetch handles that).
+    def ranked_ids(user_id, state:, kind:, topic:, now:)
+      key = "foryou:v1:#{user_id}:#{state}:#{kind}:#{topic || '-'}"
+      Cache.fetch(key, ttl: RANKING_TTL) do
+        compute_ranking(user_id, state: state, kind: kind, topic: topic, now: now)
+      end
+    end
+
+    def compute_ranking(user_id, state:, kind:, topic:, now:)
       pos_terms = corpus_terms(user_id, positive: true,  topic: topic)
       neg_terms = corpus_terms(user_id, positive: false, topic: topic)
 
       candidates = ArticlesStore.recent(
-        user_id,
-        limit:  CANDIDATE_WINDOW,
-        offset: 0,
-        state:  state,
-        kind:   kind,
-        topic:  topic
+        user_id, limit: CANDIDATE_WINDOW, offset: 0, state: state, kind: kind, topic: topic
       )
-
       feed_weights = FeedFeedbackStore.weights_by_feed_id(user_id, candidates.map { |a| a['feed_id'] })
 
-      scored = candidates.map do |a|
-        a.merge('_score' => score_article(a, pos_terms: pos_terms, neg_terms: neg_terms,
-                                              feed_weight: feed_weights[a['feed_id']] || 1.0,
-                                              now: now))
-      end
-
-      # Stable secondary sort on published_at so ties yield the
-      # deterministic "most recent first" the chronological view gives
-      # (smaller age = newer = sorts first when scores tie).
-      scored.sort_by { |a| [-a['_score'], age_hours(a['published_at'], now)] }
-            .drop(offset).first(limit)
+      candidates
+        .map do |a|
+          score = score_article(a, pos_terms: pos_terms, neg_terms: neg_terms,
+                                    feed_weight: feed_weights[a['feed_id']] || 1.0, now: now)
+          # Stable secondary sort on age so score ties yield newest-first.
+          [a['id'], score, age_hours(a['published_at'], now)]
+        end
+        .sort_by { |_id, score, age| [-score, age] }
+        .map { |id, score, _age| [id, score] }
     end
 
     # Pure-compute scorer. Exposed so specs can hit it without a DB
