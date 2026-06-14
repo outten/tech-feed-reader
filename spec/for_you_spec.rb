@@ -228,3 +228,38 @@ RSpec.describe 'GET /articles?sort=relevance' do
     expect(last_response.body).not_to include('class="active for-you"')
   end
 end
+
+# Phase 2 perf — the ranker now caches a ranked id-list and re-hydrates
+# rows with CURRENT per-user state. These cover the re-hydration
+# (ArticlesStore.by_ids_for_user) behaviour that the cache relies on.
+RSpec.describe 'For You ranker re-hydration' do
+  let(:now) { Time.parse('2026-05-06T12:00:00Z').utc }
+
+  it 'score_window(state: :unread) drops articles the user has since read' do
+    _f, a1 = make_article_for_you(uid: 'rehydr00001', title: 'Alpha', published_at: '2026-05-06T11:00:00Z')
+    _f, _a2 = make_article_for_you(uid: 'rehydr00002', title: 'Beta', published_at: '2026-05-06T10:00:00Z')
+
+    ids = described_class_window(state: :unread)
+    expect(ids).to contain_exactly('rehydr00001', 'rehydr00002')
+
+    ReadStateStore.mark_read(1, a1['id'])
+    expect(described_class_window(state: :unread)).to contain_exactly('rehydr00002')
+  end
+
+  it 'by_ids_for_user excludes ids the user is not subscribed to' do
+    _f, a1 = make_article_for_you(uid: 'rehydr00003', title: 'Sub')
+    unsub = FeedsStore.add_to_catalog(url: 'https://x.com/unsub-rss')
+    ArticlesStore.import(feed_id: unsub['id'], entries: [{
+      uid: 'rehydr00004', title: 'Unsub', url: 'https://x.com/u',
+      author: nil, published_at: '2026-05-06T09:00:00Z',
+      content_html: '<p>z</p>', content_text: 'z'
+    }])
+    other = ArticlesStore.find_by_uid('rehydr00004')
+    rows = ArticlesStore.by_ids_for_user(1, [a1['id'], other['id']])
+    expect(rows.map { |r| r['uid'] }).to contain_exactly('rehydr00003')
+  end
+
+  def described_class_window(state:)
+    Recommendation::ForYou.score_window(1, state: state, limit: 50, offset: 0, now: now).map { |a| a['uid'] }
+  end
+end

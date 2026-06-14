@@ -194,6 +194,43 @@ module ArticlesStore
     SQL
   end
 
+  # Re-hydrate full article rows (+ this user's read state) for a set of
+  # ids, subscription-scoped and with an optional fresh state filter.
+  # Used by the For-You ranker to materialize a cached ranking: the
+  # cached id-list carries the ordering; this fetches the rows with
+  # CURRENT read/bookmark state and drops anything the user has since
+  # unsubscribed from or (for state: :unread) read. Order is NOT
+  # guaranteed — the caller re-orders by the cached id-list.
+  def by_ids_for_user(user_id, ids, state: :all)
+    ids = Array(ids).map(&:to_i).uniq
+    return [] if ids.empty?
+    uid = user_id.to_i
+    placeholders = (['?'] * ids.length).join(', ')
+    state_clause = case state
+                   when :unread     then 'AND COALESCE(rs.read, 0) = 0'
+                   when :bookmarked then 'AND rs.bookmarked = 1'
+                   when :archived   then 'AND rs.archived = 1'
+                   when :all        then ''
+                   else raise ArgumentError, "Unknown state filter: #{state.inspect}"
+                   end
+    db.execute(<<~SQL, [uid] + ids + [uid])
+      SELECT a.*,
+             COALESCE(rs.read, 0)       AS read,
+             COALESCE(rs.bookmarked, 0) AS bookmarked,
+             COALESCE(rs.archived, 0)   AS archived,
+             COALESCE(rs.feedback, 0)   AS feedback,
+             rs.opened_at               AS opened_at
+      FROM articles a
+      LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
+      WHERE a.id IN (#{placeholders})
+        AND EXISTS (
+          SELECT 1 FROM user_feed_subscriptions ufs
+          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+        )
+        #{state_clause}
+    SQL
+  end
+
   # Articles tagged with the given tag id, scoped to the user.
   def for_tag(user_id, tag_id, limit: DEFAULT_LIMIT, offset: 0, state: :all)
     sql, qargs = state_query(
