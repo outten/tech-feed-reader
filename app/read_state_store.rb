@@ -1,4 +1,5 @@
 require_relative 'database'
+require_relative 'cache'
 
 # Wrapper around the `read_state` table. The table has one row per
 # (user_id, article_id), but rows are lazily created — an article without
@@ -64,16 +65,20 @@ module ReadStateStore
   # the whole articles corpus — it bounds the count to the user's feeds.
   # Same scoping pattern as ArticlesStore.state_query.
   def unread_count(user_id)
-    db.execute(<<~SQL, [user_id, user_id]).first['c']
-      SELECT COUNT(*) AS c
-      FROM articles a
-      LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
-      WHERE COALESCE(rs.read, 0) = 0
-        AND EXISTS (
-          SELECT 1 FROM user_feed_subscriptions ufs
-          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-        )
-    SQL
+    # Cached (60s) + busted on any read-state write below — this scans the
+    # articles corpus and runs on the home page for every returning user.
+    Cache.fetch("unread:v1:#{user_id}", ttl: 60) do
+      db.execute(<<~SQL, [user_id, user_id]).first['c']
+        SELECT COUNT(*) AS c
+        FROM articles a
+        LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
+        WHERE COALESCE(rs.read, 0) = 0
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+      SQL
+    end
   end
 
   def bookmarked_count(user_id)
@@ -118,6 +123,8 @@ module ReadStateStore
         user_id, article_id, next_row[:read], next_row[:bookmarked],
         next_row[:archived], next_row[:feedback], next_row[:passive_feedback], next_row[:opened_at]
       ])
+      # A read-state change can move the unread count — bust its cache.
+      Cache.delete("unread:v1:#{user_id}")
       get(user_id, article_id)
     end
 

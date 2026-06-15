@@ -30,21 +30,28 @@ module Cache
 
   # Return the cached value for `key`, or run `block`, cache its result
   # for `ttl` seconds, and return it. Degrades to a plain `block` call on
-  # any Redis/JSON error.
-  def fetch(key, ttl:)
+  # any Redis/serialization error.
+  #
+  # marshal: false (default) → JSON. Only cache JSON-round-trippable data
+  #   (primitives, arrays/hashes with STRING keys — DB rows are fine).
+  # marshal: true → Marshal, for plain Ruby structures JSON can't
+  #   round-trip (e.g. symbol-keyed hashes like TopicClusters output).
+  #   Redis is trusted (same store as the job queue); a bad/stale payload
+  #   raises and we just recompute.
+  def fetch(key, ttl:, marshal: false)
     return yield unless enabled?
 
     raw = safe_get(key)
     if raw
       begin
-        return JSON.parse(raw)
-      rescue JSON::ParserError
-        # Corrupt entry — fall through and recompute.
+        return marshal ? Marshal.load(raw.b) : JSON.parse(raw)
+      rescue StandardError
+        # Corrupt / incompatible entry — fall through and recompute.
       end
     end
 
     value = yield
-    safe_set(key, value, ttl)
+    safe_set(key, value, ttl, marshal)
     value
   end
 
@@ -66,8 +73,9 @@ module Cache
       nil
     end
 
-    def safe_set(key, value, ttl)
-      client.call('SET', key, JSON.generate(value), 'EX', ttl)
+    def safe_set(key, value, ttl, marshal = false)
+      payload = marshal ? Marshal.dump(value) : JSON.generate(value)
+      client.call('SET', key, payload, 'EX', ttl)
     rescue StandardError => e
       AppLogger.warn('cache_set_failed', key: key, message: e.message)
     end

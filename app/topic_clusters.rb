@@ -3,6 +3,7 @@ require 'json'
 require_relative 'database'
 require_relative 'recommendation'
 require_relative 'stopwords'
+require_relative 'cache'
 
 # "Trending topics" widget data — pure-Ruby term-frequency clustering
 # over recent articles, no graph algorithms required. Per SPEC.md
@@ -62,7 +63,18 @@ module TopicClusters
   # "N articles" directly; `score` is the weighted sum (categories
   # contribute CATEGORY_WEIGHT, keywords contribute 1.0).
   # Articles are the 3 most recent of each cluster.
+  # Cached wrapper. The clustering is cross-corpus (not per-user) and
+  # changes slowly, so cache it for 30 min — this is the heaviest query
+  # on /admin/dashboard and /topics (scans + tokenizes up to RECENT_LIMIT
+  # rows). Marshal: the result mixes symbol keys (term:/count:/articles:)
+  # with string-keyed article rows, which JSON can't round-trip.
   def recent(days: WINDOW_DAYS_DEFAULT, min_articles: MIN_ARTICLES_DEFAULT, limit: TOP_TOPICS_DEFAULT)
+    Cache.fetch("topics:v1:#{days}:#{min_articles}:#{limit}", ttl: 1800, marshal: true) do
+      compute_recent(days: days, min_articles: min_articles, limit: limit)
+    end
+  end
+
+  def compute_recent(days: WINDOW_DAYS_DEFAULT, min_articles: MIN_ARTICLES_DEFAULT, limit: TOP_TOPICS_DEFAULT)
     cutoff = (Date.today - days + 1).to_s
     date_expr = Database.date_sql('published_at')
     rows = Database.connection.execute(<<~SQL, [cutoff, RECENT_LIMIT])
