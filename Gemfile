@@ -81,12 +81,13 @@ gem 'sidekiq', '~> 8.0'
 # Web cron UI).
 gem 'sidekiq-cron', '~> 2.4'
 
-# Pin connection_pool to the 2.x line — Sidekiq 7.3 declares
-# `connection_pool >= 2.3.0` but is incompatible with the 3.x rewrite
-# (Sidekiq::Scheduled::Poller#initial_wait calls TimedStack#pop with a
-# timeout arg, which 3.0 dropped). Without this pin Bundler picks up
-# 3.x and the scheduled-job poller crashes on boot.
-gem 'connection_pool', '~> 2.4'
+# connection_pool — used by Sidekiq's Redis pool AND the app's own DB
+# pool (app/database.rb). The old `~> 2.4` pin guarded against a
+# Sidekiq 7.3 + connection_pool 3.0 incompatibility (TimedStack#pop
+# signature change crashed the scheduled poller on boot). Sidekiq 8 is
+# compatible with the 3.x line; smoke-tested that sidekiq boots + loads
+# cron and the DB pool works on 3.x.
+gem 'connection_pool', '~> 3.0'
 
 # Prometheus client — exposes /metrics in the Prometheus exposition
 # format (text/plain; version=0.0.4). Pure-Ruby in-memory registry;

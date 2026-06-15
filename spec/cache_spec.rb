@@ -45,6 +45,29 @@ RSpec.describe Cache do
       allow(fake).to receive(:call).with('SET', any_args).and_raise('redis down')
       expect(Cache.fetch('k', ttl: 60) { [5] }).to eq([5])
     end
+
+    context 'marshal: true (for symbol-keyed / mixed-key Ruby structures)' do
+      let(:value) { [{ term: 'ruby', count: 3, articles: [{ 'uid' => 'x' }] }] }
+
+      it 'miss → Marshal-dumps the value and returns it' do
+        allow(fake).to receive(:call).with('GET', 'k').and_return(nil)
+        expect(fake).to receive(:call).with('SET', 'k', Marshal.dump(value), 'EX', 60)
+        expect(Cache.fetch('k', ttl: 60, marshal: true) { value }).to eq(value)
+      end
+
+      it 'hit → unmarshals with symbol AND inner string keys intact' do
+        allow(fake).to receive(:call).with('GET', 'k').and_return(Marshal.dump(value))
+        result = Cache.fetch('k', ttl: 60, marshal: true) { raise 'should not recompute' }
+        expect(result.first[:term]).to eq('ruby')               # symbol key
+        expect(result.first[:articles].first['uid']).to eq('x') # inner string key
+      end
+
+      it 'corrupt marshal payload → recomputes' do
+        allow(fake).to receive(:call).with('GET', 'k').and_return('not marshal data')
+        allow(fake).to receive(:call) # SET
+        expect(Cache.fetch('k', ttl: 60, marshal: true) { value }).to eq(value)
+      end
+    end
   end
 
   it 'is bypassed in the test env by default (enabled? is false)' do
