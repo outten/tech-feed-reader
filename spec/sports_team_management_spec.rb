@@ -140,9 +140,18 @@ RSpec.describe 'Sports team management (STUFF #45)' do
     end
 
     it 'renders an empty-state for tournament-style leagues with no persistent roster' do
-      get '/sports/manage/soccer/fifa-world'
+      # fifa-world is now seeded with national teams; fifa-womens-world is
+      # still rosterless (teams: []), so it exercises the empty state.
+      get '/sports/manage/soccer/fifa-womens-world'
       expect(last_response.status).to eq(200)
       expect(last_response.body).to include('No teams listed')
+    end
+
+    it 'lists the seeded national teams for the FIFA World Cup (followable)' do
+      get '/sports/manage/soccer/fifa-world'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('United States')
+      expect(last_response.body).to include('Brazil')
     end
 
     # STUFF #52 PR3 — News + podcasts panel under the team grid.
