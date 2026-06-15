@@ -3894,14 +3894,17 @@ class TechFeedReader < Sinatra::Base
     File.read(file_path)
   end
 
-  get '/admin/coverage/assets/:file' do |filename|
-    report_dir = File.expand_path('../../coverage/assets', __FILE__)
-    file_path  = File.join(report_dir, File.basename(filename))
-    halt 404 unless File.exist?(file_path)
-    ext = File.extname(filename).downcase
-    content_type({ '.css' => 'text/css', '.js' => 'application/javascript',
-                   '.png' => 'image/png', '.svg' => 'image/svg+xml' }[ext] || 'text/plain')
-    File.read(file_path)
+  # SimpleCov references its assets under a versioned subdir
+  # (assets/<version>/application.css, plus nested images/fonts the CSS
+  # pulls in via url(...)). The old :file route only matched a single
+  # path segment, so every asset 404'd and the report rendered unstyled.
+  # Match the full subpath with a splat, scoped + path-traversal-guarded
+  # to coverage/assets. send_file handles binary + content-type.
+  get '/admin/coverage/assets/*' do
+    assets_dir = File.expand_path('../../coverage/assets', __FILE__)
+    file_path  = File.expand_path(File.join(assets_dir, params['splat'].first.to_s))
+    halt 404 unless file_path.start_with?(assets_dir + File::SEPARATOR) && File.file?(file_path)
+    send_file file_path
   end
 
   get '/admin/coverage' do
