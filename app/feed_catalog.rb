@@ -37,7 +37,13 @@ module FeedCatalog
     business:   'Business',
     travel:     'Travel',
     social:     'Social & Newsletters',
-    politics:   'Politics & Policy'
+    politics:   'Politics & Policy',
+    # 2026-06 catalog expansion
+    design:     'Design & UX',
+    automotive: 'Automotive & EVs',
+    photography: 'Photography',
+    family:     'Parenting & Family',
+    religion:   'Religion & Philosophy'
   }.freeze
 
   # Sub-grouping inside a topic. Used as the H4 headings within the
@@ -79,6 +85,7 @@ module FeedCatalog
     webcomics:   'Webcomics & humor',
     # Finance & Markets (STUFF #85)
     markets_news:  'Market news',
+    personal_finance: 'Personal finance & investing',
     # World News (STUFF #85)
     world:         'World news',
     # Science (STUFF #85)
@@ -98,6 +105,7 @@ module FeedCatalog
     # Health & Wellness
     health_news:   'Health & medicine',
     health_mental: 'Mental health & psychology',
+    health_fitness: 'Fitness & nutrition',
     health_podcast: 'Health podcasts',
     # Arts & Culture
     arts_film:     'Film & TV',
@@ -120,7 +128,13 @@ module FeedCatalog
     # Politics & Policy
     politics_us:   'US politics',
     politics_intl: 'International affairs',
-    politics_pod:  'Politics podcasts'
+    politics_pod:  'Politics podcasts',
+    # 2026-06 catalog expansion
+    design_ux:     'Design & UX',
+    auto_news:     'Automotive & EVs',
+    photo:         'Photography',
+    family_parenting: 'Parenting & family',
+    religion_philosophy: 'Religion & philosophy'
   }.freeze
 
   # Map each sub-category to its top-level topic. Avoids duplicating
@@ -152,6 +166,7 @@ module FeedCatalog
     mythos:      :history,
     webcomics:   :humor,
     markets_news:  :finance,
+    personal_finance: :finance,
     world:         :world_news,
     science_pub:   :science,
     space:         :science,
@@ -166,6 +181,7 @@ module FeedCatalog
     # Health & Wellness
     health_news:   :health,
     health_mental: :health,
+    health_fitness: :health,
     health_podcast: :health,
     # Arts & Culture
     arts_film:     :arts,
@@ -188,7 +204,13 @@ module FeedCatalog
     # Politics & Policy
     politics_us:   :politics,
     politics_intl: :politics,
-    politics_pod:  :politics
+    politics_pod:  :politics,
+    # 2026-06 catalog expansion
+    design_ux:     :design,
+    auto_news:     :automotive,
+    photo:         :photography,
+    family_parenting: :family,
+    religion_philosophy: :religion
   }.freeze
 
   CATALOG = [
@@ -1182,7 +1204,114 @@ module FeedCatalog
     # Note: NPR Politics Podcast also lives under :npr_podcasts.
     { url: 'https://crooked.com/feed/', title: 'Crooked Media', category: :politics_pod,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
-      blurb: 'Pod Save America and sister shows — progressive politics, interviews, and analysis.' }
+      blurb: 'Pod Save America and sister shows — progressive politics, interviews, and analysis.' },
+
+    # ---- Personal finance & investing (4) — Finance & Markets topic ------
+    { url: 'https://www.nerdwallet.com/blog/feed/', title: 'NerdWallet', category: :personal_finance,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Practical money advice — credit, banking, budgeting, and investing.' },
+    { url: 'https://www.fool.com/feeds/index.aspx', title: 'The Motley Fool', category: :personal_finance,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Stock analysis and long-term investing ideas.' },
+    { url: 'https://www.getrichslowly.org/feed/', title: 'Get Rich Slowly', category: :personal_finance,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Personal finance, saving, and the psychology of money.' },
+    { url: 'https://affordanything.com/feed/', title: 'Afford Anything', category: :personal_finance,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Financial independence, real estate, and money decisions.' },
+
+    # ---- Fitness & nutrition (4) — Health & Wellness topic ---------------
+    { url: 'https://www.nerdfitness.com/blog/feed/', title: 'Nerd Fitness', category: :health_fitness,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Approachable strength, fitness, and nutrition coaching.' },
+    { url: 'https://www.menshealth.com/rss/all.xml/', title: "Men's Health", category: :health_fitness,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Workouts, nutrition, and everyday health advice.' },
+    { url: 'https://www.self.com/feed/rss', title: 'SELF', category: :health_fitness,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Science-backed fitness, nutrition, and wellbeing.' },
+    { url: 'https://breakingmuscle.com/feed/', title: 'Breaking Muscle', category: :health_fitness,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Training programs and strength-and-conditioning guidance.' },
+
+    # ---- Design & UX (5) -------------------------------------------------
+    { url: 'https://www.smashingmagazine.com/feed/', title: 'Smashing Magazine', category: :design_ux,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Front-end, UX, and web design — practical, deeply researched articles.' },
+    { url: 'https://www.nngroup.com/feed/rss/', title: 'Nielsen Norman Group', category: :design_ux,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Evidence-based UX research and usability guidance.' },
+    { url: 'https://uxdesign.cc/feed', title: 'UX Collective', category: :design_ux,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Curated product and UX design essays from practitioners.' },
+    { url: 'https://design-milk.com/feed/', title: 'Design Milk', category: :design_ux,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Modern design across products, interiors, architecture, and tech.' },
+    { url: 'https://www.core77.com/feed', title: 'Core77', category: :design_ux,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Industrial and product design news, criticism, and culture.' },
+
+    # ---- Automotive & EVs (5) --------------------------------------------
+    { url: 'https://electrek.co/feed/', title: 'Electrek', category: :auto_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Electric vehicles, clean energy, and the transition off gas.' },
+    { url: 'https://insideevs.com/rss/articles/all/', title: 'InsideEVs', category: :auto_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'EV news, reviews, and sales data.' },
+    { url: 'https://www.thedrive.com/feed', title: 'The Drive', category: :auto_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Car news, reviews, and culture for enthusiasts.' },
+    { url: 'https://www.caranddriver.com/rss/all.xml/', title: 'Car and Driver', category: :auto_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Road tests, buying advice, and auto industry news.' },
+    { url: 'https://jalopnik.com/rss', title: 'Jalopnik', category: :auto_news,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Cars, racing, and the culture around them — irreverent take.' },
+
+    # ---- Photography (5) -------------------------------------------------
+    { url: 'https://petapixel.com/feed/', title: 'PetaPixel', category: :photo,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Photography news, gear, and technique.' },
+    { url: 'https://fstoppers.com/feed', title: 'Fstoppers', category: :photo,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Photography and video education, gear reviews, and community.' },
+    { url: 'https://digital-photography-school.com/feed/', title: 'Digital Photography School', category: :photo,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Tutorials and tips for hobbyist photographers.' },
+    { url: 'https://www.thephoblographer.com/feed/', title: 'The Phoblographer', category: :photo,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Camera reviews and photography craft.' },
+    { url: 'https://www.dpreview.com/feeds/news.xml', title: 'DPReview', category: :photo,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'In-depth camera and lens reviews and industry news.' },
+
+    # ---- Parenting & family (4) ------------------------------------------
+    { url: 'https://www.fatherly.com/feed', title: 'Fatherly', category: :family_parenting,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Parenting, relationships, and family life for dads.' },
+    { url: 'https://www.mother.ly/feed/', title: 'Motherly', category: :family_parenting,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Modern motherhood — pregnancy, parenting, and wellbeing.' },
+    { url: 'https://www.scarymommy.com/feed', title: 'Scary Mommy', category: :family_parenting,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Honest, funny take on parenting and family life.' },
+    { url: 'https://www.janetlansbury.com/feed/', title: 'Janet Lansbury', category: :family_parenting,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Respectful parenting advice rooted in early-childhood development.' },
+
+    # ---- Religion & philosophy (4) ---------------------------------------
+    { url: 'https://psyche.co/feed.rss', title: 'Psyche', category: :religion_philosophy,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Philosophy, psychology, and the art of living well (from Aeon).' },
+    { url: 'https://dailynous.com/feed/', title: 'Daily Nous', category: :religion_philosophy,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'News and discussion from the world of academic philosophy.' },
+    { url: 'https://religionnews.com/feed/', title: 'Religion News Service', category: :religion_philosophy,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Independent reporting on religion, ethics, and spirituality.' },
+    { url: 'https://3quarksdaily.com/feed', title: '3 Quarks Daily', category: :religion_philosophy,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'Curated ideas across philosophy, science, and the arts.' }
   ].freeze
 
   module_function

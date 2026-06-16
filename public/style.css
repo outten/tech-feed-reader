@@ -2486,9 +2486,13 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
 
 /* Catalog TOC — jump-nav above the discover section */
 .catalog-toc {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 2rem;
+  /* Fixed 4 columns via CSS multi-column (not flex-wrap). flex-wrap packed
+     a different count per row (4/5/5/4/1), which read as ragged; a row-based
+     grid would line columns up but leave big gaps under short groups (the
+     tall SPORTS group forces a full row of empty space). Multi-column packs
+     the topic groups top-to-bottom into 4 even columns with no gaps. */
+  columns: 4;
+  column-gap: 2rem;
   padding: 0.75rem 1rem;
   background: #f5f5f7;
   border-radius: 8px;
@@ -2498,6 +2502,9 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0; /* let long labels wrap instead of overflowing the column */
+  break-inside: avoid; /* keep a topic + its links together in one column */
+  margin-bottom: 0.85rem;
 }
 .catalog-toc-topic {
   font-size: 0.68rem;
@@ -2511,6 +2518,7 @@ html.dark .subscribed-badge { background: #1a3a1d; color: #6ee895; }
   color: #0071e3;
   text-decoration: none;
   line-height: 1.4;
+  overflow-wrap: anywhere; /* wrap long labels rather than blow out the column */
 }
 .catalog-toc-link:hover { text-decoration: underline; }
 html.dark .catalog-toc { background: #1c1c1e; }
@@ -2748,6 +2756,9 @@ html.dark .feeds-filter-count { color: #98989d; }
     gap: 0.5rem;
   }
   .catalog-meta { min-width: 0; }
+
+  /* Catalog TOC — 4 columns is too tight on phones; halve it. */
+  .catalog-toc { columns: 2; }
 
   /* Reading view — slimmer side padding so prose fills the screen. */
   .reading-view .article-body { padding: 0.9rem 1.1rem; }
