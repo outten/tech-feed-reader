@@ -85,6 +85,16 @@ services:
       API_SPORTS_KEY: ${API_SPORTS_KEY:-}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     command: ["bundle", "exec", "sidekiq", "-r", "./app/sidekiq_boot.rb", "-c", "5"]
+    # The app image's HEALTHCHECK curls the web server's /health on :4567 —
+    # correct for the `app` service, but this container runs the Sidekiq
+    # worker (no web server on :4567), so it always reported "unhealthy".
+    # Disable it: liveness here is the worker being PID 1 + restart:
+    # unless-stopped (a crash exits the container and Compose restarts it),
+    # and the app's /health endpoint already reports the registered Sidekiq
+    # worker count for external monitoring. (A meaningful in-container probe
+    # would have to boot Ruby every interval — too heavy for the worker box.)
+    healthcheck:
+      disable: true
 
   caddy:
     image: caddy:2-alpine
