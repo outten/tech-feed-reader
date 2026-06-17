@@ -89,7 +89,10 @@
           (clicking 👍 again clears the +1; same for 👎). Display flips
           to "Boosted" / "Demoted" with a coloured highlight via the
           .feedback-on-{up,down} modifier classes. %>
-      <form method="post" action="/article/<%= @article['uid'] %>/feedback">
+      <%# js-article-feedback + data-feedback hook public/article-feedback.js,
+          which posts via fetch and re-renders BOTH buttons from the JSON
+          response (no reload). Without JS the plain POST still works. %>
+      <form method="post" action="/article/<%= @article['uid'] %>/feedback" class="js-article-feedback" data-feedback="up">
         <input type="hidden" name="value" value="<%= @state['feedback'].to_i == 1 ? '0' : '1' %>">
         <button type="submit" class="feedback-btn <%= 'feedback-on-up' if @state['feedback'].to_i == 1 %>"
                 title="<%= @state['feedback'].to_i == 1 ? 'Clear the thumbs-up' : 'Thumbs up — the For-You ranker will boost articles like this one' %>">
@@ -97,7 +100,7 @@
         </button>
       </form>
 
-      <form method="post" action="/article/<%= @article['uid'] %>/feedback">
+      <form method="post" action="/article/<%= @article['uid'] %>/feedback" class="js-article-feedback" data-feedback="down">
         <input type="hidden" name="value" value="<%= @state['feedback'].to_i == -1 ? '0' : '-1' %>">
         <button type="submit" class="feedback-btn <%= 'feedback-on-down' if @state['feedback'].to_i == -1 %>"
                 title="<%= @state['feedback'].to_i == -1 ? 'Clear the thumbs-down' : 'Thumbs down — the For-You ranker will demote articles like this one' %>">

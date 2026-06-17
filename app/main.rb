@@ -218,6 +218,14 @@ class TechFeedReader < Sinatra::Base
     require 'rack-mini-profiler'
     require 'stackprof' # enables ?pp=flamegraph
     Rack::MiniProfiler.config.enable_advanced_debugging_tools = true
+    # The badge is injected on every page server-side (the X-MiniProfiler-Ids
+    # header is present on every response), so it renders on any *full* page
+    # load — hard-refresh (Cmd-R) any page to profile it. We deliberately do
+    # NOT set enable_hotwire_turbo_drive_support: the gem's Turbo integration
+    # (through 4.0.1) has a race where, on a Turbo Drive navigation, the new
+    # badge renders into the outgoing page's container and is then destroyed
+    # by Turbo's body swap — so the badge flashes and vanishes, which is more
+    # distracting than just refreshing to profile.
     # Hide the call-stack column for anything under 250ms — the stack
     # only earns its keep on genuinely slow queries (joins, ranker
     # scans, FTS searches). Below the threshold queries still show

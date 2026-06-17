@@ -1428,3 +1428,37 @@ The `/stocks/:symbol` page was sparse (quote + stat cards only). Show recent new
 Two follow-ups: (a) a never-before-viewed symbol showed a static "Fetching…" placeholder until reload; (b) the followed-symbols ticker only appeared on the admin dashboard, not site-wide.
 
 **Status: merged** — PR #196, v0.25.0. (a) The detail-page news section is now a partial (`views/_stock_news.erb`) that carries `data-stock-news-pending` when cold; `GET /stocks/:symbol/news` re-renders just that section and `public/stock-news.js` polls it, swapping in headlines the moment the background refresh imports them — no reload. (b) The scrolling ticker (followed symbols + major indices, via the `ticker_quotes` helper) now renders in `layout.erb` on every signed-in page; the dashboard-only inline render was removed.
+
+## [x] 98. Rack Mini Profiler
+
+Can you add rack-mini-profiler to the Development group. I'd like to profile some of the pages, particularly loading an article as it take a long time: 10,000 ms.
+
+After installing, can you analyze why. Using the debugger it looks like the calls from turbo are serial and not parallel. Please investigate.
+
+**Status: done (PR pending).** rack-mini-profiler was already in the `:development` group (added in #64, with stackprof for `?pp=flamegraph`). Investigation found the article load is **not** slow server-side: the document renders in ~130 ms warm (pure DB reads, no network/LLM in the route) and all 14 layout assets serve in ~7 ms total, fully parallel. The "serial, not parallel" effect is real but small — 10 concurrent dynamic requests ran ~2× faster than serial (not ~5× on 5 Puma threads), i.e. Ruby's GVL serializing the CPU-bound ERB/recommendation work in the single dev process; Turbo 8 also prefetches links on hover, firing request bursts that queue. Couldn't reproduce 10,000 ms locally (test article was text-only; a page with many slow external images would explain it). Shipped: **self-hosted Turbo** (`public/turbo.js`) instead of the render-blocking `unpkg.com` CDN (~200 ms off first paint, removes an external dependency). On the badge: it renders on every **full page load** (Cmd-R any page to profile it); Turbo Drive body-swaps suppress it, and the gem's Turbo integration has a flash-then-vanish race (unfixed through 4.0.1), so we deliberately left `enable_hotwire_turbo_drive_support` off. See #101.
+
+## [x] 99. AJAX Thumbs Up and Down
+
+On an article page, for example /article/19d3f8ceb73c, the thumbs up / down does a page reload. Can you convert this to AJAX.
+
+**Status: done (PR pending).** The two feedback forms on the detail page already posted to `/article/:uid/feedback`, which *already* returned `{ok, value}` for `Accept: application/json` — so this was purely client-side. Extended `public/article-feedback.js` (which already AJAX-ifies the `/articles` + `/bookmarks` list rows) to also intercept the detail-page forms (`.js-article-feedback`, `data-feedback="up"|"down"`): on submit it fetches and re-renders BOTH buttons from the JSON `value` (each button's toggle target depends on the current state) with no reload, falling back to a normal submit on error. Moved the script's load from `views/articles.erb` into `views/layout.erb` so it serves both surfaces from one place (per the "JS in layout, not views" rule). Verified via a headless click: no full reload, 👍→"👍 Boosted" + `feedback-on-up`, hidden value flips, 👎 stays plain, second click clears.
+
+## [x] 100. Puma cluster mode vs. threaded
+
+Can you investigate if we should run Puma in cluster mode vs. threaded as we prepare for launch in production?
+
+**Status: investigated — recommendation: stay threaded for launch.**
+
+Current: one Puma process, threaded (`max_threads` 5), booted via `ruby app/main.rb`. Sidekiq is a separate process.
+
+The case *for* cluster mode: Ruby's GVL lets only one thread run Ruby at a time, so threaded-only Puma can't use the Droplet's **4 vCPUs** (`s-4vcpu-8gb`) for the CPU-bound parts of a request (ERB rendering, the For-You ranker) — measured earlier (#98) as ~2× speedup on 10 concurrent requests, not ~5×. Forked workers each get their own GVL → true multi-core parallelism.
+
+The case *against*, two blockers:
+1. **Connection cap.** The managed Postgres is `db-s-1vcpu-1gb` (~22 usable connections). Budget = `workers × (threads + 1 ambient) + sidekiq ~6`. That caps the web at **~2 workers** (2×6 + 6 = 18 ✓; 4 workers = 30 ✗). Going past 2 workers needs a PG tier bump (`db-s-1vcpu-2gb` ≈ 47 conn) — a real cost decision.
+2. **Fork-safety, unverified.** Prototyped a cluster config (`config/puma.rb` with `preload_app!` + `before_fork`/`before_worker_boot { Database.reset! }` + `config.ru`). Single-process boot worked; but in cluster mode the worker **segfaults on the first request inside the `pg` gem** (`pg/connection.rb:944` ← `pg_adapter.rb:147`). The environment is `pg-arm64-darwin` — i.e. **macOS, where `fork()` + libpq is a known crash class**; production is Linux and may well be fine, but it can't be validated on a dev Mac.
+
+Recommendation: **keep threaded for launch.** The PG cap limits the upside to 2 workers, fork-safety is unverified, and the felt-latency wins already shipped (Phases 1–3: scoped `unread_count`, ranker cache, connection pool). Revisit cluster mode post-launch *only if* production profiling shows CPU saturation — and then validate the fork path on a Linux staging box and bump the PG tier first. The prototype was reverted to avoid shipping an unverified, footgun config; its design is captured here.
+
+## [ ] 101. Profiler
+
+Ok, so rack-mini-profiler won't work. Is there any similar service / Gem we could use that would work to profile our application. And in particular monitor the database performance.
