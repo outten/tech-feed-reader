@@ -289,4 +289,5 @@
 <% end %>
 
 <script src="/bulk-actions.js?v=<%= asset_mtime('public/bulk-actions.js') %>"></script>
-<script src="/article-feedback.js?v=<%= asset_mtime('public/article-feedback.js') %>"></script>
+<%# article-feedback.js now loads from layout.erb (serves list rows + the
+    article detail page), so it's no longer included here. %>

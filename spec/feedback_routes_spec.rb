@@ -184,8 +184,10 @@ RSpec.describe 'Feedback UI surfaces' do
       get "/article/#{article['uid']}"
       expect(last_response.body).to include('feedback-on-up')
       expect(last_response.body).to include('👍 Boosted')
-      # The active form posts value=0 to clear
-      expect(last_response.body).to match(%r{<form method="post" action="/article/#{article['uid']}/feedback">\s*<input type="hidden" name="value" value="0">})
+      # The active form posts value=0 to clear. (The detail-page form also
+      # carries the js-article-feedback / data-feedback AJAX hooks — #99 —
+      # so allow attributes after the action.)
+      expect(last_response.body).to match(%r{<form method="post" action="/article/#{article['uid']}/feedback"[^>]*>\s*<input type="hidden" name="value" value="0">})
     end
 
     it 'highlights the 👎 button when feedback is -1' do

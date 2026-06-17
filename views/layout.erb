@@ -32,7 +32,11 @@
       to leave the element untouched on swap). Without Turbo, every
       navigation = new document = audio stops + browser blocks
       autoplay on the new page. %>
-  <script src="https://unpkg.com/@hotwired/turbo@8.0.4/dist/turbo.es2017-umd.js" data-turbo-track="reload"></script>
+  <%# Turbo 8.0.4, self-hosted from public/turbo.js (was loaded render-blocking
+      from unpkg.com — external dependency + ~200ms on every first paint). Update
+      by re-downloading dist/turbo.es2017-umd.js for the new version; asset_mtime
+      busts the cache and data-turbo-track="reload" forces a full reload on change. %>
+  <script src="/turbo.js?v=<%= asset_mtime('public/turbo.js') %>" data-turbo-track="reload"></script>
   <script>
     /* Theme bootstrap — runs before <body> renders so there's no FOUC.
        Reads localStorage if set, otherwise honours the OS-level
@@ -355,5 +359,7 @@
   <script src="/radio.js?v=<%= asset_mtime('public/radio.js') %>"></script>
   <script src="/nav-dropdown.js?v=<%= asset_mtime('public/nav-dropdown.js') %>"></script>
   <script src="/source-page.js?v=<%= asset_mtime('public/source-page.js') %>"></script>
+  <%# 👍/👎 feedback — article list rows AND the article detail page (#99). %>
+  <script src="/article-feedback.js?v=<%= asset_mtime('public/article-feedback.js') %>"></script>
 </body>
 </html>

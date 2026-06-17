@@ -1,14 +1,14 @@
-/* Inline 👍 / 👎 controller for /articles + /bookmarks rows.
+/* Inline 👍 / 👎 controller for article feedback. Two surfaces:
+ *   1. /articles + /bookmarks list rows (.news-list / .news-row-feedback).
+ *   2. The article detail page (.js-article-feedback forms) — STUFF #99.
  *
- * The same .news-row-feedback markup ships with a plain <form> per
- * button so the no-JS fallback still works (server returns a 302 to
- * `return_to`). With JS, we intercept the click, POST via fetch with
- * `Accept: application/json`, and toggle the button state in place —
- * no navigation, no scroll-to-top.
+ * Both ship plain <form>s so the no-JS fallback still works (server
+ * returns 302 / re-renders without JS). With JS we intercept, POST via
+ * fetch with `Accept: application/json`, and toggle button state in
+ * place — no navigation, no scroll-to-top, no full-page reload.
  *
- * Re-binds on `turbo:load` since Turbo swaps the list <main> on
- * navigation (filter chips, pagination, etc.). The data-feedback-bound
- * guard avoids double-binding when the same list element is preserved.
+ * Re-binds on `turbo:load` since Turbo swaps the <body>/list on
+ * navigation. The dataset-bound guards avoid double-binding.
  */
 (function () {
   'use strict';
@@ -20,6 +20,7 @@
       list.dataset.feedbackBound = '1';
       list.addEventListener('click', onClick);
     });
+    initDetail();
   }
 
   function onClick(e) {
@@ -82,6 +83,83 @@
     downBtn.setAttribute('title',
       value === -1 ? 'Clear the thumbs-down on this article'
                    : 'Thumbs down — demote articles like this one in the For-You sort');
+  }
+
+  // --- Article detail page (#99) -------------------------------------
+  // The detail page renders two <form.js-article-feedback> (data-feedback
+  // up/down) that full-reload without JS. Intercept + re-render both
+  // buttons from the JSON `value` (the toggle target of each depends on
+  // the current state). Config mirrors views/article.erb exactly.
+  var DETAIL = {
+    up: {
+      active: 1, on: '0', off: '1', cls: 'feedback-on-up',
+      labelOn: '👍 Boosted', labelOff: '👍',
+      titleOn: 'Clear the thumbs-up',
+      titleOff: 'Thumbs up — the For-You ranker will boost articles like this one'
+    },
+    down: {
+      active: -1, on: '0', off: '-1', cls: 'feedback-on-down',
+      labelOn: '👎 Demoted', labelOff: '👎',
+      titleOn: 'Clear the thumbs-down',
+      titleOff: 'Thumbs down — the For-You ranker will demote articles like this one'
+    }
+  };
+
+  function initDetail() {
+    if (document.body.dataset.articleDetailFeedbackBound === '1') return;
+    document.body.dataset.articleDetailFeedbackBound = '1';
+    document.body.addEventListener('submit', onDetailSubmit, true);
+  }
+
+  function onDetailSubmit(e) {
+    var form = e.target;
+    if (!form || !form.matches || !form.matches('form.js-article-feedback')) return;
+    e.preventDefault();
+
+    var btn = form.querySelector('button[type="submit"]');
+    var valueInput = form.querySelector('input[name="value"]');
+    var body = new URLSearchParams();
+    body.set('value', valueInput ? valueInput.value : '0');
+    if (btn) btn.disabled = true;
+
+    fetch(form.getAttribute('action'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: body.toString()
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) { applyDetailState(parseInt(data.value, 10) || 0); })
+      .catch(function (err) {
+        console.warn('[article-feedback] detail AJAX failed, falling back to submit', err);
+        form.submit();
+      })
+      .finally(function () { if (btn) btn.disabled = false; });
+  }
+
+  function applyDetailState(value) {
+    renderDetailButton('up', value === DETAIL.up.active);
+    renderDetailButton('down', value === DETAIL.down.active);
+  }
+
+  function renderDetailButton(which, active) {
+    var cfg = DETAIL[which];
+    var form = document.querySelector('form.js-article-feedback[data-feedback="' + which + '"]');
+    if (!form) return;
+    var input = form.querySelector('input[name="value"]');
+    var btn = form.querySelector('button[type="submit"]');
+    if (input) input.value = active ? cfg.on : cfg.off;
+    if (btn) {
+      btn.classList.toggle(cfg.cls, active);
+      btn.textContent = active ? cfg.labelOn : cfg.labelOff;
+      btn.title = active ? cfg.titleOn : cfg.titleOff;
+    }
   }
 
   init();
