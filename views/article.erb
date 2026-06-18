@@ -239,33 +239,22 @@
     <% end %>
   </section>
 
-  <% if @related && @related.any? %>
-    <section class="benchmark-section">
-      <h3>Related</h3>
-      <ul class="news-list news-list-simple">
-        <% @related.each do |a| %>
-          <li class="news-item">
-            <a class="news-headline" href="/article/<%= a['uid'] %>"><%= h(a['title']) %></a>
-            <div class="news-meta">
-              <% if (feed = (@feeds_by_id || {})[a['feed_id']]) %>
-                <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
-              <% end %>
-              <span><%= relative_time(a['published_at']) %></span>
-            </div>
-          </li>
-        <% end %>
-      </ul>
-    </section>
-  <% end %>
+  <%# async-related-articles — the Related panel (an FTS ts_rank query that
+      took 1.4–2s on real articles) is lazy-loaded from GET /article/:uid/related
+      by public/lazy-fragment.js once its sentinel nears view, so it no longer
+      blocks article render. %>
+  <div class="related-sentinel" aria-hidden="true"></div>
+  <div data-fragment-url="/article/<%= h(@article['uid']) %>/related"
+       data-fragment-sentinel=".related-sentinel"></div>
 
-  <%# Phase 7 + speed-up-article-load — Read-next card, lazy-loaded. The
-      sentinel + empty placeholder ship with the page; public/read-next.js
-      fetches GET /article/:uid/read-next and swaps the card in once the
+  <%# Phase 7 + speed-up-article-load — Read-next card, lazy-loaded by
+      public/lazy-fragment.js: the sentinel + empty placeholder ship with the
+      page and the card is fetched from GET /article/:uid/read-next once the
       sentinel nears view, so the expensive ForYou.next_after ranking never
-      blocks article render (and is skipped if the reader never scrolls
-      this far). For-You pick preferred, FTS5 "Related" fallback. %>
+      blocks article render. For-You pick preferred, FTS5 "Related" fallback. %>
   <div class="read-next-sentinel" aria-hidden="true"></div>
-  <div data-read-next-url="/article/<%= h(@article['uid']) %>/read-next"></div>
+  <div data-fragment-url="/article/<%= h(@article['uid']) %>/read-next"
+       data-fragment-sentinel=".read-next-sentinel"></div>
 
   <footer class="article-footer">
     <p class="subtitle">

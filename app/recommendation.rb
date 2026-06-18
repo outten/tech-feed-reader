@@ -1,6 +1,7 @@
 require_relative 'database'
 require_relative 'summarizer/extractive'
 require_relative 'stopwords'
+require_relative 'cache'
 
 # "Articles like this" — deterministic, term-overlap based, no
 # personalization. Validates against SPEC.md's "no recommendation
@@ -25,24 +26,51 @@ module Recommendation
 
   # Returns rows shaped like ArticlesStore.recent (with the FTS5 `rank`
   # column added). Empty array when there's nothing to compare against.
+  # Related articles by FTS keyword similarity. Cached per (article, user):
+  # the result changes only as new articles import (the article body is
+  # immutable; the user's subscription set is slow-moving), so a medium TTL is
+  # safe and a warm fetch is instant. The cold compute is bounded — see
+  # compute_related. (change: async-related-articles — this used to run inline
+  # on /article/:uid and took 1.4–2s on real articles at scale.)
+  RELATED_CACHE_TTL       = 1800  # 30 min
+  RELATED_CANDIDATE_LIMIT = 500   # ts_rank only the most-recent N FTS matches
+
   def for_article(user_id, article, limit: DEFAULT_LIMIT)
     return [] if article.nil?
 
     keywords = top_keywords(article['content_text'].to_s)
     return [] if keywords.empty?
 
+    Cache.fetch("related:v1:#{article['id']}:#{user_id}", ttl: RELATED_CACHE_TTL) do
+      compute_related(user_id, article['id'], keywords, limit)
+    end
+  end
+
+  # The OR of the body's top keywords matches thousands of rows at scale, and
+  # ts_rank over all of them was the ~2s cost. Bound it: take the most-recent
+  # RELATED_CANDIDATE_LIMIT matches first (index-friendly), then ts_rank only
+  # those for the top-`limit`. "Related" becomes "related & recent" — the right
+  # read for a feed reader. Returns lean rows (only what the panel + the
+  # Read-next fallback use) so the cache payload stays small.
+  def compute_related(user_id, article_id, keywords, limit)
     # websearch_to_tsquery understands `OR` and is gentler than plain
     # to_tsquery on unusual tokens (won't error on stray punctuation).
     query = keywords.join(' OR ')
-    Database.connection.execute(<<~SQL, [query, query, article['id'], user_id.to_i, limit])
-      SELECT a.*, ts_rank(a.tsv, websearch_to_tsquery('english', ?)) AS rank
-      FROM articles a
-      WHERE a.tsv @@ websearch_to_tsquery('english', ?)
-        AND a.id != ?
-        AND EXISTS (
-          SELECT 1 FROM user_feed_subscriptions ufs
-          WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-        )
+    Database.connection.execute(<<~SQL, [query, query, article_id, user_id.to_i, RELATED_CANDIDATE_LIMIT, limit])
+      SELECT c.id, c.uid, c.title, c.feed_id, c.published_at,
+             ts_rank(c.tsv, websearch_to_tsquery('english', ?)) AS rank
+      FROM (
+        SELECT a.id, a.uid, a.title, a.feed_id, a.published_at, a.tsv
+        FROM articles a
+        WHERE a.tsv @@ websearch_to_tsquery('english', ?)
+          AND a.id != ?
+          AND EXISTS (
+            SELECT 1 FROM user_feed_subscriptions ufs
+            WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
+          )
+        ORDER BY a.published_at DESC
+        LIMIT ?
+      ) c
       ORDER BY rank DESC
       LIMIT ?
     SQL

@@ -3157,13 +3157,13 @@ class TechFeedReader < Sinatra::Base
     @all_tags        = TagsStore.all(current_user_id)
     @summary         = SummaryStore.find(@article['id'])
     @claude_available = Summarizer::Claude.available?
-    @related         = Recommendation.for_article(current_user_id, @article, limit: 5)
-    # The personalized "Read next" pick (ForYou.next_after) is deferred to
-    # GET /article/:uid/read-next and lazy-loaded by public/read-next.js when
-    # the reader scrolls near the bottom — it ran a cold-cache ranking that
-    # could take seconds and blocked article render (change:
-    # speed-up-article-load). The cheap FTS @related above stays inline.
-    @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    # Both the "Related" panel (an FTS ts_rank query, 1.4–2s on real articles)
+    # and the personalized "Read next" card (ForYou.next_after, cold-cache could
+    # take seconds) are deferred to lazy fragments — GET /article/:uid/related
+    # and /read-next, loaded by public/lazy-fragment.js when the reader scrolls
+    # near them — so neither runs on the article's critical render path
+    # (changes: async-related-articles, speed-up-article-load). @feeds_by_id is
+    # built inside those fragments, not here.
     @page_title      = @article['title']
     # Chat context — give the assistant the article body (capped) so
     # it can answer questions about what the user is reading. The
@@ -3190,6 +3190,19 @@ class TechFeedReader < Sinatra::Base
                 related.find { |a| a['id'] != article['id'] }
     feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :_read_next, layout: false, locals: { read_next: read_next, feeds_by_id: feeds_by_id }
+  end
+
+  # Deferred "Related" panel (change: async-related-articles). The article page
+  # ships a placeholder; public/lazy-fragment.js fetches this once the reader
+  # scrolls near it. for_article is an FTS ts_rank query that took 1.4–2s on
+  # real articles at scale, so deferring keeps it off the critical render path.
+  # Returns an empty body when there are no related articles.
+  get '/article/:uid/related' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    related     = Recommendation.for_article(current_user_id, article, limit: 5)
+    feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :_related, layout: false, locals: { related: related, feeds_by_id: feeds_by_id }
   end
 
   # Regenerate the extractive summary for an article. The summary is

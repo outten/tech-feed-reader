@@ -81,7 +81,7 @@ RSpec.describe 'Article page Read-next (Phase 7 + speed-up-article-load: deferre
       get '/article/rnpage000001'
 
       expect(last_response.status).to eq(200)
-      expect(last_response.body).to include('data-read-next-url="/article/rnpage000001/read-next"')
+      expect(last_response.body).to include('data-fragment-url="/article/rnpage000001/read-next"')
       expect(last_response.body).to include('read-next-sentinel')
       # The card markup itself is NOT inline anymore.
       expect(last_response.body).not_to include('class="read-next-card')
