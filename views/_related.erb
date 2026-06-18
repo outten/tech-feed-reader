@@ -1,0 +1,23 @@
+<%# Related-articles panel fragment (change: async-related-articles). Rendered
+    by GET /article/:uid/related and swapped into the article page's placeholder
+    by public/lazy-fragment.js once the reader scrolls near it — so the
+    expensive ts_rank FTS query never blocks article render. Locals: `related`
+    (array of article rows), `feeds_by_id`. Renders nothing when empty. %>
+<% if related && related.any? %>
+  <section class="benchmark-section">
+    <h3>Related</h3>
+    <ul class="news-list news-list-simple">
+      <% related.each do |a| %>
+        <li class="news-item">
+          <a class="news-headline" href="/article/<%= a['uid'] %>"><%= h(a['title']) %></a>
+          <div class="news-meta">
+            <% if (feed = (feeds_by_id || {})[a['feed_id']]) %>
+              <a class="news-source" href="/articles?feed_id=<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
+            <% end %>
+            <span><%= relative_time(a['published_at']) %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>

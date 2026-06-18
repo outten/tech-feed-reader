@@ -88,5 +88,19 @@ if cold_art
   end
 end
 
+# Related panel (change: async-related-articles). Bench on a CONTENT-FUL
+# article (non-empty keywords) — a body-less one short-circuits to [] and
+# hides the real cost. `compute_related` bypasses the cache so each run is a
+# true cold compute of the recency-bounded ts_rank query.
+require_relative '../app/recommendation'
+real_art = ArticlesStore.recent(USER_ID, limit: 200, state: :all)
+                        .find { |a| !Recommendation.top_keywords(a['content_text'].to_s).empty? }
+if real_art
+  kw = Recommendation.top_keywords(real_art['content_text'].to_s)
+  bench('Recommendation.compute_related (content-ful)', RUNS) do
+    Recommendation.compute_related(USER_ID, real_art['id'], kw, 5)
+  end
+end
+
 puts
 puts "done."

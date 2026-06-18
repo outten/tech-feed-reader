@@ -26,3 +26,17 @@ Measured against the prod-scale DB (32,610 articles): `for_article` on a content
 - **Caching**: reuses the Redis `Cache` (graceful-degradation contract preserved). Possibly a cache-warm hook if we warm it like the For-You ranking.
 - **No data model changes** (the `articles.tsv` GIN index already exists); a query rewrite is plausible but no schema change expected.
 - **Risk**: low–medium. Deferral changes when the panel appears (same, accepted pattern as Read-next). The `for_article` rewrite touches the Related result set — guard with a test that the same articles are returned for fixed input.
+
+---
+
+## Phase 1 findings (profiled)
+
+`for_article` on a content-ful article = **~2,054 ms** (`EXPLAIN ANALYZE`). The 8-keyword
+OR (`game OR spurs OR knicks OR …`) matches **8,804 of 32,610 rows**; the planner does a
+**Seq Scan computing `ts_rank` for every match** (the GIN `idx_articles_tsv` isn't selective
+at 27% match) then top-5 sorts. Cost is `ts_rank` over thousands of rows.
+
+Levers: (a) **cache** per (article,user) — result-preserving, warm instant; (b) **bound the
+ranked set** — rank only the top-N most-recent matches, which turns "related" into "related &
+recent" (a defensible, arguably better Related) and drops cold cost ~40×. Decided: do both —
+cache for repeat views + recency-bounded ranking for a fast cold fragment.
