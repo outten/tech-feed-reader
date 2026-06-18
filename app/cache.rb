@@ -63,6 +63,15 @@ module Cache
     nil
   end
 
+  # Unconditionally write `value` with `ttl` (a force-refresh — bypasses the
+  # read in `fetch`). Used by cache-warming jobs that recompute proactively.
+  # No-op when caching is disabled; swallows write errors like safe_set.
+  def write(key, value, ttl:, marshal: false)
+    return value unless enabled?
+    safe_set(key, value, ttl, marshal)
+    value
+  end
+
   class << self
     private
 

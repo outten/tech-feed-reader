@@ -75,8 +75,13 @@ module Recommendation
     # keyed by (user_id, state, kind, topic). Cache miss runs the full
     # scoring pipeline; hit returns the parsed list. Degrades to a fresh
     # compute if Redis is unavailable (Cache.fetch handles that).
-    def ranked_ids(user_id, state:, kind:, topic:, now:)
+    def ranked_ids(user_id, state:, kind:, topic:, now:, force: false)
       key = "foryou:v1:#{user_id}:#{state}:#{kind}:#{topic || '-'}"
+      # force: recompute + overwrite (used by ForYouCacheWarmWorker to keep
+      # the cache continuously warm). Otherwise read-through on miss.
+      if force
+        return Cache.write(key, compute_ranking(user_id, state: state, kind: kind, topic: topic, now: now), ttl: RANKING_TTL)
+      end
       Cache.fetch(key, ttl: RANKING_TTL) do
         compute_ranking(user_id, state: state, kind: kind, topic: topic, now: now)
       end

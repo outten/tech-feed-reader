@@ -76,4 +76,17 @@ RSpec.describe Cache do
     expect(Cache).not_to receive(:client)
     expect(Cache.fetch('k', ttl: 60) { :computed }).to eq(:computed)
   end
+
+  describe '.write (force-refresh for cache warming)' do
+    it 'unconditionally SETs the value with TTL and returns it' do
+      expect(fake).to receive(:call).with('SET', 'k', '[1,2]', 'EX', 60)
+      expect(Cache.write('k', [1, 2], ttl: 60)).to eq([1, 2])
+    end
+
+    it 'is a no-op that still returns the value when caching is disabled' do
+      allow(Cache).to receive(:enabled?).and_call_original
+      expect(Cache).not_to receive(:client)
+      expect(Cache.write('k', [9], ttl: 60)).to eq([9])
+    end
+  end
 end

@@ -3158,8 +3158,11 @@ class TechFeedReader < Sinatra::Base
     @summary         = SummaryStore.find(@article['id'])
     @claude_available = Summarizer::Claude.available?
     @related         = Recommendation.for_article(current_user_id, @article, limit: 5)
-    @read_next       = Recommendation::ForYou.next_after(current_user_id, @article) ||
-                       @related.find { |a| a['id'] != @article['id'] }
+    # The personalized "Read next" pick (ForYou.next_after) is deferred to
+    # GET /article/:uid/read-next and lazy-loaded by public/read-next.js when
+    # the reader scrolls near the bottom — it ran a cold-cache ranking that
+    # could take seconds and blocked article render (change:
+    # speed-up-article-load). The cheap FTS @related above stays inline.
     @feeds_by_id     = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     @page_title      = @article['title']
     # Chat context — give the assistant the article body (capped) so
@@ -3170,6 +3173,23 @@ class TechFeedReader < Sinatra::Base
       excerpt: @article['content_text'].to_s
     }
     erb :article
+  end
+
+  # Deferred "Read next" card (change: speed-up-article-load). The article
+  # page ships a placeholder; public/read-next.js fetches this fragment once
+  # the reader scrolls near the bottom, so the expensive ForYou.next_after
+  # ranking (cold-cache could take seconds) never blocks the article HTML —
+  # and is skipped entirely for readers who never scroll that far. Personalized
+  # pick preferred, FTS "Related" fallback. Returns an empty body when there's
+  # no suggestion (the placeholder just stays empty).
+  get '/article/:uid/read-next' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404 unless article
+    related   = Recommendation.for_article(current_user_id, article, limit: 5)
+    read_next = Recommendation::ForYou.next_after(current_user_id, article) ||
+                related.find { |a| a['id'] != article['id'] }
+    feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :_read_next, layout: false, locals: { read_next: read_next, feeds_by_id: feeds_by_id }
   end
 
   # Regenerate the extractive summary for an article. The summary is

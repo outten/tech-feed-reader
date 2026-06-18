@@ -81,6 +81,13 @@ module UsersStore
                [Time.now.utc.strftime('%Y-%m-%d %H:%M:%S'), id.to_i])
   end
 
+  # User ids seen since `cutoff` (a 'YYYY-MM-DD HH:MM:SS' UTC string).
+  # Used by ForYouCacheWarmWorker to bound cache-warming to active users.
+  def active_since(cutoff)
+    db.execute('SELECT id FROM users WHERE last_seen_at >= ? ORDER BY last_seen_at DESC', [cutoff])
+      .map { |r| r['id'] }
+  end
+
   # STUFF #29 follow-up — let a signed-in user edit their display name.
   # Display name is free-form (any unicode); we strip + cap length. An
   # empty string falls back to the username so the header chip never
