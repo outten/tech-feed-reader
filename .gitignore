@@ -8,3 +8,11 @@ tmp/
 # they don't accidentally land in a commit before you do.
 data/
 coverage/
+
+# OpenSpec / Claude Code slash-command + skill tooling — local workflow tooling
+# that got committed unintentionally (was untracked at session start). Keep on
+# disk; not repo content. Re-add specific files explicitly if a team wants them.
+.claude/commands/
+.claude/skills/
+.github/prompts/
+.github/skills/
