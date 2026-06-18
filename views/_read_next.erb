@@ -1,0 +1,27 @@
+<%# Read-next card fragment (change: speed-up-article-load). Rendered by
+    GET /article/:uid/read-next and swapped into the article page's
+    placeholder by public/read-next.js once the reader scrolls near the
+    bottom — so the expensive ForYou.next_after never blocks article render.
+    Locals: `read_next` (article row or nil), `feeds_by_id`. Renders nothing
+    when there is no suggestion. %>
+<% if read_next %>
+  <aside class="read-next-card read-next-card-visible" data-read-next>
+    <div class="read-next-label">
+      Read next
+      <% if read_next['_score'] %>
+        <span class="muted" title="Personalised relevance score (recency × per-feed weight × corpus overlap)">&middot; relevance pick</span>
+      <% else %>
+        <span class="muted" title="Content-similarity match via FTS5 — no personalised signal yet">&middot; related pick</span>
+      <% end %>
+    </div>
+    <a class="read-next-headline" href="/article/<%= read_next['uid'] %>" title="Open the next suggested article">
+      <%= h(read_next['title']) %>
+    </a>
+    <div class="read-next-meta">
+      <% if (rn_feed = (feeds_by_id || {})[read_next['feed_id']]) %>
+        <span class="news-source"><%= h(rn_feed['title'] || rn_feed['url']) %></span>
+      <% end %>
+      <span><%= relative_time(read_next['published_at']) %></span>
+    </div>
+  </aside>
+<% end %>

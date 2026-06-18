@@ -65,66 +65,86 @@ RSpec.describe Recommendation::ForYou, '#next_after (Phase 7)' do
   end
 end
 
-RSpec.describe 'GET /article/:uid Read-next card (Phase 7)' do
+RSpec.describe 'Article page Read-next (Phase 7 + speed-up-article-load: deferred)' do
   include Rack::Test::Methods
   def app; TechFeedReader; end
 
-  it 'renders the Read-next card when there is a fallback FTS5 hit (cold start)' do
-    # No corpus, but two articles with overlapping body text — the
-    # FTS5 fallback should pick the second.
-    _, _ = make_read_next_article(uid: 'rnview000001', title: 'Apples and oranges',
-                                  content_text: 'apples oranges fruit comparison')
-    _, _ = make_read_next_article(uid: 'rnview000002', title: 'More fruit thoughts',
-                                  content_text: 'apples oranges fruit are great')
+  # The article page itself ships only a placeholder + sentinel and does NOT
+  # compute ForYou.next_after on the critical path; the card is fetched from
+  # GET /article/:uid/read-next and swapped in client-side.
+  describe 'GET /article/:uid (the page)' do
+    it 'ships the lazy placeholder and does not compute next_after inline' do
+      make_read_next_article(uid: 'rnpage000001', title: 'Apples', content_text: 'apples oranges fruit')
+      make_read_next_article(uid: 'rnpage000002', title: 'More fruit', content_text: 'apples oranges fruit great')
 
-    get '/article/rnview000001'
-    expect(last_response.status).to eq(200)
-    expect(last_response.body).to match(%r{<aside class="read-next-card"[^>]*>})
-    expect(last_response.body).to include('related pick')
-    expect(last_response.body).to include('More fruit thoughts')
+      expect(Recommendation::ForYou).not_to receive(:next_after)
+      get '/article/rnpage000001'
+
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include('data-read-next-url="/article/rnpage000001/read-next"')
+      expect(last_response.body).to include('read-next-sentinel')
+      # The card markup itself is NOT inline anymore.
+      expect(last_response.body).not_to include('class="read-next-card')
+    end
   end
 
-  it 'renders the relevance-pick label when the For You ranker provides the suggestion' do
-    _, pos = make_read_next_article(uid: 'rnviewpos001', title: 'Rails routing deep dive', content_text: 'rails ruby routing')
-    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
-    ReadStateStore.mark_read(1, pos['id'], read: true)
+  describe 'GET /article/:uid/read-next (the deferred fragment)' do
+    it 'renders the card with the FTS5 fallback (cold start, related pick)' do
+      make_read_next_article(uid: 'rnview000001', title: 'Apples and oranges',
+                             content_text: 'apples oranges fruit comparison')
+      make_read_next_article(uid: 'rnview000002', title: 'More fruit thoughts',
+                             content_text: 'apples oranges fruit are great')
 
-    make_read_next_article(uid: 'rnviewmatch01', title: 'Advanced Rails performance tuning')
-    _, current = make_read_next_article(uid: 'rnviewcurr01', title: 'Something unrelated')
+      get '/article/rnview000001/read-next'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to match(%r{<aside class="read-next-card[^"]*"[^>]*>})
+      expect(last_response.body).to include('related pick')
+      expect(last_response.body).to include('More fruit thoughts')
+    end
 
-    get '/article/rnviewcurr01'
-    expect(last_response.body).to include('relevance pick')
-    expect(last_response.body).to include('Advanced Rails performance tuning')
-  end
+    it 'renders the relevance-pick label when the For You ranker provides the suggestion' do
+      _, pos = make_read_next_article(uid: 'rnviewpos001', title: 'Rails routing deep dive', content_text: 'rails ruby routing')
+      ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+      ReadStateStore.mark_read(1, pos['id'], read: true)
 
-  it 'omits the card when neither corpus nor FTS5 has anything to suggest' do
-    # Single article in the DB — no related, no corpus.
-    _, _ = make_read_next_article(uid: 'rnviewlone01', title: 'Lonely', content_text: 'unique content')
-    get '/article/rnviewlone01'
-    expect(last_response.body).not_to include('class="read-next-card"')
-    expect(last_response.body).not_to include('class="read-next-sentinel"')
-  end
+      make_read_next_article(uid: 'rnviewmatch01', title: 'Advanced Rails performance tuning')
+      make_read_next_article(uid: 'rnviewcurr01', title: 'Something unrelated')
 
-  it 'never points the card back at the current article' do
-    _, pos = make_read_next_article(uid: 'rnviewself01', title: 'Self pos', content_text: 'matching content')
-    ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
-    ReadStateStore.mark_read(1, pos['id'], read: true)
-    _, current = make_read_next_article(uid: 'rnviewself02', title: 'Self test', content_text: 'matching content')
+      get '/article/rnviewcurr01/read-next'
+      expect(last_response.body).to include('relevance pick')
+      expect(last_response.body).to include('Advanced Rails performance tuning')
+    end
 
-    get '/article/rnviewself02'
-    # No back-pointer to the current uid.
-    expect(last_response.body).not_to include('href="/article/rnviewself02" target="_blank"')
-  end
+    it 'returns an empty fragment when neither corpus nor FTS5 has anything to suggest' do
+      make_read_next_article(uid: 'rnviewlone01', title: 'Lonely', content_text: 'unique content')
+      get '/article/rnviewlone01/read-next'
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).not_to include('class="read-next-card')
+    end
 
-  # STUFF.md #19 — reversed. Internal /article/:uid links open in the
-  # same tab so the Read-next surface is consistent with the article
-  # list (/articles, /whats-on, /sports, /digests, /triage).
-  it 'opens the suggested article in the same tab (no target="_blank")' do
-    make_read_next_article(uid: 'rnviewtab01', title: 'A',  content_text: 'shared body terms here')
-    make_read_next_article(uid: 'rnviewtab02', title: 'B',  content_text: 'shared body terms here')
-    get '/article/rnviewtab01'
-    rn = last_response.body[%r{<a class="read-next-headline" href="/article/rnviewtab02"[^>]*>}]
-    expect(rn).not_to be_nil
-    expect(rn).not_to include('target="_blank"')
+    it '404s for an unknown article' do
+      get '/article/doesnotexist/read-next'
+      expect(last_response.status).to eq(404)
+    end
+
+    it 'never points the card back at the current article' do
+      _, pos = make_read_next_article(uid: 'rnviewself01', title: 'Self pos', content_text: 'matching content')
+      ReadStateStore.mark_bookmarked(1, pos['id'], value: true)
+      ReadStateStore.mark_read(1, pos['id'], read: true)
+      make_read_next_article(uid: 'rnviewself02', title: 'Self test', content_text: 'matching content')
+
+      get '/article/rnviewself02/read-next'
+      expect(last_response.body).not_to include('href="/article/rnviewself02"')
+    end
+
+    # STUFF.md #19 — internal /article/:uid links open in the same tab.
+    it 'opens the suggested article in the same tab (no target="_blank")' do
+      make_read_next_article(uid: 'rnviewtab01', title: 'A',  content_text: 'shared body terms here')
+      make_read_next_article(uid: 'rnviewtab02', title: 'B',  content_text: 'shared body terms here')
+      get '/article/rnviewtab01/read-next'
+      rn = last_response.body[%r{<a class="read-next-headline" href="/article/rnviewtab02"[^>]*>}]
+      expect(rn).not_to be_nil
+      expect(rn).not_to include('target="_blank"')
+    end
   end
 end

@@ -50,3 +50,9 @@ index_sync:
   class: "IndexSyncWorker"
   queue: default
   description: "Hourly :05 UTC: refresh cached quotes for the 10 major world indices (S&P 500, Dow, NASDAQ, FTSE, DAX, Nikkei, etc.). Offset from feeds cron (:00) and sports cron (:30) to spread load."
+
+foryou_cache_warm:
+  cron: "*/4 * * * *"
+  class: "ForYouCacheWarmWorker"
+  queue: default
+  description: "Every 4 min (< RANKING_TTL 5 min): force-refresh the For-You ranking cache for users active in the last 24h, so the home feed / relevance sort / deferred Read-next never pay the cold compute_ranking. See change: speed-up-article-load."
