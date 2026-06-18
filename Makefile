@@ -325,6 +325,13 @@ publish-image:
 # the deploy account can pull from registry.digitalocean.com/tfr.
 deploy:
 	git pull origin main
+	@# Refresh the DOCR credential before pulling. `doctl registry login`
+	@# tokens expire (~30 days), so a deploy after a long gap used to 401 on
+	@# the pull (bit us once on v1.0.6). Refreshing here — right before the
+	@# pull, every deploy — keeps the token fresh when it matters, with no
+	@# separate cron/timer to drift. Needs doctl authed with a (long-lived)
+	@# DO API token, which the one-time Phase-6 setup already established.
+	doctl registry login
 	docker compose pull app sidekiq
 	docker compose up -d --force-recreate --no-deps app sidekiq
 	@echo ''
