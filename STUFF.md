@@ -1396,7 +1396,7 @@ High-impact items from content analysis:
 
 **Status: merged** — PR #189, v0.23.3. Also covers #92 (Environment, Business) and #93 (Travel, Mastodon, Politics) — all shipped through v0.23.5.
 
-## [ ] 94. Scroll position preservation — AJAX for remaining full-reload actions
+## [x] 94. Scroll position preservation — AJAX for remaining full-reload actions
 
 Several button actions still do a full page POST + redirect, which reloads the page and drops the user back at the top. On long pages (/articles, /feeds, /stocks) this requires significant scrolling to get back to where you were.
 
@@ -1409,7 +1409,11 @@ Actions to convert to AJAX (in-place DOM update, no scroll loss):
 
 Already AJAX (no action needed): feeds catalog add/remove/weight, sports follow/unfollow, stock follow/unfollow, NPR/PBS subscribe/unsubscribe.
 
-**Status: tests** — all four items implemented. Sports manage sport got `js-sports-follow-form` class (one-liner — already AJAX-capable, just missing the class). Mutes and tags routes now return JSON when `Accept: application/json`. New `public/mutes-tags.js` handles AJAX add/delete for both, with in-place DOM updates and flash messages. No scroll loss on any of these actions.
+**Status: done.** Verified all four end-to-end (headless click, no full reload): articles-list 👍/👎 (`article-feedback.js`), mutes add/delete (`mutes-tags.js`, confirmed row added in place), tags add/delete (`/tags`, same handler), sports-manage league follow (`sports-follow.js`).
+
+The sports-manage league follow was only *partly* wired by the earlier pass — adding the `js-sports-follow-form` class wasn't enough. Two bugs found + fixed: (1) `applyState` in `sports-follow.js` rewrote the form action to `/sports/teams/` for any non-player kind, so a league form's action became `/sports/teams/unfollow` after the first toggle (broke the 2nd click); now handles `kind === 'league'` → `/sports/leagues/`. (2) The sport-level league button (`sports_manage_sport.erb`) lacked `data-follow-label`/`data-following-label`, so its text never flipped; added them. Toggle now flips label + keeps the correct action on repeat clicks.
+
+Original implementation notes: mutes/tags routes return JSON for `Accept: application/json`; `public/mutes-tags.js` handles AJAX add/delete for both with in-place DOM updates.
 
 ## [x] 95. Welcome-page feature cards for Stocks & Daily Games
 
@@ -1459,6 +1463,6 @@ The case *against*, two blockers:
 
 Recommendation: **keep threaded for launch.** The PG cap limits the upside to 2 workers, fork-safety is unverified, and the felt-latency wins already shipped (Phases 1–3: scoped `unread_count`, ranker cache, connection pool). Revisit cluster mode post-launch *only if* production profiling shows CPU saturation — and then validate the fork path on a Linux staging box and bump the PG tier first. The prototype was reverted to avoid shipping an unverified, footgun config; its design is captured here.
 
-## [ ] 101. Profiler
+## [x] 101. Profiler -- moot -- won't do
 
 Ok, so rack-mini-profiler won't work. Is there any similar service / Gem we could use that would work to profile our application. And in particular monitor the database performance.

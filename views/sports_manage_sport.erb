@@ -118,6 +118,8 @@
           <input type="hidden" name="return_to" value="/sports/manage/<%= h(@sport[:slug]) %>">
           <button type="submit"
                   class="<%= followed ? 'btn-secondary' : 'btn-primary' %> sports-manage-toggle <%= 'is-following' if followed %>"
+                  data-follow-label="+ Follow"
+                  data-following-label="✓ Following"
                   title="<%= followed ? 'Stop following' : 'Follow — surfaces tournament articles on /sports' %>">
             <%= followed ? '✓ Following' : '+ Follow' %>
           </button>

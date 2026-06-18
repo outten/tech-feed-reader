@@ -66,8 +66,13 @@
     var slug     = data.slug || '';
     var kind     = data.kind || (form.action.indexOf('/players/') !== -1 ? 'player' : 'team');
 
-    // Flip the form's action so the next click does the opposite.
-    var base = kind === 'player' ? '/sports/players/' : '/sports/teams/';
+    // Flip the form's action so the next click does the opposite. League
+    // follows (sports manage pages) post to /sports/leagues/; without this
+    // a league form's action got rewritten to /sports/teams/ on the first
+    // toggle, breaking the second click.
+    var base = kind === 'player' ? '/sports/players/'
+             : kind === 'league' ? '/sports/leagues/'
+             : '/sports/teams/';
     form.action = base + (followed ? 'unfollow' : 'follow');
 
     // Update the button visual: ★ for followed, ☆ for unfollowed.
