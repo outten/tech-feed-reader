@@ -1466,3 +1466,11 @@ Recommendation: **keep threaded for launch.** The PG cap limits the upside to 2 
 ## [x] 101. Profiler -- moot -- won't do
 
 Ok, so rack-mini-profiler won't work. Is there any similar service / Gem we could use that would work to profile our application. And in particular monitor the database performance.
+
+## [x] 102. PBS Shows
+
+Can you expand the list of PBS shows? For example, I don't see: Nature, the Ken Burns documentaries, Great Performances, American Experience, Washington Week, Finding Your Roots, The Great American Recipe, any food / cooking shows, etc. PBS has a lot of very popular shows, some of which you need to have an active membership to view, which is fine. We want to help promote PBS and NPR.
+
+Please provide a more comprehensive list.
+
+**Status: done (PR pending).** Expanded `pbs_shows` from 4 → 22 (catalog 258 → 276). PBS gates full episodes behind membership, so the new entries are each show's official YouTube channel (clips, previews, full episodes where posted) — every `channel_id` title-verified against the live feed. Added: Nature on PBS, PBS Terra, PBS Space Time, PBS Documentaries, Great Performances, Washington Week, American Masters, Antiques Roadshow, Masterpiece, Independent Lens, Secrets of the Dead, Ken Burns, Austin City Limits, plus PBS cooking shows America's Test Kitchen, Lidia's Kitchen, Christopher Kimball's Milk Street, Pati's Mexican Table, Cook's Country. Couldn't find a stable per-show feed for **Finding Your Roots** or **The Great American Recipe** (no dedicated channel/RSS — PBS publishes them only as playlists on its general channel); **PBS Eons**'s real channel couldn't be reliably resolved (YouTube handle resolution returned a wrong fallback), so it was dropped rather than risk a wrong feed.
