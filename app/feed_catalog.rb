@@ -29,6 +29,8 @@ module FeedCatalog
     # STUFF #89
     npr:        'NPR',
     pbs:        'PBS',
+    # STUFF #103 — international English-language public broadcasters
+    world_public: 'World Public Media',
     # New topics
     health:     'Health & Wellness',
     arts:       'Arts & Culture',
@@ -102,6 +104,15 @@ module FeedCatalog
     npr_podcasts:  'NPR Podcasts',
     pbs_news:      'PBS NewsHour',
     pbs_shows:     'PBS Shows & Documentaries',
+    # World Public Media (STUFF #103) — one category per broadcaster
+    bbc:           'BBC (UK)',
+    cbc:           'CBC (Canada)',
+    abc_au:        'ABC (Australia)',
+    rnz:           'RNZ (New Zealand)',
+    rte:           'RTÉ (Ireland)',
+    sbs:           'SBS (Australia)',
+    dw:            'Deutsche Welle',
+    france24:      'France 24',
     # Health & Wellness
     health_news:   'Health & medicine',
     health_mental: 'Mental health & psychology',
@@ -178,6 +189,15 @@ module FeedCatalog
     npr_podcasts:  :npr,
     pbs_news:      :pbs,
     pbs_shows:     :pbs,
+    # World Public Media (STUFF #103)
+    bbc:           :world_public,
+    cbc:           :world_public,
+    abc_au:        :world_public,
+    rnz:           :world_public,
+    rte:           :world_public,
+    sbs:           :world_public,
+    dw:            :world_public,
+    france24:      :world_public,
     # Health & Wellness
     health_news:   :health,
     health_mental: :health,
@@ -397,7 +417,7 @@ module FeedCatalog
       blurb: 'Deep, multi-hour business histories of major tech companies and deals.' },
 
     # news + ideas
-    { url: 'https://podcasts.files.bbci.co.uk/p02nq0gn.rss', title: 'BBC Global News Podcast', category: :podcast,
+    { url: 'https://podcasts.files.bbci.co.uk/p02nq0gn.rss', title: 'BBC Global News Podcast', category: :bbc,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'BBC twice-daily roundup of breaking world news and current affairs.' },
     { url: 'https://feeds.simplecast.com/Sl5CSM3S', title: 'The Daily (NYT)', category: :podcast,
@@ -1070,6 +1090,86 @@ module FeedCatalog
       title: 'Cook\'s Country', category: :pbs_shows,
       interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
       blurb: 'Regional American home cooking and comfort-food classics (YouTube).' },
+
+    # ---- World Public Media (STUFF #103) — international English-language ----
+    # public broadcasters, one category per broadcaster. All URLs curl-verified
+    # to return valid feed XML; YouTube channel_ids title-verified.
+    # BBC (UK) — BBC News top stories + world. (Global News Podcast lives under
+    # :bbc too, recategorised from :podcast above. BBC Sport stays under sports.)
+    { url: 'https://feeds.bbci.co.uk/news/rss.xml', title: 'BBC News', category: :bbc,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'UK top stories and breaking news from the BBC.' },
+    { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', title: 'BBC News – World', category: :bbc,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Global headlines and international coverage from BBC News.' },
+    # CBC (Canada)
+    { url: 'https://rss.cbc.ca/lineup/topstories.xml', title: 'CBC News – Top Stories', category: :cbc,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Canada\'s top news stories from CBC News.' },
+    { url: 'https://rss.cbc.ca/lineup/world.xml', title: 'CBC News – World', category: :cbc,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International news and world headlines from CBC.' },
+    { url: 'https://www.cbc.ca/podcasting/includes/asithappens.xml', title: 'As It Happens', category: :cbc,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'CBC Radio interviews with newsmakers across Canada and beyond.' },
+    { url: 'https://www.cbc.ca/podcasting/includes/hourlynews.xml', title: 'The World This Hour', category: :cbc,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Hourly five-minute CBC newscast of the top stories.' },
+    # ABC (Australia)
+    { url: 'https://www.abc.net.au/news/feed/51120/rss.xml', title: 'ABC News (Australia)', category: :abc_au,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Latest Australian and world news from ABC News.' },
+    { url: 'https://www.abc.net.au/feeds/2890356/podcast.xml', title: 'RN Breakfast', category: :abc_au,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'ABC Radio National\'s flagship morning current-affairs program.' },
+    { url: 'https://www.abc.net.au/feeds/7711104/podcast.xml', title: 'Conversations', category: :abc_au,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'In-depth ABC Radio National interviews on remarkable lives.' },
+    # RNZ (New Zealand) — news + world. (RNZ Sport stays under sports.)
+    { url: 'https://www.rnz.co.nz/rss/news.xml', title: 'RNZ News', category: :rnz,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Latest news headlines from Radio New Zealand.' },
+    { url: 'https://www.rnz.co.nz/rss/national.xml', title: 'RNZ – New Zealand', category: :rnz,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'New Zealand national news headlines from RNZ.' },
+    { url: 'https://www.rnz.co.nz/rss/world.xml', title: 'RNZ – World', category: :rnz,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'International and world news headlines from RNZ.' },
+    # RTÉ (Ireland)
+    { url: 'https://www.rte.ie/feeds/rss/?index=/news/', title: 'RTÉ News', category: :rte,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Top news headlines from Ireland\'s RTÉ.' },
+    { url: 'https://www.rte.ie/feeds/rss/?index=/news/world/', title: 'RTÉ – World', category: :rte,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'World and international news from RTÉ Ireland.' },
+    # SBS (Australia)
+    { url: 'https://www.sbs.com.au/news/feed', title: 'SBS News – Top Stories', category: :sbs,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Top news stories from Australia\'s SBS News.' },
+    { url: 'https://www.sbs.com.au/news/topic/latest/feed', title: 'SBS News – Latest', category: :sbs,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Latest breaking news updates from SBS News Australia.' },
+    # Deutsche Welle (English service)
+    { url: 'https://rss.dw.com/rdf/rss-en-all', title: 'Deutsche Welle (English)', category: :dw,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'All English-language news from Germany\'s Deutsche Welle.' },
+    { url: 'https://rss.dw.com/xml/podcast_inside-europe', title: 'Inside Europe', category: :dw,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'DW\'s weekly English podcast on European news and culture.' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCknLrEdhRCp1aegoMqRaCZg',
+      title: 'DW News (YouTube)', category: :dw,
+      interval: FeedsStore::PERSONAL_BLOG_INTERVAL, seed: false,
+      blurb: 'DW English news video reports and analysis (YouTube).' },
+    # France 24 (English service) — per-region feeds (no working single English feed).
+    { url: 'https://www.france24.com/en/europe/rss', title: 'France 24 – Europe', category: :france24,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'European news and headlines from France 24 English.' },
+    { url: 'https://www.france24.com/en/americas/rss', title: 'France 24 – Americas', category: :france24,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'News from the Americas via France 24 English.' },
+    { url: 'https://www.france24.com/en/middle-east/rss', title: 'France 24 – Middle East', category: :france24,
+      interval: FeedsStore::PUBLISHER_INTERVAL, seed: false,
+      blurb: 'Middle East news and reports from France 24 English.' },
 
     # ---- Health & medicine (4) -------------------------------------------
     { url: 'https://www.statnews.com/feed/', title: 'STAT News', category: :health_news,
