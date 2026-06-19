@@ -4501,6 +4501,13 @@ end
 # script invocation.
 if __FILE__ == $PROGRAM_NAME
   require 'sidekiq/web'
+  # Load the full sidekiq-cron gem (defines + initializes
+  # Sidekiq::Cron.configuration). The Cron web tab below calls it via
+  # Sidekiq::Cron::Job.all, but `sidekiq/cron/web` alone only loads job.rb —
+  # not the main file that DEFINES `configuration` — so rendering the Cron tab
+  # raised NoMethodError without this. The worker boots fine because
+  # sidekiq_boot.rb already requires 'sidekiq-cron'.
+  require 'sidekiq-cron'
   require 'sidekiq/cron/web'   # adds the "Cron" tab to /admin/sidekiq
   require 'rack/session/cookie'
   require 'rack/auth/basic'
