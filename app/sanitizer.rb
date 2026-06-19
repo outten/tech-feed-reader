@@ -1,5 +1,6 @@
 require 'loofah'
 require 'uri'
+require 'cgi'
 
 # Strips dangerous tags / attributes from feed-supplied HTML before we
 # render it. Whitelist mode (loofah's :prune) — anything not on the
@@ -31,7 +32,8 @@ module Sanitizer
 
   def sanitize_html(html, base_url: nil)
     return '' if html.to_s.empty?
-    fragment = Loofah.fragment(html.to_s).scrub!(:prune)
+    cleaned  = decode_double_encoded_markup(html.to_s)
+    fragment = Loofah.fragment(cleaned).scrub!(:prune)
     fragment.scrub!(LinkAbsolutizer.new(base_url)) if base_url && !base_url.to_s.empty?
     fragment.scrub!(ExternalLinkScrubber.new)
     fragment.to_s
@@ -39,7 +41,38 @@ module Sanitizer
 
   def text_only(html)
     return '' if html.to_s.empty?
-    Loofah.fragment(html.to_s).text(encode_special_chars: false).strip
+    Loofah.fragment(decode_double_encoded_markup(html.to_s)).text(encode_special_chars: false).strip
+  end
+
+  # STUFF #104 — some feeds double-encode inner HTML. The Points Guy ships
+  #   <td>&lt;strong&gt;Final cost&lt;/strong&gt;</td>
+  # so the cell renders the literal text "<strong>Final cost</strong>" instead
+  # of bold; WordPress blocks and a JSON-data variant on HuggingFace do the
+  # same. Decode the entity-encoded HTML *tags* back into real tags so they
+  # render. Scoped two ways to stay safe:
+  #   1. Only a recognised set of formatting/structure tags is decoded, so
+  #      prose like "5 &lt; 10" or a one-off "&lt;p&gt;" code example is left
+  #      untouched (the gate also requires at least two encoded tags).
+  #   2. The caller re-prunes afterwards, so a double-escaped &lt;script&gt;
+  #      decodes and is then stripped — this can't reintroduce XSS.
+  SAFE_DECODE_TAGS = %w[
+    p br hr div span a b i u s em strong small sub sup mark
+    ul ol li dl dt dd blockquote pre code
+    h1 h2 h3 h4 h5 h6
+    table thead tbody tfoot tr td th caption colgroup col
+    figure figcaption img picture source
+  ].join('|').freeze
+
+  # An entity-encoded tag: &lt;strong&gt;, &lt;/td&gt;, or
+  # &lt;a href=&quot;...&quot;&gt; (attributes may carry encoded quotes, but
+  # never a real < or >, which bounds the match to a single tag).
+  ENCODED_TAG_RX = /&lt;\/?(?:#{SAFE_DECODE_TAGS})\b[^<>]{0,400}?&gt;/i
+
+  def decode_double_encoded_markup(html)
+    # Gate: needs at least two encoded tags so a lone HTML example in prose
+    # isn't rewritten into a real tag.
+    return html if html.scan(ENCODED_TAG_RX).length < 2
+    html.gsub(ENCODED_TAG_RX) { |tag| CGI.unescapeHTML(tag) }
   end
 
   # STUFF #61 — Rewrites relative `<a href>` and `<img src>` to
