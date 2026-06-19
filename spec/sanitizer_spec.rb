@@ -153,5 +153,57 @@ RSpec.describe Sanitizer do
       expect(Sanitizer.text_only(nil)).to eq('')
       expect(Sanitizer.text_only('')).to eq('')
     end
+
+    it 'strips decoded inner tags so FTS text is clean (#104)' do
+      html = '<td>&lt;strong&gt;Final cost&lt;/strong&gt;</td><td>&lt;strong&gt;$0&lt;/strong&gt;</td>'
+      expect(Sanitizer.text_only(html)).to eq('Final cost$0')
+    end
+  end
+
+  # STUFF #104 — some feeds double-encode inner HTML, so formatting tags
+  # render as literal "<strong>" text. sanitize_html decodes recognised
+  # encoded tags back to real ones, then re-prunes (so it stays XSS-safe).
+  describe '.sanitize_html double-encoded markup (#104)' do
+    it 'decodes double-encoded inline tags inside a real table cell' do
+      html = '<table><tr><td>&lt;strong&gt;Final cost&lt;/strong&gt;</td><td>$0.12</td></tr></table>'
+      out = Sanitizer.sanitize_html(html)
+      expect(out).to include('<td><strong>Final cost</strong></td>')
+      expect(out).not_to include('&lt;strong&gt;')
+    end
+
+    it 'decodes a double-encoded list' do
+      out = Sanitizer.sanitize_html('<div>&lt;ul&gt;&lt;li&gt;5 points&lt;/li&gt;&lt;li&gt;2 points&lt;/li&gt;&lt;/ul&gt;</div>')
+      expect(out).to include('<ul>')
+      expect(out).to include('<li>5 points</li>')
+    end
+
+    it 'leaves genuine escaped < in prose alone (not a tag pattern)' do
+      out = Sanitizer.sanitize_html('<p>For all x where 5 &lt; 10 and a &lt; b.</p>')
+      expect(out).to include('5 &lt; 10')
+      expect(out).to include('a &lt; b')
+    end
+
+    it 'does not decode a lone HTML example in prose (gate needs >= 2)' do
+      out = Sanitizer.sanitize_html('<p>Use the &lt;p&gt; tag for paragraphs.</p>')
+      expect(out).to include('&lt;p&gt;')
+    end
+
+    it 'never decodes <script> — a double-escaped script stays inert text' do
+      out = Sanitizer.sanitize_html('<p>x</p>&lt;script&gt;alert(1)&lt;/script&gt;&lt;strong&gt;a&lt;/strong&gt;&lt;strong&gt;b&lt;/strong&gt;')
+      expect(out).to include('&lt;script&gt;')          # still escaped, not executable
+      expect(out).not_to include('<script')            # no real script tag
+      expect(out).to include('<strong>a</strong>')     # the real formatting still decoded
+    end
+
+    it 'strips dangerous attrs from a decoded tag via the re-prune (no XSS)' do
+      out = Sanitizer.sanitize_html('&lt;img src=x onerror=alert(1)&gt;&lt;strong&gt;a&lt;/strong&gt;')
+      expect(out).to include('<img')
+      expect(out).not_to include('onerror')
+    end
+
+    it 'leaves normal (already-decoded) content unchanged' do
+      html = '<p><strong>Hello</strong> world</p>'
+      expect(Sanitizer.sanitize_html(html)).to eq(html)
+    end
   end
 end

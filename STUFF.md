@@ -1480,3 +1480,13 @@ Please provide a more comprehensive list.
 Are there any English-speaking public radio and television stations that we are missing. Like CBC, for example. Or BBC. Should we add content categories for them? I think so. Please analyzez and implement.
 
 **Status: done (PR pending).** Added a new **World Public Media** topic with a category per broadcaster, mirroring how NPR/PBS are structured. 22 new feeds (catalog 276 → 298), each curl-verified to return valid feed XML (YouTube channel_ids title-verified): **BBC** (News, World; + the existing Global News Podcast recategorised here), **CBC** (Top Stories, World, As It Happens, The World This Hour), **ABC Australia** (News, RN Breakfast, Conversations), **RNZ** (News, NZ, World), **RTÉ** (News, World), **SBS** (Top Stories, Latest), **Deutsche Welle** (English all, Inside Europe, DW News YouTube), **France 24** (Europe/Americas/Middle East — no working single English feed, so per-region). BBC/RNZ Sport stay under Sports. Al Jazeera left in World News (state media, not a public broadcaster).
+
+## [x] 104. HTML Not fully rendering
+
+On the article page, every now and then I notice that raw HTML is being displayed -- i.e. it is not being rendered.
+
+For example: http://localhost:4567/article/025b4ec5d8ff
+
+<strong>Total </strong>	<strong>$485</strong>	<strong>1,455 points</strong>	<strong>$30</strong>
+
+**Status: done (PR pending).** Root cause: some feeds **double-encode** inner HTML — e.g. The Points Guy ships `<td>&lt;strong&gt;Final cost&lt;/strong&gt;</td>`, so the real table renders but the cell shows the literal text `<strong>Final cost</strong>` instead of bold. Our parser decodes the outer tags once; the inner tags stay entity-encoded and Loofah keeps them (to it they're just text). Fix: `Sanitizer.sanitize_html` now decodes a recognised set of entity-encoded HTML *tags* back into real tags, then re-prunes (so a double-escaped `<script>` decodes-then-strips — XSS-safe; `onerror` on a decoded `<img>` is pruned). Gated to avoid rewriting prose like `5 &lt; 10` or a lone `&lt;p&gt;` code example. `text_only` decodes too, so FTS text is clean. Added `scripts/backfill_double_encoded_html.rb` to re-sanitize already-imported rows (318 fixed in dev; the 7 that remain are escaped HTML inside *attributes* — `dangerousDek`/`data-widget-introduction` data blobs — which correctly stay untouched).
