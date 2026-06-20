@@ -23,6 +23,7 @@ require_relative 'workers/stock_quote_fetch_worker'
 require_relative 'workers/stock_sync_worker'
 require_relative 'workers/index_sync_worker'
 require_relative 'workers/foryou_cache_warm_worker'
+require_relative 'workers/health_alert_worker'
 
 # Recurring jobs (hourly feed refresh, nightly sports sync). Loaded
 # server-side only so the web process doesn't double-register the

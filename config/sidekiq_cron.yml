@@ -56,3 +56,9 @@ foryou_cache_warm:
   class: "ForYouCacheWarmWorker"
   queue: default
   description: "Every 4 min (< RANKING_TTL 5 min): force-refresh the For-You ranking cache for users active in the last 24h, so the home feed / relevance sort / deferred Read-next never pay the cold compute_ranking. See change: speed-up-article-load."
+
+health_alert:
+  cron: "*/5 * * * *"
+  class: "HealthAlertWorker"
+  queue: default
+  description: "Every 5 min: liveness/degradation check (DB reachable, feed pipeline fresh, Sidekiq dead set bounded). Pushes an ntfy alert on a state transition. No-op when NTFY_URL is unset. See docs/alerting.md."

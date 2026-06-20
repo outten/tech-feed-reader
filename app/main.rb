@@ -94,6 +94,7 @@ require_relative 'stock_news_feed'
 # connection happens until the first perform_async, so this is safe to
 # require in test (specs stub perform_async).
 require_relative 'sidekiq_config'
+require_relative 'notifier'
 require_relative 'workers/feed_refresh_worker'
 require_relative 'workers/sports_team_fetch_worker'
 require 'sidekiq/api'
@@ -254,6 +255,16 @@ class TechFeedReader < Sinatra::Base
       class:      err.class.name,
       message:    err.message,
       backtrace:  Array(err.backtrace).first(5)
+    )
+    # Push an ops alert for the unhandled 500. Deduped per
+    # error class + path for 15 min so a recurring fault pings once, not
+    # on every request. No-op when NTFY_URL is unset (dev/test).
+    Notifier.push(
+      title:      "Feeder 500: #{err.class.name}",
+      body:       "#{request.request_method} #{request.path_info}\n#{err.message}",
+      tags:       %w[rotating_light],
+      priority:   'high',
+      dedupe_key: "http500:#{err.class.name}:#{request.path_info}"
     )
     raise err if settings.raise_errors?
     # Pre-launch — branded 500 page instead of Sinatra's default
