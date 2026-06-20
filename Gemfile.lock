@@ -84,7 +84,7 @@ GEM
       google-protobuf (~> 4.26)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
-    json (2.19.5)
+    json (2.19.9)
     jwt (3.2.0)
       base64
     listen (3.10.0)
@@ -348,12 +348,12 @@ GEM
       jwt (>= 2.0, < 4.0)
     sax-machine (1.3.2)
     securerandom (0.4.1)
-    sidekiq (8.0.10)
-      connection_pool (>= 2.5.0)
-      json (>= 2.9.0)
-      logger (>= 1.6.2)
-      rack (>= 3.1.0)
-      redis-client (>= 0.23.2)
+    sidekiq (8.1.6)
+      connection_pool (>= 3.0.0)
+      json (>= 2.16.0)
+      logger (>= 1.7.0)
+      rack (>= 3.2.0)
+      redis-client (>= 0.29.0)
     sidekiq-cron (2.4.0)
       cronex (>= 0.13.0)
       fugit (~> 1.8, >= 1.11.1)
@@ -422,7 +422,7 @@ DEPENDENCIES
   rackup (~> 2.3)
   rerun
   rspec
-  sidekiq (~> 8.0)
+  sidekiq (~> 8.1)
   sidekiq-cron (~> 2.4)
   simplecov
   sinatra

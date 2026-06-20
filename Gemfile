@@ -72,7 +72,7 @@ gem 'anthropic'
 # process is started separately via `make sidekiq`. Sidekiq pulls in
 # `redis` transitively and connects via REDIS_URL (default
 # redis://localhost:6379/0).
-gem 'sidekiq', '~> 8.0'
+gem 'sidekiq', '~> 8.1'
 
 # Recurring background jobs (hourly feed refresh, nightly sports sync).
 # Schedule is loaded at sidekiq_boot in the server process only; jobs
