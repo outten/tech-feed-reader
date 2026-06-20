@@ -206,4 +206,50 @@ RSpec.describe Sanitizer do
       expect(Sanitizer.sanitize_html(html)).to eq(html)
     end
   end
+
+  # Some feeds leak serialized component / community data (HuggingFace
+  # discussion threads, Condé Nast commerce widgets) into the article body
+  # as visible JSON text. Strip those text nodes; keep real prose + code.
+  describe '.sanitize_html serialized-data blobs' do
+    let(:hf_blob) do
+      '<p>Real intro about the model.</p>' \
+      '<div><div>x\n","updatedAt":"2026-01-20T16:07:58.908Z","author":{"_id":"648a374f",' \
+      '"fullname":"Sam"},"hidden":false,"reactions":[]</div></div>' \
+      '<p>Real closing paragraph.</p>'
+    end
+
+    it 'removes a serialized community-JSON text node but keeps the prose' do
+      out = Sanitizer.sanitize_html(hf_blob)
+      expect(out).to include('Real intro about the model.')
+      expect(out).to include('Real closing paragraph.')
+      expect(out).not_to include('updatedAt')
+      expect(out).not_to include('648a374f')
+    end
+
+    it 'also strips the blob from text_only so FTS text stays clean' do
+      expect(Sanitizer.text_only(hf_blob)).not_to include('updatedAt')
+      expect(Sanitizer.text_only(hf_blob)).to include('Real intro about the model.')
+    end
+
+    it 'preserves a legitimate JSON example inside <pre>/<code>' do
+      html = '<p>The response:</p>' \
+             '<pre>{"updatedAt":"2024","author":{"_id":"x"},"reactions":5}</pre>' \
+             '<p>Done.</p>'
+      out = Sanitizer.sanitize_html(html)
+      expect(out).to include('"updatedAt"')
+      expect(out).to include('"author"')
+      expect(out).to include('Done.')
+    end
+
+    it 'preserves prose that casually names one of the fields' do
+      html = '<p>The API returns an "author" object you can use for lookups.</p>'
+      expect(Sanitizer.sanitize_html(html)).to include('The API returns an')
+    end
+
+    it 'does not strip a short snippet below the signature threshold' do
+      # one signature key only — not a serialized blob
+      html = '<p>Set "hidden": true to suppress it in the feed listing view today.</p>'
+      expect(Sanitizer.sanitize_html(html)).to include('Set')
+    end
+  end
 end

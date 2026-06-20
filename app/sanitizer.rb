@@ -34,6 +34,7 @@ module Sanitizer
     return '' if html.to_s.empty?
     cleaned  = decode_double_encoded_markup(html.to_s)
     fragment = Loofah.fragment(cleaned).scrub!(:prune)
+    strip_data_blobs!(fragment)
     fragment.scrub!(LinkAbsolutizer.new(base_url)) if base_url && !base_url.to_s.empty?
     fragment.scrub!(ExternalLinkScrubber.new)
     fragment.to_s
@@ -41,7 +42,38 @@ module Sanitizer
 
   def text_only(html)
     return '' if html.to_s.empty?
-    Loofah.fragment(decode_double_encoded_markup(html.to_s)).text(encode_special_chars: false).strip
+    fragment = Loofah.fragment(decode_double_encoded_markup(html.to_s))
+    strip_data_blobs!(fragment)
+    fragment.text(encode_special_chars: false).strip
+  end
+
+  # Some feeds leak serialized component / community data into the article
+  # body as visible text — HuggingFace discussion threads ship
+  #   ...,"updatedAt":"2026-..","author":{"_id":".."},"html":".."},..
+  # and Condé Nast commerce widgets ship "dangerousDek"/"productBrand"/
+  # "offerUrl" objects. Rendered, that JSON reads as garbage in the middle of
+  # the article. Strip a TEXT NODE when it carries >= 2 of these distinct
+  # serialization keys (the `"key":` colon form, which prose doesn't use).
+  #
+  # Deliberately conservative so technical articles keep their content:
+  # legit JSON examples live in <pre>/<code>, which we never touch, and a
+  # casual one-key mention ("the updatedAt field") stays below the threshold.
+  BLOB_SIGNATURE = /"(?:updatedAt|_id|author|hidden|reactions|dangerousDek|dangerousHed|productBrand|componentName|offerUrl|offerRetailer)"\s*:/.freeze
+  BLOB_SKIP_ANCESTORS = %w[pre code script style].freeze
+  BLOB_MIN_LENGTH = 80
+  BLOB_MIN_SIGNATURES = 2
+
+  def strip_data_blobs!(fragment)
+    fragment.search('.//text()').each do |node|
+      next if node.ancestors.any? { |a| BLOB_SKIP_ANCESTORS.include?(a.name) }
+      node.remove if data_blob?(node.content)
+    end
+    fragment
+  end
+
+  def data_blob?(text)
+    return false if text.length < BLOB_MIN_LENGTH
+    text.scan(BLOB_SIGNATURE).length >= BLOB_MIN_SIGNATURES
   end
 
   # STUFF #104 — some feeds double-encode inner HTML. The Points Guy ships
