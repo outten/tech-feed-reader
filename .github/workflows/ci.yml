@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Reads .ruby-version. bundler-cache: true caches the gem bundle keyed on
       # Gemfile.lock so warm runs are fast.
