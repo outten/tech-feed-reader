@@ -273,6 +273,16 @@ RSpec.describe 'Stock follows & quotes' do
       expect(last_response.body).to include('AAPL')
     end
 
+    it 'shows followed symbols even when their cached quote is absent' do
+      # Simulates a just-followed symbol whose background fetch hasn't run yet.
+      StockFollowsStore.add(user_id: 1, symbol: 'NVDA', name: 'NVIDIA')
+      # No StockQuotesStore row for NVDA.
+      get '/articles'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('stock-ticker-track')
+      expect(last_response.body).to include('NVDA')
+    end
+
     it 'is omitted when there are no cached quotes to show' do
       # No follows and no index quotes seeded → nothing to render.
       get '/articles'
