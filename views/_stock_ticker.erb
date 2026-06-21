@@ -6,7 +6,7 @@
 <% if quotes.any? %>
   <section class="stock-ticker-section" aria-label="Stock ticker">
     <div class="stock-ticker-bar">
-      <div class="stock-ticker-track">
+      <div class="stock-ticker-track" style="animation-duration: <%= [quotes.size * 3, 20].max %>s">
         <%# Rendered twice (the second pass aria-hidden) so the track can
             scroll a seamless -50% loop. %>
         <% 2.times do |pass| %>
