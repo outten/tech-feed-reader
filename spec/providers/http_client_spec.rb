@@ -119,6 +119,9 @@ RSpec.describe Providers::HttpClient do
       allow(redirect_resp).to receive(:[]).with('Location').and_return('https://elsewhere.example.com/final')
       final_resp    = instance_double(Net::HTTPSuccess, code: '200', body: '<rss/>')
 
+      # Stub SSRF guard so the fake redirect hostname doesn't need real DNS.
+      allow(Providers::HttpClient).to receive(:guard_public_host!)
+
       allow(Net::HTTP).to receive(:new) do |host, _port|
         http = instance_double(Net::HTTP)
         allow(http).to receive(:use_ssl=)
@@ -161,6 +164,56 @@ RSpec.describe Providers::HttpClient do
       expect {
         Providers::HttpClient.get('https://example.com/feed')
       }.to raise_error(/Too many redirects/)
+    end
+  end
+
+  describe 'SSRF guard' do
+    around(:each) do |ex|
+      ENV['ALLOW_HTTP'] = '1'
+      ex.run
+    ensure
+      ENV.delete('ALLOW_HTTP')
+    end
+
+    %w[
+      http://127.0.0.1/metadata
+      http://169.254.169.254/latest/meta-data/
+      http://10.0.0.1/internal
+      http://192.168.1.1/admin
+      http://[::1]/
+    ].each do |url|
+      it "blocks #{url}" do
+        expect {
+          Providers::HttpClient.get(url)
+        }.to raise_error(Providers::HttpClient::SsrfError)
+      end
+    end
+
+    it 'raises SsrfError when the host resolves to a private address' do
+      allow(Providers::HttpClient).to receive(:resolve_addresses)
+        .with('internal.corp')
+        .and_return([IPAddr.new('10.0.0.5')])
+      expect {
+        Providers::HttpClient.get('https://internal.corp/secret')
+      }.to raise_error(Providers::HttpClient::SsrfError, /non-public address/)
+    end
+
+    it 'raises SsrfError when the host cannot be resolved' do
+      allow(Providers::HttpClient).to receive(:resolve_addresses)
+        .with('no-such-host.invalid')
+        .and_return([])
+      expect {
+        Providers::HttpClient.get('https://no-such-host.invalid/')
+      }.to raise_error(Providers::HttpClient::SsrfError, /Cannot resolve host/)
+    end
+
+    it 'blocks an IPv4-mapped IPv6 loopback (::ffff:127.0.0.1)' do
+      allow(Providers::HttpClient).to receive(:resolve_addresses)
+        .with('mapped.example')
+        .and_return([IPAddr.new('::ffff:127.0.0.1')])
+      expect {
+        Providers::HttpClient.get('https://mapped.example/path')
+      }.to raise_error(Providers::HttpClient::SsrfError)
     end
   end
 end

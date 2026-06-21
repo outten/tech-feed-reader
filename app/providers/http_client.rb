@@ -1,5 +1,7 @@
 require 'net/http'
 require 'uri'
+require 'ipaddr'
+require 'resolv'
 
 # Shared HTTP layer used by FeedFetcher and (later) the readability /
 # archive providers. Wraps Net::HTTP with:
@@ -29,6 +31,24 @@ module Providers
       Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
       EOFError, SocketError, IOError
     ].freeze
+
+    # SSRF guard. Feed + article URLs are user-supplied, so without this a
+    # user could add a "feed" pointing at the cloud-metadata endpoint
+    # (169.254.169.254), localhost, or an internal service and have the
+    # server fetch it — and the readability path renders the fetched body
+    # straight into article content. We refuse any URL that resolves into a
+    # private / loopback / link-local / reserved range. Checked on every hop
+    # (perform_get runs per redirect), so a public URL that 302s inward is
+    # blocked too. Residual risk: DNS rebinding between this check and the
+    # socket connect — acceptable for a first pass; revisit by pinning the
+    # resolved IP if it ever matters.
+    BLOCKED_RANGES = %w[
+      0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16
+      172.16.0.0/12 192.0.0.0/24 192.168.0.0/16 198.18.0.0/15
+      ::1/128 fc00::/7 fe80::/10
+    ].map { |r| IPAddr.new(r) }.freeze
+
+    SsrfError = Class.new(StandardError)
 
     module_function
 
@@ -67,6 +87,7 @@ module Providers
     def perform_get(url, headers:, timeout:)
       uri = URI.parse(url)
       raise ArgumentError, "Unsupported URL scheme: #{uri.scheme}" unless %w[http https].include?(uri.scheme)
+      guard_public_host!(uri.host)
 
       req = Net::HTTP::Get.new(uri.request_uri)
       req['User-Agent'] = USER_AGENT
@@ -87,6 +108,38 @@ module Providers
 
     def redirect?(response)
       %w[301 302 307 308].include?(response.code.to_s)
+    end
+
+    # Raise SsrfError unless every address `host` resolves to is publicly
+    # routable. A literal IP is checked directly; a hostname is DNS-resolved
+    # and every returned address must pass (so a name with one internal A
+    # record is rejected).
+    def guard_public_host!(host)
+      raise SsrfError, 'Refusing to fetch a URL with no host' if host.to_s.empty?
+
+      addrs = resolve_addresses(host)
+      raise SsrfError, "Cannot resolve host: #{host}" if addrs.empty?
+
+      bad = addrs.find { |ip| blocked_ip?(ip) }
+      raise SsrfError, "Refusing to fetch non-public address #{bad} (host #{host})" if bad
+    end
+
+    def resolve_addresses(host)
+      literal = (IPAddr.new(host) rescue nil)
+      return [literal] if literal
+
+      Resolv.getaddresses(host).filter_map { |a| IPAddr.new(a) rescue nil }
+    rescue StandardError
+      []
+    end
+
+    def blocked_ip?(ip)
+      # Normalise IPv4-mapped IPv6 (::ffff:127.0.0.1) to its IPv4 form so a
+      # mapped loopback/private address can't slip past the v4 ranges.
+      ip = ip.native if ip.respond_to?(:ipv4_mapped?) && ip.ipv4_mapped?
+      BLOCKED_RANGES.any? { |range| range.include?(ip) }
+    rescue StandardError
+      true # fail closed on anything we can't classify
     end
 
     class << self
