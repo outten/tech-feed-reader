@@ -568,16 +568,26 @@ class TechFeedReader < Sinatra::Base
     # follows first, then the major world indices, deduped. Cache-only —
     # reads stock_quotes, never the Finnhub API. Memoized per request and
     # ordered (find_many sorts alphabetically, so re-order in Ruby).
+    #
+    # Followed symbols are always included even when their cached quote is
+    # absent (e.g. the background fetch hasn't run yet). The view renders
+    # just the symbol name as a link in that case — price/change are omitted
+    # when nil. Indices are omitted when not yet cached.
     def ticker_quotes
       return [] unless signed_in?
 
       @ticker_quotes ||= begin
-        followed = StockFollowsStore.all(current_user_id).map { |r| r['symbol'] }
-        indices  = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
-        ordered  = (followed + indices).uniq
-        by_sym   = StockQuotesStore.find_many(ordered)
-                                   .each_with_object({}) { |q, h| h[q['symbol']] = q }
-        ordered.filter_map { |s| by_sym[s] }
+        followed        = StockFollowsStore.all(current_user_id)
+        followed_syms   = followed.map { |r| r['symbol'] }
+        indices         = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
+        ordered         = (followed_syms + indices).uniq
+        by_sym          = StockQuotesStore.find_many(ordered)
+                                          .each_with_object({}) { |q, h| h[q['symbol']] = q }
+        followed_by_sym = followed.each_with_object({}) { |r, h| h[r['symbol']] = r }
+
+        ordered.filter_map do |s|
+          by_sym[s] || (followed_by_sym[s] ? { 'symbol' => s, 'name' => followed_by_sym[s]['name'] } : nil)
+        end
       end
     end
 
