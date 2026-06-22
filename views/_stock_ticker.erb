@@ -4,7 +4,7 @@
     no API calls on render. Renders nothing when there are no quotes. %>
 <% quotes = ticker_quotes %>
 <% if quotes.any? %>
-  <section class="stock-ticker-section" aria-label="Stock ticker">
+  <section id="stock-ticker" class="stock-ticker-section" aria-label="Stock ticker" data-turbo-permanent>
     <div class="stock-ticker-bar">
       <div class="stock-ticker-track" style="animation-duration: <%= [quotes.size * 3, 20].max %>s">
         <%# Rendered twice (the second pass aria-hidden) so the track can
