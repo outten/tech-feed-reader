@@ -27,7 +27,7 @@ module SidekiqConfig
     # is already defined before notifier → cache loads. Worker-process
     # only, which is correct: jobs die in the worker.
     require_relative 'notifier'
-    config.death_handler = lambda do |job, ex|
+    config.death_handlers << lambda do |job, ex|
       Notifier.push(
         title:      "Feeder job died: #{job['class']}",
         body:       "#{job['class']} exhausted retries\n#{ex.class}: #{ex.message}",
