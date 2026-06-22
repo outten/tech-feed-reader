@@ -1495,4 +1495,9 @@ For example: http://localhost:4567/article/025b4ec5d8ff
 
 The stock ticker is not showing all the stocks a user is following. It appears to be stocking when it should be user personalized.
 
-**Status: done.** Root cause: `ticker_quotes` used `filter_map { |s| by_sym[s] }`, silently dropping any followed symbol that had no cached row in `stock_quotes` (e.g. a just-followed symbol whose background Finnhub fetch hadn't run yet, or a fetch that failed). This made the ticker look static — only the always-refreshed major indices appeared. Fix: followed symbols are now always included, falling back to `{ 'symbol' => s, 'name' => ... }` from the `stock_follows` table when no cached quote exists. The view already guarded `if q['price']` so price/change are simply omitted for the no-cache case. Indices without a cached quote are still omitted. Added a spec covering the no-cache-yet case.
+**Status: done.** Several related fixes shipped across v1.1.6–v1.1.9:
+
+- **Personalization bug** (`ticker_quotes`): used `filter_map { |s| by_sym[s] }`, silently dropping any followed symbol with no cached row in `stock_quotes`. Fix: followed symbols always included, falling back to a name-only placeholder from `stock_follows`. Spec added.
+- **Animation speed**: hardcoded 30 s made the ticker unreadable with many items. Now scales at 3 s/item (min 20 s).
+- **Turbo reset**: Turbo Drive replaced `<body>` on every navigation, restarting the animation before all stocks scrolled past. Fixed with `data-turbo-permanent` + stable `id` on the section.
+- **Sidekiq death handler** (v1.1.9): `config.death_handler=` (Sidekiq 7 setter) was removed in Sidekiq 8; Sidekiq crashed on boot and silently stopped processing all enqueued jobs. Fixed: `config.death_handlers <<`.
