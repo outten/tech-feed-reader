@@ -283,11 +283,45 @@ RSpec.describe 'Stock follows & quotes' do
       expect(last_response.body).to include('NVDA')
     end
 
-    it 'is omitted when there are no cached quotes to show' do
-      # No follows and no index quotes seeded → nothing to render.
+    it 'always shows major index symbols even when their cached quote is absent' do
+      # Indices always appear as name-only placeholders even before IndexSyncWorker runs.
       get '/articles'
       expect(last_response).to be_ok
-      expect(last_response.body).not_to include('stock-ticker-track')
+      expect(last_response.body).to include('stock-ticker-track')
+      StockQuoteProvider::MAJOR_INDICES.each do |idx|
+        expect(last_response.body).to include(idx[:symbol])
+      end
+    end
+  end
+
+  # --- GET /api/ticker -------------------------------------------------------
+
+  describe 'GET /api/ticker' do
+    include Rack::Test::Methods
+
+    def app
+      TechFeedReader
+    end
+
+    it 'returns JSON array with all major indices even with cold cache' do
+      get '/api/ticker'
+      expect(last_response).to be_ok
+      expect(last_response.content_type).to include('application/json')
+      data = JSON.parse(last_response.body)
+      expect(data).to be_an(Array)
+      index_syms = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
+      returned_syms = data.map { |q| q['symbol'] }
+      expect(index_syms - returned_syms).to be_empty
+    end
+
+    it 'includes followed symbol without cached quote' do
+      StockFollowsStore.add(user_id: 1, symbol: 'TSLA', name: 'Tesla')
+      get '/api/ticker'
+      expect(last_response).to be_ok
+      data = JSON.parse(last_response.body)
+      tsla = data.find { |q| q['symbol'] == 'TSLA' }
+      expect(tsla).not_to be_nil
+      expect(tsla['name']).to eq('Tesla')
     end
   end
 end
