@@ -221,12 +221,16 @@ generate-trivia:
 #   make release-minor     # new-feature    (0.9.1 → 0.10.0)
 #   make release-major     # breaking       (0.10.0 → 1.0.0)
 #
-# Picks up wherever main is — run from a clean main checkout. The
-# Droplet's `make deploy` (run via SSH) is the actual ship step;
-# `make release-*` only produces the tagged commit that `make deploy`
-# will pull. Keeping the two concerns separate means a failed deploy
-# doesn't leave you with a "version was bumped but never reached prod"
-# inconsistency.
+# Full deploy flow (DO NOT bypass):
+#   1. Merge PR to main — CI runs (.github/workflows/ci.yml).
+#   2. `make release-patch` on a clean main checkout — runs tests, bumps
+#      VERSION, commits, tags vX.Y.Z, pushes main + tag to GitHub.
+#   3. The tag push triggers .github/workflows/deploy.yml automatically,
+#      which builds the Docker image, pushes it to DOCR, and SSHes to the
+#      Droplet to run `make deploy`. No manual image build or SSH needed.
+#
+# DO NOT run `docker buildx build` or `ssh ... make deploy` manually —
+# that bypasses the Actions audit trail and leaves VERSION out of sync.
 release-major: BUMP_KIND := major
 release-minor: BUMP_KIND := minor
 release-patch: BUMP_KIND := patch
