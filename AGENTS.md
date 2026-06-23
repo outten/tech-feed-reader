@@ -435,7 +435,7 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 
 ## Deploy pipeline
 
-`make deploy-patch` (or `release-minor` / `release-major`) is the one command to ship:
+`make release-patch` (or `release-minor` / `release-major`) is the one command to ship:
 
 1. Gates: clean tree, on `main`, full RSpec suite green.
 2. Bumps `VERSION`, commits `chore: release vX.Y.Z`, tags, pushes commit + tag to origin.
@@ -443,6 +443,8 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
    - **test job** — full RSpec suite in CI (same as `ci.yml`) — deploy is cancelled if this fails.
    - **deploy job** (`needs: test`) — builds `linux/amd64` Docker image via `buildx`, pushes `:X.Y.Z` + `:latest` to DOCR, SSHs to the Droplet and runs `make deploy` (git pull + image pull + `docker compose up --force-recreate`).
 4. Agent watches with `gh run watch` and reports when live.
+
+**Do not** run `docker buildx build` or `ssh deploy@... make deploy` manually — that bypasses the Actions audit trail and risks VERSION/image-tag drift. The Makefile's `make publish-image` and `make _remote_deploy` exist as a break-glass fallback only if GitHub Actions is fully unavailable.
 
 **Secrets required** (set in GitHub repo Settings → Secrets → Actions):
 
@@ -453,8 +455,6 @@ CI is configured at [.github/workflows/ci.yml](.github/workflows/ci.yml) — run
 | `DROPLET_IP` | the Droplet's public IP (resolve with `terraform output -raw droplet_ipv4`) |
 
 **Rollback**: set `IMAGE_TAG=X.Y.Z` in `/opt/app/.env` on the Droplet, then `make deploy` there.
-
-**Manual fallback** if GH Actions is down: `make publish-image && make _remote_deploy DROPLET_IP=<droplet-ip>`.
 
 ## AJAX pattern
 
