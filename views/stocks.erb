@@ -94,7 +94,7 @@
               <span class="stock-day-range-label muted"><%= format_price(day_high) %></span>
             </div>
           <% end %>
-          <canvas class="stock-spark" data-symbol="<%= h(idx[:symbol]) %>" width="180" height="40"></canvas>
+          <canvas class="stock-spark" data-symbol="<%= h(idx[:symbol]) %>"></canvas>
         <% else %>
           <div class="stock-index-price muted">—</div>
         <% end %>

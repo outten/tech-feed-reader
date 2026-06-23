@@ -584,9 +584,13 @@ class TechFeedReader < Sinatra::Base
         by_sym          = StockQuotesStore.find_many(ordered)
                                           .each_with_object({}) { |q, h| h[q['symbol']] = q }
         followed_by_sym = followed.each_with_object({}) { |r, h| h[r['symbol']] = r }
+        index_by_sym    = StockQuoteProvider::MAJOR_INDICES
+                            .each_with_object({}) { |i, h| h[i[:symbol]] = i }
 
         ordered.filter_map do |s|
-          by_sym[s] || (followed_by_sym[s] ? { 'symbol' => s, 'name' => followed_by_sym[s]['name'] } : nil)
+          by_sym[s] ||
+            (followed_by_sym[s] && { 'symbol' => s, 'name' => followed_by_sym[s]['name'] }) ||
+            (index_by_sym[s]    && { 'symbol' => s, 'name' => index_by_sym[s][:name] })
         end
       end
     end
@@ -4396,6 +4400,13 @@ class TechFeedReader < Sinatra::Base
     @followed_quotes = followed_symbols.any? ? StockQuotesStore.find_many(followed_symbols) : []
 
     erb :stocks
+  end
+
+  # API: current ticker data for the signed-in user (followed symbols + major indices).
+  # Polled by stock-ticker.js every 5 minutes to keep the ticker fresh without a reload.
+  get '/api/ticker' do
+    content_type :json
+    JSON.generate(ticker_quotes)
   end
 
   # API: intraday sparklines for all major indices (Yahoo Finance, no key needed).

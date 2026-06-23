@@ -27,12 +27,11 @@
 
   function drawSparkline(canvas, data) {
     var dpr = window.devicePixelRatio || 1;
-    var w = canvas.width;
-    var h = canvas.height;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
+    var w = canvas.offsetWidth;
+    var h = 40;
+    if (!w) return;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
     var ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
