@@ -1,31 +1,20 @@
-<%# Global stock ticker bar — rendered in the layout on every page for
-    signed-in users. Shows the user's followed symbols then the major
-    world indices (see the ticker_quotes helper). Reads cached DB rows,
-    no API calls on render. Renders nothing when there are no quotes. %>
+<%# Stock quotes grid — rendered in the layout on every page for signed-in
+    users. Shows the user's followed symbols then the major world indices.
+    Reads cached DB rows, no API calls on render. %>
 <% quotes = ticker_quotes %>
 <% if quotes.any? %>
-  <section id="stock-ticker" class="stock-ticker-section" aria-label="Stock ticker">
-    <div class="stock-ticker-bar">
-      <div class="stock-ticker-track">
-        <%# Rendered twice (the second pass aria-hidden) so the track can
-            scroll a seamless -50% loop. %>
-        <% 2.times do |pass| %>
-          <% quotes.each do |q| %>
-            <a href="/stocks/<%= h(q['symbol']) %>" class="stock-ticker-item"
-               <%= 'aria-hidden="true" tabindex="-1"' if pass == 1 %>
-               title="<%= h(q['name'] || q['symbol']) %>">
-              <span class="stock-ticker-symbol"><%= h(q['symbol']) %></span>
-              <% if q['price'] %>
-                <span class="stock-ticker-price"><%= format_price(q['price']) %></span>
-                <span class="stock-ticker-change <%= q['change'].to_f >= 0 ? 'positive' : 'negative' %>">
-                  <%= q['change'].to_f >= 0 ? '▲' : '▼' %>
-                  <%= format_pct(q['change_pct']) %>
-                </span>
-              <% end %>
-            </a>
-          <% end %>
+  <div class="stock-grid">
+    <% quotes.each do |q| %>
+      <% chg = q['change'].to_f %>
+      <a href="/stocks/<%= h(q['symbol']) %>" class="stock-cell">
+        <span class="stock-cell-symbol"><%= h(q['symbol']) %></span>
+        <% if q['price'] %>
+          <span class="stock-cell-price"><%= format_price(q['price']) %></span>
+          <span class="stock-cell-change <%= chg >= 0 ? 'positive' : 'negative' %>">
+            <%= chg >= 0 ? '▲' : '▼' %> <%= format_pct(q['change_pct']) %>
+          </span>
         <% end %>
-      </div>
-    </div>
-  </section>
+      </a>
+    <% end %>
+  </div>
 <% end %>

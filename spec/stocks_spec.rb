@@ -255,9 +255,40 @@ RSpec.describe 'Stock follows & quotes' do
     end
   end
 
+  # --- format_market_cap (via stock detail page) -------------------------
+
+  describe 'market cap currency display' do
+    include Rack::Test::Methods
+
+    def app
+      TechFeedReader
+    end
+
+    it 'shows $ prefix for USD market cap' do
+      StockQuotesStore.upsert(symbol: 'AAPL', name: 'Apple', price: 100.0, market_cap: 1_230_000_000_000, currency: 'USD')
+      get '/stocks/AAPL'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('$1.23T')
+    end
+
+    it 'shows — for non-USD market cap (no exchange rate available)' do
+      StockQuotesStore.upsert(symbol: 'TSM', name: 'TSMC', price: 100.0, market_cap: 60_000_000_000_000, currency: 'TWD')
+      get '/stocks/TSM'
+      expect(last_response).to be_ok
+      expect(last_response.body).not_to include('60.00T')
+    end
+
+    it 'shows $ for null currency (legacy row treated as USD)' do
+      StockQuotesStore.upsert(symbol: 'XYZ', name: 'XYZ Corp', price: 100.0, market_cap: 500_000_000_000)
+      get '/stocks/XYZ'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('$500.00B')
+    end
+  end
+
   # --- Global stock ticker (layout) --------------------------------------
 
-  describe 'Global stock ticker' do
+  describe 'Global stock quotes table' do
     include Rack::Test::Methods
 
     def app
@@ -269,29 +300,37 @@ RSpec.describe 'Stock follows & quotes' do
       StockQuotesStore.upsert(symbol: 'AAPL', name: 'Apple Inc', price: 200.0, change: 1.0, change_pct: 0.5)
       get '/articles'
       expect(last_response).to be_ok
-      expect(last_response.body).to include('stock-ticker-track')
+      expect(last_response.body).to include('stock-grid')
       expect(last_response.body).to include('AAPL')
     end
 
     it 'shows followed symbols even when their cached quote is absent' do
-      # Simulates a just-followed symbol whose background fetch hasn't run yet.
       StockFollowsStore.add(user_id: 1, symbol: 'NVDA', name: 'NVIDIA')
-      # No StockQuotesStore row for NVDA.
       get '/articles'
       expect(last_response).to be_ok
-      expect(last_response.body).to include('stock-ticker-track')
+      expect(last_response.body).to include('stock-grid')
       expect(last_response.body).to include('NVDA')
     end
 
     it 'always shows major index symbols even when their cached quote is absent' do
-      # Indices always appear as name-only placeholders even before IndexSyncWorker runs.
       get '/articles'
       expect(last_response).to be_ok
-      expect(last_response.body).to include('stock-ticker-track')
+      expect(last_response.body).to include('stock-grid')
       StockQuoteProvider::MAJOR_INDICES.each do |idx|
         expect(last_response.body).to include(idx[:symbol])
       end
     end
+
+    it 'shows ALL followed symbols in the rendered HTML, even with no cached quotes' do
+      symbols = %w[AAPL TSM NVDA GOOG MSFT]
+      symbols.each { |s| StockFollowsStore.add(user_id: 1, symbol: s, name: s) }
+      get '/articles'
+      expect(last_response).to be_ok
+      symbols.each do |s|
+        expect(last_response.body).to include(s), "expected stock grid to include #{s}"
+      end
+    end
+
   end
 
   # --- GET /api/ticker -------------------------------------------------------
