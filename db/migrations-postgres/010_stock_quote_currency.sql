@@ -1,0 +1,1 @@
+ALTER TABLE stock_quotes ADD COLUMN IF NOT EXISTS currency VARCHAR(10);

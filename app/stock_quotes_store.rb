@@ -38,22 +38,23 @@ module StockQuotesStore
     args = [
       sym,
       data[:name],       data[:exchange],   data[:sector],
-      data[:industry],   data[:market_cap], data[:logo],
+      data[:industry],   data[:market_cap], data[:currency],  data[:logo],
       data[:price],      data[:change],     data[:change_pct],
       data[:day_high],   data[:day_low],    data[:open],
       data[:prev_close], data[:volume]
     ]
     sql = <<~SQL
       INSERT INTO stock_quotes
-        (symbol, name, exchange, sector, industry, market_cap, logo,
+        (symbol, name, exchange, sector, industry, market_cap, currency, logo,
          price, change, change_pct, day_high, day_low, open, prev_close, volume, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, now()::text)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now()::text)
       ON CONFLICT (symbol) DO UPDATE SET
         name       = COALESCE(EXCLUDED.name,       stock_quotes.name),
         exchange   = COALESCE(EXCLUDED.exchange,    stock_quotes.exchange),
         sector     = COALESCE(EXCLUDED.sector,      stock_quotes.sector),
         industry   = COALESCE(EXCLUDED.industry,    stock_quotes.industry),
         market_cap = COALESCE(EXCLUDED.market_cap,  stock_quotes.market_cap),
+        currency   = COALESCE(EXCLUDED.currency,    stock_quotes.currency),
         logo       = COALESCE(EXCLUDED.logo,        stock_quotes.logo),
         price      = COALESCE(EXCLUDED.price,       stock_quotes.price),
         change     = COALESCE(EXCLUDED.change,      stock_quotes.change),

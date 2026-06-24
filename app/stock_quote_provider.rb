@@ -100,6 +100,7 @@ module StockQuoteProvider
         sector:     p['finnhubIndustry'],
         industry:   p['finnhubIndustry'],
         market_cap: p['marketCapitalization'] ? (p['marketCapitalization'].to_f * 1_000_000).to_i : nil,
+        currency:   p['currency'],
         logo:       p['logo']
       )
     end

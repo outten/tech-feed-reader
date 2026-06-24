@@ -53,7 +53,7 @@
     <% if @quote['market_cap'] %>
       <div class="summary-card">
         <span class="summary-label">Market cap</span>
-        <span class="summary-value"><%= format_market_cap(@quote['market_cap']) %></span>
+        <span class="summary-value"><%= format_market_cap(@quote['market_cap'], @quote['currency']) %></span>
         <% if @quote['industry'] %>
           <span class="summary-sub"><%= h(@quote['industry']) %></span>
         <% end %>

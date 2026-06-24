@@ -5793,62 +5793,40 @@ html.dark .stock-search-input:focus {
 }
 
 /* --- Dashboard ticker bar -------------------------------------------- */
-.stock-ticker-section {
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
   margin-bottom: 1.2rem;
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--card-bg, var(--bg));
-}
-.stock-ticker-bar {
   overflow: hidden;
-  position: relative;
-  height: 2.5rem;
+  background: var(--border);
 }
-.stock-ticker-track {
+.stock-cell {
   display: flex;
   align-items: center;
-  height: 100%;
-  white-space: nowrap;
-  animation: ticker-scroll 30s linear infinite;
-  will-change: transform;
-}
-.stock-ticker-track:hover {
-  animation-play-state: paused;
-}
-@keyframes ticker-scroll {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-/* Respect the user's reduced-motion preference — stop the ticker
-   auto-scrolling (it already pauses on hover; this opts out entirely)
-   and let it scroll manually on overflow instead. */
-@media (prefers-reduced-motion: reduce) {
-  .stock-ticker-track { animation: none; }
-  .stock-ticker-bar { overflow-x: auto; }
-}
-.stock-ticker-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 1.2rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--card-bg, var(--bg));
   text-decoration: none;
   color: var(--text);
   font-size: 0.85rem;
-  border-right: 1px solid var(--border);
-  height: 100%;
+  white-space: nowrap;
 }
-.stock-ticker-item:last-child { border-right: none; }
-.stock-ticker-symbol {
-  font-weight: 600;
+.stock-cell:hover { background: var(--hover-bg, rgba(0,0,0,0.03)); }
+html.dark .stock-cell:hover { background: rgba(255,255,255,0.05); }
+.stock-cell-symbol {
+  font-weight: 700;
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.8rem;
 }
-.stock-ticker-price {
-  font-weight: 500;
+.stock-cell-price {
+  font-variant-numeric: tabular-nums;
 }
-.stock-ticker-change {
+.stock-cell-change {
   font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* btn-sm helper (if not already defined) */

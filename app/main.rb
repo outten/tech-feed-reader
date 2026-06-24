@@ -624,13 +624,15 @@ class TechFeedReader < Sinatra::Base
       end
     end
 
-    def format_market_cap(val)
+    def format_market_cap(val, currency = nil)
       return '—' if val.nil?
+      cur = currency.to_s.upcase
+      return '—' unless cur == 'USD' || cur.empty?
       v = val.to_i
-      if v >= 1_000_000_000_000 then format('$%.2fT', v / 1_000_000_000_000.0)
-      elsif v >= 1_000_000_000  then format('$%.2fB', v / 1_000_000_000.0)
-      elsif v >= 1_000_000      then format('$%.2fM', v / 1_000_000.0)
-      else "$#{v}"
+      if    v >= 1_000_000_000_000 then format('$%.2fT', v / 1_000_000_000_000.0)
+      elsif v >= 1_000_000_000     then format('$%.2fB', v / 1_000_000_000.0)
+      elsif v >= 1_000_000         then format('$%.2fM', v / 1_000_000.0)
+      else  "$#{v}"
       end
     end
 
