@@ -271,18 +271,18 @@ RSpec.describe 'Stock follows & quotes' do
       expect(last_response.body).to include('$1.23T')
     end
 
-    it 'shows — for non-USD market cap (no exchange rate available)' do
+    it 'shows currency-prefixed value for non-USD market cap' do
       StockQuotesStore.upsert(symbol: 'TSM', name: 'TSMC', price: 100.0, market_cap: 60_000_000_000_000, currency: 'TWD')
       get '/stocks/TSM'
       expect(last_response).to be_ok
-      expect(last_response.body).not_to include('60.00T')
+      expect(last_response.body).to include('TWD 60.00T')
     end
 
-    it 'shows $ for null currency (legacy row treated as USD)' do
+    it 'shows — for null currency (unknown currency suppressed)' do
       StockQuotesStore.upsert(symbol: 'XYZ', name: 'XYZ Corp', price: 100.0, market_cap: 500_000_000_000)
       get '/stocks/XYZ'
       expect(last_response).to be_ok
-      expect(last_response.body).to include('$500.00B')
+      expect(last_response.body).not_to include('$500.00B')
     end
   end
 
