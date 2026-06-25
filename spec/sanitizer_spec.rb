@@ -252,4 +252,74 @@ RSpec.describe Sanitizer do
       expect(Sanitizer.sanitize_html(html)).to include('Set')
     end
   end
+
+  describe 'SocialShareScrubber' do
+    def clean(html) = Sanitizer.sanitize_html(html)
+
+    it 'removes a Twitter/X share anchor' do
+      html = '<p>Read this.</p><a href="https://twitter.com/intent/tweet?text=hi&amp;url=http://example.com">Tweet</a>'
+      out  = clean(html)
+      expect(out).to include('Read this.')
+      expect(out).not_to include('twitter.com/intent')
+      expect(out).not_to include('Tweet')
+    end
+
+    it 'removes an X.com share anchor' do
+      html = '<a href="https://x.com/intent/tweet?url=http://example.com">Share on X</a>'
+      expect(clean(html)).not_to include('x.com/intent')
+    end
+
+    it 'removes a Facebook sharer anchor' do
+      html = '<p>Article.</p><a href="https://www.facebook.com/sharer/sharer.php?u=http://example.com">Share</a>'
+      out  = clean(html)
+      expect(out).to include('Article.')
+      expect(out).not_to include('facebook.com/sharer')
+    end
+
+    it 'removes a LinkedIn share anchor' do
+      html = '<a href="https://www.linkedin.com/shareArticle?url=http://example.com">LinkedIn</a>'
+      expect(clean(html)).not_to include('linkedin.com/shareArticle')
+    end
+
+    it 'preserves a normal social profile link' do
+      html = '<p>Follow us on <a href="https://twitter.com/example">@example</a>.</p>'
+      out  = clean(html)
+      expect(out).to include('twitter.com/example')
+      expect(out).to include('@example')
+    end
+
+    it 'removes an AddThis container element' do
+      html = '<p>Content.</p><div class="addthis_sharing_toolbox"><a href="#">Share</a></div>'
+      out  = clean(html)
+      expect(out).to include('Content.')
+      expect(out).not_to include('addthis')
+    end
+
+    it 'removes a ShareThis container element' do
+      html = '<p>Article.</p><div class="sharethis-inline-share-buttons"></div>'
+      out  = clean(html)
+      expect(out).to include('Article.')
+      expect(out).not_to include('sharethis')
+    end
+
+    it 'removes a Jetpack sharedaddy block' do
+      html = '<p>Post.</p><div class="sharedaddy sd-sharing-enabled"><a href="#">Share this</a></div>'
+      out  = clean(html)
+      expect(out).to include('Post.')
+      expect(out).not_to include('sharedaddy')
+    end
+
+    it 'removes a button with share data-url attribute' do
+      html = '<p>Body.</p><button class="social-share-btn" data-url="https://twitter.com/intent/tweet?url=http://example.com">Tweet</button>'
+      out  = clean(html)
+      expect(out).to include('Body.')
+      expect(out).not_to include('twitter.com/intent')
+    end
+
+    it 'preserves an unrelated element whose class contains "share" as a substring' do
+      html = '<div class="market-share-chart"><p>AAPL: 10%</p></div>'
+      out  = clean(html)
+      expect(out).to include('AAPL: 10%')
+    end
+  end
 end

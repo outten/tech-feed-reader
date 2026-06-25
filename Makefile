@@ -1,4 +1,4 @@
-.PHONY: run dev stop serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links
+.PHONY: run dev stop serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links strip-social-share
 
 install:
 	bundle install
@@ -173,6 +173,11 @@ backfill-podcast-images:
 # scripts/backfill_stock_news_feeds.rb.
 backfill-stock-news:
 	bundle exec ruby scripts/backfill_stock_news_feeds.rb
+
+# Strip social-media sharing buttons from all existing articles.
+# Pass DRY_RUN=1 to preview without writing, LIMIT=N to cap rows.
+strip-social-share:
+	bundle exec ruby scripts/strip_social_share.rb $(if $(DRY_RUN),--dry-run) $(if $(LIMIT),--limit $(LIMIT))
 
 # STUFF #61 — re-sanitize every article's content_html with the
 # article's own URL as the absolute-link base. Fixes relative <a>

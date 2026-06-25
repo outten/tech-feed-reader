@@ -24,6 +24,14 @@ require 'cgi'
 # Anchor (`#foo`) and protocol links (`mailto:`, `tel:`) are left
 # alone — those aren't HTTP citations.
 #
+# SocialShareScrubber runs after the prune pass and removes social
+# sharing widgets — <a> elements with share-intent hrefs (Twitter,
+# Facebook, LinkedIn, Reddit, Pinterest, WhatsApp, Telegram) and
+# elements whose class identifies them as a known widget container
+# (AddThis, ShareThis, Jetpack Sharedaddy, etc.). These buttons
+# reference the original publisher URL, depend on third-party JS we
+# never load, and render as broken links or orphaned icons.
+#
 # Two outputs:
 #   sanitize_html(html, base_url: nil) — safe HTML for the reading view
 #   text_only(html)                    — plain text for FTS5 indexing
@@ -35,6 +43,7 @@ module Sanitizer
     cleaned  = decode_double_encoded_markup(html.to_s)
     fragment = Loofah.fragment(cleaned).scrub!(:prune)
     strip_data_blobs!(fragment)
+    fragment.scrub!(SocialShareScrubber.new)
     fragment.scrub!(LinkAbsolutizer.new(base_url)) if base_url && !base_url.to_s.empty?
     fragment.scrub!(ExternalLinkScrubber.new)
     fragment.to_s
@@ -136,6 +145,74 @@ module Sanitizer
       URI.join(@base, s).to_s
     rescue URI::InvalidURIError, URI::BadURIError, ArgumentError
       url
+    end
+  end
+
+  # Removes social media sharing widgets from article HTML. Two detection
+  # strategies run together on every node (top-down so a removed container
+  # skips its children automatically):
+  #
+  #   1. Share-URL href/data-url — <a href="https://twitter.com/intent/tweet...">
+  #      and similar buttons that carry the share URL in any attribute.
+  #   2. Widget container class — elements whose class attribute matches a
+  #      known sharing-widget pattern (AddThis, ShareThis, Sharedaddy, etc.).
+  class SocialShareScrubber < Loofah::Scrubber
+    SHARE_URL_PATTERNS = [
+      %r{\Ahttps?://(?:www\.)?twitter\.com/intent/tweet}i,
+      %r{\Ahttps?://(?:www\.)?x\.com/intent/tweet}i,
+      %r{\Ahttps?://(?:www\.)?facebook\.com/sharer}i,
+      %r{\Ahttps?://(?:www\.)?facebook\.com/dialog/share}i,
+      %r{\Ahttps?://(?:www\.)?linkedin\.com/share}i,
+      %r{\Ahttps?://(?:www\.)?linkedin\.com/shareArticle}i,
+      %r{\Ahttps?://(?:www\.)?reddit\.com/submit}i,
+      %r{\Ahttps?://(?:www\.)?pinterest\.com/pin/create}i,
+      %r{\Ahttps?://(?:wa\.me|api\.whatsapp\.com|web\.whatsapp\.com)/send}i,
+      %r{\Ahttps?://t\.me/share}i,
+    ].freeze
+
+    # Class substrings that unambiguously identify a sharing widget container.
+    # Kept specific (multi-word or unique prefixes) to avoid false positives.
+    SHARE_CLASS_PATTERNS = [
+      /\baddthis/i,
+      /\bsharethis/i,
+      /\bsharedaddy\b/i,
+      /\bsd-sharing\b/i,
+      /\bwp-block-social-links\b/i,
+      /\bsocial-share[-_]/i,
+      /\bshare-buttons\b/i,
+      /\bshare-bar\b/i,
+      /\bShareNewsArticle_/,
+      /\bvossi-social-share\b/i,
+    ].freeze
+
+    def initialize
+      @direction = :top_down
+    end
+
+    def scrub(node)
+      return Loofah::Scrubber::CONTINUE if node.type != Nokogiri::XML::Node::ELEMENT_NODE
+
+      if share_class?(node) || share_url_node?(node)
+        node.remove
+        return Loofah::Scrubber::STOP
+      end
+
+      Loofah::Scrubber::CONTINUE
+    end
+
+    private
+
+    def share_class?(node)
+      cls = node['class'].to_s
+      return false if cls.empty?
+      SHARE_CLASS_PATTERNS.any? { |pat| cls.match?(pat) }
+    end
+
+    def share_url_node?(node)
+      # Check href on <a>, and data-url / data-share-url on any element
+      # (some publishers put share URLs in data attributes on <button>).
+      candidates = [node['href'], node['data-url'], node['data-share-url']].compact
+      candidates.any? { |url| SHARE_URL_PATTERNS.any? { |pat| url.match?(pat) } }
     end
   end
 
