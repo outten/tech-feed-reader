@@ -698,6 +698,14 @@ class TechFeedReader < Sinatra::Base
       videos_today, non_video = todays.reject { |a| a['audio_url'].to_s.size.positive? }
                                       .partition { |a| youtube_video_id(a) }
       @today_watching = videos_today.first(10)
+      if @today_watching.length < 10
+        covered_feed_ids = @today_watching.map { |a| a['feed_id'] }.compact.uniq
+        fallbacks = ArticlesStore.latest_youtube_videos_for_channels(
+          current_user_id, exclude_feed_ids: covered_feed_ids
+        )
+        slots = 10 - @today_watching.length
+        @today_watching = @today_watching + fallbacks.first(slots)
+      end
       @today_reading  = non_video.first(10)
 
       # Phase 3 follow-up (2026-05-12) — surface bus mode on the home.
