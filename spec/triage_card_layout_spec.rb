@@ -5,11 +5,10 @@ require_relative '../app/articles_store'
 require_relative '../app/triage/claude'
 require_relative '../app/triage_store'
 
-# STUFF.md #8 — triage page card layout. Each entry now renders
-# as a vertical-card (.sports-article shape) rather than the old
-# horizontal news-item row. New: inline article summary + the
-# title links to the publisher in a new tab + "Open in app"
-# affordance for the in-app reading view.
+# STUFF.md #8 — triage page card layout. Each entry renders as a
+# vertical-card (.sports-article shape). Title links to /article/:uid
+# (in-app reading view); a separate "Source →" link in the meta row
+# opens the publisher URL in a new tab. "Open in app" removed (#106).
 
 def seed_triage_with_article(uid:, title:, url:, content_text:, group: :must_read, rationale: 'Strong corpus match')
   feed = FeedsStore.find_by_url('https://x.com/triage-rss') ||
@@ -46,13 +45,25 @@ RSpec.describe 'GET /triage/:id card layout (STUFF.md #8)' do
     expect(last_response.body).to include('class="sports-article-title"')
   end
 
-  it 'links the headline to the publisher URL in a new tab' do
+  it 'links the headline to the in-app reading view' do
     id = seed_triage_with_article(
       uid: 'triagecard02', title: 'External link test',
       url: 'https://publisher.example.com/article', content_text: 'body'
     )
     get "/triage/#{id}"
-    expect(last_response.body).to match(%r{<a href="https://publisher\.example\.com/article"\s+target="_blank"\s+rel="noopener noreferrer"})
+    expect(last_response.body).to include('href="/article/triagecard02"')
+    expect(last_response.body).to match(%r{<h4[^>]*>\s*<a href="/article/triagecard02"})
+  end
+
+  it 'adds a Source link in the meta row pointing to the publisher URL' do
+    id = seed_triage_with_article(
+      uid: 'triagecard02b', title: 'Source link test',
+      url: 'https://publisher.example.com/source-article', content_text: 'body'
+    )
+    get "/triage/#{id}"
+    expect(last_response.body).to include('href="https://publisher.example.com/source-article"')
+    expect(last_response.body).to include('Source')
+    expect(last_response.body).to include('target="_blank"')
   end
 
   it 'renders the inline article summary (skim_summary_for fallback)' do
@@ -75,13 +86,12 @@ RSpec.describe 'GET /triage/:id card layout (STUFF.md #8)' do
     expect(last_response.body).to match(/<strong>Why:<\/strong>\s*matches your bookmarked Ruby work/)
   end
 
-  it 'offers an "Open in app" affordance pointing at /article/<uid>' do
+  it 'does not render an "Open in app" link (redundant since title links in-app)' do
     id = seed_triage_with_article(
       uid: 'triagecard05', title: 'X', url: 'https://example.com/e', content_text: 'body'
     )
     get "/triage/#{id}"
-    expect(last_response.body).to include('class="sports-article-in-app"')
-    expect(last_response.body).to include('href="/article/triagecard05"')
-    expect(last_response.body).to include('Open in app')
+    expect(last_response.body).not_to include('Open in app')
+    expect(last_response.body).not_to include('sports-article-in-app')
   end
 end

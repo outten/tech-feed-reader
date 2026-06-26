@@ -43,7 +43,8 @@ RSpec.describe Digests do
       expect(result.text).to include('Fresh + unread')
       expect(result.text).not_to include('Fresh + read')
       expect(result.text).not_to include('Stale + unread')
-      expect(result.html).to include(kept['url'])
+      expect(result.html).to include('/article/aaaaaaaaaaaa')   # title links in-app
+      expect(result.html).to include(kept['url'])               # source link still present
     end
 
     it 'orders newest first within the window' do

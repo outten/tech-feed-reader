@@ -120,15 +120,9 @@
             <% summary_text = skim_summary_for(article, summary_row) %>
             <li class="sports-article triage-card <%= 'read' if article['read'] == 1 %>">
               <h4 class="sports-article-title">
-                <% if article['url'] && !article['url'].to_s.empty? %>
-                  <% host = (URI.parse(article['url']).host rescue nil) || 'publisher' %>
-                  <a href="<%= h(article['url']) %>" target="_blank" rel="noopener noreferrer"
-                     title="Open at <%= h(host) %> (new tab)">
-                    <%= h(article['title']) %>
-                  </a>
-                <% else %>
+                <a href="/article/<%= article['uid'] %>" title="Open in reading view">
                   <%= h(article['title']) %>
-                <% end %>
+                </a>
               </h4>
 
               <% unless entry['rationale'].to_s.empty? %>
@@ -156,11 +150,13 @@
                   <span class="sports-article-meta-sep">&middot;</span>
                   <span class="badge podcast-badge" title="Podcast episode">🎧</span>
                 <% end %>
-                <span class="sports-article-meta-sep">&middot;</span>
-                <a class="sports-article-in-app" href="/article/<%= article['uid'] %>"
-                   title="Open the in-app reading view (summary + tags + feedback)">
-                  Open in app &rarr;
-                </a>
+                <% if article['url'] && !article['url'].to_s.empty? %>
+                  <span class="sports-article-meta-sep">&middot;</span>
+                  <a class="sports-article-source-link" href="<%= h(article['url']) %>"
+                     target="_blank" rel="noopener noreferrer" title="Open original article (new tab)">
+                    Source &rarr;
+                  </a>
+                <% end %>
               </div>
             </li>
           <% end %>

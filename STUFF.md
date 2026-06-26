@@ -1501,3 +1501,11 @@ The stock ticker is not showing all the stocks a user is following. It appears t
 - **Animation speed**: hardcoded 30 s made the ticker unreadable with many items. Now scales at 3 s/item (min 20 s).
 - **Turbo reset**: Turbo Drive replaced `<body>` on every navigation, restarting the animation before all stocks scrolled past. Fixed with `data-turbo-permanent` + stable `id` on the section.
 - **Sidekiq death handler** (v1.1.9): `config.death_handler=` (Sidekiq 7 setter) was removed in Sidekiq 8; Sidekiq crashed on boot and silently stopped processing all enqueued jobs. Fixed: `config.death_handlers <<`.
+
+## [x] 106. Articles Link
+
+On the home page, the digest page, and on the triage page, the link in the title goes to the source page. Can we change that to go to our apps page. And then add a Source link that goes to the source. And then remove the "Open in app" link.
+
+We want to have the user stay on our site a much as possible.
+
+**Shipped.** Triage and digest article titles now link to `/article/:uid` (in-app reading view) rather than the external publisher URL. A "Source →" link added to the triage meta row and a "Source" link to the digest meta line so users can still reach the original. "Open in app →" removed from triage (redundant). Home page and articles list were already linking in-app. No DB changes.
