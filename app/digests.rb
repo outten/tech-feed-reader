@@ -128,11 +128,13 @@ module Digests
       published = h(relative_when(row['published_at'], now))
       summary  = h(pick_summary(row))
       pod_badge = row['audio_url'] ? ' <span class="badge podcast-badge">PODCAST</span>' : ''
-      title_html = url.empty? ? title : %(<a href="#{url}" target="_blank" rel="noopener">#{title}</a>)
+      uid        = h(row['uid'].to_s)
+      title_html = %(<a href="/article/#{uid}">#{title}</a>)
+      source_html = url.empty? ? '' : %( · <a href="#{url}" target="_blank" rel="noopener noreferrer">Source</a>)
       <<~HTML
         <li class="digest-item">
           <div class="digest-item-title">#{title_html}#{pod_badge}</div>
-          <div class="digest-item-meta muted">#{feed} · #{published}</div>
+          <div class="digest-item-meta muted">#{feed} · #{published}#{source_html}</div>
           #{summary.empty? ? '' : %(<div class="digest-item-summary">#{summary}</div>)}
         </li>
       HTML
