@@ -147,6 +147,22 @@ module ArticlesStore
     SQL
   end
 
+  def latest_youtube_videos_for_channels(user_id, exclude_feed_ids: [])
+    exclude_clause = exclude_feed_ids.empty? ? '' : "AND f.id NOT IN (#{exclude_feed_ids.map(&:to_i).join(',')})"
+    db.execute(<<~SQL, [user_id.to_i, YOUTUBE_FEED_URL_PATTERN])
+      SELECT DISTINCT ON (f.id)
+             a.id, a.uid, a.title, a.url, a.published_at,
+             a.feed_id, a.audio_url, a.content_text
+      FROM articles a
+      JOIN feeds f ON f.id = a.feed_id
+      JOIN user_feed_subscriptions ufs ON ufs.feed_id = f.id AND ufs.user_id = ?
+      WHERE f.url LIKE ?
+        #{exclude_clause}
+        AND (a.url LIKE '%youtube.com%' OR a.url LIKE '%youtu.be%')
+      ORDER BY f.id, a.published_at DESC NULLS LAST, a.id DESC
+    SQL
+  end
+
   # STUFF #65 — distinct webcomic feeds in the user's subscriptions.
   # Matched by `feeds.topic = 'humor'` (the catalog-add path plumbs the
   # category's topic through). Returns the latest article's uid + its

@@ -134,6 +134,73 @@ RSpec.describe "GET / What's On Today (returning user)" do
   end
 end
 
+RSpec.describe 'YouTube one-video-per-channel fallback (STUFF.md #107)' do
+  include Rack::Test::Methods
+  def app; TechFeedReader; end
+
+  def make_youtube_channel_article(uid:, title:, channel_id:, video_id:, published_at: nil)
+    feed_url = "https://www.youtube.com/feeds/videos.xml?channel_id=#{channel_id}"
+    feed = FeedsStore.find_by_url(feed_url) ||
+           FeedsStore.add(url: feed_url, title: "YT #{channel_id}", topic: 'nature')
+    ArticlesStore.import(feed_id: feed['id'], entries: [{
+      uid: uid, title: title,
+      url: "https://www.youtube.com/watch?v=#{video_id}",
+      author: nil,
+      published_at: published_at || Time.now.utc.iso8601,
+      content_html: "<p>#{title}</p>", content_text: title,
+      audio_url: nil, audio_mime_type: nil, audio_duration_seconds: nil
+    }])
+    ArticlesStore.find_by_uid(uid)
+  end
+
+  it 'shows the latest video from a subscribed channel that has not posted today' do
+    seed_returning!
+    week_ago = (Time.now.utc - 7 * 86_400).iso8601
+    make_youtube_channel_article(
+      uid: 'yt_old_video_01', title: 'Old channel video',
+      channel_id: 'UColdchannel00001', video_id: 'oldvid000001',
+      published_at: week_ago
+    )
+    get '/'
+    expect(last_response.body).to include('To watch today')
+    expect(last_response.body).to include('Old channel video')
+  end
+
+  it 'shows videos from both a channel that posted today and one that did not' do
+    seed_returning!
+    # Channel A: posted today
+    make_youtube_channel_article(
+      uid: 'yt_today_ch_a01', title: 'Channel A today video',
+      channel_id: 'UCchannelA000001', video_id: 'todayvida0001'
+    )
+    # Channel B: last video was a week ago
+    week_ago = (Time.now.utc - 7 * 86_400).iso8601
+    make_youtube_channel_article(
+      uid: 'yt_old_ch_b0001', title: 'Channel B old video',
+      channel_id: 'UCchannelB000001', video_id: 'oldvideb00001',
+      published_at: week_ago
+    )
+    get '/'
+    expect(last_response.body).to include('Channel A today video')
+    expect(last_response.body).to include('Channel B old video')
+  end
+
+  it 'does not exceed 10 videos when today already fills all slots' do
+    seed_returning!
+    11.times do |i|
+      make_youtube_channel_article(
+        uid: "yt_fill_slot_%02d" % i, title: "Fill slot #{i}",
+        channel_id: "UCfillchannel%04d" % i, video_id: "fillvid%05d" % i
+      )
+    end
+    get '/'
+    # Count <li class="video-card"> or similar — at most 10
+    watch_section = last_response.body[/To watch today.*?(<\/section>)/m]
+    video_links = watch_section&.scan(%r{youtube\.com/watch\?v=})&.size || 0
+    expect(video_links).to be <= 10
+  end
+end
+
 RSpec.describe '/whats-on (legacy URL)' do
   include Rack::Test::Methods
   def app; TechFeedReader; end
