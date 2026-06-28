@@ -1509,3 +1509,9 @@ On the home page, the digest page, and on the triage page, the link in the title
 We want to have the user stay on our site a much as possible.
 
 **Shipped.** Triage and digest article titles now link to `/article/:uid` (in-app reading view) rather than the external publisher URL. A "Source →" link added to the triage meta row and a "Source" link to the digest meta line so users can still reach the original. "Open in app →" removed from triage (redundant). Home page and articles list were already linking in-app. No DB changes.
+
+## [x] 107. Substack
+
+Can you support Substack?
+
+**Shipped.** Substack RSS feeds already worked at the infrastructure level. Added URL normalization in `POST /api/feeds`: pasting `https://name.substack.com` (with or without trailing slash) is automatically rewritten to `https://name.substack.com/feed`. Paywalled posts remain truncated (true for all RSS readers — no workaround without auth).

@@ -3739,6 +3739,10 @@ class TechFeedReader < Sinatra::Base
       next({ ok: false, error: 'invalid-url', message: "That doesn't look like a valid http(s) URL." }.to_json)
     end
 
+    # Normalize Substack homepage URLs to their RSS feed endpoint.
+    # https://name.substack.com → https://name.substack.com/feed
+    url = url.chomp('/') + '/feed' if url.match?(%r{\Ahttps?://[^/]+\.substack\.com/?\z}i)
+
     title    = (params['title'] || '').strip
     title    = nil if title.empty?
     interval = params['fetch_interval_seconds'].to_i
