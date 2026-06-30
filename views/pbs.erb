@@ -59,7 +59,7 @@
     <% @my_feeds.each do |feed| %>
       <li class="catalog-row" data-catalog-url="<%= h(feed['url']) %>">
         <div class="catalog-meta">
-          <span class="catalog-title"><%= h(feed['title'] || feed['url']) %></span>
+          <a class="catalog-title" href="/pbs/<%= feed['id'] %>"><%= h(feed['title'] || feed['url']) %></a>
           <span class="muted catalog-url"><%= h(feed['url']) %></span>
         </div>
         <form method="post" action="/feeds/<%= feed['id'] %>/delete" class="js-remove-feed">

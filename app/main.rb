@@ -2395,6 +2395,17 @@ class TechFeedReader < Sinatra::Base
     erb :pbs
   end
 
+  get '/pbs/:feed_id' do |feed_id|
+    @feed = FeedsStore.find(feed_id.to_i)
+    halt 404, erb(:article_not_found) unless @feed
+    halt 404, erb(:article_not_found) unless FeedsStore.subscribed?(current_user_id, @feed['id'])
+    halt 404, erb(:article_not_found) unless @feed['topic'] == 'pbs'
+
+    @page_title = @feed['title'] || 'PBS Show'
+    @articles   = ArticlesStore.for_feed(current_user_id, @feed['id'], limit: 50)
+    erb :pbs_show
+  end
+
   # ── YouTube ───────────────────────────────────────────────────────────────
 
   get '/youtube' do
