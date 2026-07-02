@@ -1,0 +1,55 @@
+<div class="page-header">
+  <div>
+    <a class="muted" href="/feeds" style="font-size:0.85rem">&larr; Feeds</a>
+    <h2 style="margin-top:0.25rem">
+      <% if @feed['image_url'] && !@feed['image_url'].to_s.empty? %>
+        <img src="<%= h(@feed['image_url']) %>" alt="" style="height:1.5rem; vertical-align:middle; border-radius:4px; margin-right:0.4rem">
+      <% end %>
+      <%= h(@page_title) %>
+    </h2>
+    <p class="subtitle muted" style="font-size:0.8rem"><%= h(@feed['url']) %></p>
+  </div>
+</div>
+
+<section class="benchmark-section" style="margin-top:1.5rem">
+  <h3>Content <span class="muted" style="font-size:0.85rem; font-weight:normal">(<%= @articles.length %>)</span></h3>
+  <% if @articles.empty? %>
+    <p class="muted">No content yet — check back after the next fetch.</p>
+  <% else %>
+    <ul class="podcast-episodes">
+      <% @articles.each do |item| %>
+        <%
+          item_image = item['image_url'].to_s.empty? ? @feed['image_url'] : item['image_url']
+          is_audio   = item['audio_url'] && !item['audio_url'].to_s.empty?
+          is_youtube = !is_audio && (item['url'].to_s.include?('youtube.com') || item['url'].to_s.include?('youtu.be'))
+        %>
+        <li class="podcast-card <%= item['read'] == 1 ? 'read' : '' %> <%= 'has-image' if item_image && !item_image.to_s.empty? %>">
+          <% if item_image && !item_image.to_s.empty? %>
+            <a class="podcast-card-image" href="/article/<%= item['uid'] %>" title="Open article"><img src="<%= h(item_image) %>" alt="" loading="lazy"></a>
+          <% end %>
+          <div class="podcast-card-body">
+            <div class="podcast-card-meta">
+              <span class="podcast-card-date" title="Published <%= h(item['published_at']) %>"><%= relative_time(item['published_at']) %></span>
+              <% if (dur = fmt_duration(item['audio_duration_seconds'])) %>
+                <span class="podcast-card-duration"><%= dur %></span>
+              <% end %>
+            </div>
+            <a class="podcast-card-title" href="/article/<%= item['uid'] %>"><%= h(item['title']) %></a>
+            <% if item['content_text'] && !item['content_text'].to_s.empty? %>
+              <p class="podcast-card-excerpt"><%= h(item['content_text'].to_s.gsub(/\s+/, ' ').strip[0, 240]) %><%= '…' if item['content_text'].to_s.length > 240 %></p>
+            <% end %>
+            <div class="podcast-card-actions">
+              <% if is_audio %>
+                <a class="btn-primary" href="/article/<%= item['uid'] %>">&#9654; Listen</a>
+              <% elsif is_youtube %>
+                <a class="btn-primary" href="<%= h(item['url']) %>" target="_blank" rel="noopener noreferrer">&#9654; Watch</a>
+              <% else %>
+                <a class="btn-secondary" href="/article/<%= item['uid'] %>">Read &rarr;</a>
+              <% end %>
+            </div>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

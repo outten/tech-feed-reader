@@ -79,7 +79,7 @@
     <% if signed_in? %>
       <%
         ai_paths      = %w[/topics /triage /digests]
-        manage_paths  = %w[/feeds /tags /sports/manage /radio]
+        manage_paths  = %w[/tags /sports/manage /radio]
         # STUFF #65 — Browse ▾ consolidates the per-content-type
         # destinations (Podcasts / YouTube / Sports / Comics) under
         # one parent so adding new content types doesn't keep growing
@@ -100,6 +100,7 @@
             STUFF #65 — content-type links moved under Browse ▾. %>
         <a href="/articles"  class="<%= request.path_info == '/articles' ? 'active' : '' %>">Articles</a>
         <a href="/bookmarks" class="<%= request.path_info == '/bookmarks' ? 'active' : '' %>" title="Articles you've saved">★ Bookmarks</a>
+        <a href="/feeds"     class="<%= (request.path_info == '/feeds' || request.path_info.start_with?('/feeds/')) ? 'active' : '' %>">Feeds</a>
 
         <div class="nav-dropdown <%= 'active' if browse_active %>">
           <button type="button" class="nav-dropdown-trigger" aria-haspopup="true">Browse <span class="nav-dropdown-caret" aria-hidden="true">▾</span></button>

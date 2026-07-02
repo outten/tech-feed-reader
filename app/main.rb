@@ -3864,6 +3864,17 @@ class TechFeedReader < Sinatra::Base
     OPML.build(FeedsStore.for_user(current_user_id))
   end
 
+  # STUFF.md #108 — per-feed content page. Placed after all fixed /feeds/*
+  # routes (including export.opml) so :feed_id doesn't shadow them.
+  get '/feeds/:feed_id' do |feed_id|
+    @feed = FeedsStore.find(feed_id.to_i)
+    halt 404, erb(:article_not_found) unless @feed
+    halt 404, erb(:article_not_found) unless FeedsStore.subscribed?(current_user_id, @feed['id'])
+    @page_title = @feed['title'] || 'Feed'
+    @articles   = ArticlesStore.for_feed(current_user_id, @feed['id'], limit: 50)
+    erb :feed_show
+  end
+
   get '/tags' do
     @page_title     = 'Tags'
     @tags           = TagsStore.all(current_user_id)
