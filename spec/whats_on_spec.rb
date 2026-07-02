@@ -248,9 +248,10 @@ RSpec.describe 'header nav consolidation (STUFF.md #15)' do
     expect(last_response.body).to match(%r{<div class="nav-dropdown active">\s*<button[^>]*>AI})
   end
 
-  it 'highlights Manage dropdown active when on /feeds' do
+  it 'highlights top-level Feeds link active when on /feeds (STUFF.md #108)' do
     get '/feeds'
-    expect(last_response.body).to match(%r{<div class="nav-dropdown active">\s*<button[^>]*>Manage})
+    expect(last_response.body).to match(%r{<a href="/feeds"[^>]*\bactive\b})
+    expect(last_response.body).not_to match(%r{<div class="nav-dropdown active">\s*<button[^>]*>Manage})
   end
 end
 

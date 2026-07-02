@@ -1515,3 +1515,8 @@ We want to have the user stay on our site a much as possible.
 Can you support Substack?
 
 **Shipped.** Substack RSS feeds already worked at the infrastructure level. Added URL normalization in `POST /api/feeds`: pasting `https://name.substack.com` (with or without trailing slash) is automatically rewritten to `https://name.substack.com/feed`. Paywalled posts remain truncated (true for all RSS readers — no workaround without auth).
+
+## [ ] 108. Feeds
+
+Let's add a top level menu item: Feeds. Clicking on it should list all of the logged in users Feeds. And selecting on one should take them to a page of all the content for the feed. And then allow them to engage each content item.
+
