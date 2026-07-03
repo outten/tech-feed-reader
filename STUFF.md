@@ -1522,6 +1522,8 @@ Let's add a top level menu item: Feeds. Clicking on it should list all of the lo
 
 **Shipped.** "Feeds" added as a top-level nav link alongside Articles and Bookmarks — active on `/feeds` and `/feeds/*`. Feed titles in the subscriptions table now link to `/feeds/:feed_id` (a new per-feed content page) rather than the raw XML. The per-feed page lists up to 50 recent items using the established podcast-card layout with Listen, Watch, or Read actions depending on content type. Route is placed after all fixed `/feeds/*` paths so it never shadows `/feeds/export.opml` or other literal routes. Shipped in v1.1.18.
 
-## [ ] 109. I Feel Lucky 
+## [x] 109. I Feel Lucky 
 
 Let's add a I Feel Luck icon next to the bus icon. This will return a random list of items from the user's feeds across all media and content types. The list should be no larger than fifty items.
+
+**Shipped.** Dice icon added to the signed-in header next to the Bus icon — `data-turbo-prefetch="false"` prevents hover from pre-fetching and wasting a roll. `GET /lucky` returns up to 50 randomly-sampled articles via `ArticlesStore.random` (`ORDER BY RANDOM()`) across all topics and content types with no filters beyond mute rules. Rendered in podcast-card layout with Listen / Watch / Read actions; each visit re-rolls independently. Shipped in v1.1.19.
