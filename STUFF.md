@@ -1520,3 +1520,5 @@ Can you support Substack?
 
 Let's add a top level menu item: Feeds. Clicking on it should list all of the logged in users Feeds. And selecting on one should take them to a page of all the content for the feed. And then allow them to engage each content item.
 
+**Shipped.** "Feeds" added as a top-level nav link alongside Articles and Bookmarks — active on `/feeds` and `/feeds/*`. Feed titles in the subscriptions table now link to `/feeds/:feed_id` (a new per-feed content page) rather than the raw XML. The per-feed page lists up to 50 recent items using the established podcast-card layout with Listen, Watch, or Read actions depending on content type. Route is placed after all fixed `/feeds/*` paths so it never shadows `/feeds/export.opml` or other literal routes. Shipped in v1.1.18.
+
