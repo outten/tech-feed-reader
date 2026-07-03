@@ -172,6 +172,22 @@
           <circle cx="17" cy="14" r="2"/>
         </svg>
       </a>
+      <%# STUFF.md #109 — I Feel Lucky: random cross-type article roll. %>
+      <a href="/lucky" class="header-icon-btn <%= 'active' if request.path_info == '/lucky' %>"
+         title="I Feel Lucky — random mix from all your feeds"
+         aria-label="I Feel Lucky"
+         data-turbo-prefetch="false">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="2" width="20" height="20" rx="3"/>
+          <circle cx="8"  cy="8"  r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="16" cy="8"  r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="8"  cy="16" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+        </svg>
+      </a>
     <% else %>
       <%# Logged-out: push the auth CTAs out to the right edge so the
           header doesn't feel half-empty. The block below the auth-chip

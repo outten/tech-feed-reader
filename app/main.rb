@@ -2196,6 +2196,14 @@ class TechFeedReader < Sinatra::Base
     erb :bus
   end
 
+  # STUFF.md #109 — "I Feel Lucky": random cross-type sample.
+  get '/lucky' do
+    @page_title = 'I Feel Lucky'
+    @articles   = ArticlesStore.random(current_user_id, limit: 50)
+    @feeds_by_id = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
+    erb :lucky
+  end
+
   get '/podcasts' do
     @page_title       = 'Podcasts'
     @shows            = ArticlesStore.podcast_feeds(current_user_id)
