@@ -1527,3 +1527,7 @@ Let's add a top level menu item: Feeds. Clicking on it should list all of the lo
 Let's add a I Feel Luck icon next to the bus icon. This will return a random list of items from the user's feeds across all media and content types. The list should be no larger than fifty items.
 
 **Shipped.** Dice icon added to the signed-in header next to the Bus icon — `data-turbo-prefetch="false"` prevents hover from pre-fetching and wasting a roll. `GET /lucky` returns up to 50 randomly-sampled articles via `ArticlesStore.random` (`ORDER BY RANDOM()`) across all topics and content types with no filters beyond mute rules. Rendered in podcast-card layout with Listen / Watch / Read actions; each visit re-rolls independently. Shipped in v1.1.19.
+
+## [ ] 110. GitHub Actioms Vulnerabilities Check
+
+The RSpec test in GitHub Actions to check and stop for vulnerabilities needs to be updated. Only HIGH and CRITICAL vulnerabilities should FAIL the action. Not MEDIUM and LOW.

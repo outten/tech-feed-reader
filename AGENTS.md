@@ -22,7 +22,7 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 4. **Pause — user approval required before committing.** Show the diff / commit message and wait for explicit go-ahead. For UI changes, the user must also manually verify the page in the browser before approving.
 5. Commit, push the branch, open the PR (`gh pr create`). **Opening a PR also requires explicit user approval** — do not auto-open after every task. Ask first; bundle related items into one PR. **Exception: doc-only changes** (STUFF.md, README.md, AGENTS.md, about.erb, etc. — no code, no tests) may be committed on a branch and merged directly to main without a PR.
 6. **Wait for CI green** on the PR before claiming "shipped" — CI is at [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs RSpec + script syntax check on every push to `main` and every PR.
-7. **Only the user merges PRs.** Never call `gh pr merge` unless the user explicitly instructs it for this specific PR. A previous merge approval does not carry over to the next PR.
+7. **Only the user merges PRs and deletes branches.** Never call `gh pr merge` (with or without `--delete-branch`) and never delete remote branches (`git push origin --delete <branch>`, `gh api .../git/refs/heads/...`). These actions are the user's to perform on GitHub. Even explicit "yes, merge it" approval during a session does not grant this permission — the user presses the button themselves.
 8. **Production deploy** — the user says "deploy" or "go" and the agent runs `make deploy-patch` (or minor/major). This bumps VERSION, commits, tags, pushes, and the GitHub Actions deploy workflow handles the build + SSH. The agent may execute this step on explicit instruction; it may not decide to deploy on its own. Never run `make deploy-*` speculatively. After a deploy, sync local: `git checkout main && git pull --ff-only origin main && git remote prune origin`.
 
 **Summary of the four gates — each requires its own explicit user instruction:**
@@ -31,7 +31,7 @@ If the user grants batch authority for a specific run ("commit, push, merge when
 |---|---|
 | Code review | `git commit` (+ browser verify for UI changes) |
 | PR creation | `gh pr create` |
-| PR merge | Only the user merges on GitHub |
+| PR merge + branch delete | Only the user merges on GitHub and deletes branches |
 | Production deploy | User says "deploy" → agent runs `make deploy-patch` → GH Actions builds + ships |
 
 **UI approval gate** — for any change that affects what a human sees in a browser (views/, public/*.js, public/*.css, anything click-driven), the "pause before staging" in step 4 means: **green specs are not enough**. The user must manually verify in the browser and explicitly approve before `git commit`. Specs caught the data-layer plumbing on STUFF #23 but missed two JS/CSS bugs (a `hidden` attribute overridden by a `display: inline-flex` rule; a `button.disabled = true` inside the submit handler that cancelled the form submission) — both only visible by clicking the actual button. Backend-only changes (stores, migrations, scripts) don't trigger the gate.
