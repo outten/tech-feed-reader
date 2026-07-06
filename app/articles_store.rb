@@ -102,9 +102,18 @@ module ArticlesStore
 
   # STUFF.md #109 — "I Feel Lucky": random cross-type sample from the
   # user's subscriptions. Respects mute rules; no other filters.
+  #
+  # Two-step approach: fetch subscribed feed IDs first so the planner sees
+  # a literal IN list and uses idx_articles_feed_id (Bitmap Index Scan)
+  # rather than a full table Seq Scan. Reduces the ORDER BY RANDOM() sort
+  # from ~28K rows to ~2K rows when the user has many subscriptions.
   def random(user_id, limit: 50)
     uid = user_id.to_i
-    db.execute(<<~SQL, [uid, uid, uid, limit])
+    feed_ids = db.execute('SELECT feed_id FROM user_feed_subscriptions WHERE user_id = ?', [uid])
+                 .map { |r| r['feed_id'].to_i }
+    return [] if feed_ids.empty?
+
+    db.execute(<<~SQL, [uid, uid, limit])
       SELECT a.*,
              COALESCE(rs.read, 0)       AS read,
              COALESCE(rs.bookmarked, 0) AS bookmarked,
@@ -113,10 +122,7 @@ module ArticlesStore
              rs.opened_at               AS opened_at
       FROM articles a
       LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
-      WHERE EXISTS (
-              SELECT 1 FROM user_feed_subscriptions ufs
-              WHERE ufs.user_id = ? AND ufs.feed_id = a.feed_id
-            )
+      WHERE a.feed_id IN (#{feed_ids.join(',')})
         AND NOT EXISTS (
               SELECT 1 FROM mute_rules mr
               WHERE mr.user_id = ? AND (
