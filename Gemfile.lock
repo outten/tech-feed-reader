@@ -84,7 +84,7 @@ GEM
       google-protobuf (~> 4.26)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
-    json (2.19.5)
+    json (2.20.0)
     jwt (3.2.0)
       base64
     listen (3.10.0)
