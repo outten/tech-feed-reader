@@ -1528,6 +1528,8 @@ Let's add a I Feel Luck icon next to the bus icon. This will return a random lis
 
 **Shipped.** Dice icon added to the signed-in header next to the Bus icon — `data-turbo-prefetch="false"` prevents hover from pre-fetching and wasting a roll. `GET /lucky` returns up to 50 randomly-sampled articles via `ArticlesStore.random` (`ORDER BY RANDOM()`) across all topics and content types with no filters beyond mute rules. Rendered in podcast-card layout with Listen / Watch / Read actions; each visit re-rolls independently. Shipped in v1.1.19.
 
+**Performance fix (v1.1.20).** Initial load took 30+ seconds because the query did a full seq scan over ~28K articles then sorted all qualifying rows with `ORDER BY RANDOM()`. Root cause: `idx_articles_feed_id` was declared in `001_init.sql` but never applied to existing databases, so every query hitting `articles.feed_id` fell back to a seq scan. Fix: migration `011_articles_feed_id_index.sql` adds the missing index; `ArticlesStore.random` now fetches the user's subscribed feed IDs first, then uses a literal `IN (id1,id2,…)` clause (not a subquery) so the planner uses a Bitmap Index Scan, reducing the candidate set from ~28K rows to ~2K before the `ORDER BY RANDOM() LIMIT 50` sort. Also updated `json` gem to 2.20.0 (CVE-2026-54696). Shipped in v1.1.20.
+
 ## [ ] 110. GitHub Actioms Vulnerabilities Check
 
 The RSpec test in GitHub Actions to check and stop for vulnerabilities needs to be updated. Only HIGH and CRITICAL vulnerabilities should FAIL the action. Not MEDIUM and LOW.
