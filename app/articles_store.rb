@@ -113,6 +113,17 @@ module ArticlesStore
                  .map { |r| r['feed_id'].to_i }
     return [] if feed_ids.empty?
 
+    # Step 1: fetch candidate IDs only — index scan, no TOAST reads.
+    all_ids = db.execute(
+      "SELECT id FROM articles WHERE feed_id IN (#{feed_ids.join(',')})"
+    ).map { |r| r['id'].to_i }
+    return [] if all_ids.empty?
+
+    # Step 2: sample in Ruby — eliminates ORDER BY RANDOM() over large sets.
+    # Overshoot 3x so mute-rule drops don't leave us short of limit.
+    sample_ids = all_ids.sample([limit * 3, all_ids.length].min)
+
+    # Step 3: fetch full rows for the small sample via primary key.
     db.execute(<<~SQL, [uid, uid, limit])
       SELECT a.*,
              COALESCE(rs.read, 0)       AS read,
@@ -122,7 +133,7 @@ module ArticlesStore
              rs.opened_at               AS opened_at
       FROM articles a
       LEFT JOIN read_state rs ON a.id = rs.article_id AND rs.user_id = ?
-      WHERE a.feed_id IN (#{feed_ids.join(',')})
+      WHERE a.id IN (#{sample_ids.join(',')})
         AND NOT EXISTS (
               SELECT 1 FROM mute_rules mr
               WHERE mr.user_id = ? AND (
@@ -131,7 +142,6 @@ module ArticlesStore
                OR (mr.kind = 'feed'    AND a.feed_id = CAST(mr.value AS INTEGER))
               )
             )
-      ORDER BY RANDOM()
       LIMIT ?
     SQL
   end
