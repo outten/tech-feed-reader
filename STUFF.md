@@ -1532,6 +1532,8 @@ Let's add a I Feel Luck icon next to the bus icon. This will return a random lis
 
 **Performance fix 2 (v1.1.22).** Still 17s in production after v1.1.20 because `ORDER BY RANDOM()` forces Postgres to materialize and sort the entire qualifying set — including large `content_html`/`content_text` TOAST columns — before taking LIMIT 50. Replaced with a three-step approach: (1) `SELECT id FROM articles WHERE feed_id IN (…)` — index scan only, no TOAST reads; (2) `.sample(limit * 3)` in Ruby — instantaneous even for thousands of IDs; (3) `WHERE a.id IN (sampled_ids)` — primary key lookup on ~150 rows, no sort. `ORDER BY RANDOM()` eliminated from SQL entirely. Shipped in v1.1.22.
 
-## [ ] 110. GitHub Actioms Vulnerabilities Check
+## [x] 110. GitHub Actions Vulnerabilities Check
 
 The RSpec test in GitHub Actions to check and stop for vulnerabilities needs to be updated. Only HIGH and CRITICAL vulnerabilities should FAIL the action. Not MEDIUM and LOW.
+
+**Shipped.** `bundler-audit` 0.9.3 has no `--severity` flag, so a shell wrapper was used instead: `bundle-audit check --update` output is captured, then `grep -iE "^Criticality: (High|Critical)"` determines the exit code. LOW/MEDIUM advisories still appear in the CI log but no longer block merges. Shipped in v1.1.23.
