@@ -1,33 +1,34 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
-### Requirement: Ticker JS module initializes from SSR content
-`stock-ticker.js` SHALL initialize the ticker from existing SSR-rendered DOM content on page load. It SHALL use a `data-ticker-inited` sentinel attribute on `#stock-ticker` to guard against double-init on Turbo full-page loads (where both `DOMContentLoaded` and `turbo:load` fire).
+### Requirement: Ticker JS fetches user-specific data once per page load
+`stock-ticker.js` SHALL fetch `GET /api/ticker` exactly once on each page load/navigation and rebuild the `.stock-ticker-track` from the response. This ensures the ticker reflects the signed-in user's actual follows regardless of SSR state. There is NO polling interval — the fetch happens once per init.
 
-#### Scenario: First load with SSR content present
-- **WHEN** the page loads and `#stock-ticker` has `.stock-ticker-item` children
-- **THEN** JS sets `data-ticker-inited` and starts the polling timer without an immediate network request
-- **THEN** the animation continues from the SSR-rendered content
+#### Scenario: Page load — SSR content present (common case)
+- **WHEN** the page loads and `#stock-ticker` has `.stock-ticker-item` children from SSR
+- **THEN** JS immediately sets `animation-duration` from the SSR item count so the ticker animates while the fetch is in flight
+- **THEN** JS fetches `/api/ticker` once; on success, replaces track content with API data and recalculates duration
 
-#### Scenario: Double-fire guard
-- **WHEN** both `DOMContentLoaded` and `turbo:load` fire on a full page load
-- **THEN** the init function runs only once (guarded by `data-ticker-inited`)
+#### Scenario: Page load — cold SSR (no cached quotes)
+- **WHEN** the page loads and `#stock-ticker` has no `.stock-ticker-item` children
+- **THEN** JS fetches `/api/ticker` once; on success, builds and animates the track from the response
 
-### Requirement: Ticker JS polls /api/ticker and updates the DOM
-`stock-ticker.js` SHALL poll `GET /api/ticker` every 5 minutes and rebuild the `.stock-ticker-track` innerHTML with fresh data. After each rebuild it SHALL recalculate and set the `animation-duration` on the track element using `Math.max(items.length * 3, 20)` seconds.
-
-#### Scenario: Successful poll with new data
-- **WHEN** the 5-minute timer fires and `/api/ticker` returns data
-- **THEN** the `.stock-ticker-track` content is rebuilt with the latest items (duplicated twice for seamless loop)
-- **THEN** `animation-duration` is recalculated based on the item count
-
-#### Scenario: Poll failure (network error or non-200)
+#### Scenario: Fetch failure
 - **WHEN** `/api/ticker` returns an error or the request fails
-- **THEN** the existing ticker content is left unchanged
-- **THEN** the polling timer continues (next attempt in 5 minutes)
+- **THEN** the existing SSR content (if any) is left intact
+- **THEN** no retry or polling occurs
 
-### Requirement: Ticker is wired into the layout
-`stock-ticker.js` SHALL be loaded via `views/layout.erb` using the `asset_mtime` helper (consistent with other JS files in the project). It SHALL NOT use `<script defer>` inside a view file.
+#### Scenario: Double-fire guard (Turbo 8)
+- **WHEN** both `DOMContentLoaded` and `turbo:load` fire on a full page load
+- **THEN** the init function runs only once (guarded by `section.dataset.tickerInited`, a DOM attribute sentinel on the `#stock-ticker` element)
+- **WHY `dataset` not a module-level flag**: on Turbo navigations, the body is replaced and `#stock-ticker` is a fresh element without the attribute, so init correctly re-runs per navigation. A module-level flag would block re-init on navigations.
 
-#### Scenario: Script included in layout
-- **WHEN** a signed-in user loads any page
-- **THEN** `stock-ticker.js` is included via the layout's asset script block with cache-busting via `asset_mtime`
+#### Scenario: Turbo navigation
+- **WHEN** the user navigates to a new page via Turbo Drive
+- **THEN** the new `#stock-ticker` element (from SSR) has no `data-ticker-inited` attribute
+- **THEN** init runs again, sets duration from new SSR count, fetches `/api/ticker`, updates content
+
+### Requirement: No polling
+`stock-ticker.js` SHALL NOT call `setInterval` or `setTimeout`. The ticker data is fetched once per page load only.
+
+### Requirement: Animation speed
+The animation duration formula SHALL be `Math.max(itemCount * 1.5, 10) + 's'`, where `itemCount` is the number of unique symbols (half of the duplicated DOM count for SSR, or the raw API item count when building from API data).
