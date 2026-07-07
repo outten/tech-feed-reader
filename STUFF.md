@@ -1530,6 +1530,8 @@ Let's add a I Feel Luck icon next to the bus icon. This will return a random lis
 
 **Performance fix (v1.1.20).** Initial load took 30+ seconds because the query did a full seq scan over ~28K articles then sorted all qualifying rows with `ORDER BY RANDOM()`. Root cause: `idx_articles_feed_id` was declared in `001_init.sql` but never applied to existing databases, so every query hitting `articles.feed_id` fell back to a seq scan. Fix: migration `011_articles_feed_id_index.sql` adds the missing index; `ArticlesStore.random` now fetches the user's subscribed feed IDs first, then uses a literal `IN (id1,id2,…)` clause (not a subquery) so the planner uses a Bitmap Index Scan, reducing the candidate set from ~28K rows to ~2K before the `ORDER BY RANDOM() LIMIT 50` sort. Also updated `json` gem to 2.20.0 (CVE-2026-54696). Shipped in v1.1.20.
 
+**Performance fix 2 (v1.1.22).** Still 17s in production after v1.1.20 because `ORDER BY RANDOM()` forces Postgres to materialize and sort the entire qualifying set — including large `content_html`/`content_text` TOAST columns — before taking LIMIT 50. Replaced with a three-step approach: (1) `SELECT id FROM articles WHERE feed_id IN (…)` — index scan only, no TOAST reads; (2) `.sample(limit * 3)` in Ruby — instantaneous even for thousands of IDs; (3) `WHERE a.id IN (sampled_ids)` — primary key lookup on ~150 rows, no sort. `ORDER BY RANDOM()` eliminated from SQL entirely. Shipped in v1.1.22.
+
 ## [ ] 110. GitHub Actioms Vulnerabilities Check
 
 The RSpec test in GitHub Actions to check and stop for vulnerabilities needs to be updated. Only HIGH and CRITICAL vulnerabilities should FAIL the action. Not MEDIUM and LOW.
