@@ -52,9 +52,16 @@ module Auth
     '/mini-profiler-resources/'
   ].freeze
 
+  # Regex patterns for public paths that can't be expressed as exact matches
+  # or simple prefixes (e.g. /:username/sports/calendar.ics).
+  PUBLIC_PATTERNS = [
+    %r{\A/[^/]+/sports/calendar\.ics\z}
+  ].freeze
+
   def public_path?(path)
     return true if PUBLIC_PATHS.include?(path)
-    PUBLIC_PREFIXES.any? { |p| path.start_with?(p) }
+    return true if PUBLIC_PREFIXES.any? { |p| path.start_with?(p) }
+    PUBLIC_PATTERNS.any? { |re| re.match?(path) }
   end
 
   # STUFF #49 — admin HTTP Basic Auth gate. /admin/* + /api/admin/*

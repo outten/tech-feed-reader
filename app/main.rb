@@ -2867,7 +2867,7 @@ class TechFeedReader < Sinatra::Base
     @teams_by_id = build_teams_by_id_for_matches(matches)
     @leagues_by_id = build_leagues_by_id_for_matches(matches)
     @grouped     = group_by_local_day(matches)
-    @ical_url    = url('/sports/calendar.ics')
+    @ical_url    = url("/#{current_user['username']}/sports/calendar.ics")
     erb :sports_calendar
   end
 
@@ -2884,6 +2884,22 @@ class TechFeedReader < Sinatra::Base
 
     content_type 'text/calendar; charset=utf-8'
     headers      'Content-Disposition' => 'inline; filename="tech-feed-reader-sports.ics"'
+    build_ical(matches, teams_by_id, leagues_by_id)
+  end
+
+  # Public username-scoped iCal URL — no auth required so Apple/Google
+  # Calendar can subscribe. Username in the path identifies the user.
+  get '/:username/sports/calendar.ics' do |username|
+    user = UsersStore.find_by_username(username)
+    halt 404 unless user
+
+    days_forward  = (params['days'].to_s.match?(/\A\d+\z/) ? params['days'].to_i : 30).clamp(1, 365)
+    matches       = SportsMatchesStore.upcoming_for_followed_teams(user['id'], days_forward: days_forward)
+    teams_by_id   = build_teams_by_id_for_matches(matches)
+    leagues_by_id = build_leagues_by_id_for_matches(matches)
+
+    content_type 'text/calendar; charset=utf-8'
+    headers      'Content-Disposition' => "inline; filename=\"#{username}-sports.ics\""
     build_ical(matches, teams_by_id, leagues_by_id)
   end
 

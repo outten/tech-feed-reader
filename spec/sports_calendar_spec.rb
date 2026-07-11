@@ -104,11 +104,11 @@ RSpec.describe 'GET /sports/calendar' do
     expect(last_response.body).to include('No upcoming fixtures')
   end
 
-  it 'renders the subscribe-URL callout' do
+  it 'renders the subscribe-URL callout with the username-scoped URL' do
     setup_followed_match(scheduled_at: (Time.now.utc + 86400).iso8601)
     get '/sports/calendar'
     expect(last_response.body).to include('Subscribe to this calendar')
-    expect(last_response.body).to include('/sports/calendar.ics')
+    expect(last_response.body).to include('/t-money/sports/calendar.ics')
   end
 
   it 'groups fixtures by day, soonest first' do
@@ -225,6 +225,29 @@ RSpec.describe 'GET /sports/calendar.ics' do
     expect(dtend).not_to   be_nil
     diff_seconds = Time.strptime(dtend, '%Y%m%dT%H%M%SZ') - Time.strptime(dtstart, '%Y%m%dT%H%M%SZ')
     expect(diff_seconds).to eq(2.5 * 3600) # NBA default
+  end
+end
+
+RSpec.describe 'GET /:username/sports/calendar.ics (public)' do
+  include Rack::Test::Methods
+  def app; TechFeedReader; end
+
+  it 'returns iCal data for a valid username without a session' do
+    setup_followed_match(scheduled_at: (Time.now.utc + 86400).iso8601)
+    get '/t-money/sports/calendar.ics'
+    expect(last_response.status).to eq(200)
+    expect(last_response.content_type).to start_with('text/calendar')
+    expect(last_response.body).to start_with('BEGIN:VCALENDAR')
+  end
+
+  it 'returns 404 for an unknown username' do
+    get '/nobody-here/sports/calendar.ics'
+    expect(last_response.status).to eq(404)
+  end
+
+  it 'filename in Content-Disposition uses the username' do
+    get '/t-money/sports/calendar.ics'
+    expect(last_response.headers['Content-Disposition']).to include('t-money-sports.ics')
   end
 end
 
