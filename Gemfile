@@ -101,6 +101,6 @@ gem 'prometheus-client', '~> 4.2'
 # no-op tracers). instrumentation-all auto-instruments Sinatra,
 # Rack, Sidekiq, Net::HTTP, and SQLite3; we add manual spans on
 # top for FeedFetcher + Summarizer::Claude.
-gem 'opentelemetry-sdk',                '~> 1.6'
+gem 'opentelemetry-sdk',                '~> 1.12'
 gem 'opentelemetry-instrumentation-all', '~> 0.78'
 gem 'opentelemetry-exporter-otlp',       '~> 0.30'
