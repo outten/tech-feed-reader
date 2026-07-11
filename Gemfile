@@ -103,4 +103,4 @@ gem 'prometheus-client', '~> 4.2'
 # top for FeedFetcher + Summarizer::Claude.
 gem 'opentelemetry-sdk',                '~> 1.6'
 gem 'opentelemetry-instrumentation-all', '~> 0.78'
-gem 'opentelemetry-exporter-otlp',       '~> 0.30'
+gem 'opentelemetry-exporter-otlp',       '~> 0.34'
