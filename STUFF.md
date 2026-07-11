@@ -1537,3 +1537,14 @@ Let's add a I Feel Luck icon next to the bus icon. This will return a random lis
 The RSpec test in GitHub Actions to check and stop for vulnerabilities needs to be updated. Only HIGH and CRITICAL vulnerabilities should FAIL the action. Not MEDIUM and LOW.
 
 **Shipped.** `bundler-audit` 0.9.3 has no `--severity` flag, so a shell wrapper was used instead: `bundle-audit check --update` output is captured, then `grep -iE "^Criticality: (High|Critical)"` determines the exit code. LOW/MEDIUM advisories still appear in the CI log but no longer block merges. Shipped in v1.1.23.
+
+## [x] 111. Sports Calendar
+
+The Sports Calendar feed link doesn't work: https://feeder.tmoneystuff.com/sports/calendar.ics.
+
+I think because:
+
+- I think it requires the user to be logged in. So, when Apple Calendar fetches it, it doesn't work.
+- The feed also needs to be user specific. I think we should use links like https://feeder.tmoneystuff.com/outten/sports/calendar.ics. Where "outten" is the user name / handle. It should not require login.
+
+**Shipped.** Added `GET /:username/sports/calendar.ics` as a public endpoint — no session required so Apple/Google Calendar can subscribe. Auth bypass via a `PUBLIC_PATTERNS` regex in `app/auth.rb`, narrowly scoped to only that path. The subscribe link on `/sports/calendar` now shows the username-scoped URL (e.g. `https://feeder.tmoneystuff.com/outten/sports/calendar.ics`). Old `/sports/calendar.ics` kept working for signed-in users. Unknown usernames return 404. Shipped in v1.1.24.
