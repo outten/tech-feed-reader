@@ -41,4 +41,14 @@ resource "digitalocean_database_firewall" "pg" {
     type  = "droplet"
     value = digitalocean_droplet.app.id
   }
+
+  # mapper's droplet (id 585644243) -- a second app sharing this cluster via
+  # a dedicated "mapper" logical database (see its own repo's
+  # terraform/database.tf). digitalocean_database_firewall is authoritative
+  # for the whole ruleset, not additive, so this rule has to live here
+  # rather than in mapper's own Terraform state.
+  rule {
+    type  = "droplet"
+    value = "585644243"
+  }
 }
