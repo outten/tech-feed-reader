@@ -2,6 +2,10 @@ require_relative 'spec_helper'
 require_relative '../app/main'
 require_relative '../app/games/trivia_generator'
 require_relative '../app/games/trivia_store'
+require_relative '../app/feeds_store'
+require_relative '../app/articles_store'
+require_relative '../app/workers/generate_trivia_worker'
+require_relative '../app/notifier'
 
 RSpec.describe 'News Trivia' do
   include Rack::Test::Methods
@@ -165,6 +169,53 @@ RSpec.describe 'News Trivia' do
       TriviaStore.submit_answer!(user_id: user_id, question_id: q['id'].to_i, answer: 'b')
       answers = TriviaStore.answers_for(user_id: user_id, quiz_id: quiz['id'])
       expect(answers.keys).to include(q['id'].to_i)
+    end
+
+    describe 'fetch_source_articles' do
+      let!(:feed) { FeedsStore.add(url: 'https://example.com/feed.rss') }
+
+      def seed_source_article(uid:, content_text:, minutes_ago: 0)
+        ArticlesStore.import(feed_id: feed['id'], entries: [{
+          uid: uid, title: "Title #{uid}", url: "https://example.com/#{uid}", author: nil,
+          published_at: (Time.now - (minutes_ago * 60)).utc.iso8601,
+          content_html: "<p>#{content_text}</p>", content_text: content_text
+        }])
+      end
+
+      it 'excludes an article whose content_text is shorter than MIN_ARTICLE_CHARS, even when it is the most recent' do
+        # Near-empty "content" (like a webcomic caption) that's newer than the real article.
+        seed_source_article(uid: 'a' * 12, content_text: 'ha ha ha huhhhhgh', minutes_ago: 1)
+        seed_source_article(uid: 'b' * 12, content_text: 'A' * 500, minutes_ago: 10)
+
+        articles = TriviaStore.send(:fetch_source_articles)
+        titles   = articles.map { |a| a['title'] }
+        expect(titles).to eq(["Title #{'b' * 12}"])
+      end
+
+      it 'returns substantive articles unaffected by the filter' do
+        seed_source_article(uid: 'a' * 12, content_text: 'A' * 500, minutes_ago: 1)
+        seed_source_article(uid: 'b' * 12, content_text: 'B' * 300, minutes_ago: 5)
+
+        articles = TriviaStore.send(:fetch_source_articles)
+        expect(articles.length).to eq(2)
+      end
+    end
+  end
+
+  # ── GenerateTriviaWorker ───────────────────────────────────────────────────
+
+  describe 'GenerateTriviaWorker' do
+    it 'pushes a Notifier alert when ensure_today! fails to produce a quiz' do
+      allow(TriviaStore).to receive(:ensure_today!).and_return(nil)
+      expect(Notifier).to receive(:push).with(hash_including(dedupe_key: 'trivia_generation_skipped'))
+      GenerateTriviaWorker.new.perform
+    end
+
+    it 'does not push a Notifier alert when a quiz is produced' do
+      quiz = seed_quiz
+      allow(TriviaStore).to receive(:ensure_today!).and_return(quiz)
+      expect(Notifier).not_to receive(:push)
+      GenerateTriviaWorker.new.perform
     end
   end
 
