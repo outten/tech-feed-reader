@@ -6,6 +6,10 @@ module TriviaStore
   SOURCE_WINDOW_HOURS = 24
   # How many articles to send to Claude (enough variety, not too many tokens).
   SOURCE_ARTICLE_LIMIT = 20
+  # Minimum content_text length to count as real trivia material. Guards
+  # against feeds whose published_at sorts recent but whose content is
+  # near-empty (e.g. a webcomic's caption text) crowding out genuine news.
+  MIN_ARTICLE_CHARS = 100
 
   # ── quizzes ───────────────────────────────────────────────────────────────
 
@@ -118,10 +122,10 @@ module TriviaStore
        WHERE published_at > $1
          AND title IS NOT NULL
          AND content_text IS NOT NULL
-         AND content_text != \'\'
+         AND LENGTH(content_text) >= $2
        ORDER BY published_at DESC
-       LIMIT $2',
-      [cutoff, SOURCE_ARTICLE_LIMIT]
+       LIMIT $3',
+      [cutoff, MIN_ARTICLE_CHARS, SOURCE_ARTICLE_LIMIT]
     )
   end
 
