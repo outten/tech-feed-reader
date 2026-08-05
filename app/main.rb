@@ -2424,7 +2424,7 @@ class TechFeedReader < Sinatra::Base
     # thumbnail derivable from its URL, so this section gives the page
     # a steady image-led feel even when individual channels lack a
     # cover image.
-    @recent_videos = ArticlesStore.recent(current_user_id, limit: 12, kind: :youtube)
+    @recent_videos = ArticlesStore.recent(current_user_id, limit: 60, kind: :youtube)
     @feeds_by_id   = FeedsStore.for_user(current_user_id).each_with_object({}) { |f, h| h[f['id']] = f }
     erb :youtube
   end

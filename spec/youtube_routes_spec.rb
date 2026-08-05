@@ -51,6 +51,22 @@ RSpec.describe 'YouTube routes' do
       get '/youtube'
       expect(last_response.body).not_to include('Regular blog')
     end
+
+    it 'shows up to 60 recent videos, not capped at 12 (STUFF #113)' do
+      feed = FeedsStore.add(url: channel_url, title: 'Bourdain Travels')
+      ArticlesStore.import(feed_id: feed['id'], entries: (1..20).map do |i|
+        { uid: format('recv%08d', i), title: "Recent Video #{i}",
+          url: "https://www.youtube.com/watch?v=#{('a'..'z').to_a.sample(11).join}",
+          author: nil, published_at: "2026-05-#{format('%02d', i)}T12:00:00Z",
+          content_html: '<p>x</p>', content_text: "v#{i}" }
+      end)
+
+      get '/youtube'
+      # 20 seeded, all within the 60 cap — the 8 oldest under the old
+      # 12-video cap (Video 1..8) must now be present too.
+      expect(last_response.body).to include('Recent Video 1<')
+      expect(last_response.body).to include('Recent Video 20<')
+    end
   end
 
   describe 'GET /youtube/:feed_id' do
