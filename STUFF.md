@@ -1561,3 +1561,11 @@ The trivia game is not working in production or dev when ran from sidekiq cron j
 when browsing youtube, the recent videos area shows twelve listings, which is too small. can you expand that to sixty.
 
 **Shipped.** One-line change: `/youtube`'s "Recent videos" section (`app/main.rb`) now fetches `limit: 60` instead of `limit: 12`. The grid (`.youtube-videos`, `grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))`) already auto-wraps, so no CSS change was needed. Verified visually — seeded 20 videos, all rendered cleanly in the grid with no layout breakage — plus a new spec asserting videos beyond the old 12-item cap render. Suite: **1743 / 0**.
+
+## [ ] 114. Article retention isn't actually running in production
+
+`Pruner` (`app/pruner.rb`) deletes articles older than `RETENTION_DAYS` (default 7 days, bookmarks always kept, unread optionally kept), but it's only ever invoked from `scripts/refresh_feeds.rb` (the `make refresh-feeds` / `make scheduler` CLI path) or standalone via `make prune`. Production's `docker-compose.yml` doesn't run either of those — the hourly fetch there goes through `RefreshAllFeedsWorker` / `FeedRefreshWorker` via `config/sidekiq_cron.yml`, and neither the workers nor the cron schedule ever call `Pruner`. So in production, articles accumulate forever with no sweep ever running.
+
+Confirmed, not theoretical: production currently has **108,441 total articles**, including a webcomic feed's archive with `published_at` dates back to **2012** still present — evidence surfaced while investigating STUFF #112 (trivia generation). The `/admin` dashboard's "activity window" label reads `Pruner.effective_retention_days` (`app/main.rb:2058`) for display only — it says "7 days" but nothing enforces it, which is mildly misleading.
+
+Wire `Pruner` into the actual production path (e.g. a `prune` entry in `sidekiq_cron.yml`, or call it at the end of `RefreshAllFeedsWorker`) so the retention policy the app already claims to have is actually enforced.
