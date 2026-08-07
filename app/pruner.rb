@@ -22,7 +22,7 @@ require_relative 'logger'
 # DELETE trigger keeps the FTS5 index in sync. So this single DELETE
 # is sufficient.
 module Pruner
-  DEFAULT_RETENTION_DAYS = 7
+  DEFAULT_RETENTION_DAYS = 30
 
   Result = Struct.new(:deleted, :kept_bookmarked, :kept_unread, :cutoff, :retention_days, keyword_init: true)
 

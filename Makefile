@@ -153,7 +153,7 @@ digest:
 	bundle exec ruby scripts/generate_digest.rb
 
 # Retention sweep — delete articles older than RETENTION_DAYS (default
-# 7). Bookmarked articles are always preserved; set PRUNE_KEEP_UNREAD=1
+# 30). Bookmarked articles are always preserved; set PRUNE_KEEP_UNREAD=1
 # to also keep unread items past the window. Cascades clean up
 # read_state, summaries, article_tags, and the articles_fts index.
 # `make refresh-feeds` calls this automatically at the end of every

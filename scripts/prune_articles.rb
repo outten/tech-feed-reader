@@ -5,7 +5,7 @@
 # any other script.
 #
 # Env knobs:
-#   RETENTION_DAYS      default 7 (Pruner::DEFAULT_RETENTION_DAYS)
+#   RETENTION_DAYS      default 30 (Pruner::DEFAULT_RETENTION_DAYS)
 #   PRUNE_KEEP_UNREAD   set to "1" to also preserve unread articles
 #
 # Always preserved: bookmarked articles (regardless of age).

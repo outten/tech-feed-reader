@@ -33,12 +33,12 @@ RSpec.describe Pruner do
       result = Pruner.prune_old(now: now)
       expect(result.deleted).to eq(0)
       expect(result.kept_bookmarked).to eq(0)
-      expect(result.cutoff).to eq((now - 7 * 86_400).iso8601)
+      expect(result.cutoff).to eq((now - Pruner::DEFAULT_RETENTION_DAYS * 86_400).iso8601)
       expect(result.retention_days).to eq(Pruner::DEFAULT_RETENTION_DAYS)
     end
 
     it 'deletes articles whose published_at is older than the retention window' do
-      add(uid: 'old1old1old1', title: 'Old',   days_ago: 10)
+      add(uid: 'old1old1old1', title: 'Old',   days_ago: 45)
       add(uid: 'newrnewrnewr', title: 'New',   days_ago: 1)
       result = Pruner.prune_old(now: now)
       expect(result.deleted).to eq(1)
@@ -47,8 +47,8 @@ RSpec.describe Pruner do
     end
 
     it 'preserves bookmarked articles past the window' do
-      old = add(uid: 'oldbookmrkbk', title: 'Old + bookmarked', days_ago: 30)
-      add(uid: 'oldarticleab', title: 'Old, unread', days_ago: 30)
+      old = add(uid: 'oldbookmrkbk', title: 'Old + bookmarked', days_ago: 45)
+      add(uid: 'oldarticleab', title: 'Old, unread', days_ago: 45)
       ReadStateStore.mark_bookmarked(1, old['id'], value: true)
 
       result = Pruner.prune_old(now: now)
@@ -59,8 +59,8 @@ RSpec.describe Pruner do
     end
 
     it 'with keep_unread:true, also preserves unread articles past the window' do
-      add(uid: 'oldunread011', title: 'Old + unread', days_ago: 30)
-      old_read = add(uid: 'oldreadthis1', title: 'Old + read', days_ago: 30)
+      add(uid: 'oldunread011', title: 'Old + unread', days_ago: 45)
+      old_read = add(uid: 'oldreadthis1', title: 'Old + read', days_ago: 45)
       ReadStateStore.mark_read(1, old_read['id'], read: true)
 
       result = Pruner.prune_old(keep_unread: true, now: now)
@@ -71,7 +71,7 @@ RSpec.describe Pruner do
     end
 
     it 'falls back to fetched_at when published_at is null' do
-      old_fetch = (now - 30 * 86_400).iso8601
+      old_fetch = (now - 45 * 86_400).iso8601
       add(uid: 'nopubd000001', title: 'No publish date — old fetch', published_at: nil, fetched_at: old_fetch)
       add(uid: 'nopubd000002', title: 'No publish date — fresh fetch', published_at: nil, fetched_at: now.iso8601)
 
@@ -90,7 +90,7 @@ RSpec.describe Pruner do
     end
 
     it 'cascades through read_state / summaries / article_tags / articles_fts' do
-      old = add(uid: 'oldwithdeps1', title: 'Old + deps', days_ago: 30)
+      old = add(uid: 'oldwithdeps1', title: 'Old + deps', days_ago: 45)
       tag = TagsStore.add(user_id: 1, name: 'tag1', match_kind: 'keyword', match_value: 'foo')
       TagsStore.tag_article(old['id'], tag['id'])
       SummaryStore.upsert(old['id'], extractive: 'old summary', llm: 'old llm', llm_model: 'claude-x')
@@ -108,7 +108,7 @@ RSpec.describe Pruner do
     end
 
     it 'still deletes archived articles past the window (archived is not a protection signal)' do
-      old = add(uid: 'oldarchived1', title: 'Old + archived', days_ago: 30)
+      old = add(uid: 'oldarchived1', title: 'Old + archived', days_ago: 45)
       ReadStateStore.mark_archived(1, old['id'], value: true)
       result = Pruner.prune_old(now: now)
       expect(result.deleted).to eq(1)
@@ -116,7 +116,7 @@ RSpec.describe Pruner do
     end
 
     it 'is idempotent — a second run with no new old articles deletes nothing' do
-      add(uid: 'oldarticleab', title: 'Old', days_ago: 30)
+      add(uid: 'oldarticleab', title: 'Old', days_ago: 45)
       first  = Pruner.prune_old(now: now)
       second = Pruner.prune_old(now: now)
       expect(first.deleted).to eq(1)
