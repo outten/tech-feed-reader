@@ -18,14 +18,18 @@ class PruneArticlesWorker
   def perform
     Pruner.prune_old(
       retention_days: Pruner.effective_retention_days,
-      # Hardcoded true, not env-driven. Measured against production:
-      # with keep_unread: false, a first run deletes 89% of the
-      # corpus, including 121,660 unread articles the user has never
-      # seen. This job runs unattended every night with nobody
-      # watching, so the safe behaviour has to be the only behaviour
-      # — do not make this configurable without re-reading
-      # openspec/changes/wire-production-article-retention/design.md.
-      keep_unread: true
+      # keep_unread: false — deliberate, not the default it shipped
+      # with. The first-ever run needed keep_unread: true (unread
+      # articles exempt forever) because the growth rate against the
+      # existing 138K-row backlog was unknown. Once shipped, real data
+      # showed ~2,000 articles/day ingested with almost no read-through,
+      # putting the unread backlog on an unbounded growth path (~9GB/yr
+      # projected). RETENTION_DAYS was raised 7 -> 30 in the same change
+      # so unread articles now get a full month before expiring, same as
+      # read ones — a bounded reading window instead of no window at
+      # all. See openspec/changes/wire-production-article-retention
+      # design.md's "Decision 2 (revised)" for the full numbers.
+      keep_unread: false
     )
   end
 end

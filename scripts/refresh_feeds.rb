@@ -5,7 +5,7 @@
 # the right tool once polling cadence matters.
 #
 # After every refresh, sweeps articles older than RETENTION_DAYS
-# (default 7). Bookmarked articles are always preserved; set
+# (default 30). Bookmarked articles are always preserved; set
 # PRUNE_KEEP_UNREAD=1 to also keep unread items past the window.
 # PRUNE_ON_REFRESH=0 disables the sweep for this run.
 #

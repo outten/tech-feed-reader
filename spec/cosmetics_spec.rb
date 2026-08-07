@@ -46,11 +46,10 @@ RSpec.describe 'GET /dashboard activity chart' do
     }])
   end
 
-  it 'labels the chart with the actual retention window (default 7 days)' do
+  it 'labels the chart with the actual retention window (Pruner::DEFAULT_RETENTION_DAYS)' do
     seed_one_article
     get '/admin/dashboard'
-    expect(last_response.body).to include('Activity (last 7 days)')
-    expect(last_response.body).not_to include('Activity (last 30 days)')
+    expect(last_response.body).to include("Activity (last #{Pruner::DEFAULT_RETENTION_DAYS} days)")
   end
 
   it 'reflects RETENTION_DAYS env override in the heading' do

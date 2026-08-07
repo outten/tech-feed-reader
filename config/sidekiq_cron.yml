@@ -43,7 +43,7 @@ prune_articles:
   cron: "0 5 * * *"
   class: "PruneArticlesWorker"
   queue: default
-  description: "Daily 05:00 UTC: delete read, non-bookmarked articles older than RETENTION_DAYS (default 7). Unread and bookmarked articles are never deleted — see openspec/changes/wire-production-article-retention."
+  description: "Daily 05:00 UTC: delete non-bookmarked articles older than RETENTION_DAYS (default 30), read or unread. Bookmarked articles are never deleted — see openspec/changes/wire-production-article-retention."
 
 stock_sync:
   cron: "*/15 * * * *"
