@@ -86,6 +86,7 @@ services:
       API_SPORTS_KEY: ${API_SPORTS_KEY:-}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       NTFY_URL: ${NTFY_URL:-}
+      RETENTION_DAYS: ${RETENTION_DAYS:-}
     command: ["bundle", "exec", "sidekiq", "-r", "./app/sidekiq_boot.rb", "-c", "5"]
     # The app image's HEALTHCHECK curls the web server's /health on :4567 —
     # correct for the `app` service, but this container runs the Sidekiq
