@@ -65,8 +65,8 @@ Credentials live in `.credentials` (NOT `.env`). Both files are auto-loaded by [
 | `OTEL_SERVICE_NAME` | Resource attribute attached to every span. Defaults to `tech-feed-reader`. |
 | `TRACING_RECORDER_CAPACITY` | Ring-buffer size for `Tracing::Recorder` (default `200`). |
 | `REDIS_URL` | Sidekiq broker. Defaults to `redis://localhost:6379/0`. |
-| `RETENTION_DAYS` | Article retention window for [`Pruner`](app/pruner.rb). Default `7`. Sweep runs at the end of `make refresh-feeds` and standalone via `make prune`. |
-| `PRUNE_KEEP_UNREAD` | Set to `1` to preserve unread articles past the retention window (default sweeps unread + read). Bookmarked articles are always kept. |
+| `RETENTION_DAYS` | Article retention window for [`Pruner`](app/pruner.rb). Default `30`. Swept nightly in production by `PruneArticlesWorker` (sidekiq-cron); also runs at the end of `make refresh-feeds` and standalone via `make prune` in dev. |
+| `PRUNE_KEEP_UNREAD` | Set to `1` to preserve unread articles past the retention window (default sweeps unread + read). Bookmarked articles are always kept. Only affects the CLI paths (`make refresh-feeds`, `make prune`) — `PruneArticlesWorker` (production's nightly sweep) hardcodes `keep_unread: false`, deliberately not env-driven. |
 | `PRUNE_ON_REFRESH` | Set to `0` to skip the post-refresh sweep on a given `make refresh-feeds` run. |
 | `FINNHUB_API_KEY` | Finnhub stock API (free tier, 60 req/min). Powers `/stocks` search, detail, the global ticker (every signed-in page, via the `ticker_quotes` helper), and the hourly `IndexSyncWorker`. Optional — stock quote features hide when unset (per-symbol news via Yahoo RSS needs no key). **Production**: must be in both `.env` and `docker-compose.yml` environment blocks (app + sidekiq). |
 
@@ -89,7 +89,7 @@ make scheduler               # long-running poller honouring per-feed intervals
 make sidekiq                 # background-job worker (needs Redis up)
 make redis                   # foreground Redis (alternative to brew services)
 make digest                  # generate + persist a digest snapshot (read at /digests; cron-friendly)
-make prune                   # delete articles older than RETENTION_DAYS (default 7); bookmarks always kept
+make prune                   # delete articles older than RETENTION_DAYS (default 30); bookmarks always kept
 make backfill-podcast-images # fill feeds.image_url via iTunes Search for podcasts missing <itunes:image>
 make seed-sports-data        # seed sports_leagues + sports_teams + sports_follows for user-followed teams (idempotent)
 make sync-sports             # daily ESPN sync — pulls match schedules + scores for every followed team into sports_matches
@@ -118,10 +118,11 @@ This replaces `t-money-terminal`'s file-per-store + mutex + atomic-rename patter
 
 Article bodies, extracted content, and summaries all live in PG.
 
-**Retention policy** — articles older than `RETENTION_DAYS` (default 7) get swept by [`Pruner`](app/pruner.rb). Bookmarked articles are always preserved regardless of age; set `PRUNE_KEEP_UNREAD=1` to also preserve unread items past the window. Cascades take care of `read_state`, `summaries`, and `article_tags`; the `tsv` column lives on `articles` itself so deletes need no separate index sweep. Wired in two places:
+**Retention policy** — articles older than `RETENTION_DAYS` (default 30) get swept by [`Pruner`](app/pruner.rb). Bookmarked articles are always preserved regardless of age. Cascades take care of `read_state`, `summaries`, and `article_tags`; the `tsv` column lives on `articles` itself so deletes need no separate index sweep. Wired in three places:
 
-- `scripts/refresh_feeds.rb` runs `Pruner.prune_old` at the end of every refresh-all cycle. Override with `PRUNE_ON_REFRESH=0` to skip the sweep on a given run.
-- `make prune` (= `scripts/prune_articles.rb`) runs the same sweep standalone — useful in cron / launchd if you want a separate retention cadence from the refresh cadence.
+- **`PruneArticlesWorker`** (production) — daily `05:00 UTC` via `sidekiq-cron` (`config/sidekiq_cron.yml`). This is the path that actually runs in production; hardcodes `keep_unread: false` deliberately (not `PRUNE_KEEP_UNREAD`-driven) — see `openspec/changes/wire-production-article-retention` for why production's docker-compose stack didn't run *any* sweep for a long time (only the two CLI paths below called `Pruner`, and production runs neither), and for the reasoning behind bounding unread articles to the retention window too instead of exempting them forever.
+- `scripts/refresh_feeds.rb` (dev/CLI) runs `Pruner.prune_old` at the end of every refresh-all cycle. Override with `PRUNE_ON_REFRESH=0` to skip the sweep on a given run; `PRUNE_KEEP_UNREAD=1` to preserve unread articles.
+- `make prune` (dev/CLI, = `scripts/prune_articles.rb`) runs the same sweep standalone — useful in cron / launchd if you want a separate retention cadence from the refresh cadence. Also respects `PRUNE_KEEP_UNREAD`.
 
 The cutoff is `COALESCE(published_at, fetched_at) < now - retention_days`, so feeds that don't ship a publish date still get swept based on when we first saw them.
 
