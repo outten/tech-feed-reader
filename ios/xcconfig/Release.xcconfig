@@ -1,3 +1,4 @@
-// TODO(ios-app Phase 2): replace with the real production domain once
-// Associated Domains / Apple Team ID are set up (see openspec/changes/ios-app/design.md).
-API_BASE_URL = https:/$()/REPLACE-WITH-PRODUCTION-DOMAIN.example
+// Production API — Phase 1 (recovery-code auth + browser-handoff sign-up)
+// doesn't need Associated Domains to work; those are still Phase 2
+// (native passkey UI) — see openspec/changes/ios-app/design.md.
+API_BASE_URL = https:/$()/feeder.tmoneystuff.com
