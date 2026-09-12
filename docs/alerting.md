@@ -11,8 +11,11 @@ Pre-launch push alerting so the operator finds out about prod problems
 | **HTTP 500** | Any unhandled exception in a web request | Sinatra `error` handler (`app/main.rb`) |
 | **Dead job** | A Sidekiq job exhausts all retries and lands in the dead set | `death_handler` (`app/sidekiq_config.rb`) |
 | **Health check** | DB unreachable · feed pipeline stalled (no article fetched in `HEALTH_FRESH_HOURS`) · Sidekiq dead set over `HEALTH_DEAD_MAX` | `HealthAlertWorker`, every 5 min |
+| **Trivia generation skipped** | `GenerateTriviaWorker` completes without producing a quiz (unavailable, or Claude's response didn't parse into enough valid questions) | `GenerateTriviaWorker#perform` (`app/workers/generate_trivia_worker.rb`) |
 
-All three route through `Notifier.push` (`app/notifier.rb`):
+This last one exists because a skipped generation isn't a crash — the Sidekiq job finishes normally, so it never reaches the dead-job path above. See `openspec/changes/fix-trivia-cron-generation` for the incident that motivated it (a low-content source feed starved the day's trivia prompt, silently, with nothing in the dead set to alert on).
+
+All four route through `Notifier.push` (`app/notifier.rb`):
 
 - **No-op when `NTFY_URL` is unset** — the alert is logged at `warn` instead, so
   dev / test / CI never push.

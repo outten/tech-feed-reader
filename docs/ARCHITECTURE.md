@@ -209,11 +209,14 @@ flowchart LR
     subgraph cron["sidekiq-cron schedule (UTC)"]
         a["0 * * * * · RefreshAllFeedsWorker"]
         b["5 * * * * · IndexSyncWorker"]
+        h["*/4 * * * * · ForYouCacheWarmWorker"]
+        i["*/5 * * * * · HealthAlertWorker"]
         c["*/15 * * * * · StockSyncWorker"]
         d["30 * * * * · SportsSyncWorker"]
         e["0 1 * * * · GenerateSudokuWorker"]
         f["30 1 * * * · GenerateTriviaWorker"]
         g["45 4 * * * · FixArticleLinksWorker"]
+        j["0 5 * * * · PruneArticlesWorker"]
     end
 ```
 
@@ -221,11 +224,14 @@ flowchart LR
 |---|---|---|
 | `0 * * * *` (hourly) | `RefreshAllFeedsWorker` | Fan out one `FeedRefreshWorker` per feed |
 | `5 * * * *` | `IndexSyncWorker` | Refresh quotes for the 10 major world indices |
+| `*/4 * * * *` | `ForYouCacheWarmWorker` | Force-refresh the For-You ranking cache for recently-active users (< `RANKING_TTL` 5 min) so the home feed never pays the cold `compute_ranking` |
+| `*/5 * * * *` | `HealthAlertWorker` | Liveness/degradation check (DB, feed pipeline freshness, dead-set size); pushes an ntfy alert on a state transition |
 | `*/15 * * * *` | `StockSyncWorker` | Refresh cached quotes for all followed symbols (Finnhub) |
 | `30 * * * *` | `SportsSyncWorker` | ESPN/API-Sports schedules, standings, tennis rankings |
 | `0 1 * * *` | `GenerateSudokuWorker` | Pre-generate the next 7 days of puzzles |
 | `30 1 * * *` | `GenerateTriviaWorker` | Build today’s News Trivia from the last 24h of articles (Claude) |
 | `45 4 * * *` | `FixArticleLinksWorker` | Re-scrub any `content_scrubbed = FALSE` article HTML |
+| `0 5 * * *` | `PruneArticlesWorker` | Delete non-bookmarked articles older than `RETENTION_DAYS` (default 30), read or unread |
 
 On-demand workers also exist: `FeedRefreshWorker` (single feed — also enqueued
 when you first view/follow a cold stock symbol), `StockQuoteFetchWorker` (eager

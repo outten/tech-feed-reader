@@ -1562,13 +1562,21 @@ when browsing youtube, the recent videos area shows twelve listings, which is to
 
 **Shipped.** One-line change: `/youtube`'s "Recent videos" section (`app/main.rb`) now fetches `limit: 60` instead of `limit: 12`. The grid (`.youtube-videos`, `grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))`) already auto-wraps, so no CSS change was needed. Verified visually — seeded 20 videos, all rendered cleanly in the grid with no layout breakage — plus a new spec asserting videos beyond the old 12-item cap render. Suite: **1743 / 0**.
 
-## [ ] 114. Article retention isn't actually running in production
+## [x] 114. Article retention isn't actually running in production
 
 `Pruner` (`app/pruner.rb`) deletes articles older than `RETENTION_DAYS` (default 7 days, bookmarks always kept, unread optionally kept), but it's only ever invoked from `scripts/refresh_feeds.rb` (the `make refresh-feeds` / `make scheduler` CLI path) or standalone via `make prune`. Production's `docker-compose.yml` doesn't run either of those — the hourly fetch there goes through `RefreshAllFeedsWorker` / `FeedRefreshWorker` via `config/sidekiq_cron.yml`, and neither the workers nor the cron schedule ever call `Pruner`. So in production, articles accumulate forever with no sweep ever running.
 
 Confirmed, not theoretical: production currently has **108,441 total articles**, including a webcomic feed's archive with `published_at` dates back to **2012** still present — evidence surfaced while investigating STUFF #112 (trivia generation). The `/admin` dashboard's "activity window" label reads `Pruner.effective_retention_days` (`app/main.rb:2058`) for display only — it says "7 days" but nothing enforces it, which is mildly misleading.
 
 Wire `Pruner` into the actual production path (e.g. a `prune` entry in `sidekiq_cron.yml`, or call it at the end of `RefreshAllFeedsWorker`) so the retention policy the app already claims to have is actually enforced.
+
+**Shipped in two steps** — the second one deliberately reversed part of the first, after real data came in.
+
+**Step 1 (v1.1.27, safe-first).** New `PruneArticlesWorker` + a `prune_articles` cron entry (daily 05:00 UTC). Hardcoded `keep_unread: true` — a first-ever run against a never-swept 138K-row table needed the conservative default, since the real growth rate was unknown. First manual run: **1,756 deleted** (read, non-bookmarked, >7 days old), 6 bookmarks preserved, 121,768 unread articles untouched.
+
+**Step 2 (v1.1.28, bounded retention).** With the safe version live, the real numbers came in: ~2,000 articles/day ingested, `articles` table already 1.5 GB of a 10 GiB shared managed-Postgres allocation, projecting to ~9 GB/year unbounded — a real, if not urgent, capacity trajectory. Reviewed and decided (captured via `/openspec-explore`, not guessed): flip `keep_unread` to `false`, raise `RETENTION_DAYS` from 7 to **30** — a full month before an unread article expires instead of no expiry at all, bounding the backlog to roughly a month of ingestion instead of growing forever. Bookmarks remain the one unconditional exemption. Second manual run under the new settings: **74,934 deleted**, 5 bookmarks preserved. Corpus went from 136,710 → 61,852 articles and now holds roughly steady.
+
+Both runs were triggered manually and reviewed before the nightly cron ran unattended — not blindly trusted from a pre-deploy estimate, given the DELETE has no undo. Full reasoning + the scenario comparison that ruled out "just raise the day count" (does nothing while `keep_unread: true`) is in `openspec/changes/wire-production-article-retention/design.md`. Doc pass alongside: fixed stale "7 days" / "unread is exempt forever" copy in `AGENTS.md`, `docs/ARCHITECTURE.md`'s cron schedule table, `.env.example`, the cron entry's own description, and — the one that actually mattered most — **user-facing privacy policy copy** (`views/privacy.erb`), which had been telling users articles get pruned after 7 days this whole time production wasn't pruning at all.
 
 ## [ ] 115. Native iOS app
 
