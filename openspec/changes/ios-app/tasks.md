@@ -53,7 +53,7 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 - [x] 7.1 Document the local-dev flow (run `make run`/`make serve`, point iOS Simulator at `http://localhost:4567`, log in via recovery code) in `ios/README.md`
 - [~] 7.2 Verified what can be verified non-interactively: the app builds, installs, and launches in Simulator; the sign-in screen renders correctly (screenshot-checked); the full `/api/v1/*` flow (sign-up → subscribe → list feeds → list/read articles) was driven for real against the running dev server via curl/a WebAuthn-FakeClient script and returned correct data. **Full tap-through (typing a recovery code, browsing feeds/articles on-screen) needs a human at the Simulator** — a real test account already exists for this (see chat for the recovery code) with a subscribed feed that has articles.
-- [~] 7.3 iPad build installs and launches (see `ios/build/`); full-screen layout not yet eyeballed by a human — same caveat as 7.2.
+- [~] 7.3 iPad build installs, launches, and renders full-screen edge-to-edge (screenshot-confirmed on iPad Pro 11-inch Simulator — no iPhone-sized letterboxing). Tapping through the actual login/feeds/article flow on-screen is the remaining human step — same caveat as 7.2.
 
 ## 8. Docs
 
