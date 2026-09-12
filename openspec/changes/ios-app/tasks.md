@@ -1,3 +1,5 @@
+**Scope note (added during apply):** Associated Domains setup was deferred (see group 3 and design.md "Phase scoping") pending production domain + Apple Team ID. Groups 3 and part of 5 are Phase 2. This pass's iOS auth uses recovery-code login + browser-handoff sign-up instead of native passkeys — `specs/ios-app/spec.md`'s sign-up/login requirements are met via that mechanism for now, with native passkey UI to follow in Phase 2.
+
 ## 1. Backend: token auth for native clients
 
 - [x] 1.1 Add `api_tokens` migration (`user_id`, `token`, `created_at`, `last_used_at`) under `db/migrations-postgres/`
@@ -16,7 +18,9 @@
 - [x] 2.6 Add `POST /api/v1/read_state` (read/bookmarked/archived)
 - [x] 2.7 Write request specs covering the scenarios in `specs/mobile-api/spec.md` — `spec/mobile_api_spec.rb`, 13 examples, full suite (1759 examples) still green
 
-## 3. Backend: associated domains
+## 3. Backend: associated domains — DEFERRED to Phase 2 (see design.md)
+
+User doesn't have production domain / Apple Team ID handy yet. Revisit when available.
 
 - [ ] 3.1 Confirm production domain and Apple Team ID / Bundle ID to use
 - [ ] 3.2 Add Caddy route serving `apple-app-site-association` with the `webcredentials` entry
@@ -24,34 +28,34 @@
 
 ## 4. iOS project scaffolding
 
-- [ ] 4.1 Create `ios/TechFeedReader.xcodeproj` (SwiftUI app, iPhone + iPad, `TARGETED_DEVICE_FAMILY = "1,2"`)
-- [ ] 4.2 Add Associated Domains entitlement pointing at the production domain
-- [ ] 4.3 Set up Debug/Release configs with a switchable API base URL (localhost for Debug/Simulator, production for Release)
-- [ ] 4.4 Add an `NSAppTransportSecurity` exception scoped to Debug builds for local HTTP testing on a physical device
+- [x] 4.1 Create `ios/TechFeedReader.xcodeproj` (SwiftUI app, iPhone + iPad, `TARGETED_DEVICE_FAMILY = "1,2"`) — generated via XcodeGen from `ios/project.yml` (not hand-committed pbxproj; regenerate with `xcodegen generate`, see `ios/README.md`). Builds succeed for both `iPhone 17` and `iPad Pro 11-inch (M5)` simulator destinations.
+- [ ] 4.2 ~~Add Associated Domains entitlement~~ — DEFERRED to Phase 2 (needs prod domain + Team ID)
+- [x] 4.3 Set up Debug/Release configs with a switchable API base URL (localhost for Debug/Simulator, production for Release) — `xcconfig/Debug.xcconfig` / `Release.xcconfig`
+- [x] 4.4 Add an `NSAppTransportSecurity` exception scoped to Debug builds for local HTTP testing on a physical device — `NSAllowsLocalNetworking` in `Info-Debug.plist` only (covers loopback, `.local`, and literal LAN IPs — Release's Info.plist omits it)
 
-## 5. iOS: auth
+## 5. iOS: auth (Phase 1 scope — recovery-code login + browser-handoff sign-up)
 
-- [ ] 5.1 Implement sign-up flow using `ASAuthorizationPlatformPublicKeyCredentialProvider` against `/api/auth/register/options` + `/register/verify`
-- [ ] 5.2 Implement login flow against `/api/auth/login/options` + `/login/verify`
-- [ ] 5.3 Implement recovery-code login (mirrors `/api/auth/recovery`) as the local-dev-friendly fallback
-- [ ] 5.4 Store the issued bearer token in the Keychain; attach `Authorization: Bearer` to all `/api/v1/*` requests
-- [ ] 5.5 Implement sign-out (calls `DELETE /api/v1/session`, clears the Keychain entry)
+- [x] 5.1 Sign-up: open the production `/sign-up` page in an in-app `SFSafariViewController`; no native code changes to the web flow. User completes passkey sign-up there (seeing their recovery codes), dismisses the sheet, and logs in natively (5.3). — `Auth/SafariSignUpView.swift`
+- [ ] 5.2 ~~Native login via `ASAuthorizationPlatformPublicKeyCredentialProvider`~~ — DEFERRED to Phase 2 (needs Associated Domains)
+- [x] 5.3 Implement recovery-code login (native form, calls `/api/auth/recovery` with `native: true`) — the primary login path for Phase 1 — `Auth/SignInView.swift` + `Auth/AuthViewModel.swift`
+- [x] 5.4 Store the issued bearer token in the Keychain; attach `Authorization: Bearer` to all `/api/v1/*` requests — `Networking/KeychainStore.swift` + `Networking/APIClient.swift`
+- [x] 5.5 Implement sign-out (calls `DELETE /api/v1/session`, clears the Keychain entry) — `AuthViewModel.signOut()`, wired to the "Sign Out" toolbar button in `Views/MainView.swift`
 
 ## 6. iOS: feed/article UI
 
-- [ ] 6.1 Feed list view (iPhone: navigation stack; iPad: `NavigationSplitView` sidebar)
-- [ ] 6.2 Article list view for a selected feed, paginated
-- [ ] 6.3 Article detail view (rendered content)
-- [ ] 6.4 Mark read/bookmark/archive actions wired to `POST /api/v1/read_state`
-- [ ] 6.5 Subscribe/unsubscribe UI wired to `POST /api/v1/subscriptions`
+- [x] 6.1 Feed list view (iPhone: navigation stack; iPad: `NavigationSplitView` sidebar) — one `NavigationSplitView` in `Views/MainView.swift` adapts to both automatically
+- [x] 6.2 Article list view for a selected feed, paginated — `Views/ArticleListView.swift`
+- [x] 6.3 Article detail view (rendered content) — `Views/ArticleDetailView.swift` + `Views/ArticleContentView.swift` (WKWebView renders the server-scrubbed content_html)
+- [x] 6.4 Mark read/bookmark/archive actions wired to `POST /api/v1/read_state` — `ArticleDetailView` (read-on-open, bookmark/archive toolbar buttons)
+- [x] 6.5 Subscribe/unsubscribe UI wired to `POST /api/v1/subscriptions` — `Views/FeedListView.swift` (add-feed alert, swipe-to-delete)
 
 ## 7. Local dev + verification
 
-- [ ] 7.1 Document the local-dev flow (run `make run`/`make serve`, point iOS Simulator at `http://localhost:4567`, log in via recovery code) in `ios/README.md`
-- [ ] 7.2 Manually verify sign-up, login, feed list, article read, and sign-out end-to-end in the Simulator against the local server
-- [ ] 7.3 Manually verify the same flows on a physical iPad in full-screen (not scaled iPhone layout)
+- [x] 7.1 Document the local-dev flow (run `make run`/`make serve`, point iOS Simulator at `http://localhost:4567`, log in via recovery code) in `ios/README.md`
+- [~] 7.2 Verified what can be verified non-interactively: the app builds, installs, and launches in Simulator; the sign-in screen renders correctly (screenshot-checked); the full `/api/v1/*` flow (sign-up → subscribe → list feeds → list/read articles) was driven for real against the running dev server via curl/a WebAuthn-FakeClient script and returned correct data. **Full tap-through (typing a recovery code, browsing feeds/articles on-screen) needs a human at the Simulator** — a real test account already exists for this (see chat for the recovery code) with a subscribed feed that has articles.
+- [~] 7.3 iPad build installs and launches (see `ios/build/`); full-screen layout not yet eyeballed by a human — same caveat as 7.2.
 
 ## 8. Docs
 
-- [ ] 8.1 Update `SPEC.md` to remove/revise the "Mobile-native app — responsive web only" non-goal
-- [ ] 8.2 Add a `STUFF.md` entry for this change per existing changelog convention
+- [x] 8.1 Update `SPEC.md` to remove/revise the "Mobile-native app — responsive web only" non-goal — struck both non-goal mentions, added a "Native iOS app" subsection under Scope evolution
+- [x] 8.2 Add a `STUFF.md` entry for this change per existing changelog convention — #115, left `[ ]` (in progress, not shipped) per the Phase 1/2 split

@@ -50,6 +50,19 @@ A single Xcode project at `ios/TechFeedReader.xcodeproj` with one app target sup
 - Physical device: base URL becomes the dev Mac's LAN IP; requires an `NSAppTransportSecurity` exception scoped to Debug builds only (plain HTTP, dev-only) since ATS blocks non-HTTPS by default.
 - Passkey ceremony against a non-production RP: Apple supports "Associated Domains Development Mode" (device/simulator setting) to test passkey flows without hosting a real AASA file. As a simpler fallback, the existing recovery-code login (`/api/auth/recovery`) works over the JSON API unchanged and is the practical way to log in locally without wrestling with associated-domains dev mode.
 
+## Phase scoping (added post-proposal, during apply)
+
+The user deferred Associated Domains setup (production domain + Apple Team ID weren't available) until they have Apple Developer account details handy. Consequence worth being explicit about: **sign-up is a passkey registration ceremony**, so it's blocked by the same associated-domains gap as native login, not just login — there's no username/password path to fall back on.
+
+**Phase 1 (this pass):**
+- Native login: the recovery-code flow (`/api/auth/recovery` with `native: true`) — fully native UI, no associated domains needed, already returns a bearer token.
+- Sign-up: opens the existing production `/sign-up` page in an in-app `SFSafariViewController` (a system browser sheet — not a custom `WKWebView`, so no JS bridge or web-code changes needed). That flow already ends by showing the user their one-time recovery codes; they dismiss the sheet and log in natively with one of those codes. This satisfies "sign up from the app" without any native passkey UI.
+- No Associated Domains entitlement, no AASA file, no `ASAuthorizationPlatformPublicKeyCredentialProvider` code in Phase 1.
+
+**Phase 2 (later, once domain + Team ID are available):**
+- Add Associated Domains + AASA (original group 3 tasks).
+- Replace the `SFSafariViewController` sign-up hand-off and add native login via `ASAuthorizationPlatformPublicKeyCredentialProvider` (original tasks 5.1/5.2), so passkeys sync natively between web and iOS as originally designed.
+
 ## Risks / Trade-offs
 
 - **Associated Domains complexity for local testing** → mitigated by recovery-code fallback for day-to-day local dev; full passkey ceremony verified against a staging/production-like domain before release.

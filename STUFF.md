@@ -1569,3 +1569,19 @@ when browsing youtube, the recent videos area shows twelve listings, which is to
 Confirmed, not theoretical: production currently has **108,441 total articles**, including a webcomic feed's archive with `published_at` dates back to **2012** still present — evidence surfaced while investigating STUFF #112 (trivia generation). The `/admin` dashboard's "activity window" label reads `Pruner.effective_retention_days` (`app/main.rb:2058`) for display only — it says "7 days" but nothing enforces it, which is mildly misleading.
 
 Wire `Pruner` into the actual production path (e.g. a `prune` entry in `sidekiq_cron.yml`, or call it at the end of `RefreshAllFeedsWorker`) so the retention policy the app already claims to have is actually enforced.
+
+## [ ] 115. Native iOS app
+
+I'd like to make an iOS app for tech-feed-reader.
+
+Specs for the app:
+
+- iPhone and iPad
+- iPad should be full screen
+- users can login to their tech-feed-reader on any platform and see their information, feeds, etc.
+- users can sign-up from any account
+- iOS app files should be a separate directory so that we don't intermingle files
+- app should be built using Apple's xcode
+- app should be able to run locally to test during development
+
+Full plan in `openspec/changes/ios-app/` (proposal, design, specs, tasks). **In progress, Phase 1:** a new token-authenticated `/api/v1/*` JSON API (feeds, articles, subscriptions, read-state) alongside the existing cookie-session routes, and a SwiftUI app under `ios/` (built via XcodeGen, `ios/project.yml`) that builds and runs on both iPhone and iPad Simulators. Sign-up/login are covered by recovery-code login (native) + a browser-handoff to the existing web `/sign-up` flow, since Associated Domains (needed for native passkey UI) aren't set up yet — deferred to Phase 2 pending a production domain + Apple Developer Team ID. See `openspec/changes/ios-app/design.md` for the full rationale.
