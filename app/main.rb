@@ -42,6 +42,7 @@ require_relative 'providers/itunes_lookup'
 require_relative 'providers/youtube_channel_resolver'
 require_relative 'providers/wikipedia'
 require_relative 'auth'
+require_relative 'api_tokens_store'
 
 # Phase A1 (consumer auth) — load .env in dev for SESSION_SECRET
 # + WEBAUTHN_* config. Production reads from real env vars (host's
@@ -391,7 +392,24 @@ class TechFeedReader < Sinatra::Base
     end
   end
 
+  # ios-app change — token auth wall for the mobile JSON API. Separate
+  # from the cookie-session wall above (which /api/v1/ is exempted from
+  # via Auth::PUBLIC_PREFIXES): native clients (the iOS app) present
+  # `Authorization: Bearer <token>` instead of a session cookie. Sets
+  # @api_user for the route handlers below — deliberately not reusing
+  # current_user/session so this stays independent of browser auth.
+  before '/api/v1/*' do
+    content_type :json
+    header = request.env['HTTP_AUTHORIZATION'].to_s
+    @api_token = header.start_with?('Bearer ') ? header.sub('Bearer ', '') : nil
+    @api_user  = @api_token && ApiTokensStore.find_user_by_token(@api_token)
+    halt 401, JSON.generate(error: 'unauthorized', message: 'Missing or invalid bearer token.') unless @api_user
+  end
+
   helpers do
+    def api_user_id
+      @api_user['id'].to_i
+    end
     # Cache-bust query string for static assets — same pattern as t-money so
     # CSS/JS edits show up on next render without a hard reload.
     def asset_mtime(rel_path)
@@ -1737,7 +1755,11 @@ class TechFeedReader < Sinatra::Base
     codes = RecoveryCodesStore.mint_for!(user_id: user['id'])
     sign_in!(user)
 
-    JSON.generate(ok: true, recovery_codes: codes, username: user['username'])
+    result = { ok: true, recovery_codes: codes, username: user['username'] }
+    # ios-app change — a native client passes `native: true` to also get
+    # a bearer token, since it can't rely on the cookie session set above.
+    result[:api_token] = ApiTokensStore.issue!(user['id']) if body['native']
+    JSON.generate(result)
   end
 
   # Step 1 of authentication ceremony. For a given username, emit
@@ -1807,7 +1829,10 @@ class TechFeedReader < Sinatra::Base
     sign_in!(user)
 
     return_to = session.delete(:return_to) || '/'
-    JSON.generate(ok: true, return_to: return_to)
+    result = { ok: true, return_to: return_to }
+    # ios-app change — see register/verify above.
+    result[:api_token] = ApiTokensStore.issue!(user['id']) if body['native']
+    JSON.generate(result)
   end
 
   # Recovery — consume a one-time code, sign the user in. The code
@@ -1827,7 +1852,11 @@ class TechFeedReader < Sinatra::Base
 
     return_to = session.delete(:return_to) || '/'
     remaining = RecoveryCodesStore.unconsumed_count_for(user_id)
-    JSON.generate(ok: true, return_to: return_to, recovery_codes_remaining: remaining)
+    result = { ok: true, return_to: return_to, recovery_codes_remaining: remaining }
+    # ios-app change — recovery is the local-dev-friendly fallback login
+    # for the iOS app (passkeys need Associated Domains set up).
+    result[:api_token] = ApiTokensStore.issue!(user_id) if body['native']
+    JSON.generate(result)
   end
 
   # ===================================================================
@@ -3804,6 +3833,84 @@ class TechFeedReader < Sinatra::Base
       status 404
       { ok: false, error: 'not-found', message: 'No feed with that id.' }.to_json
     end
+  end
+
+  # ===================================================================
+  # Mobile API (ios-app change) — token-authenticated JSON API for the
+  # native iOS client. Auth is the `before '/api/v1/*'` filter above
+  # (bearer token, sets @api_user), not the cookie session, so every
+  # route here uses api_user_id instead of current_user_id. Mirrors the
+  # same FeedsStore / ArticlesStore / ReadStateStore calls the HTML +
+  # /api/feeds routes above already use.
+  # ===================================================================
+
+  get '/api/v1/feeds' do
+    FeedsStore.for_user(api_user_id).to_json
+  end
+
+  API_V1_ARTICLES_PER_PAGE = 50
+  get '/api/v1/articles' do
+    page     = [params['page'].to_i, 1].max
+    offset   = (page - 1) * API_V1_ARTICLES_PER_PAGE
+    feed_id  = params['feed_id'].to_i
+    articles = if feed_id.positive?
+                 ArticlesStore.for_feed(api_user_id, feed_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset)
+               else
+                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset)
+               end
+    articles.to_json
+  end
+
+  get '/api/v1/articles/:uid' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'not-found') unless article
+    article.merge(ReadStateStore.get(api_user_id, article['id'])).to_json
+  end
+
+  post '/api/v1/subscriptions' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    url = body['url'].to_s.strip
+    unless url.match?(%r{\Ahttps?://\S+\z})
+      status 422
+      next { ok: false, error: 'invalid-url', message: "That doesn't look like a valid http(s) URL." }.to_json
+    end
+
+    feed, inserted = FeedsStore.add_for_user(user_id: api_user_id, url: url)
+    if inserted
+      status 201
+      { ok: true, feed: feed }.to_json
+    else
+      status 422
+      { ok: false, error: 'duplicate-url', message: 'That feed is already subscribed.' }.to_json
+    end
+  end
+
+  delete '/api/v1/subscriptions/:id' do |id|
+    if FeedsStore.unsubscribe(api_user_id, id.to_i)
+      { ok: true, id: id.to_i }.to_json
+    else
+      status 404
+      { ok: false, error: 'not-found', message: 'No feed with that id.' }.to_json
+    end
+  end
+
+  post '/api/v1/read_state' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    article = ArticlesStore.find_by_uid(body['uid'].to_s)
+    halt 404, JSON.generate(error: 'not-found') unless article
+
+    ReadStateStore.mark_read(api_user_id, article['id'], read: body['read']) if body.key?('read')
+    ReadStateStore.mark_bookmarked(api_user_id, article['id'], value: body['bookmarked']) if body.key?('bookmarked')
+    ReadStateStore.mark_archived(api_user_id, article['id'], value: body['archived']) if body.key?('archived')
+
+    { ok: true, state: ReadStateStore.get(api_user_id, article['id']) }.to_json
+  end
+
+  delete '/api/v1/session' do
+    ApiTokensStore.revoke!(@api_token)
+    { ok: true }.to_json
   end
 
   post '/api/feeds/catalog/add' do
