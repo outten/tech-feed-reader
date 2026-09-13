@@ -113,3 +113,22 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 14.7 YouTube embed player — `YouTubePlayerView.swift` + `Article+YouTube.swift` (client-side video-ID extraction mirroring `youtube_video_id`/`youtube_embed_url`), shown above the description instead of the plain content renderer for YouTube articles
 - [x] 14.8 Add navigation entry points for Podcasts + YouTube — `SidebarView.swift`'s new "Browse" section
 - [x] 14.9 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders the new "Browse" section correctly (screenshot-confirmed)
+
+## 15. Phase 6a — Sports (backend)
+
+- [x] 15.1 Add `GET /api/v1/sports`, `GET /api/v1/sports/:sport_slug/leagues`, `GET /api/v1/sports/:sport_slug/:league_slug/teams` (catalog browse, wraps `SportsCatalog`, with the api-sports DB-teams fallback the web `/sports/manage/:sport/:league` route uses)
+- [x] 15.2 Add `POST`/`DELETE /api/v1/sports/teams/follow`, `/leagues/follow`, `/players/follow` (wraps `SportsFollowsStore` + `ensure_catalog_*_in_db` helpers, mirroring the web follow routes exactly — including the `SportsTeamFetchWorker` enqueue on team follow)
+- [x] 15.3 Add `GET /api/v1/sports/teams/:slug`, `/leagues/:slug`, `/players/:slug` (detail — DB-backed with catalog fallback for teams not yet synced, per the design.md simplification). Note: team detail's `standings` is a single object-or-null (`SportsStandingsStore.for_team`), league detail's `standings` is an array (`.for_league`) — different shapes by design, matches the underlying store methods.
+- [x] 15.4 Add `GET /api/v1/sports/overview` (followed teams/leagues/players + live matches)
+- [x] 15.5 Request specs covering the scenarios in `specs/mobile-sports/spec.md` — 13 new examples in `spec/mobile_api_spec.rb`, full suite 1788/0
+
+## 16. Phase 6a — Sports (iOS)
+
+- [ ] 16.1 Sports models (Sport, League, Team, Player, Match, Standing — matching the new endpoints' JSON shapes)
+- [ ] 16.2 Catalog browse screens (sport list → league list → team list, follow toggle at each followable level)
+- [ ] 16.3 Team / League / Player detail screens (standings, upcoming, recent results, mentions — reusing `ArticleRow`/`ArticlesListView` patterns where the shape fits)
+- [ ] 16.4 Sports overview screen (followed teams/leagues/players + live matches)
+- [ ] 16.5 Add a "Sports" navigation entry point (sidebar)
+- [ ] 16.6 Verify in the Simulator against the local dev server
+
+**Phase 6b (deferred, not yet tasked)**: tennis ATP/WTA rankings, Wikipedia league summaries, calendar/.ics surfacing — see design.md.

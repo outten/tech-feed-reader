@@ -9,6 +9,13 @@ require_relative '../app/read_state_store'
 require_relative '../app/webauthn_credentials_store'
 require_relative '../app/feed_catalog'
 require_relative '../app/mute_rules_store'
+require_relative '../app/sports_catalog'
+require_relative '../app/sports_leagues_store'
+require_relative '../app/sports_teams_store'
+require_relative '../app/sports_matches_store'
+require_relative '../app/sports_standings_store'
+require_relative '../app/sports_players_store'
+require_relative '../app/sports_follows_store'
 
 # ios-app change — mobile JSON API (openspec/changes/ios-app/specs/mobile-api).
 # Covers native-client token issuance from the existing WebAuthn ceremonies
@@ -306,6 +313,131 @@ RSpec.describe 'Mobile API' do
       expect(channels.map { |c| c['id'] }).to eq([channel['id']])
       expect(channels.first['video_count'].to_i).to eq(1)
       expect(channels.first['latest_uid']).to eq('vid-1')
+    end
+  end
+
+  describe 'sports (Phase 6a)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/sports lists catalog sports' do
+      get '/api/v1/sports', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      sports = JSON.parse(last_response.body)
+      football = sports.find { |s| s['slug'] == 'football' }
+      expect(football['name']).to eq('American Football')
+    end
+
+    it 'GET /api/v1/sports/:sport/leagues lists leagues without their team arrays' do
+      get '/api/v1/sports/football/leagues', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      leagues = JSON.parse(last_response.body)
+      nfl = leagues.find { |lg| lg['slug'] == 'nfl' }
+      expect(nfl['name']).to eq('NFL')
+      expect(nfl).not_to have_key('teams')
+    end
+
+    it 'GET /api/v1/sports/:sport/leagues 404s for an unknown sport' do
+      get '/api/v1/sports/quidditch/leagues', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(404)
+    end
+
+    it 'GET /api/v1/sports/:sport/:league/teams lists catalog teams' do
+      get '/api/v1/sports/football/nfl/teams', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      teams = JSON.parse(last_response.body)
+      expect(teams.map { |t| t['slug'] }).to include('eagles')
+    end
+
+    it 'follows a catalog-only team, materializing it into the database' do
+      expect(SportsTeamsStore.find_by_slug('eagles')).to be_nil
+
+      post '/api/v1/sports/teams/follow', { slug: 'eagles' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to include('followed' => true)
+
+      team = SportsTeamsStore.find_by_slug('eagles')
+      expect(team).not_to be_nil
+      expect(SportsFollowsStore.follow?(user['id'], 'team', 'eagles')).to be true
+    end
+
+    it 'unfollows a team' do
+      SportsFollowsStore.add(user_id: user['id'], kind: 'team', value: 'eagles')
+      delete '/api/v1/sports/teams/follow', { slug: 'eagles' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(SportsFollowsStore.follow?(user['id'], 'team', 'eagles')).to be false
+    end
+
+    it 'follows and unfollows a league' do
+      post '/api/v1/sports/leagues/follow', { slug: 'nfl' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(SportsFollowsStore.follow?(user['id'], 'league', 'nfl')).to be true
+
+      delete '/api/v1/sports/leagues/follow', { slug: 'nfl' }, auth_header(result['api_token'])
+      expect(SportsFollowsStore.follow?(user['id'], 'league', 'nfl')).to be false
+    end
+
+    it 'GET /api/v1/sports/teams/:slug returns basic info for a catalog-only team (not 404)' do
+      get '/api/v1/sports/teams/eagles', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['team']['name']).to eq('Philadelphia Eagles')
+      expect(body['standings']).to be_nil
+      expect(body['followed']).to be false
+    end
+
+    it 'GET /api/v1/sports/teams/:slug returns full detail once synced' do
+      league = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football', source_provider: 'espn', external_id: 'football/nfl')
+      team = SportsTeamsStore.upsert(league_id: league['id'], slug: 'eagles', name: 'Philadelphia Eagles', source_provider: 'espn', external_id: '21')
+      SportsStandingsStore.upsert(league_id: league['id'], team_id: team['id'], group_name: 'NFC East', source_provider: 'espn', position: 1)
+
+      get '/api/v1/sports/teams/eagles', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['league']['slug']).to eq('nfl')
+      expect(body['standings']['group_name']).to eq('NFC East')
+    end
+
+    it 'GET /api/v1/sports/leagues/:slug 404s for an unknown league' do
+      get '/api/v1/sports/leagues/does-not-exist', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(404)
+    end
+
+    it 'GET /api/v1/sports/leagues/:slug returns standings grouped by group_name' do
+      league = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football', source_provider: 'espn', external_id: 'football/nfl')
+      team = SportsTeamsStore.upsert(league_id: league['id'], slug: 'eagles', name: 'Philadelphia Eagles', source_provider: 'espn', external_id: '21')
+      SportsStandingsStore.upsert(league_id: league['id'], team_id: team['id'], group_name: 'NFC East', source_provider: 'espn', position: 1)
+
+      get '/api/v1/sports/leagues/nfl', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['standings'].first['group_name']).to eq('NFC East')
+      expect(body['teams_by_id'][team['id'].to_s]['slug']).to eq('eagles')
+    end
+
+    it 'GET /api/v1/sports/players/:slug materializes a catalog notable-player chip' do
+      team_with_players = SportsCatalog.all_teams.find { |t| (t[:players] || []).any? }
+      player_name = team_with_players[:players].first
+      slug = "#{team_with_players[:slug]}-#{player_name.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/^-+|-+$/, '')}"
+
+      get "/api/v1/sports/players/#{slug}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['player']['full_name']).to eq(player_name)
+      expect(SportsPlayersStore.find_by_slug(slug)).not_to be_nil
+    end
+
+    it 'GET /api/v1/sports/overview lists followed teams and live matches' do
+      league = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football', source_provider: 'espn', external_id: 'football/nfl')
+      team = SportsTeamsStore.upsert(league_id: league['id'], slug: 'eagles', name: 'Philadelphia Eagles', source_provider: 'espn', external_id: '21')
+      SportsFollowsStore.add(user_id: user['id'], kind: 'team', value: 'eagles')
+
+      get '/api/v1/sports/overview', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['followed_teams'].map { |t| t['slug'] }).to eq(['eagles'])
     end
   end
 

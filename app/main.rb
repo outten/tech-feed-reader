@@ -4000,6 +4000,172 @@ class TechFeedReader < Sinatra::Base
     ArticlesStore.youtube_channels(api_user_id).to_json
   end
 
+  # Phase 6a (mobile-sports) — catalog browse, follow/unfollow, detail,
+  # overview. Reuses the same store methods + ensure_catalog_*_in_db
+  # lazy-materialization helpers (defined earlier as Sinatra `helpers`,
+  # reachable from any route in this class) that the web /sports/*
+  # routes already use — see design.md for the DB-backed-only
+  # simplification on team detail (skips the 5-team curated
+  # SportsTeams module path).
+
+  get '/api/v1/sports' do
+    SportsCatalog::SPORTS.map { |slug, sport|
+      { slug: slug, name: sport[:name], emoji: sport[:emoji], region: sport[:region], blurb: sport[:blurb] }
+    }.to_json
+  end
+
+  get '/api/v1/sports/:sport_slug/leagues' do |sport_slug|
+    sport = SportsCatalog.find_sport(sport_slug)
+    halt 404, JSON.generate(error: 'not-found') unless sport
+    (sport[:leagues] || []).map { |lg| lg.reject { |k, _| k == :teams } }.to_json
+  end
+
+  get '/api/v1/sports/:sport_slug/:league_slug/teams' do |sport_slug, league_slug|
+    league = SportsCatalog.find_league(sport_slug, league_slug)
+    halt 404, JSON.generate(error: 'not-found') unless league
+    teams = league[:teams] || []
+    # STUFF #75 — api-sports leagues ship teams:[] in the catalog;
+    # teams auto-populate from synced match data instead. Same
+    # fallback the web /sports/manage/:sport/:league route uses.
+    if teams.empty? && league[:source_provider] == 'api-sports'
+      league_row = SportsLeaguesStore.find_by_slug(league[:slug])
+      teams = SportsTeamsStore.for_league(league_row['id']).sort_by { |t| t['name'] } if league_row
+    end
+    teams.to_json
+  end
+
+  get '/api/v1/sports/overview' do
+    followed_team_slugs   = SportsFollowsStore.for_kind(api_user_id, 'team').map { |f| f['value'] }
+    followed_league_slugs = SportsFollowsStore.for_kind(api_user_id, 'league').map { |f| f['value'] }
+    followed_player_slugs = SportsFollowsStore.for_kind(api_user_id, 'player').map { |f| f['value'] }
+
+    followed_teams = followed_team_slugs.filter_map { |slug| SportsTeamsStore.find_by_slug(slug) }
+    followed_leagues = followed_league_slugs.filter_map { |slug| SportsLeaguesStore.find_by_slug(slug) }
+    followed_players = followed_player_slugs.filter_map { |slug| SportsPlayersStore.find_by_slug(slug) }
+
+    live_matches = SportsMatchesStore.live
+    team_ids = live_matches.flat_map { |m| [m['home_team_id'], m['away_team_id']] }.compact.uniq
+    teams_by_id = SportsTeamsStore.find_many(team_ids).each_with_object({}) { |t, h| h[t['id']] = t }
+    live_matches = live_matches.map { |m|
+      m.merge('home_team' => teams_by_id[m['home_team_id']], 'away_team' => teams_by_id[m['away_team_id']])
+    }
+
+    {
+      followed_teams: followed_teams, followed_leagues: followed_leagues, followed_players: followed_players,
+      live_matches: live_matches
+    }.to_json
+  end
+
+  get '/api/v1/sports/teams/:slug' do |slug|
+    team = SportsTeamsStore.find_by_slug(slug)
+    if team
+      league = SportsLeaguesStore.find(team['league_id'])
+      SportsEntityArticlesStore.refresh_for(kind: 'team', entity_id: team['id'], name: team['name'])
+      {
+        team: team, league: league,
+        standings: SportsStandingsStore.for_team(team['id']),
+        upcoming: SportsMatchesStore.upcoming_for_team(team['id'], limit: 8),
+        recent_finals: SportsMatchesStore.recent_finals_for_team(team['id'], limit: 6),
+        mentions: SportsEntityArticlesStore.for_entity(kind: 'team', entity_id: team['id'], limit: 20),
+        followed: SportsFollowsStore.follow?(api_user_id, 'team', slug)
+      }.to_json
+    else
+      catalog_team = SportsCatalog.find_team(slug)
+      halt 404, JSON.generate(error: 'not-found') unless catalog_team
+      {
+        team: catalog_team, league: nil, standings: nil, upcoming: [], recent_finals: [], mentions: [],
+        followed: SportsFollowsStore.follow?(api_user_id, 'team', slug)
+      }.to_json
+    end
+  end
+
+  get '/api/v1/sports/leagues/:slug' do |slug|
+    league = SportsLeaguesStore.find_by_slug(slug)
+    halt 404, JSON.generate(error: 'not-found') unless league
+
+    standings = SportsStandingsStore.for_league(league['id'])
+    upcoming = SportsMatchesStore.upcoming_for_league(league['id'], limit: 20)
+    recent_finals = if league['sport'] == 'tennis'
+                      SportsMatchesStore.finals_by_round_for_league(league['id'])
+                    else
+                      SportsMatchesStore.recent_finals_for_league(league['id'], limit: 12)
+                    end
+    team_ids = (standings.map { |r| r['team_id'] } + (upcoming + recent_finals).flat_map { |m| [m['home_team_id'], m['away_team_id']] }).compact.uniq
+    teams_by_id = SportsTeamsStore.find_many(team_ids).each_with_object({}) { |t, h| h[t['id']] = t }
+
+    {
+      league: league, standings: standings, upcoming: upcoming, recent_finals: recent_finals,
+      teams_by_id: teams_by_id,
+      followed: SportsFollowsStore.follow?(api_user_id, 'league', slug)
+    }.to_json
+  end
+
+  get '/api/v1/sports/players/:slug' do |slug|
+    player = SportsPlayersStore.find_by_slug(slug) || ensure_catalog_player_by_slug(slug)
+    halt 404, JSON.generate(error: 'not-found') unless player
+    SportsEntityArticlesStore.refresh_for(kind: 'player', entity_id: player['id'], name: player['full_name'])
+    {
+      player: player,
+      mentions: SportsEntityArticlesStore.for_entity(kind: 'player', entity_id: player['id'], limit: 30),
+      followed: SportsFollowsStore.follow?(api_user_id, 'player', slug)
+    }.to_json
+  end
+
+  post '/api/v1/sports/teams/follow' do
+    body = parse_json_body
+    slug = body.is_a?(Hash) ? body['slug'].to_s : ''
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    team = SportsTeamsStore.find_by_slug(slug) || ensure_catalog_team_in_db(slug)
+    halt 404, JSON.generate(error: 'not-found') unless team
+    SportsFollowsStore.add(user_id: api_user_id, kind: 'team', value: slug)
+    begin
+      SportsTeamFetchWorker.perform_async(team['id']) if team['source_provider'] == 'espn'
+    rescue StandardError => e
+      AppLogger.warn('team_follow_enqueue_failed', slug: slug, message: e.message)
+    end
+    { ok: true, slug: slug, followed: true }.to_json
+  end
+
+  delete '/api/v1/sports/teams/follow' do
+    slug = params['slug'].to_s
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    SportsFollowsStore.remove(user_id: api_user_id, kind: 'team', value: slug)
+    { ok: true, slug: slug, followed: false }.to_json
+  end
+
+  post '/api/v1/sports/leagues/follow' do
+    body = parse_json_body
+    slug = body.is_a?(Hash) ? body['slug'].to_s : ''
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    league = SportsLeaguesStore.find_by_slug(slug) || ensure_catalog_league_in_db(slug)
+    halt 404, JSON.generate(error: 'not-found') unless league
+    SportsFollowsStore.add(user_id: api_user_id, kind: 'league', value: slug)
+    { ok: true, slug: slug, followed: true }.to_json
+  end
+
+  delete '/api/v1/sports/leagues/follow' do
+    slug = params['slug'].to_s
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    SportsFollowsStore.remove(user_id: api_user_id, kind: 'league', value: slug)
+    { ok: true, slug: slug, followed: false }.to_json
+  end
+
+  post '/api/v1/sports/players/follow' do
+    body = parse_json_body
+    slug = body.is_a?(Hash) ? body['slug'].to_s : ''
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    halt 404, JSON.generate(error: 'not-found') unless SportsPlayersStore.find_by_slug(slug)
+    SportsFollowsStore.add(user_id: api_user_id, kind: 'player', value: slug)
+    { ok: true, slug: slug, followed: true }.to_json
+  end
+
+  delete '/api/v1/sports/players/follow' do
+    slug = params['slug'].to_s
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    SportsFollowsStore.remove(user_id: api_user_id, kind: 'player', value: slug)
+    { ok: true, slug: slug, followed: false }.to_json
+  end
+
   post '/api/feeds/catalog/add' do
     content_type :json
     url   = params['url'].to_s.strip
