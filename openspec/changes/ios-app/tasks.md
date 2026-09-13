@@ -143,8 +143,8 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 18. Phase 7 — Stocks (iOS)
 
-- [ ] 18.1 Stocks models (Quote, StockSearchResult)
-- [ ] 18.2 Search screen + symbol detail (quote, follow toggle, news via `ArticlesListView`-style list)
-- [ ] 18.3 Ticker view (followed symbols + major indices)
-- [ ] 18.4 Add a "Stocks" navigation entry point
-- [ ] 18.5 Verify in the Simulator against the local dev server
+- [x] 18.1 Stocks models — `StockQuote.swift` (StockQuote, StockDetail, StockSearchResult, TickerEntry)
+- [x] 18.2 Search screen + symbol detail — `StockSearchView.swift`, `StockDetailView.swift` (quote, follow toggle, news reusing `ArticleRow`)
+- [x] 18.3 Ticker view — `StocksHomeView.swift` (followed symbols + major indices)
+- [x] 18.4 Add a "Stocks" navigation entry point — `SidebarView.swift`'s "Browse" section
+- [x] 18.5 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders "Stocks" in the Browse section correctly (screenshot-confirmed)

@@ -236,6 +236,38 @@ final class APIClient {
         let _: FollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
     }
 
+    // MARK: - Phase 7: stocks
+
+    func searchStocks(query: String) async throws -> [StockSearchResult] {
+        let path = urlPath("/api/v1/stocks/search", query: ["q": query])
+        return try await request(path: path, method: "GET", authenticated: true)
+    }
+
+    func fetchStockDetail(symbol: String) async throws -> StockDetail {
+        try await request(path: "/api/v1/stocks/\(percentEncodedPathSegment(symbol))", method: "GET", authenticated: true)
+    }
+
+    func fetchStockNews(symbol: String) async throws -> [Article] {
+        try await request(path: "/api/v1/stocks/\(percentEncodedPathSegment(symbol))/news", method: "GET", authenticated: true)
+    }
+
+    func fetchStockTicker() async throws -> [TickerEntry] {
+        try await request(path: "/api/v1/stocks/ticker", method: "GET", authenticated: true)
+    }
+
+    private struct StockFollowResponse: Decodable { let ok: Bool; let followed: Bool }
+
+    func followStock(symbol: String, name: String? = nil) async throws {
+        var body: [String: Any] = ["symbol": symbol]
+        if let name { body["name"] = name }
+        let _: StockFollowResponse = try await request(path: "/api/v1/stocks/follow", method: "POST", jsonBody: body, authenticated: true)
+    }
+
+    func unfollowStock(symbol: String) async throws {
+        let path = urlPath("/api/v1/stocks/follow", query: ["symbol": symbol])
+        let _: StockFollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }
