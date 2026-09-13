@@ -6,7 +6,11 @@ struct ArticleDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let html = article.contentHtml, !html.isEmpty {
+                // WKWebView reports no intrinsic content size in SwiftUI —
+                // without an explicit frame it collapses to zero height and
+                // renders nothing, even though loadHTMLString succeeded.
                 ArticleContentView(html: html)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     Text(article.contentText ?? "")
