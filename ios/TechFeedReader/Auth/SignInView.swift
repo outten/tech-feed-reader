@@ -56,7 +56,7 @@ struct SignInView: View {
                 .padding(.bottom)
             }
             .sheet(isPresented: $showingSignUp) {
-                SafariSignUpView(url: AppConfig.signUpURL)
+                SafariView(url: AppConfig.signUpURL)
             }
         }
     }

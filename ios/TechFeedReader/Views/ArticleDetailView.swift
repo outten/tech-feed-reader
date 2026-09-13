@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ArticleDetailView: View {
     @State var article: Article
+    @State private var tappedLink: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -9,7 +10,7 @@ struct ArticleDetailView: View {
                 // WKWebView reports no intrinsic content size in SwiftUI —
                 // without an explicit frame it collapses to zero height and
                 // renders nothing, even though loadHTMLString succeeded.
-                ArticleContentView(html: html)
+                ArticleContentView(html: html) { url in tappedLink = url }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -20,6 +21,11 @@ struct ArticleDetailView: View {
         }
         .navigationTitle(article.title)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: Binding(get: { tappedLink != nil }, set: { if !$0 { tappedLink = nil } })) {
+            if let tappedLink {
+                SafariView(url: tappedLink)
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {

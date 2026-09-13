@@ -4,13 +4,26 @@ import WebKit
 /// Renders an article's server-scrubbed content_html (see
 /// app/articles_store.rb's content_scrubbed column — the server already
 /// sanitizes this before it ever reaches a client). Not the auth
-/// SafariSignUpView — this is a plain content renderer, no navigation
-/// or JS bridge involved.
+/// SafariView usage — this is a plain content renderer.
+///
+/// Links tapped inside the content are handed off via `onLinkTapped`
+/// rather than let the WKWebView navigate itself: an embedded web view
+/// following an arbitrary external link spins up new WebContent/GPU
+/// processes that this app isn't entitled for, producing a cascade of
+/// sandbox/process errors in the console (and a broken-looking page) —
+/// the fix is to never let it navigate away from the article at all.
 struct ArticleContentView: UIViewRepresentable {
     let html: String
+    let onLinkTapped: (URL) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onLinkTapped: onLinkTapped)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
-        WKWebView()
+        let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
+        return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
@@ -20,5 +33,28 @@ struct ArticleContentView: UIViewRepresentable {
         </head><body>\(html)</body></html>
         """
         webView.loadHTMLString(styled, baseURL: nil)
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        let onLinkTapped: (URL) -> Void
+
+        init(onLinkTapped: @escaping (URL) -> Void) {
+            self.onLinkTapped = onLinkTapped
+        }
+
+        func webView(
+            _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            // .other is the initial loadHTMLString call — allow it. Anything
+            // the user taps (.linkActivated) gets handed off instead of
+            // loaded in this same web view.
+            guard navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+            decisionHandler(.cancel)
+            onLinkTapped(url)
+        }
     }
 }
