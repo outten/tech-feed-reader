@@ -45,6 +45,8 @@ struct MainView: View {
                     PodcastsView()
                 case .youtube:
                     YouTubeChannelsView()
+                case .sports:
+                    SportsHomeView()
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

@@ -22,6 +22,7 @@ struct SidebarView: View {
             Section("Browse") {
                 Label("Podcasts", systemImage: "mic").tag(SidebarItem.podcasts)
                 Label("YouTube", systemImage: "play.rectangle").tag(SidebarItem.youtube)
+                Label("Sports", systemImage: "sportscourt").tag(SidebarItem.sports)
             }
             Section("Feeds") {
                 if let errorMessage {

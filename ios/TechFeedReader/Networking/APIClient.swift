@@ -174,6 +174,68 @@ final class APIClient {
         try await request(path: "/api/v1/youtube/channels", method: "GET", authenticated: true)
     }
 
+    // MARK: - Phase 6a: sports
+
+    func fetchSports() async throws -> [Sport] {
+        try await request(path: "/api/v1/sports", method: "GET", authenticated: true)
+    }
+
+    func fetchSportsLeagues(sport: String) async throws -> [SportsLeague] {
+        try await request(path: "/api/v1/sports/\(percentEncodedPathSegment(sport))/leagues", method: "GET", authenticated: true)
+    }
+
+    func fetchSportsTeams(sport: String, league: String) async throws -> [SportsTeam] {
+        try await request(
+            path: "/api/v1/sports/\(percentEncodedPathSegment(sport))/\(percentEncodedPathSegment(league))/teams",
+            method: "GET", authenticated: true
+        )
+    }
+
+    func fetchSportsOverview() async throws -> SportsOverview {
+        try await request(path: "/api/v1/sports/overview", method: "GET", authenticated: true)
+    }
+
+    func fetchSportsTeamDetail(slug: String) async throws -> SportsTeamDetail {
+        try await request(path: "/api/v1/sports/teams/\(percentEncodedPathSegment(slug))", method: "GET", authenticated: true)
+    }
+
+    func fetchSportsLeagueDetail(slug: String) async throws -> SportsLeagueDetail {
+        try await request(path: "/api/v1/sports/leagues/\(percentEncodedPathSegment(slug))", method: "GET", authenticated: true)
+    }
+
+    func fetchSportsPlayerDetail(slug: String) async throws -> SportsPlayerDetail {
+        try await request(path: "/api/v1/sports/players/\(percentEncodedPathSegment(slug))", method: "GET", authenticated: true)
+    }
+
+    private struct FollowResponse: Decodable { let ok: Bool; let followed: Bool }
+
+    func followSportsTeam(slug: String) async throws {
+        let _: FollowResponse = try await request(path: "/api/v1/sports/teams/follow", method: "POST", jsonBody: ["slug": slug], authenticated: true)
+    }
+
+    func unfollowSportsTeam(slug: String) async throws {
+        let path = urlPath("/api/v1/sports/teams/follow", query: ["slug": slug])
+        let _: FollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
+    }
+
+    func followSportsLeague(slug: String) async throws {
+        let _: FollowResponse = try await request(path: "/api/v1/sports/leagues/follow", method: "POST", jsonBody: ["slug": slug], authenticated: true)
+    }
+
+    func unfollowSportsLeague(slug: String) async throws {
+        let path = urlPath("/api/v1/sports/leagues/follow", query: ["slug": slug])
+        let _: FollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
+    }
+
+    func followSportsPlayer(slug: String) async throws {
+        let _: FollowResponse = try await request(path: "/api/v1/sports/players/follow", method: "POST", jsonBody: ["slug": slug], authenticated: true)
+    }
+
+    func unfollowSportsPlayer(slug: String) async throws {
+        let path = urlPath("/api/v1/sports/players/follow", query: ["slug": slug])
+        let _: FollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }

@@ -124,11 +124,11 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 16. Phase 6a — Sports (iOS)
 
-- [ ] 16.1 Sports models (Sport, League, Team, Player, Match, Standing — matching the new endpoints' JSON shapes)
-- [ ] 16.2 Catalog browse screens (sport list → league list → team list, follow toggle at each followable level)
-- [ ] 16.3 Team / League / Player detail screens (standings, upcoming, recent results, mentions — reusing `ArticleRow`/`ArticlesListView` patterns where the shape fits)
-- [ ] 16.4 Sports overview screen (followed teams/leagues/players + live matches)
-- [ ] 16.5 Add a "Sports" navigation entry point (sidebar)
-- [ ] 16.6 Verify in the Simulator against the local dev server
+- [x] 16.1 Sports models — `Sports.swift` (Sport, SportsLeague, SportsTeam, SportsMatch, SportsStanding, SportsPlayer + the three detail/overview response wrappers)
+- [x] 16.2 Catalog browse screens — `SportsBrowseView.swift` (sport list → league list); team-follow toggle lives inline in league detail rather than a separate team-list screen (see 16.3)
+- [x] 16.3 Team / League / Player detail screens — `SportsTeamDetailView.swift`, `SportsLeagueDetailView.swift` (merges standings/matches AND the league's teams-with-follow-toggle into one screen rather than a separate team-browse screen), `SportsPlayerDetailView.swift`
+- [x] 16.4 Sports overview screen — `SportsHomeView.swift` (followed teams/leagues/players + live matches)
+- [x] 16.5 Add a "Sports" navigation entry point — `SidebarView.swift`'s "Browse" section
+- [x] 16.6 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders "Sports" in the Browse section correctly (screenshot-confirmed)
 
 **Phase 6b (deferred, not yet tasked)**: tennis ATP/WTA rankings, Wikipedia league summaries, calendar/.ics surfacing — see design.md.

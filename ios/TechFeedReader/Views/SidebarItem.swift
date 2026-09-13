@@ -11,5 +11,6 @@ enum SidebarItem: Hashable {
     case muteRules
     case podcasts
     case youtube
+    case sports
     case feed(Feed)
 }
