@@ -17,5 +17,7 @@ enum SidebarItem: Hashable {
     case npr
     case pbs
     case radio
+    case triage
+    case digests
     case feed(Feed)
 }

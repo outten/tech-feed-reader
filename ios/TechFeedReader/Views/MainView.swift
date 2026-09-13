@@ -63,6 +63,10 @@ struct MainView: View {
                     }
                 case .radio:
                     RadioStationsView()
+                case .triage:
+                    TriageHomeView()
+                case .digests:
+                    DigestsHomeView()
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

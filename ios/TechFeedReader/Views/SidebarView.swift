@@ -29,6 +29,10 @@ struct SidebarView: View {
                 Label("PBS", systemImage: "tv").tag(SidebarItem.pbs)
                 Label("Radio", systemImage: "radio").tag(SidebarItem.radio)
             }
+            Section("AI") {
+                Label("Triage", systemImage: "checklist").tag(SidebarItem.triage)
+                Label("Digests", systemImage: "doc.text.below.ecg").tag(SidebarItem.digests)
+            }
             Section("Feeds") {
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red)

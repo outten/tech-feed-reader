@@ -173,7 +173,7 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 22. Phase 9 — AI features (iOS)
 
-- [ ] 22.1 Triage models + screen (recent runs list, run detail with must-read/optional/skip sections, trigger button)
-- [ ] 22.2 Digests models + screen (recent list, digest detail, generate button, summarize button)
-- [ ] 22.3 Add navigation entry points for Triage + Digests
-- [ ] 22.4 Verify in the Simulator against the local dev server
+- [x] 22.1 Triage models + screen — `Triage.swift`, `TriageHomeView.swift` (recent runs, trigger button), `TriageDetailView.swift` (must-read/optional/skip sections)
+- [x] 22.2 Digests models + screen — `Digest.swift`, `DigestsHomeView.swift` (recent list, generate button), `DigestDetailView.swift` (summarize button, cached summary display)
+- [x] 22.3 Add navigation entry points for Triage + Digests — `SidebarView.swift`'s new "AI" section
+- [x] 22.4 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders correctly against the real dev server (screenshot-confirmed). The sidebar has grown long enough (6 sections, ~20 items) to need scrolling on iPad — noted to the user as a UX consideration for a later pass, not a defect.

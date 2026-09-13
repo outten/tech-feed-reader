@@ -286,6 +286,38 @@ final class APIClient {
         let _: RadioFollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
     }
 
+    // MARK: - Phase 9: triage, digests
+
+    func fetchTriageRuns() async throws -> [TriageSummary] {
+        try await request(path: "/api/v1/triage", method: "GET", authenticated: true)
+    }
+
+    func fetchTriageDetail(id: Int) async throws -> TriageDetail {
+        try await request(path: "/api/v1/triage/\(id)", method: "GET", authenticated: true)
+    }
+
+    func runTriage(topic: String? = nil) async throws -> TriageRunResult {
+        var body: [String: Any] = [:]
+        if let topic { body["topic"] = topic }
+        return try await request(path: "/api/v1/triage", method: "POST", jsonBody: body, authenticated: true)
+    }
+
+    func fetchDigests() async throws -> [DigestSummary] {
+        try await request(path: "/api/v1/digests", method: "GET", authenticated: true)
+    }
+
+    func fetchDigestDetail(id: Int) async throws -> DigestDetail {
+        try await request(path: "/api/v1/digests/\(id)", method: "GET", authenticated: true)
+    }
+
+    func generateDigest() async throws -> DigestDetail {
+        try await request(path: "/api/v1/digests", method: "POST", jsonBody: [:], authenticated: true)
+    }
+
+    func summarizeDigest(id: Int) async throws -> DigestDetail {
+        try await request(path: "/api/v1/digests/\(id)/summarize", method: "POST", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }
