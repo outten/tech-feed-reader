@@ -76,3 +76,22 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 10.4 Topics screen — `TopicsListView.swift` (list topics → `ArticlesListView` filtered by topic term)
 - [x] 10.5 Add navigation entry points for Bookmarks/Search/Tags/Topics — `SidebarView.swift`'s new "Library" section, above the existing "Feeds" section; `MainView.swift`'s detail switches on the new `SidebarItem` enum
 - [x] 10.6 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders Library + Feeds sections correctly (screenshot-confirmed with real subscribed feeds). Tapping through each of the four new screens is a human-at-the-Simulator step, same as prior manual-verification tasks.
+
+## 11. Phase 4a — Feed discovery & management (backend)
+
+- [x] 11.1 Add `GET /api/v1/feed_catalog` (wraps `FeedCatalog.by_category` + `FeedCatalog::CATEGORIES` for labels)
+- [x] 11.2 Add `GET /api/v1/feed_catalog/recommended` (wraps `FeedCatalog.recommend_for`)
+- [x] 11.3 Add `GET /api/v1/feeds/popular?type=` (wraps `FeedsStore.popular_by_type`)
+- [x] 11.4 Add `GET /api/v1/mute_rules`, `POST /api/v1/mute_rules`, `DELETE /api/v1/mute_rules` (wraps `MuteRulesStore`)
+- [x] 11.5 Request specs covering the scenarios in `specs/mobile-feed-discovery/spec.md` — 6 new examples in `spec/mobile_api_spec.rb`, full suite 1773/0
+
+## 12. Phase 4a — Feed discovery & management (iOS)
+
+- [ ] 12.1 Catalog browse screen (categories → feeds → tap to subscribe)
+- [ ] 12.2 "Recommended for you" section on the catalog screen
+- [ ] 12.3 Popular-by-type charts (small section, e.g. on the catalog screen or Feeds sidebar)
+- [ ] 12.4 Mute rules screen (list + add + remove, by kind)
+- [ ] 12.5 Add navigation entry point(s) for catalog browse + mute rules
+- [ ] 12.6 Verify in the Simulator against the local dev server
+
+**Phase 4b (deferred, not yet tasked)**: AI feed recommender, OPML import/export — see design.md.

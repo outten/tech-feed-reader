@@ -17,7 +17,8 @@ Tech Feed Reader is currently a responsive web app only (`SPEC.md` explicitly li
 ### New Capabilities
 - `mobile-api`: Token-authenticated JSON API (feeds, subscriptions, articles, read-state) plus passkey-based token issuance for native clients, built alongside the existing cookie-session web auth without changing it.
 - `ios-app`: Native SwiftUI iPhone/iPad client (login, sign-up, feed/article reading) living under `ios/`, buildable and runnable locally via Xcode against a local or production API.
-- `mobile-reading-parity`: Phase 3 — bookmarks, search, tags, topics, and read-state filters, extending `mobile-api` and the iOS app's existing Feeds/Articles screens. Later phases (feed discovery, Podcasts/YouTube, Sports, Stocks, misc content, AI features, account management) are roadmapped in `design.md` but not yet specced — each gets its own capability spec when its phase starts.
+- `mobile-reading-parity`: Phase 3 — bookmarks, search, tags, topics, and read-state filters, extending `mobile-api` and the iOS app's existing Feeds/Articles screens.
+- `mobile-feed-discovery`: Phase 4a — curated catalog browse, recommended-for-you feeds, popular-by-type charts, and mute rules (keyword/author/feed). Phase 4b (AI feed recommender, OPML import/export) is deferred within the same phase — see design.md. Later phases (Podcasts/YouTube, Sports, Stocks, misc content, AI features, account management) are roadmapped in `design.md` but not yet specced — each gets its own capability spec when its phase starts.
 
 ### Modified Capabilities
 (none — no existing openspec-tracked spec has changing requirements; the only existing spec, `ticker-api`, is unrelated and untouched)

@@ -3940,6 +3940,55 @@ class TechFeedReader < Sinatra::Base
     { ok: true }.to_json
   end
 
+  # Phase 4a (mobile-feed-discovery) — catalog browse, recommendations,
+  # popular charts, mute rules. Same store calls the web /feeds page +
+  # Manage nav already use.
+  get '/api/v1/feed_catalog' do
+    FeedCatalog.by_category.map { |category, feeds|
+      {
+        category: category,
+        label: FeedCatalog::CATEGORIES[category],
+        feeds: feeds.map { |f| f.slice(:url, :title, :blurb) }
+      }
+    }.to_json
+  end
+
+  get '/api/v1/feed_catalog/recommended' do
+    subscribed_urls = FeedsStore.for_user(api_user_id).map { |f| f['url'] }
+    FeedCatalog.recommend_for(subscribed_urls: subscribed_urls).to_json
+  end
+
+  get '/api/v1/feeds/popular' do
+    type = params['type'].to_s
+    halt 400, JSON.generate(error: 'invalid-type') unless FeedsStore::POPULAR_TYPES.include?(type)
+    FeedsStore.popular_by_type(type).to_json
+  end
+
+  get '/api/v1/mute_rules' do
+    MuteRulesStore.all(api_user_id).to_json
+  end
+
+  post '/api/v1/mute_rules' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    begin
+      inserted = MuteRulesStore.add(user_id: api_user_id, kind: body['kind'].to_s, value: body['value'].to_s)
+    rescue ArgumentError => e
+      halt 422, JSON.generate(error: 'invalid-rule', message: e.message)
+    end
+    status inserted ? 201 : 200
+    { ok: true }.to_json
+  end
+
+  delete '/api/v1/mute_rules' do
+    begin
+      removed = MuteRulesStore.remove(user_id: api_user_id, kind: params['kind'].to_s, value: params['value'].to_s)
+    rescue ArgumentError => e
+      halt 422, JSON.generate(error: 'invalid-rule', message: e.message)
+    end
+    { ok: true, removed: removed }.to_json
+  end
+
   post '/api/feeds/catalog/add' do
     content_type :json
     url   = params['url'].to_s.strip

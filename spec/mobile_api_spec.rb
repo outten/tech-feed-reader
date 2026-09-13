@@ -7,6 +7,8 @@ require_relative '../app/feeds_store'
 require_relative '../app/articles_store'
 require_relative '../app/read_state_store'
 require_relative '../app/webauthn_credentials_store'
+require_relative '../app/feed_catalog'
+require_relative '../app/mute_rules_store'
 
 # ios-app change — mobile JSON API (openspec/changes/ios-app/specs/mobile-api).
 # Covers native-client token issuance from the existing WebAuthn ceremonies
@@ -206,6 +208,61 @@ RSpec.describe 'Mobile API' do
       expect(last_response.status).to eq(200)
       articles = JSON.parse(last_response.body)
       expect(articles.map { |a| a['uid'] }).to include('art-1')
+    end
+  end
+
+  describe 'feed discovery (Phase 4a)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/feed_catalog groups the catalog by category with labels' do
+      get '/api/v1/feed_catalog', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      groups = JSON.parse(last_response.body)
+      aggregator = groups.find { |g| g['category'] == 'aggregator' }
+      expect(aggregator['label']).to eq('Aggregators')
+      expect(aggregator['feeds'].map { |f| f['url'] }).to include('https://news.ycombinator.com/rss')
+    end
+
+    it 'GET /api/v1/feed_catalog/recommended scores against current subscriptions' do
+      FeedsStore.add_for_user(user_id: user['id'], url: 'https://lobste.rs/rss', title: 'Lobsters')
+      get '/api/v1/feed_catalog/recommended', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      recommended = JSON.parse(last_response.body)
+      expect(recommended.map { |f| f['url'] }).not_to include('https://lobste.rs/rss')
+    end
+
+    it 'GET /api/v1/feed_catalog/recommended returns an empty array cold-start' do
+      get '/api/v1/feed_catalog/recommended', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq([])
+    end
+
+    it 'GET /api/v1/feeds/popular?type=news returns an array' do
+      get '/api/v1/feeds/popular', { type: 'news' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to be_an(Array)
+    end
+
+    it 'GET /api/v1/feeds/popular rejects an invalid type' do
+      get '/api/v1/feeds/popular', { type: 'bogus' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(400)
+    end
+
+    it 'mute rules: add, list, remove' do
+      post '/api/v1/mute_rules', { kind: 'keyword', value: 'crypto' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(201)
+
+      get '/api/v1/mute_rules', {}, auth_header(result['api_token'])
+      rules = JSON.parse(last_response.body)
+      expect(rules.map { |r| [r['kind'], r['value']] }).to include(['keyword', 'crypto'])
+
+      delete '/api/v1/mute_rules', { kind: 'keyword', value: 'crypto' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+
+      get '/api/v1/mute_rules', {}, auth_header(result['api_token'])
+      expect(JSON.parse(last_response.body)).to be_empty
     end
   end
 
