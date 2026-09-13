@@ -3850,13 +3850,20 @@ class TechFeedReader < Sinatra::Base
 
   API_V1_ARTICLES_PER_PAGE = 50
   get '/api/v1/articles' do
-    page     = [params['page'].to_i, 1].max
-    offset   = (page - 1) * API_V1_ARTICLES_PER_PAGE
-    feed_id  = params['feed_id'].to_i
-    articles = if feed_id.positive?
-                 ArticlesStore.for_feed(api_user_id, feed_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset)
+    page    = [params['page'].to_i, 1].max
+    offset  = (page - 1) * API_V1_ARTICLES_PER_PAGE
+    feed_id = params['feed_id'].to_i
+    tag_id  = params['tag_id'].to_i
+
+    state = params['state'].to_s.to_sym
+    state = :all unless ARTICLES_STATE_FILTERS.include?(state)
+
+    articles = if tag_id.positive?
+                 ArticlesStore.for_tag(api_user_id, tag_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
+               elsif feed_id.positive?
+                 ArticlesStore.for_feed(api_user_id, feed_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
                else
-                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset)
+                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
                end
     articles.to_json
   end
@@ -3865,6 +3872,26 @@ class TechFeedReader < Sinatra::Base
     article = ArticlesStore.find_by_uid(uid)
     halt 404, JSON.generate(error: 'not-found') unless article
     article.merge(ReadStateStore.get(api_user_id, article['id'])).to_json
+  end
+
+  # Phase 3 (mobile-reading-parity) — search, tags, topics. Same
+  # store calls the web /search, /tags, /topics routes already use.
+  get '/api/v1/search' do
+    query = params['q'].to_s.strip
+    return [].to_json if query.empty?
+    ArticlesStore.search(api_user_id, query, limit: API_V1_ARTICLES_PER_PAGE).to_json
+  end
+
+  get '/api/v1/tags' do
+    TagsStore.all(api_user_id).to_json
+  end
+
+  get '/api/v1/topics' do
+    TopicClusters.recent.to_json
+  end
+
+  get '/api/v1/topics/:term' do |term|
+    ArticlesStore.for_topic(api_user_id, term, limit: API_V1_ARTICLES_PER_PAGE).to_json
   end
 
   post '/api/v1/subscriptions' do

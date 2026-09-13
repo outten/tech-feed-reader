@@ -63,6 +63,23 @@ The user deferred Associated Domains setup (production domain + Apple Team ID we
 - Add Associated Domains + AASA (original group 3 tasks).
 - Replace the `SFSafariViewController` sign-up hand-off and add native login via `ASAuthorizationPlatformPublicKeyCredentialProvider` (original tasks 5.1/5.2), so passkeys sync natively between web and iOS as originally designed.
 
+## Feature-parity roadmap (Phases 3+, added post-launch)
+
+Once Phase 1 shipped (feeds + articles + recovery-code auth), the user asked for the iOS app to eventually do "the same things as the production web app" — which has a lot more surface area than Phase 1 covered. Rather than one undifferentiated pile of tasks, the remaining web functionality is broken into phases ordered by how directly they extend the reading experience already built, cheapest/most-reused-backend-logic first. Every phase reuses existing store modules (`TagsStore`, `ArticlesStore.search`, `TopicClusters`, `FeedCatalog`, etc.) through new thin `/api/v1/*` endpoints — the same pattern Phase 1 established — so backend work per phase is small; the iOS-side work (new screens) is the bulk of each phase.
+
+- **Phase 3 — Reading experience parity** (bookmarks, search, tags, topics, read/unread/archived filters). Directly extends the Feeds/Articles screens already built; no new content types. **This is the phase being implemented now** — see `specs/mobile-reading-parity/spec.md`.
+- **Phase 4 — Feed discovery & management**: curated catalog browse + categories, "recommended for you", AI feed recommender (Claude), popular-feeds charts, mute rules (keyword/author/feed), OPML import/export. Maps to the web's `/feeds` page + Manage ▾ nav.
+- **Phase 5 — Podcasts & YouTube**: dedicated browse screens, YouTube channel grid + embedded video, podcast mini-player. The two highest-traffic "Browse ▾" content types.
+- **Phase 6 — Sports**: leagues/teams/players follow, standings, calendar, match-specific articles. Large and structurally distinct (its own schema on the backend) — kept as its own phase rather than folded into "misc content."
+- **Phase 7 — Stocks**: symbol search/follow, quotes, ticker bar, per-symbol news.
+- **Phase 8 — Misc Browse content**: Comics, Games (Sudoku/Trivia), Radio, NPR, PBS — smaller, thinner wrappers grouped together.
+- **Phase 9 — AI features**: Triage (Claude classifies unread into must-read/optional/skip), Digests (daily digest + Claude summary).
+- **Phase 10 — Account management**: display name edit, recovery-code regeneration (in-app UI — today this is a dev script, not an app screen), delete account. Passkey list/add/revoke waits on Phase 2 (Associated Domains) since "add a passkey" is itself a registration ceremony.
+- **Chat widget — open question, not yet phased.** The web app's per-article Claude chat is page-context-driven in a way that may not translate directly to a mobile IA; whether/how to bring it to iOS is deferred until the phases above are further along.
+- **Admin (`/admin/*`) is explicitly out of scope for the iOS app** — it's an operator-only surface (Basic Auth gated, separate from user auth entirely), not part of "what a user does with their account."
+
+Each phase gets its own `specs/<capability>/spec.md` and `tasks.md` section when work on it starts, rather than speccing all ~8 phases in full detail upfront — the roadmap above is the durable plan; the detail is filled in phase-by-phase so specs don't go stale waiting for their turn.
+
 ## Risks / Trade-offs
 
 - **Associated Domains complexity for local testing** → mitigated by recovery-code fallback for day-to-day local dev; full passkey ceremony verified against a staging/production-like domain before release.

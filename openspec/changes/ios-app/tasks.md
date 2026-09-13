@@ -59,3 +59,20 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 - [x] 8.1 Update `SPEC.md` to remove/revise the "Mobile-native app — responsive web only" non-goal — struck both non-goal mentions, added a "Native iOS app" subsection under Scope evolution
 - [x] 8.2 Add a `STUFF.md` entry for this change per existing changelog convention — #115, left `[ ]` (in progress, not shipped) per the Phase 1/2 split
+
+## 9. Phase 3 — Reading experience parity (backend)
+
+- [x] 9.1 Add `state` query param (`unread`/`bookmarked`/`archived`/`all`) to `GET /api/v1/articles`, reusing `ArticlesStore.recent`/`.for_feed`'s existing `state:` filter
+- [x] 9.2 Add `GET /api/v1/search` (wraps `ArticlesStore.search`)
+- [x] 9.3 Add `GET /api/v1/tags` (wraps `TagsStore.all`) and `tag_id` filter on `GET /api/v1/articles` (wraps `ArticlesStore.for_tag`)
+- [x] 9.4 Add `GET /api/v1/topics` (wraps `TopicClusters.recent`) and `GET /api/v1/topics/:term` (wraps `ArticlesStore.for_topic`)
+- [x] 9.5 Request specs covering the scenarios in `specs/mobile-reading-parity/spec.md` — 8 new examples in `spec/mobile_api_spec.rb`, full suite 1767/0
+
+## 10. Phase 3 — Reading experience parity (iOS)
+
+- [ ] 10.1 Bookmarks screen (reuses the article-list UI already built, sourced from `state=bookmarked`)
+- [ ] 10.2 Search screen (search field + results list)
+- [ ] 10.3 Tags screen (list tags → tap to filter articles)
+- [ ] 10.4 Topics screen (list topics → tap to filter articles)
+- [ ] 10.5 Add navigation entry points for Bookmarks/Search/Tags/Topics alongside the existing Feeds sidebar
+- [ ] 10.6 Manually verify all four in the Simulator against the local dev server

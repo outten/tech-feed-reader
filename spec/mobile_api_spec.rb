@@ -148,6 +148,65 @@ RSpec.describe 'Mobile API' do
       expect(last_response.status).to eq(200)
       expect(FeedsStore.for_user(user['id'])).to be_empty
     end
+
+    it 'GET /api/v1/articles?state=bookmarked filters to bookmarked articles' do
+      ReadStateStore.mark_bookmarked(user['id'], article['id'], value: true)
+      get '/api/v1/articles', { state: 'bookmarked' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to eq(['art-1'])
+    end
+
+    it 'GET /api/v1/articles?state=unread excludes read articles' do
+      ReadStateStore.mark_read(user['id'], article['id'], read: true)
+      get '/api/v1/articles', { state: 'unread' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).not_to include('art-1')
+    end
+
+    it 'GET /api/v1/search returns matching articles' do
+      get '/api/v1/search', { q: 'Hello' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to include('art-1')
+    end
+
+    it 'GET /api/v1/search with no q returns an empty array' do
+      get '/api/v1/search', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq([])
+    end
+
+    it 'GET /api/v1/tags lists the user\'s tags' do
+      TagsStore.add(user_id: user['id'], name: 'Ruby', match_kind: 'keyword', match_value: 'ruby')
+      get '/api/v1/tags', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      tags = JSON.parse(last_response.body)
+      expect(tags.map { |t| t['name'] }).to eq(['Ruby'])
+    end
+
+    it 'GET /api/v1/articles?tag_id filters to tagged articles' do
+      tag = TagsStore.add(user_id: user['id'], name: 'Ruby', match_kind: 'keyword', match_value: 'ruby')
+      TagsStore.tag_article(article['id'], tag['id'])
+      get '/api/v1/articles', { tag_id: tag['id'] }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to eq(['art-1'])
+    end
+
+    it 'GET /api/v1/topics returns an array' do
+      get '/api/v1/topics', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to be_an(Array)
+    end
+
+    it 'GET /api/v1/topics/:term returns matching articles' do
+      get '/api/v1/topics/Hello', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to include('art-1')
+    end
   end
 
   describe 'DELETE /api/v1/session' do

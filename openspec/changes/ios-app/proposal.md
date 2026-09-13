@@ -9,6 +9,7 @@ Tech Feed Reader is currently a responsive web app only (`SPEC.md` explicitly li
 - Add a new token-authenticated JSON API (`/api/v1/...`) exposing feeds, subscriptions, articles, and read-state, since **no general JSON API exists today** — only the WebAuthn ceremony endpoints are JSON. The web app's cookie-session HTML routes are untouched.
 - Support running the iOS app locally against a local dev server (`make run`/`make serve` on `http://localhost:4567`) for development, in addition to pointing at production.
 - Revise `SPEC.md`'s "Mobile-native app — responsive web only" non-goal, since it's being directly reversed by this change.
+- **Grow the iOS app toward full feature parity with the web app, in phases** (Phase 3 onward — see `design.md` → "Feature-parity roadmap"). Phase 3, specced and built as part of this update: bookmarks, full-text search, tag browsing, topic browsing, and read/unread/archived filters on the article list — the reading-experience features that don't require a new content type or backend subsystem.
 - **BREAKING**: none — all changes are additive (new directory, new API namespace, new entitlements/config). No existing web routes, sessions, or HTML behavior change.
 
 ## Capabilities
@@ -16,6 +17,7 @@ Tech Feed Reader is currently a responsive web app only (`SPEC.md` explicitly li
 ### New Capabilities
 - `mobile-api`: Token-authenticated JSON API (feeds, subscriptions, articles, read-state) plus passkey-based token issuance for native clients, built alongside the existing cookie-session web auth without changing it.
 - `ios-app`: Native SwiftUI iPhone/iPad client (login, sign-up, feed/article reading) living under `ios/`, buildable and runnable locally via Xcode against a local or production API.
+- `mobile-reading-parity`: Phase 3 — bookmarks, search, tags, topics, and read-state filters, extending `mobile-api` and the iOS app's existing Feeds/Articles screens. Later phases (feed discovery, Podcasts/YouTube, Sports, Stocks, misc content, AI features, account management) are roadmapped in `design.md` but not yet specced — each gets its own capability spec when its phase starts.
 
 ### Modified Capabilities
 (none — no existing openspec-tracked spec has changing requirements; the only existing spec, `ticker-api`, is unrelated and untouched)
