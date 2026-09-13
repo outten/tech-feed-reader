@@ -70,12 +70,13 @@ final class APIClient {
     }
 
     /// `state`: "unread" | "bookmarked" | "archived" | "all" (server default) — see mobile-reading-parity spec.
-    func fetchArticles(feedId: Int? = nil, tagId: Int? = nil, state: String? = nil, page: Int = 1) async throws -> [Article] {
+    func fetchArticles(feedId: Int? = nil, tagId: Int? = nil, state: String? = nil, topic: String? = nil, page: Int = 1) async throws -> [Article] {
         let path = urlPath("/api/v1/articles", query: [
             "page": String(page),
             "feed_id": feedId.map(String.init),
             "tag_id": tagId.map(String.init),
-            "state": state
+            "state": state,
+            "topic": topic
         ])
         return try await request(path: path, method: "GET", authenticated: true)
     }
@@ -266,6 +267,23 @@ final class APIClient {
     func unfollowStock(symbol: String) async throws {
         let path = urlPath("/api/v1/stocks/follow", query: ["symbol": symbol])
         let _: StockFollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
+    }
+
+    // MARK: - Phase 8a: radio
+
+    func fetchRadioStations() async throws -> RadioStationsResponse {
+        try await request(path: "/api/v1/radio/stations", method: "GET", authenticated: true)
+    }
+
+    private struct RadioFollowResponse: Decodable { let ok: Bool; let followed: Bool }
+
+    func followRadioStation(id: Int) async throws {
+        let _: RadioFollowResponse = try await request(path: "/api/v1/radio/follow", method: "POST", jsonBody: ["station_id": id], authenticated: true)
+    }
+
+    func unfollowRadioStation(id: Int) async throws {
+        let path = urlPath("/api/v1/radio/follow", query: ["station_id": String(id)])
+        let _: RadioFollowResponse = try await request(path: path, method: "DELETE", authenticated: true)
     }
 
     // MARK: - Core request plumbing

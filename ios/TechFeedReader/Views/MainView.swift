@@ -49,6 +49,20 @@ struct MainView: View {
                     SportsHomeView()
                 case .stocks:
                     StocksHomeView()
+                case .comics:
+                    ArticlesListView(title: "Comics", emptyTitle: "No Comics Yet") {
+                        try await APIClient.shared.fetchArticles(topic: "humor")
+                    }
+                case .npr:
+                    ArticlesListView(title: "NPR", emptyTitle: "No NPR Articles Yet") {
+                        try await APIClient.shared.fetchArticles(topic: "npr")
+                    }
+                case .pbs:
+                    ArticlesListView(title: "PBS", emptyTitle: "No PBS Articles Yet") {
+                        try await APIClient.shared.fetchArticles(topic: "pbs")
+                    }
+                case .radio:
+                    RadioStationsView()
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

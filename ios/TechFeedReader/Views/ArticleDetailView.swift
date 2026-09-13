@@ -38,12 +38,12 @@ struct ArticleDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if article.isPodcastEpisode {
+                if let playable = PlayableItem(article: article) {
                     Button {
-                        if audioPlayer.currentArticle?.uid == article.uid {
+                        if audioPlayer.currentItem?.id == playable.id {
                             audioPlayer.togglePlayPause()
                         } else {
-                            audioPlayer.play(article)
+                            audioPlayer.play(playable)
                         }
                     } label: {
                         Image(systemName: isCurrentlyPlaying ? "pause.fill" : "play.fill")
@@ -65,7 +65,7 @@ struct ArticleDetailView: View {
     }
 
     private var isCurrentlyPlaying: Bool {
-        audioPlayer.currentArticle?.uid == article.uid && audioPlayer.isPlaying
+        audioPlayer.currentItem?.id == article.uid && audioPlayer.isPlaying
     }
 
     private func markRead() async {

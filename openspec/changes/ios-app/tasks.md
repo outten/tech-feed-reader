@@ -157,10 +157,10 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 20. Phase 8a — Misc content (iOS)
 
-- [ ] 20.1 Comics / NPR / PBS screens (topic-filtered `ArticlesListView`, reusing the existing component — three thin call sites, not three new views)
-- [ ] 20.2 Radio station catalog screen (grouped list, follow toggle, tap to play)
-- [ ] 20.3 Generalize `AudioPlayerViewModel`/`MiniPlayerView` to play a plain stream URL + title (not just a podcast `Article`)
-- [ ] 20.4 Add navigation entry points for Comics, NPR, PBS, Radio
-- [ ] 20.5 Verify in the Simulator against the local dev server
+- [x] 20.1 Comics / NPR / PBS screens — three thin `ArticlesListView(topic:)` call sites in `MainView.swift`, not three new view files
+- [x] 20.2 Radio station catalog screen — `RadioStationsView.swift` (grouped list, follow toggle, tap to play)
+- [x] 20.3 Generalize `AudioPlayerViewModel`/`MiniPlayerView` to play a plain stream URL + title — introduced `PlayableItem` (article-or-station), `currentArticle` → `currentItem`; `MiniPlayerView` shows an indeterminate indicator instead of a stuck-at-0% bar when duration is unknown (radio)
+- [x] 20.4 Add navigation entry points for Comics, NPR, PBS, Radio — `SidebarView.swift`'s "Browse" section
+- [x] 20.5 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders all four new entries correctly (screenshot-confirmed)
 
 **Phase 8b (deferred, not yet tasked)**: Sudoku/Trivia games, radio AI recommendations — see design.md.

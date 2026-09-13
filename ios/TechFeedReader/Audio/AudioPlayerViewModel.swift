@@ -1,13 +1,39 @@
 import Foundation
 import AVFoundation
 
+/// Anything the shared player can play — a podcast episode (Article)
+/// or a radio station (a live stream with no known duration). `id`
+/// distinguishes "already playing this" from "switch to something new".
+struct PlayableItem: Equatable {
+    let id: String
+    let title: String
+    let url: URL
+    let durationSeconds: Int?
+
+    init?(article: Article) {
+        guard let urlString = article.audioUrl, let url = URL(string: urlString) else { return nil }
+        self.id = article.uid
+        self.title = article.title
+        self.url = url
+        self.durationSeconds = article.audioDurationSeconds
+    }
+
+    init?(radioStation: RadioStation) {
+        guard let url = URL(string: radioStation.streamUrl) else { return nil }
+        self.id = "radio-\(radioStation.id)"
+        self.title = radioStation.name
+        self.url = url
+        self.durationSeconds = nil
+    }
+}
+
 /// Held at the app root (RootView), above the navigation stack, so
 /// playback survives navigating between screens — the native
 /// equivalent of the web app's persistent mini-player surviving Turbo
-/// navigations. A single AVPlayer for the one episode playing at a time.
+/// navigations. A single AVPlayer for the one item playing at a time.
 @MainActor
 final class AudioPlayerViewModel: ObservableObject {
-    @Published private(set) var currentArticle: Article?
+    @Published private(set) var currentItem: PlayableItem?
     @Published private(set) var isPlaying = false
     @Published private(set) var currentTime: Double = 0
     @Published private(set) var duration: Double = 0
@@ -19,21 +45,18 @@ final class AudioPlayerViewModel: ObservableObject {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
     }
 
-    func play(_ article: Article) {
-        guard let urlString = article.audioUrl, let url = URL(string: urlString) else { return }
-
-        if currentArticle?.uid == article.uid, player != nil {
+    func play(_ item: PlayableItem) {
+        if currentItem?.id == item.id, player != nil {
             player?.play()
             isPlaying = true
             return
         }
 
         removeTimeObserver()
-        let item = AVPlayerItem(url: url)
-        let newPlayer = AVPlayer(playerItem: item)
+        let newPlayer = AVPlayer(playerItem: AVPlayerItem(url: item.url))
         player = newPlayer
-        currentArticle = article
-        duration = Double(article.audioDurationSeconds ?? 0)
+        currentItem = item
+        duration = Double(item.durationSeconds ?? 0)
 
         timeObserver = newPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 1), queue: .main) { [weak self] time in
             self?.currentTime = time.seconds
@@ -58,7 +81,7 @@ final class AudioPlayerViewModel: ObservableObject {
         player?.pause()
         removeTimeObserver()
         player = nil
-        currentArticle = nil
+        currentItem = nil
         isPlaying = false
         currentTime = 0
         duration = 0

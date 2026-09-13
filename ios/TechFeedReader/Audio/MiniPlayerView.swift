@@ -8,12 +8,18 @@ struct MiniPlayerView: View {
     @ObservedObject var player: AudioPlayerViewModel
 
     var body: some View {
-        if let article = player.currentArticle {
+        if let item = player.currentItem {
             VStack(spacing: 4) {
-                ProgressView(value: player.duration > 0 ? player.currentTime / player.duration : 0)
-                    .tint(.accentColor)
+                // Radio streams have no known duration — show an
+                // indeterminate style instead of a 0%-stuck bar.
+                if player.duration > 0 {
+                    ProgressView(value: player.currentTime / player.duration)
+                        .tint(.accentColor)
+                } else {
+                    ProgressView().tint(.accentColor)
+                }
                 HStack {
-                    Text(article.title)
+                    Text(item.title)
                         .font(.subheadline)
                         .lineLimit(1)
                     Spacer()

@@ -24,6 +24,10 @@ struct SidebarView: View {
                 Label("YouTube", systemImage: "play.rectangle").tag(SidebarItem.youtube)
                 Label("Sports", systemImage: "sportscourt").tag(SidebarItem.sports)
                 Label("Stocks", systemImage: "chart.line.uptrend.xyaxis").tag(SidebarItem.stocks)
+                Label("Comics", systemImage: "photo.on.rectangle").tag(SidebarItem.comics)
+                Label("NPR", systemImage: "antenna.radiowaves.left.and.right").tag(SidebarItem.npr)
+                Label("PBS", systemImage: "tv").tag(SidebarItem.pbs)
+                Label("Radio", systemImage: "radio").tag(SidebarItem.radio)
             }
             Section("Feeds") {
                 if let errorMessage {
