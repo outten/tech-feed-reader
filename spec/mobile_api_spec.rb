@@ -20,6 +20,8 @@ require_relative '../app/stock_follows_store'
 require_relative '../app/stock_quotes_store'
 require_relative '../app/stock_quote_provider'
 require_relative '../app/stock_news_feed'
+require_relative '../app/radio_catalog'
+require_relative '../app/radio_store'
 
 # ios-app change — mobile JSON API (openspec/changes/ios-app/specs/mobile-api).
 # Covers native-client token issuance from the existing WebAuthn ceremonies
@@ -512,6 +514,58 @@ RSpec.describe 'Mobile API' do
       expect(last_response.status).to eq(200)
       sparklines = JSON.parse(last_response.body)
       expect(sparklines).to have_key('SPY')
+    end
+  end
+
+  describe 'misc content (Phase 8a)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/articles?topic filters to that topic' do
+      humor_feed = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/comic.xml', title: 'A Comic', topic: 'humor').first
+      other_feed = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/other.xml', title: 'Other').first
+      ArticlesStore.import(feed_id: humor_feed['id'], entries: [{
+        uid: 'comic-1', title: 'Panel', url: 'https://example.com/panel1',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      ArticlesStore.import(feed_id: other_feed['id'], entries: [{
+        uid: 'other-1', title: 'Not a comic', url: 'https://example.com/other1',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+
+      get '/api/v1/articles', { topic: 'humor' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to eq(['comic-1'])
+    end
+
+    it 'GET /api/v1/radio/stations lists the catalog grouped, with followed_ids' do
+      get '/api/v1/radio/stations', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['groups']).not_to be_empty
+      expect(body['groups'].first).to have_key('stations')
+      expect(body['followed_ids']).to eq([])
+    end
+
+    it 'follows and unfollows a radio station' do
+      RadioStore.seed_catalog!
+      station = RadioStore.all_stations.first
+
+      post '/api/v1/radio/follow', { station_id: station['id'] }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(RadioStore.following?(user['id'], station['id'])).to be true
+
+      delete '/api/v1/radio/follow', { station_id: station['id'] }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(RadioStore.following?(user['id'], station['id'])).to be false
+    end
+
+    it 'POST /api/v1/radio/follow 404s for an unknown station_id' do
+      post '/api/v1/radio/follow', { station_id: 999_999 }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(404)
     end
   end
 

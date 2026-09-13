@@ -3857,13 +3857,17 @@ class TechFeedReader < Sinatra::Base
 
     state = params['state'].to_s.to_sym
     state = :all unless ARTICLES_STATE_FILTERS.include?(state)
+    topic = params['topic'].to_s
+    topic = nil if topic.empty?
 
     articles = if tag_id.positive?
                  ArticlesStore.for_tag(api_user_id, tag_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
                elsif feed_id.positive?
                  ArticlesStore.for_feed(api_user_id, feed_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
                else
-                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
+                 # topic (Phase 8a — Comics/NPR/PBS) only applies here, matching
+                 # the web /comics, /npr, /pbs routes' use of ArticlesStore.recent.
+                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state, topic: topic)
                end
     articles.to_json
   end
@@ -4258,6 +4262,28 @@ class TechFeedReader < Sinatra::Base
     end
 
     { ok: true, symbol: symbol, followed: false }.to_json
+  end
+
+  # Phase 8a (mobile-misc-content) — radio station catalog + follow.
+  get '/api/v1/radio/stations' do
+    RadioStore.seed_catalog!
+    groups = RadioStore.stations_by_group.map { |group, stations| { group: group, stations: stations } }
+    followed_ids = RadioStore.followed_stations(api_user_id).map { |s| s['id'] }
+    { groups: groups, followed_ids: followed_ids }.to_json
+  end
+
+  post '/api/v1/radio/follow' do
+    body = parse_json_body
+    station_id = body.is_a?(Hash) ? body['station_id'].to_i : 0
+    halt 404, JSON.generate(error: 'not-found') unless RadioStore.find(station_id)
+    RadioStore.follow!(api_user_id, station_id)
+    { ok: true, station_id: station_id, followed: true }.to_json
+  end
+
+  delete '/api/v1/radio/follow' do
+    station_id = params['station_id'].to_i
+    RadioStore.unfollow!(api_user_id, station_id)
+    { ok: true, station_id: station_id, followed: false }.to_json
   end
 
   post '/api/feeds/catalog/add' do

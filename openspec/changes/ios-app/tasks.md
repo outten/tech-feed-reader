@@ -148,3 +148,19 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 18.3 Ticker view — `StocksHomeView.swift` (followed symbols + major indices)
 - [x] 18.4 Add a "Stocks" navigation entry point — `SidebarView.swift`'s "Browse" section
 - [x] 18.5 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders "Stocks" in the Browse section correctly (screenshot-confirmed)
+
+## 19. Phase 8a — Misc content (backend)
+
+- [x] 19.1 Add `topic` query param to `GET /api/v1/articles` (wraps `ArticlesStore.recent`'s existing `topic:` kwarg)
+- [x] 19.2 Add `GET /api/v1/radio/stations` (wraps `RadioStore.stations_by_group` + `.followed_stations`) and `POST`/`DELETE /api/v1/radio/follow` (wraps `RadioStore.follow!`/`.unfollow!`)
+- [x] 19.3 Request specs covering the scenarios in `specs/mobile-misc-content/spec.md` — 4 new examples in `spec/mobile_api_spec.rb`, full suite 1800/0
+
+## 20. Phase 8a — Misc content (iOS)
+
+- [ ] 20.1 Comics / NPR / PBS screens (topic-filtered `ArticlesListView`, reusing the existing component — three thin call sites, not three new views)
+- [ ] 20.2 Radio station catalog screen (grouped list, follow toggle, tap to play)
+- [ ] 20.3 Generalize `AudioPlayerViewModel`/`MiniPlayerView` to play a plain stream URL + title (not just a podcast `Article`)
+- [ ] 20.4 Add navigation entry points for Comics, NPR, PBS, Radio
+- [ ] 20.5 Verify in the Simulator against the local dev server
+
+**Phase 8b (deferred, not yet tasked)**: Sudoku/Trivia games, radio AI recommendations — see design.md.
