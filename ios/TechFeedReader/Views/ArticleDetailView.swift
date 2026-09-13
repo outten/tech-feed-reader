@@ -3,10 +3,20 @@ import SwiftUI
 struct ArticleDetailView: View {
     @State var article: Article
     @State private var tappedLink: URL?
+    @EnvironmentObject var audioPlayer: AudioPlayerViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let html = article.contentHtml, !html.isEmpty {
+        Group {
+            if let embedURL = article.youtubeEmbedURL {
+                VStack(spacing: 0) {
+                    YouTubePlayerView(embedURL: embedURL)
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                    ScrollView {
+                        Text(article.contentText ?? "")
+                            .padding()
+                    }
+                }
+            } else if let html = article.contentHtml, !html.isEmpty {
                 // WKWebView reports no intrinsic content size in SwiftUI —
                 // without an explicit frame it collapses to zero height and
                 // renders nothing, even though loadHTMLString succeeded.
@@ -28,6 +38,17 @@ struct ArticleDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                if article.isPodcastEpisode {
+                    Button {
+                        if audioPlayer.currentArticle?.uid == article.uid {
+                            audioPlayer.togglePlayPause()
+                        } else {
+                            audioPlayer.play(article)
+                        }
+                    } label: {
+                        Image(systemName: isCurrentlyPlaying ? "pause.fill" : "play.fill")
+                    }
+                }
                 Button {
                     Task { await toggleBookmarked() }
                 } label: {
@@ -41,6 +62,10 @@ struct ArticleDetailView: View {
             }
         }
         .task { await markRead() }
+    }
+
+    private var isCurrentlyPlaying: Bool {
+        audioPlayer.currentArticle?.uid == article.uid && audioPlayer.isPlaying
     }
 
     private func markRead() async {

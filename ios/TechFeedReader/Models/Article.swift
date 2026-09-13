@@ -12,6 +12,13 @@ struct Article: Identifiable, Codable, Hashable {
     let contentText: String?
     let imageUrl: String?
 
+    // Podcast enclosure — nil for a plain article.
+    let audioUrl: String?
+    let audioMimeType: String?
+    let audioDurationSeconds: Int?
+
+    var isPodcastEpisode: Bool { audioUrl != nil }
+
     // read_state columns — 0/1 from the Postgres LEFT JOIN. `var` so the
     // detail view can flip them optimistically after a successful API call
     // without reconstructing the whole struct.

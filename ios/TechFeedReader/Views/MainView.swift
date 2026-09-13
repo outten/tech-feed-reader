@@ -41,6 +41,10 @@ struct MainView: View {
                     CatalogView()
                 case .muteRules:
                     MuteRulesView()
+                case .podcasts:
+                    PodcastsView()
+                case .youtube:
+                    YouTubeChannelsView()
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

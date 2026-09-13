@@ -9,5 +9,7 @@ enum SidebarItem: Hashable {
     case topics
     case discoverFeeds
     case muteRules
+    case podcasts
+    case youtube
     case feed(Feed)
 }

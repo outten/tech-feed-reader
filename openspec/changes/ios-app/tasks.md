@@ -104,12 +104,12 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 14. Phase 5 — Podcasts & YouTube (iOS)
 
-- [ ] 14.1 Add `audioUrl`/`audioMimeType`/`audioDurationSeconds` to the `Article` model (backend already returns them; only the client-side model needs updating)
-- [ ] 14.2 Podcasts screen (feed list → episode list, reusing `ArticlesListView`)
-- [ ] 14.3 Shared `AudioPlayerViewModel` (native `AVPlayer`) held above the navigation stack + a persistent mini-player bar
-- [ ] 14.4 Wire episode playback (play button in article detail + mini-player) to the shared player
-- [ ] 14.5 Background audio playback capability (`UIBackgroundModes: [audio]`) so playback survives backgrounding, matching the web mini-player's "survives navigation"
-- [ ] 14.6 YouTube channels screen (channel list → video list, reusing `ArticlesListView`)
-- [ ] 14.7 YouTube embed player in article detail (client-side video-ID extraction, mirrors `youtube_video_id`/`youtube_embed_url` in `app/main.rb`) shown instead of the plain content renderer for YouTube articles
-- [ ] 14.8 Add navigation entry points for Podcasts + YouTube
-- [ ] 14.9 Verify in the Simulator against the local dev server
+- [x] 14.1 Add `audioUrl`/`audioMimeType`/`audioDurationSeconds` to the `Article` model (backend already returns them; only the client-side model needed updating)
+- [x] 14.2 Podcasts screen — `PodcastsView.swift` (feed list → episode list, reusing `ArticlesListView`)
+- [x] 14.3 Shared `AudioPlayerViewModel` (native `AVPlayer`) — held at `TechFeedReaderApp`/`RootView`, above `MainView`'s `NavigationSplitView`, + `MiniPlayerView` bar
+- [x] 14.4 Wire episode playback (play/pause button in article detail toolbar + mini-player) to the shared player
+- [x] 14.5 Background audio playback capability (`UIBackgroundModes: [audio]` in both Info.plist fragments) so playback survives backgrounding
+- [x] 14.6 YouTube channels screen — `YouTubeChannelsView.swift` (channel list → video list, reusing `ArticlesListView`)
+- [x] 14.7 YouTube embed player — `YouTubePlayerView.swift` + `Article+YouTube.swift` (client-side video-ID extraction mirroring `youtube_video_id`/`youtube_embed_url`), shown above the description instead of the plain content renderer for YouTube articles
+- [x] 14.8 Add navigation entry points for Podcasts + YouTube — `SidebarView.swift`'s new "Browse" section
+- [x] 14.9 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders the new "Browse" section correctly (screenshot-confirmed)

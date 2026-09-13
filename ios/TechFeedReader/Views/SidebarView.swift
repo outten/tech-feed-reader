@@ -19,6 +19,10 @@ struct SidebarView: View {
                 Label("Tags", systemImage: "tag").tag(SidebarItem.tags)
                 Label("Topics", systemImage: "square.grid.2x2").tag(SidebarItem.topics)
             }
+            Section("Browse") {
+                Label("Podcasts", systemImage: "mic").tag(SidebarItem.podcasts)
+                Label("YouTube", systemImage: "play.rectangle").tag(SidebarItem.youtube)
+            }
             Section("Feeds") {
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red)

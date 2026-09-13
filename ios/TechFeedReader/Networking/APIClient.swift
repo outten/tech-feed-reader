@@ -164,6 +164,16 @@ final class APIClient {
         let _: EmptyResponse = try await request(path: path, method: "DELETE", authenticated: true)
     }
 
+    // MARK: - Phase 5: podcasts, YouTube
+
+    func fetchPodcastFeeds() async throws -> [PodcastFeed] {
+        try await request(path: "/api/v1/podcasts", method: "GET", authenticated: true)
+    }
+
+    func fetchYouTubeChannels() async throws -> [YouTubeChannel] {
+        try await request(path: "/api/v1/youtube/channels", method: "GET", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }
