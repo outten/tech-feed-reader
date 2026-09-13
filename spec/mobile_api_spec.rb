@@ -16,6 +16,10 @@ require_relative '../app/sports_matches_store'
 require_relative '../app/sports_standings_store'
 require_relative '../app/sports_players_store'
 require_relative '../app/sports_follows_store'
+require_relative '../app/stock_follows_store'
+require_relative '../app/stock_quotes_store'
+require_relative '../app/stock_quote_provider'
+require_relative '../app/stock_news_feed'
 
 # ios-app change — mobile JSON API (openspec/changes/ios-app/specs/mobile-api).
 # Covers native-client token issuance from the existing WebAuthn ceremonies
@@ -438,6 +442,76 @@ RSpec.describe 'Mobile API' do
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
       expect(body['followed_teams'].map { |t| t['slug'] }).to eq(['eagles'])
+    end
+  end
+
+  describe 'stocks (Phase 7)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/stocks/search returns an array (provider unavailable in test env)' do
+      get '/api/v1/stocks/search', { q: 'apple' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq([])
+    end
+
+    it 'GET /api/v1/stocks/:symbol returns a cached quote when fresh' do
+      StockQuotesStore.upsert(symbol: 'AAPL', name: 'Apple Inc', price: 150.0)
+      get '/api/v1/stocks/AAPL', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['quote']['name']).to eq('Apple Inc')
+      expect(body['followed']).to be false
+    end
+
+    it 'GET /api/v1/stocks/:symbol returns quote: nil when uncached and provider unavailable' do
+      get '/api/v1/stocks/ZZZZ', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)['quote']).to be_nil
+    end
+
+    it 'follows a symbol, subscribing its news feed' do
+      post '/api/v1/stocks/follow', { symbol: 'aapl', name: 'Apple Inc' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to include('symbol' => 'AAPL', 'followed' => true)
+      expect(StockFollowsStore.follow?(user['id'], 'AAPL')).to be true
+
+      feed = FeedsStore.find_by_url(StockNewsFeed.url_for('AAPL'))
+      expect(feed).not_to be_nil
+      expect(FeedsStore.subscribed?(user['id'], feed['id'])).to be true
+    end
+
+    it 'unfollows a symbol, unsubscribing its news feed' do
+      StockFollowsStore.add(user_id: user['id'], symbol: 'AAPL')
+      feed = StockNewsFeed.ensure_feed!('AAPL')
+      FeedsStore.subscribe(user['id'], feed['id'])
+
+      delete '/api/v1/stocks/follow', { symbol: 'AAPL' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(StockFollowsStore.follow?(user['id'], 'AAPL')).to be false
+      expect(FeedsStore.subscribed?(user['id'], feed['id'])).to be false
+    end
+
+    it 'GET /api/v1/stocks/ticker includes major indices even when uncached' do
+      get '/api/v1/stocks/ticker', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      ticker = JSON.parse(last_response.body)
+      expect(ticker.map { |t| t['symbol'] }).to include('SPY')
+    end
+
+    it 'GET /api/v1/stocks/ticker includes followed symbols' do
+      StockFollowsStore.add(user_id: user['id'], symbol: 'AAPL', name: 'Apple Inc')
+      get '/api/v1/stocks/ticker', {}, auth_header(result['api_token'])
+      ticker = JSON.parse(last_response.body)
+      expect(ticker.map { |t| t['symbol'] }).to include('AAPL')
+    end
+
+    it 'GET /api/v1/stocks/sparklines returns an object keyed by index symbol' do
+      get '/api/v1/stocks/sparklines', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      sparklines = JSON.parse(last_response.body)
+      expect(sparklines).to have_key('SPY')
     end
   end
 

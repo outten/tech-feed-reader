@@ -4166,6 +4166,100 @@ class TechFeedReader < Sinatra::Base
     { ok: true, slug: slug, followed: false }.to_json
   end
 
+  # Phase 7 (mobile-stocks) — search, quote detail, news, follow,
+  # ticker, sparklines. Same store calls the web /stocks/* routes
+  # already use; ticker_quotes itself is cookie-session-only
+  # (checks signed_in?), so this reimplements its small body against
+  # api_user_id instead of calling it directly.
+  get '/api/v1/stocks/search' do
+    StockQuoteProvider.search(params['q'].to_s).to_json
+  end
+
+  # Literal-path routes must come before the /:symbol wildcard below —
+  # Sinatra matches routes in definition order, so /:symbol would
+  # otherwise swallow /ticker and /sparklines with symbol="ticker" etc.
+  get '/api/v1/stocks/ticker' do
+    followed      = StockFollowsStore.all(api_user_id)
+    followed_syms = followed.map { |r| r['symbol'] }
+    indices       = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
+    ordered       = (followed_syms + indices).uniq
+    by_sym        = StockQuotesStore.find_many(ordered).each_with_object({}) { |q, h| h[q['symbol']] = q }
+    followed_by_sym = followed.each_with_object({}) { |r, h| h[r['symbol']] = r }
+    index_by_sym  = StockQuoteProvider::MAJOR_INDICES.each_with_object({}) { |i, h| h[i[:symbol]] = i }
+
+    ordered.filter_map { |s|
+      by_sym[s] ||
+        (followed_by_sym[s] && { 'symbol' => s, 'name' => followed_by_sym[s]['name'] }) ||
+        (index_by_sym[s] && { 'symbol' => s, 'name' => index_by_sym[s][:name] })
+    }.to_json
+  end
+
+  get '/api/v1/stocks/sparklines' do
+    StockQuoteProvider.sparklines_for_indices.to_json
+  end
+
+  get '/api/v1/stocks/:symbol' do |symbol|
+    symbol = symbol.to_s.upcase
+    StockQuoteProvider.fetch_and_cache(symbol) if StockQuotesStore.stale?(symbol, max_age_seconds: 300)
+    quote = StockQuotesStore.find(symbol)
+    { quote: quote, followed: StockFollowsStore.follow?(api_user_id, symbol) }.to_json
+  end
+
+  get '/api/v1/stocks/:symbol/news' do |symbol|
+    symbol = symbol.to_s.upcase
+    feed = StockNewsFeed.ensure_feed!(symbol)
+    if stock_news_stale?(feed)
+      begin
+        FeedRefreshWorker.perform_async(feed['id'])
+      rescue StandardError => e
+        AppLogger.warn('stock_news_refresh_enqueue_failed', symbol: symbol, message: e.message)
+      end
+    end
+    ArticlesStore.recent_for_feed(api_user_id, feed['id'], limit: 12).to_json
+  end
+
+  post '/api/v1/stocks/follow' do
+    body = parse_json_body
+    symbol = body.is_a?(Hash) ? body['symbol'].to_s.strip.upcase : ''
+    halt 400, JSON.generate(error: 'symbol required') if symbol.empty?
+    name = body['name'].to_s.strip
+    name = nil if name.empty?
+
+    StockFollowsStore.add(user_id: api_user_id, symbol: symbol, name: name)
+
+    begin
+      feed = StockNewsFeed.ensure_feed!(symbol, name)
+      FeedsStore.subscribe(api_user_id, feed['id'])
+      FeedRefreshWorker.perform_async(feed['id'])
+    rescue StandardError => e
+      AppLogger.warn('stock_news_subscribe_failed', symbol: symbol, message: e.message)
+    end
+
+    begin
+      require_relative 'workers/stock_quote_fetch_worker'
+      StockQuoteFetchWorker.perform_async(symbol)
+    rescue StandardError => e
+      AppLogger.warn('stock_follow_enqueue_failed', symbol: symbol, message: e.message)
+    end
+
+    { ok: true, symbol: symbol, followed: true }.to_json
+  end
+
+  delete '/api/v1/stocks/follow' do
+    symbol = params['symbol'].to_s.strip.upcase
+    halt 400, JSON.generate(error: 'symbol required') if symbol.empty?
+    StockFollowsStore.remove(user_id: api_user_id, symbol: symbol)
+
+    begin
+      feed = FeedsStore.find_by_url(StockNewsFeed.url_for(symbol))
+      FeedsStore.unsubscribe(api_user_id, feed['id']) if feed
+    rescue StandardError => e
+      AppLogger.warn('stock_news_unsubscribe_failed', symbol: symbol, message: e.message)
+    end
+
+    { ok: true, symbol: symbol, followed: false }.to_json
+  end
+
   post '/api/feeds/catalog/add' do
     content_type :json
     url   = params['url'].to_s.strip

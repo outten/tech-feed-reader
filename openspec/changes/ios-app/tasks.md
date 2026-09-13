@@ -132,3 +132,19 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 16.6 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders "Sports" in the Browse section correctly (screenshot-confirmed)
 
 **Phase 6b (deferred, not yet tasked)**: tennis ATP/WTA rankings, Wikipedia league summaries, calendar/.ics surfacing — see design.md.
+
+## 17. Phase 7 — Stocks (backend)
+
+- [x] 17.1 Add `GET /api/v1/stocks/search` (wraps `StockQuoteProvider.search`)
+- [x] 17.2 Add `GET /api/v1/stocks/:symbol` (quote + follow state, refreshing via `StockQuoteProvider.fetch_and_cache` if stale) and `GET /api/v1/stocks/:symbol/news`
+- [x] 17.3 Add `POST`/`DELETE /api/v1/stocks/follow` (mirrors the web route's news-feed subscribe + eager-fetch behavior, not just the follow row)
+- [x] 17.4 Add `GET /api/v1/stocks/ticker` and `GET /api/v1/stocks/sparklines` — defined *before* the `/:symbol` wildcard route (Sinatra matches route definitions in order; the wildcard would otherwise swallow them)
+- [x] 17.5 Request specs covering the scenarios in `specs/mobile-stocks/spec.md` — 8 new examples in `spec/mobile_api_spec.rb`, full suite 1796/0
+
+## 18. Phase 7 — Stocks (iOS)
+
+- [ ] 18.1 Stocks models (Quote, StockSearchResult)
+- [ ] 18.2 Search screen + symbol detail (quote, follow toggle, news via `ArticlesListView`-style list)
+- [ ] 18.3 Ticker view (followed symbols + major indices)
+- [ ] 18.4 Add a "Stocks" navigation entry point
+- [ ] 18.5 Verify in the Simulator against the local dev server
