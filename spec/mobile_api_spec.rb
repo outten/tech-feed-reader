@@ -22,6 +22,11 @@ require_relative '../app/stock_quote_provider'
 require_relative '../app/stock_news_feed'
 require_relative '../app/radio_catalog'
 require_relative '../app/radio_store'
+require_relative '../app/triage/claude'
+require_relative '../app/triage_store'
+require_relative '../app/digest_store'
+require_relative '../app/digests'
+require_relative '../app/llm_guard'
 
 # ios-app change — mobile JSON API (openspec/changes/ios-app/specs/mobile-api).
 # Covers native-client token issuance from the existing WebAuthn ceremonies
@@ -566,6 +571,102 @@ RSpec.describe 'Mobile API' do
       post '/api/v1/radio/follow', { station_id: 999_999 }.to_json,
            auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
       expect(last_response.status).to eq(404)
+    end
+  end
+
+  describe 'AI features (Phase 9)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    def triage_result(status: :ok)
+      Triage::Claude::Result.new(
+        status: status,
+        must_read: [{ 'uid' => 'art-1', 'rationale' => 'important' }],
+        optional: [], skip: [],
+        raw: nil, model: 'claude-sonnet-4-6', latency_ms: 100,
+        input_tokens: 500, output_tokens: 200, error: nil,
+        unread_count: 1, topic: nil
+      )
+    end
+
+    describe 'triage' do
+      it 'GET /api/v1/triage lists recent runs' do
+        TriageStore.create(user['id'], triage_result)
+        get '/api/v1/triage', {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).length).to eq(1)
+      end
+
+      it 'GET /api/v1/triage/:id resolves each entry to its full article' do
+        feed = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml').first
+        ArticlesStore.import(feed_id: feed['id'], entries: [{
+          uid: 'art-1', title: 'Important News', url: 'https://example.com/1',
+          author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+        }])
+        id = TriageStore.create(user['id'], triage_result)
+
+        get "/api/v1/triage/#{id}", {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body['must_read'].first['article']['title']).to eq('Important News')
+      end
+
+      it 'GET /api/v1/triage/:id 404s for an unknown id' do
+        get '/api/v1/triage/999999', {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(404)
+      end
+
+      it 'POST /api/v1/triage returns :unavailable when no ANTHROPIC_API_KEY is set' do
+        ENV.delete('ANTHROPIC_API_KEY')
+        post '/api/v1/triage', {}.to_json, auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)['status']).to eq('unavailable')
+      end
+
+      it 'POST /api/v1/triage 429s when LLM_ENABLED=false' do
+        ENV['LLM_ENABLED'] = 'false'
+        post '/api/v1/triage', {}.to_json, auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+        expect(last_response.status).to eq(429)
+      ensure
+        ENV.delete('LLM_ENABLED')
+      end
+    end
+
+    describe 'digests' do
+      it 'GET /api/v1/digests lists recent digests' do
+        Digests.generate_and_store!(user['id'])
+        get '/api/v1/digests', {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).length).to eq(1)
+      end
+
+      it 'GET /api/v1/digests/:id 404s for an unknown id' do
+        get '/api/v1/digests/999999', {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(404)
+      end
+
+      it 'POST /api/v1/digests generates and stores a new digest' do
+        post '/api/v1/digests', {}.to_json, auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body['subject']).not_to be_nil
+        expect(DigestStore.count(user['id'])).to eq(1)
+      end
+
+      it 'POST /api/v1/digests/:id/summarize 422s when Claude is unavailable' do
+        ENV.delete('ANTHROPIC_API_KEY')
+        id, = Digests.generate_and_store!(user['id'])
+        post "/api/v1/digests/#{id}/summarize", {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(422)
+      end
+
+      it 'POST /api/v1/digests/:id/summarize returns the cached summary on a second call' do
+        id, = Digests.generate_and_store!(user['id'])
+        DigestStore.update_llm_summary(user['id'], id, summary: 'Already summarized.', model: 'claude-sonnet-4-6')
+        post "/api/v1/digests/#{id}/summarize", {}, auth_header(result['api_token'])
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)['llm_summary']).to eq('Already summarized.')
+      end
     end
   end
 

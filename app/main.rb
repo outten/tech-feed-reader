@@ -4286,6 +4286,91 @@ class TechFeedReader < Sinatra::Base
     { ok: true, station_id: station_id, followed: false }.to_json
   end
 
+  # Phase 9 (mobile-ai-features) — triage + digests. Both gated by the
+  # same LlmGuard budget check the web /triage + /digests routes use;
+  # a denial is a real 429 here rather than the web's redirect-with-
+  # error-query-param (there's no page to redirect to on mobile).
+  get '/api/v1/triage' do
+    topic = sanitize_topic_filter(params['topic'])
+    TriageStore.recent(api_user_id, limit: 20, topic: topic || :any).to_json
+  end
+
+  get '/api/v1/triage/:id' do |id|
+    row = TriageStore.find(api_user_id, id)
+    halt 404, JSON.generate(error: 'not-found') unless row
+    %w[must_read optional skip].each do |key|
+      row[key] = row[key].map { |entry| entry.merge('article' => ArticlesStore.find_by_uid(entry['uid'])) }
+    end
+    row.to_json
+  end
+
+  post '/api/v1/triage' do
+    body  = parse_json_body
+    topic = sanitize_topic_filter(body.is_a?(Hash) ? body['topic'] : nil)
+
+    guard = LlmGuard.check(user_id: api_user_id)
+    halt 429, JSON.generate(error: 'llm-quota', message: guard.message) if guard.denied?
+
+    result = Triage::Claude.run(api_user_id, topic: topic)
+    if result.status == :ok && result.input_tokens
+      LlmUsageStore.record!(user_id: api_user_id, route: '/api/v1/triage',
+                            model: result.model, input_tokens: result.input_tokens, output_tokens: result.output_tokens)
+    end
+    id = TriageStore.create(api_user_id, result) if result.status != :unavailable
+    row = id ? TriageStore.find(api_user_id, id) : nil
+    if row
+      %w[must_read optional skip].each do |key|
+        row[key] = row[key].map { |entry| entry.merge('article' => ArticlesStore.find_by_uid(entry['uid'])) }
+      end
+    end
+    { status: result.status, id: id, triage: row }.to_json
+  end
+
+  get '/api/v1/digests' do
+    DigestStore.recent(api_user_id, limit: 100).to_json
+  end
+
+  get '/api/v1/digests/:id' do |id|
+    digest = DigestStore.find(api_user_id, id)
+    halt 404, JSON.generate(error: 'not-found') unless digest
+    digest.to_json
+  end
+
+  post '/api/v1/digests' do
+    body   = parse_json_body
+    window = body.is_a?(Hash) && body['window_hours'].to_s.match?(/\A\d+\z/) ? body['window_hours'].to_i : Digests::DEFAULT_WINDOW_HOURS
+    limit  = body.is_a?(Hash) && body['limit'].to_s.match?(/\A\d+\z/) ? body['limit'].to_i : Digests::DEFAULT_LIMIT
+    id, = Digests.generate_and_store!(api_user_id, window_hours: window.clamp(1, 720), limit: limit.clamp(1, 200))
+    DigestStore.find(api_user_id, id).to_json
+  end
+
+  post '/api/v1/digests/:id/summarize' do |id|
+    digest = DigestStore.find(api_user_id, id)
+    halt 404, JSON.generate(error: 'not-found') unless digest
+
+    if digest['llm_summary'].to_s.strip != ''
+      next digest.to_json
+    end
+
+    guard = LlmGuard.check(user_id: api_user_id)
+    halt 429, JSON.generate(error: 'llm-quota', message: guard.message) if guard.denied?
+
+    result = Summarizer::Claude.summarize_digest(subject: digest['subject'], text_body: digest['text_body'])
+    case result.status
+    when :ok
+      DigestStore.update_llm_summary(api_user_id, id, summary: result.text, model: result.model)
+      LlmUsageStore.record!(user_id: api_user_id, route: '/api/v1/digests/:id/summarize',
+                            model: result.model, input_tokens: result.input_tokens, output_tokens: result.output_tokens)
+      DigestStore.find(api_user_id, id).to_json
+    when :unavailable
+      halt 422, JSON.generate(error: 'llm-unavailable')
+    when :empty
+      halt 422, JSON.generate(error: 'empty-content')
+    else
+      halt 500, JSON.generate(error: 'llm-failed', message: result.error.to_s)
+    end
+  end
+
   post '/api/feeds/catalog/add' do
     content_type :json
     url   = params['url'].to_s.strip

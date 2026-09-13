@@ -164,3 +164,16 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 20.5 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders all four new entries correctly (screenshot-confirmed)
 
 **Phase 8b (deferred, not yet tasked)**: Sudoku/Trivia games, radio AI recommendations — see design.md.
+
+## 21. Phase 9 — AI features (backend)
+
+- [x] 21.1 Add `GET /api/v1/triage`, `GET /api/v1/triage/:id` (each must-read/optional/skip entry resolved to its full article, not a separate uid→article map), `POST /api/v1/triage` (gated by `LlmGuard`, HTTP 429 on denial)
+- [x] 21.2 Add `GET /api/v1/digests`, `GET /api/v1/digests/:id`, `POST /api/v1/digests`, `POST /api/v1/digests/:id/summarize` (gated by `LlmGuard`, cached — a second call doesn't re-spend tokens)
+- [x] 21.3 Request specs covering the scenarios in `specs/mobile-ai-features/spec.md` — 10 new examples in `spec/mobile_api_spec.rb`, full suite 1810/0
+
+## 22. Phase 9 — AI features (iOS)
+
+- [ ] 22.1 Triage models + screen (recent runs list, run detail with must-read/optional/skip sections, trigger button)
+- [ ] 22.2 Digests models + screen (recent list, digest detail, generate button, summarize button)
+- [ ] 22.3 Add navigation entry points for Triage + Digests
+- [ ] 22.4 Verify in the Simulator against the local dev server
