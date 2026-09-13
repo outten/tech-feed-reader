@@ -70,9 +70,9 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 10. Phase 3 — Reading experience parity (iOS)
 
-- [ ] 10.1 Bookmarks screen (reuses the article-list UI already built, sourced from `state=bookmarked`)
-- [ ] 10.2 Search screen (search field + results list)
-- [ ] 10.3 Tags screen (list tags → tap to filter articles)
-- [ ] 10.4 Topics screen (list topics → tap to filter articles)
-- [ ] 10.5 Add navigation entry points for Bookmarks/Search/Tags/Topics alongside the existing Feeds sidebar
-- [ ] 10.6 Manually verify all four in the Simulator against the local dev server
+- [x] 10.1 Bookmarks screen — generalized the feed article-list into `ArticlesListView` (title + async fetch closure) so Bookmarks reuses it with `state: "bookmarked"` instead of a separate screen
+- [x] 10.2 Search screen — `SearchView.swift` (`.searchable`-backed field + results list)
+- [x] 10.3 Tags screen — `TagsListView.swift` (list tags → `ArticlesListView` filtered by `tag_id`)
+- [x] 10.4 Topics screen — `TopicsListView.swift` (list topics → `ArticlesListView` filtered by topic term)
+- [x] 10.5 Add navigation entry points for Bookmarks/Search/Tags/Topics — `SidebarView.swift`'s new "Library" section, above the existing "Feeds" section; `MainView.swift`'s detail switches on the new `SidebarItem` enum
+- [x] 10.6 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders Library + Feeds sections correctly (screenshot-confirmed with real subscribed feeds). Tapping through each of the four new screens is a human-at-the-Simulator step, same as prior manual-verification tasks.

@@ -1,7 +1,10 @@
 import SwiftUI
 
-struct FeedListView: View {
-    @Binding var selectedFeed: Feed?
+/// The sidebar column of MainView's NavigationSplitView: a fixed
+/// "Library" section (Bookmarks/Search/Tags/Topics — Phase 3) above the
+/// user's subscribed feeds (Phase 1).
+struct SidebarView: View {
+    @Binding var selection: SidebarItem?
     @State private var feeds: [Feed] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -9,17 +12,25 @@ struct FeedListView: View {
     @State private var newFeedURL = ""
 
     var body: some View {
-        List(selection: $selectedFeed) {
-            if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red)
+        List(selection: $selection) {
+            Section("Library") {
+                Label("Bookmarks", systemImage: "bookmark").tag(SidebarItem.bookmarks)
+                Label("Search", systemImage: "magnifyingglass").tag(SidebarItem.search)
+                Label("Tags", systemImage: "tag").tag(SidebarItem.tags)
+                Label("Topics", systemImage: "square.grid.2x2").tag(SidebarItem.topics)
             }
-            ForEach(feeds) { feed in
-                Text(feed.title ?? feed.url)
-                    .tag(feed)
+            Section("Feeds") {
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
+                }
+                ForEach(feeds) { feed in
+                    Text(feed.title ?? feed.url)
+                        .tag(SidebarItem.feed(feed))
+                }
+                .onDelete(perform: unsubscribe)
             }
-            .onDelete(perform: unsubscribe)
         }
-        .navigationTitle("Feeds")
+        .navigationTitle("Tech Feed Reader")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -31,9 +42,6 @@ struct FeedListView: View {
         }
         .overlay {
             if isLoading && feeds.isEmpty { ProgressView() }
-            if !isLoading && feeds.isEmpty && errorMessage == nil {
-                ContentUnavailableView("No Feeds Yet", systemImage: "tray")
-            }
         }
         .refreshable { await loadFeeds() }
         .task { await loadFeeds() }

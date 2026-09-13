@@ -14,9 +14,10 @@ enum APIError: Error, LocalizedError {
     }
 }
 
-/// Talks to the mobile JSON API (openspec/changes/ios-app/specs/mobile-api).
-/// Auth is a bearer token from the Keychain — no cookies involved, so this
-/// is fully independent of the web app's session-based auth.
+/// Talks to the mobile JSON API (openspec/changes/ios-app/specs/mobile-api,
+/// specs/mobile-reading-parity). Auth is a bearer token from the Keychain —
+/// no cookies involved, so this is fully independent of the web app's
+/// session-based auth.
 final class APIClient {
     static let shared = APIClient()
 
@@ -68,14 +69,19 @@ final class APIClient {
         try await request(path: "/api/v1/feeds", method: "GET", authenticated: true)
     }
 
-    func fetchArticles(feedId: Int?, page: Int = 1) async throws -> [Article] {
-        var path = "/api/v1/articles?page=\(page)"
-        if let feedId { path += "&feed_id=\(feedId)" }
+    /// `state`: "unread" | "bookmarked" | "archived" | "all" (server default) — see mobile-reading-parity spec.
+    func fetchArticles(feedId: Int? = nil, tagId: Int? = nil, state: String? = nil, page: Int = 1) async throws -> [Article] {
+        let path = urlPath("/api/v1/articles", query: [
+            "page": String(page),
+            "feed_id": feedId.map(String.init),
+            "tag_id": tagId.map(String.init),
+            "state": state
+        ])
         return try await request(path: path, method: "GET", authenticated: true)
     }
 
     func fetchArticle(uid: String) async throws -> Article {
-        try await request(path: "/api/v1/articles/\(uid)", method: "GET", authenticated: true)
+        try await request(path: "/api/v1/articles/\(percentEncodedPathSegment(uid))", method: "GET", authenticated: true)
     }
 
     struct ReadStateResponse: Decodable {
@@ -107,24 +113,61 @@ final class APIClient {
         let _: EmptyResponse = try await request(path: "/api/v1/subscriptions/\(feedId)", method: "DELETE", authenticated: true)
     }
 
+    // MARK: - Phase 3: search, tags, topics
+
+    func search(query: String) async throws -> [Article] {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        let path = urlPath("/api/v1/search", query: ["q": query])
+        return try await request(path: path, method: "GET", authenticated: true)
+    }
+
+    func fetchTags() async throws -> [Tag] {
+        try await request(path: "/api/v1/tags", method: "GET", authenticated: true)
+    }
+
+    func fetchTopics() async throws -> [Topic] {
+        try await request(path: "/api/v1/topics", method: "GET", authenticated: true)
+    }
+
+    func fetchTopicArticles(term: String) async throws -> [Article] {
+        try await request(path: "/api/v1/topics/\(percentEncodedPathSegment(term))", method: "GET", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }
 
+    /// Builds `path?key=value&...`, skipping nil values, with each value
+    /// percent-encoded (including `&`/`=`/`+`, which `.urlQueryAllowed`
+    /// alone treats as already-legal query characters and would otherwise
+    /// leave as literal delimiters inside a value like a search term).
+    private func urlPath(_ path: String, query: [String: String?]) -> String {
+        let pairs = query.compactMapValues { $0 }
+        guard !pairs.isEmpty else { return path }
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+")
+        let encoded = pairs.map { key, value in
+            "\(key)=\(value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value)"
+        }
+        return "\(path)?\(encoded.joined(separator: "&"))"
+    }
+
+    private func percentEncodedPathSegment(_ segment: String) -> String {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        return segment.addingPercentEncoding(withAllowedCharacters: allowed) ?? segment
+    }
+
+    /// `path` must already be fully percent-encoded (via `urlPath`/
+    /// `percentEncodedPathSegment` above) — `URL(string:relativeTo:)`
+    /// parses it as-is rather than re-encoding, so this can't
+    /// double-encode the way round-tripping through URLComponents'
+    /// unencoded `.query`/`.path` setters can.
     private func request<T: Decodable>(
         path: String, method: String, jsonBody: [String: Any]? = nil, authenticated: Bool
     ) async throws -> T {
-        var urlComponents = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-        // `path` may already carry a query string (fetchArticles) — split it off
-        // so URLComponents doesn't double-encode the "?".
-        if let qIndex = path.firstIndex(of: "?") {
-            urlComponents.path = String(path[path.startIndex..<qIndex])
-            urlComponents.query = String(path[path.index(after: qIndex)...])
-        } else {
-            urlComponents.path = path
-        }
-
-        var req = URLRequest(url: urlComponents.url!)
+        guard let url = URL(string: path, relativeTo: baseURL) else { throw APIError.invalidResponse }
+        var req = URLRequest(url: url.absoluteURL)
         req.httpMethod = method
 
         if authenticated {
