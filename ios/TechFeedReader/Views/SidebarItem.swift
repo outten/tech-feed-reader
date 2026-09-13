@@ -7,5 +7,7 @@ enum SidebarItem: Hashable {
     case search
     case tags
     case topics
+    case discoverFeeds
+    case muteRules
     case feed(Feed)
 }

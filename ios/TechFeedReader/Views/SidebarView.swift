@@ -29,6 +29,10 @@ struct SidebarView: View {
                 }
                 .onDelete(perform: unsubscribe)
             }
+            Section("Manage") {
+                Label("Discover Feeds", systemImage: "sparkle.magnifyingglass").tag(SidebarItem.discoverFeeds)
+                Label("Mute Rules", systemImage: "speaker.slash").tag(SidebarItem.muteRules)
+            }
         }
         .navigationTitle("Tech Feed Reader")
         .toolbar {

@@ -87,11 +87,11 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 12. Phase 4a — Feed discovery & management (iOS)
 
-- [ ] 12.1 Catalog browse screen (categories → feeds → tap to subscribe)
-- [ ] 12.2 "Recommended for you" section on the catalog screen
-- [ ] 12.3 Popular-by-type charts (small section, e.g. on the catalog screen or Feeds sidebar)
-- [ ] 12.4 Mute rules screen (list + add + remove, by kind)
-- [ ] 12.5 Add navigation entry point(s) for catalog browse + mute rules
-- [ ] 12.6 Verify in the Simulator against the local dev server
+- [x] 12.1 Catalog browse screen — `CatalogView.swift` (categories → feeds → tap to subscribe, checkmark for already-subscribed)
+- [x] 12.2 "Recommended for you" section on the catalog screen
+- [x] 12.3 Popular-by-type charts — segmented-control type picker within `CatalogView` rather than a 5th near-duplicate screen
+- [x] 12.4 Mute rules screen — `MuteRulesView.swift` (list + add via sheet + swipe-to-remove, by kind)
+- [x] 12.5 Add navigation entry points for catalog browse + mute rules — `SidebarView.swift`'s new "Manage" section
+- [x] 12.6 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders the new "Manage" section correctly (screenshot-confirmed)
 
 **Phase 4b (deferred, not yet tasked)**: AI feed recommender, OPML import/export — see design.md.

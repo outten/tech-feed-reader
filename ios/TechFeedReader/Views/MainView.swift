@@ -37,6 +37,10 @@ struct MainView: View {
                     TagsListView()
                 case .topics:
                     TopicsListView()
+                case .discoverFeeds:
+                    CatalogView()
+                case .muteRules:
+                    MuteRulesView()
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

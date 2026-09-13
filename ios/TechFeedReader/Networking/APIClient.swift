@@ -133,6 +133,37 @@ final class APIClient {
         try await request(path: "/api/v1/topics/\(percentEncodedPathSegment(term))", method: "GET", authenticated: true)
     }
 
+    // MARK: - Phase 4a: feed catalog, recommendations, popular, mute rules
+
+    func fetchFeedCatalog() async throws -> [CatalogGroup] {
+        try await request(path: "/api/v1/feed_catalog", method: "GET", authenticated: true)
+    }
+
+    func fetchRecommendedFeeds() async throws -> [CatalogFeed] {
+        try await request(path: "/api/v1/feed_catalog/recommended", method: "GET", authenticated: true)
+    }
+
+    /// `type`: "news" | "sports" | "podcasts" | "nature" | "youtube"
+    func fetchPopularFeeds(type: String) async throws -> [Feed] {
+        let path = urlPath("/api/v1/feeds/popular", query: ["type": type])
+        return try await request(path: path, method: "GET", authenticated: true)
+    }
+
+    func fetchMuteRules() async throws -> [MuteRule] {
+        try await request(path: "/api/v1/mute_rules", method: "GET", authenticated: true)
+    }
+
+    func addMuteRule(kind: String, value: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/mute_rules", method: "POST", jsonBody: ["kind": kind, "value": value], authenticated: true
+        )
+    }
+
+    func removeMuteRule(kind: String, value: String) async throws {
+        let path = urlPath("/api/v1/mute_rules", query: ["kind": kind, "value": value])
+        let _: EmptyResponse = try await request(path: path, method: "DELETE", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }
