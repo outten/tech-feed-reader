@@ -95,3 +95,21 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 12.6 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders the new "Manage" section correctly (screenshot-confirmed)
 
 **Phase 4b (deferred, not yet tasked)**: AI feed recommender, OPML import/export — see design.md.
+
+## 13. Phase 5 — Podcasts & YouTube (backend)
+
+- [x] 13.1 Add `GET /api/v1/podcasts` (wraps `ArticlesStore.podcast_feeds`)
+- [x] 13.2 Add `GET /api/v1/youtube/channels` (wraps `ArticlesStore.youtube_channels`)
+- [x] 13.3 Request specs covering the scenarios in `specs/mobile-podcasts-youtube/spec.md` — 2 new examples in `spec/mobile_api_spec.rb`, full suite 1775/0
+
+## 14. Phase 5 — Podcasts & YouTube (iOS)
+
+- [ ] 14.1 Add `audioUrl`/`audioMimeType`/`audioDurationSeconds` to the `Article` model (backend already returns them; only the client-side model needs updating)
+- [ ] 14.2 Podcasts screen (feed list → episode list, reusing `ArticlesListView`)
+- [ ] 14.3 Shared `AudioPlayerViewModel` (native `AVPlayer`) held above the navigation stack + a persistent mini-player bar
+- [ ] 14.4 Wire episode playback (play button in article detail + mini-player) to the shared player
+- [ ] 14.5 Background audio playback capability (`UIBackgroundModes: [audio]`) so playback survives backgrounding, matching the web mini-player's "survives navigation"
+- [ ] 14.6 YouTube channels screen (channel list → video list, reusing `ArticlesListView`)
+- [ ] 14.7 YouTube embed player in article detail (client-side video-ID extraction, mirrors `youtube_video_id`/`youtube_embed_url` in `app/main.rb`) shown instead of the plain content renderer for YouTube articles
+- [ ] 14.8 Add navigation entry points for Podcasts + YouTube
+- [ ] 14.9 Verify in the Simulator against the local dev server

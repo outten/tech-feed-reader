@@ -266,6 +266,49 @@ RSpec.describe 'Mobile API' do
     end
   end
 
+  describe 'podcasts + youtube (Phase 5)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/podcasts lists feeds with audio-enclosure articles' do
+      podcast_feed = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/podcast.xml', title: 'My Podcast').first
+      text_feed    = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/text.xml', title: 'Text Feed').first
+      ArticlesStore.import(feed_id: podcast_feed['id'], entries: [{
+        uid: 'ep-1', title: 'Episode 1', url: 'https://example.com/ep1',
+        author: nil, published_at: Time.now.utc.iso8601,
+        content_html: '', content_text: '', audio_url: 'https://example.com/ep1.mp3',
+        audio_mime_type: 'audio/mpeg', audio_duration_seconds: 1800
+      }])
+      ArticlesStore.import(feed_id: text_feed['id'], entries: [{
+        uid: 'txt-1', title: 'Article', url: 'https://example.com/txt1',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+
+      get '/api/v1/podcasts', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      feeds = JSON.parse(last_response.body)
+      expect(feeds.map { |f| f['id'] }).to eq([podcast_feed['id']])
+      expect(feeds.first['episode_count'].to_i).to eq(1)
+    end
+
+    it 'GET /api/v1/youtube/channels lists subscribed YouTube channel feeds' do
+      channel = FeedsStore.add_for_user(
+        user_id: user['id'], url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC123', title: 'A Channel'
+      ).first
+      ArticlesStore.import(feed_id: channel['id'], entries: [{
+        uid: 'vid-1', title: 'Video 1', url: 'https://www.youtube.com/watch?v=abcdefghijk',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+
+      get '/api/v1/youtube/channels', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      channels = JSON.parse(last_response.body)
+      expect(channels.map { |c| c['id'] }).to eq([channel['id']])
+      expect(channels.first['video_count'].to_i).to eq(1)
+      expect(channels.first['latest_uid']).to eq('vid-1')
+    end
+  end
+
   describe 'DELETE /api/v1/session' do
     it 'revokes the token so subsequent requests 401' do
       result = sign_up_native

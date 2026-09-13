@@ -3989,6 +3989,17 @@ class TechFeedReader < Sinatra::Base
     { ok: true, removed: removed }.to_json
   end
 
+  # Phase 5 (mobile-podcasts-youtube) — feed-level listings. Episode/video
+  # listing itself reuses GET /api/v1/articles?feed_id= (already returns
+  # audio_url/audio_mime_type/audio_duration_seconds via `a.*`).
+  get '/api/v1/podcasts' do
+    ArticlesStore.podcast_feeds(api_user_id).to_json
+  end
+
+  get '/api/v1/youtube/channels' do
+    ArticlesStore.youtube_channels(api_user_id).to_json
+  end
+
   post '/api/feeds/catalog/add' do
     content_type :json
     url   = params['url'].to_s.strip
