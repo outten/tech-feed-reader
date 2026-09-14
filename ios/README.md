@@ -5,15 +5,19 @@ directory — nothing here touches the Sinatra app under `app/`, `views/`,
 or `public/`, and nothing there needs to change to build or run this.
 
 See `openspec/changes/ios-app/` (proposal, design, specs, tasks) for the
-full plan. Short version of where things stand:
+full plan and current status. Short version:
 
-- **Phase 1 (this pass):** native login via a recovery code, sign-up by
-  handing off to the existing web `/sign-up` flow in an in-app browser
-  sheet. Both get you a bearer token stored in the Keychain, used against
-  the new `/api/v1/*` JSON API.
+- **Phases 1–10 (done):** auth (recovery-code login + browser-handoff
+  sign-up), feeds/articles, bookmarks/search/tags/topics, feed
+  discovery + mute rules, podcasts/YouTube, sports, stocks, comics/
+  NPR/PBS/radio, AI triage/digests, and account management.
 - **Phase 2 (later):** once a production domain + Apple Developer Team ID
   are set up, native passkey sign-up/login replaces the recovery-code
   path — see `openspec/changes/ios-app/design.md` → "Phase scoping".
+- A few pieces were deliberately deferred within their phases (tennis
+  rankings, the AI feed recommender, OPML import/export, Sudoku/Trivia
+  games) — see design.md's "Feature-parity roadmap" for the full list
+  and reasoning.
 
 ## Requirements
 
@@ -37,12 +41,30 @@ open TechFeedReader.xcodeproj
    `http://localhost:4567` automatically (see `xcconfig/Debug.xcconfig`) and allow local-network
    HTTP via `NSAllowsLocalNetworking` (`Info-Debug.plist` — Release omits this).
 3. **Sign up:** tap "New here? Sign up" — this opens the production `/sign-up` page in an
-   in-app browser sheet (Phase 1 has no native passkey UI yet). To sign up against your
-   *local* server instead, visit `http://localhost:4567/sign-up` directly in Safari, complete
-   registration there, and note the recovery codes shown on success.
+   in-app browser sheet (native passkey UI is Phase 2). To sign up against your *local* server
+   instead, visit `http://localhost:4567/sign-up` directly in Safari, complete registration
+   there, and note the recovery codes shown on success.
 4. **Log in:** back in the app, enter one of those recovery codes and tap "Log In".
-5. You should land on the feed list (empty until you subscribe to something — the existing
-   web UI at `http://localhost:4567/feeds` works fine for that against the same account).
+5. You'll land on an empty feed list — either subscribe to something yourself (the `+` button,
+   or Discover Feeds), or seed a full account's worth of test content in one step (next section).
+
+## Seeding demo data for testing
+
+`scripts/seed_ios_demo_data.rb` populates an **existing** account (sign up first — the script
+adds content, it doesn't create accounts) with realistic data across every area the app covers,
+so every screen has something to look at instead of an empty state:
+
+```sh
+make seed-ios-demo USER=your-username
+```
+
+This subscribes to a real mix of catalog feeds (tech, podcast, YouTube, comics, NPR, PBS) and
+does a **real fetch** so articles/images are genuine; marks some read/bookmarked; adds a tag
+and a mute rule; follows a sports team + league + player (with seeded standings/matches so
+detail screens work without waiting on a live ESPN sync); follows two stock symbols with
+seeded quotes (no `FINNHUB_API_KEY` needed) and real news; follows two radio stations;
+generates a digest; and runs triage if `ANTHROPIC_API_KEY` is set (skips gracefully, not an
+error, if it isn't). Safe to re-run — everything it does is idempotent or additive.
 
 ## Configuration
 

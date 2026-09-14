@@ -198,10 +198,12 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 Not a product capability (no spec.md — this is dev tooling, not app behavior), but tracked here since it's part of the same effort: a script that populates one user's account with realistic content across every phase built so far, so every screen has something to look at instead of an empty state during manual testing.
 
-- [ ] 25.1 `scripts/seed_ios_demo_data.rb` (or a `make` target): subscribe to a real mix of catalog feeds (tech, podcast, YouTube, humor/comics, NPR, PBS) and trigger a real fetch so articles/images are genuine, not placeholder text
-- [ ] 25.2 Mark some articles read/bookmarked/tagged; add a tag rule; add a mute rule
-- [ ] 25.3 Follow sports teams/leagues/players (via the same `ensure_catalog_*_in_db` path the app uses) and seed standings/match rows so team/league detail screens show real-looking data without waiting on a live ESPN sync
-- [ ] 25.4 Follow stock symbols and seed cached quotes (`StockQuotesStore.upsert`) so ticker/detail screens work without a `FINNHUB_API_KEY`
-- [ ] 25.5 Follow a few radio stations
-- [ ] 25.6 Generate a digest; attempt a triage run (skips gracefully — logged, not an error — if `ANTHROPIC_API_KEY` is unset, matching the app's existing `available?` gating everywhere else)
-- [ ] 25.7 Document usage in `ios/README.md`
+- [x] 25.1 `scripts/seed_ios_demo_data.rb` + `make seed-ios-demo USER=`: subscribes to a real mix of catalog feeds (tech, podcast, YouTube, comics, NPR, PBS) and triggers a real fetch (`Scheduler.refresh_one`) so articles/images are genuine, not placeholder text
+- [x] 25.2 Marks some articles read/bookmarked; adds a tag rule (applied against existing articles via `TagsApplier`); adds a mute rule
+- [x] 25.3 Follows a sports team/league/player — replicates `ensure_catalog_team_in_db`'s logic inline (it's a private Sinatra `helpers` method, not callable from a standalone script) and seeds standings/match rows so team/league detail screens show real-looking data without waiting on a live ESPN sync
+- [x] 25.4 Follows 2 stock symbols, seeds cached quotes (`StockQuotesStore.upsert`, no `FINNHUB_API_KEY` needed), and subscribes + real-fetches each symbol's news feed
+- [x] 25.5 Follows 2 radio stations
+- [x] 25.6 Generates a digest; runs triage if `ANTHROPIC_API_KEY` is set (skips gracefully, logged not errored, otherwise)
+- [x] 25.7 Documented in `ios/README.md` (also refreshed the doc's stale "Phase 1" framing — it hadn't been updated since Phase 1 shipped)
+
+**Verified live** against the real dev database with an existing account (`ios-tester`): all 6 feeds fetched real content (30/2/15/4/10/20 articles imported), tag matched existing articles, sports team/league/player followed with seeded standings/matches, both stock symbols followed with real news fetched, 2 radio stations followed, a digest generated (25 articles), and — since `ANTHROPIC_API_KEY` happened to be set on this machine — a real triage run completed (6 must-read / 9 optional / 15 skip).
