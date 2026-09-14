@@ -177,3 +177,31 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 22.2 Digests models + screen — `Digest.swift`, `DigestsHomeView.swift` (recent list, generate button), `DigestDetailView.swift` (summarize button, cached summary display)
 - [x] 22.3 Add navigation entry points for Triage + Digests — `SidebarView.swift`'s new "AI" section
 - [x] 22.4 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders correctly against the real dev server (screenshot-confirmed). The sidebar has grown long enough (6 sections, ~20 items) to need scrolling on iPad — noted to the user as a UX consideration for a later pass, not a defect.
+
+## 23. Phase 10 — Account management (backend)
+
+- [x] 23.1 Add `GET /api/v1/account` (username, display name, passkey count, recovery-code count, calendar `.ics` URL — resolves the Phase 6b calendar-surfacing deferral cheaply)
+- [x] 23.2 Add `POST /api/v1/account/display_name`
+- [x] 23.3 Add `POST /api/v1/account/recovery_codes/regenerate`
+- [x] 23.4 Add `GET /api/v1/account/passkeys`, `DELETE /api/v1/account/passkeys/:credential_id` (same lockout protection as the web route)
+- [x] 23.5 Add `DELETE /api/v1/account` (typed-username confirmation, sent as a JSON body rather than a query param since this is destructive and shouldn't land in access logs)
+- [x] 23.6 Request specs covering the scenarios in `specs/mobile-account/spec.md` — 8 new examples in `spec/mobile_api_spec.rb`, full suite 1818/0
+
+## 24. Phase 10 — Account management (iOS)
+
+- [ ] 24.1 Account models + screen (info, display-name edit, regenerate-codes button showing the new batch once, passkey list, revoke, delete-account with typed confirmation, "Add to Calendar" link opening the `.ics` URL)
+- [ ] 24.2 Wire account deletion to sign out + clear the Keychain token locally
+- [ ] 24.3 Add a navigation entry point for Account
+- [ ] 24.4 Verify in the Simulator against the local dev server
+
+## 25. Seed data for manual testing
+
+Not a product capability (no spec.md — this is dev tooling, not app behavior), but tracked here since it's part of the same effort: a script that populates one user's account with realistic content across every phase built so far, so every screen has something to look at instead of an empty state during manual testing.
+
+- [ ] 25.1 `scripts/seed_ios_demo_data.rb` (or a `make` target): subscribe to a real mix of catalog feeds (tech, podcast, YouTube, humor/comics, NPR, PBS) and trigger a real fetch so articles/images are genuine, not placeholder text
+- [ ] 25.2 Mark some articles read/bookmarked/tagged; add a tag rule; add a mute rule
+- [ ] 25.3 Follow sports teams/leagues/players (via the same `ensure_catalog_*_in_db` path the app uses) and seed standings/match rows so team/league detail screens show real-looking data without waiting on a live ESPN sync
+- [ ] 25.4 Follow stock symbols and seed cached quotes (`StockQuotesStore.upsert`) so ticker/detail screens work without a `FINNHUB_API_KEY`
+- [ ] 25.5 Follow a few radio stations
+- [ ] 25.6 Generate a digest; attempt a triage run (skips gracefully — logged, not an error — if `ANTHROPIC_API_KEY` is unset, matching the app's existing `available?` gating everywhere else)
+- [ ] 25.7 Document usage in `ios/README.md`

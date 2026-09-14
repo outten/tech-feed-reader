@@ -670,6 +670,76 @@ RSpec.describe 'Mobile API' do
     end
   end
 
+  describe 'account (Phase 10)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/account returns username, counts, and calendar_url' do
+      get '/api/v1/account', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['username']).to eq(user['username'])
+      expect(body['passkey_count']).to eq(1)
+      expect(body['recovery_codes_remaining']).to eq(10)
+      expect(body['calendar_url']).to include("/#{user['username']}/sports/calendar.ics")
+    end
+
+    it 'POST /api/v1/account/display_name updates the display name' do
+      post '/api/v1/account/display_name', { display_name: 'New Name' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(UsersStore.find(user['id'])['display_name']).to eq('New Name')
+    end
+
+    it 'POST /api/v1/account/recovery_codes/regenerate invalidates the old batch' do
+      old_code = result['recovery_codes'].first
+      post '/api/v1/account/recovery_codes/regenerate', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      new_codes = JSON.parse(last_response.body)['recovery_codes']
+      expect(new_codes.length).to eq(10)
+      expect(RecoveryCodesStore.consume!(old_code)).to be_nil
+    end
+
+    it 'GET /api/v1/account/passkeys lists the one passkey from sign-up' do
+      get '/api/v1/account/passkeys', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body).length).to eq(1)
+    end
+
+    it 'refuses to revoke the last passkey with no recovery codes left' do
+      # Recovery code plaintexts aren't retrievable after minting, so
+      # exhaust them directly at the DB layer rather than one at a time.
+      Database.connection.execute('UPDATE recovery_codes SET consumed_at = now() WHERE user_id = ?', [user['id']])
+      expect(RecoveryCodesStore.unconsumed_count_for(user['id'])).to eq(0)
+
+      credential = WebauthnCredentialsStore.for_user(user['id']).first
+      delete "/api/v1/account/passkeys/#{credential['credential_id']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(422)
+      expect(WebauthnCredentialsStore.count_for_user(user['id'])).to eq(1)
+    end
+
+    it 'revokes a passkey when recovery codes remain' do
+      credential = WebauthnCredentialsStore.for_user(user['id']).first
+      delete "/api/v1/account/passkeys/#{credential['credential_id']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(WebauthnCredentialsStore.count_for_user(user['id'])).to eq(0)
+    end
+
+    it 'DELETE /api/v1/account refuses a mismatched confirmation' do
+      delete '/api/v1/account', { confirm_username: 'not-the-username' }.to_json,
+             auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(400)
+      expect(UsersStore.find(user['id'])).not_to be_nil
+    end
+
+    it 'DELETE /api/v1/account deletes the account when confirmed' do
+      delete '/api/v1/account', { confirm_username: user['username'] }.to_json,
+             auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(UsersStore.find(user['id'])).to be_nil
+    end
+  end
+
   describe 'DELETE /api/v1/session' do
     it 'revokes the token so subsequent requests 401' do
       result = sign_up_native

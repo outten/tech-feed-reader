@@ -4371,6 +4371,62 @@ class TechFeedReader < Sinatra::Base
     end
   end
 
+  # Phase 10 (mobile-account) — account info, display name, recovery
+  # codes, passkey list/revoke (add still waits on Phase 2 — that's a
+  # registration ceremony), delete account. Mirrors the web /account/*
+  # routes' logic (including the last-passkey lockout protection),
+  # scoped to api_user_id instead of the cookie session.
+  get '/api/v1/account' do
+    {
+      username: @api_user['username'],
+      display_name: @api_user['display_name'],
+      passkey_count: WebauthnCredentialsStore.count_for_user(api_user_id),
+      recovery_codes_remaining: RecoveryCodesStore.unconsumed_count_for(api_user_id),
+      # Phase 6b calendar-surfacing deferral, resolved here for free now
+      # that a native client has a username to build the URL from.
+      calendar_url: url("/#{@api_user['username']}/sports/calendar.ics")
+    }.to_json
+  end
+
+  post '/api/v1/account/display_name' do
+    body = parse_json_body
+    display_name = body.is_a?(Hash) ? body['display_name'] : nil
+    UsersStore.update_display_name!(api_user_id, display_name)
+    { ok: true }.to_json
+  end
+
+  post '/api/v1/account/recovery_codes/regenerate' do
+    codes = RecoveryCodesStore.regenerate_for!(api_user_id)
+    { ok: true, recovery_codes: codes }.to_json
+  end
+
+  get '/api/v1/account/passkeys' do
+    WebauthnCredentialsStore.for_user(api_user_id).to_json
+  end
+
+  delete '/api/v1/account/passkeys/:credential_id' do |credential_id|
+    passkey_count = WebauthnCredentialsStore.count_for_user(api_user_id)
+    recovery_left = RecoveryCodesStore.unconsumed_count_for(api_user_id)
+    if passkey_count <= 1 && recovery_left.zero?
+      halt 422, JSON.generate(error: 'last-passkey-no-recovery',
+                             message: 'Refusing to remove your last passkey with no recovery codes left — this would lock you out.')
+    end
+    halt 404, JSON.generate(error: 'not-found') unless WebauthnCredentialsStore.delete_for_user!(api_user_id, credential_id)
+    { ok: true }.to_json
+  end
+
+  delete '/api/v1/account' do
+    # Body, not a query param — this is sensitive/destructive and
+    # shouldn't land in access logs the way a query string might.
+    body     = parse_json_body
+    expected = @api_user['username'].to_s
+    typed    = (body.is_a?(Hash) ? body['confirm_username'] : nil).to_s.strip.downcase
+    halt 400, JSON.generate(error: 'confirm-mismatch') unless typed == expected
+
+    UsersStore.delete!(api_user_id)
+    { ok: true }.to_json
+  end
+
   post '/api/feeds/catalog/add' do
     content_type :json
     url   = params['url'].to_s.strip
