@@ -46,6 +46,7 @@ struct SidebarView: View {
             Section("Manage") {
                 Label("Discover Feeds", systemImage: "sparkle.magnifyingglass").tag(SidebarItem.discoverFeeds)
                 Label("Mute Rules", systemImage: "speaker.slash").tag(SidebarItem.muteRules)
+                Label("Account", systemImage: "person.crop.circle").tag(SidebarItem.account)
             }
         }
         .navigationTitle("Tech Feed Reader")

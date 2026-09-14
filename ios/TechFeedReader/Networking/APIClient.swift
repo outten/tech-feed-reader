@@ -318,6 +318,43 @@ final class APIClient {
         try await request(path: "/api/v1/digests/\(id)/summarize", method: "POST", authenticated: true)
     }
 
+    // MARK: - Phase 10: account
+
+    func fetchAccount() async throws -> AccountInfo {
+        try await request(path: "/api/v1/account", method: "GET", authenticated: true)
+    }
+
+    func updateDisplayName(_ displayName: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/account/display_name", method: "POST", jsonBody: ["display_name": displayName], authenticated: true
+        )
+    }
+
+    struct RegenerateCodesResponse: Decodable { let ok: Bool; let recoveryCodes: [String] }
+
+    func regenerateRecoveryCodes() async throws -> [String] {
+        let response: RegenerateCodesResponse = try await request(
+            path: "/api/v1/account/recovery_codes/regenerate", method: "POST", authenticated: true
+        )
+        return response.recoveryCodes
+    }
+
+    func fetchPasskeys() async throws -> [Passkey] {
+        try await request(path: "/api/v1/account/passkeys", method: "GET", authenticated: true)
+    }
+
+    func revokePasskey(credentialId: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/account/passkeys/\(percentEncodedPathSegment(credentialId))", method: "DELETE", authenticated: true
+        )
+    }
+
+    func deleteAccount(confirmUsername: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/account", method: "DELETE", jsonBody: ["confirm_username": confirmUsername], authenticated: true
+        )
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }

@@ -189,10 +189,10 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 
 ## 24. Phase 10 — Account management (iOS)
 
-- [ ] 24.1 Account models + screen (info, display-name edit, regenerate-codes button showing the new batch once, passkey list, revoke, delete-account with typed confirmation, "Add to Calendar" link opening the `.ics` URL)
-- [ ] 24.2 Wire account deletion to sign out + clear the Keychain token locally
-- [ ] 24.3 Add a navigation entry point for Account
-- [ ] 24.4 Verify in the Simulator against the local dev server
+- [x] 24.1 Account models + screen — `Account.swift`, `AccountView.swift` (info, display-name edit, regenerate-codes button showing the new batch once via alert, passkey list + swipe-to-revoke, delete-account with typed confirmation, "Add to Calendar" opening the `.ics` URL in a `SafariView` sheet)
+- [x] 24.2 Wire account deletion to sign out + clear the Keychain token locally — reuses `AuthViewModel.signOut()` (best-effort token revoke + local Keychain clear)
+- [x] 24.3 Add a navigation entry point for Account — `SidebarView.swift`'s "Manage" section
+- [x] 24.4 Verified in the Simulator: builds clean on iPhone + iPad against the real dev server
 
 ## 25. Seed data for manual testing
 

@@ -67,6 +67,8 @@ struct MainView: View {
                     TriageHomeView()
                 case .digests:
                     DigestsHomeView()
+                case .account:
+                    AccountView()
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

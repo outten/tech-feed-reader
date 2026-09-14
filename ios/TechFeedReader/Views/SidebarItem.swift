@@ -19,5 +19,6 @@ enum SidebarItem: Hashable {
     case radio
     case triage
     case digests
+    case account
     case feed(Feed)
 }
