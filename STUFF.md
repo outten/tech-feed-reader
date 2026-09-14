@@ -1577,3 +1577,19 @@ Wire `Pruner` into the actual production path (e.g. a `prune` entry in `sidekiq_
 **Step 2 (v1.1.28, bounded retention).** With the safe version live, the real numbers came in: ~2,000 articles/day ingested, `articles` table already 1.5 GB of a 10 GiB shared managed-Postgres allocation, projecting to ~9 GB/year unbounded — a real, if not urgent, capacity trajectory. Reviewed and decided (captured via `/openspec-explore`, not guessed): flip `keep_unread` to `false`, raise `RETENTION_DAYS` from 7 to **30** — a full month before an unread article expires instead of no expiry at all, bounding the backlog to roughly a month of ingestion instead of growing forever. Bookmarks remain the one unconditional exemption. Second manual run under the new settings: **74,934 deleted**, 5 bookmarks preserved. Corpus went from 136,710 → 61,852 articles and now holds roughly steady.
 
 Both runs were triggered manually and reviewed before the nightly cron ran unattended — not blindly trusted from a pre-deploy estimate, given the DELETE has no undo. Full reasoning + the scenario comparison that ruled out "just raise the day count" (does nothing while `keep_unread: true`) is in `openspec/changes/wire-production-article-retention/design.md`. Doc pass alongside: fixed stale "7 days" / "unread is exempt forever" copy in `AGENTS.md`, `docs/ARCHITECTURE.md`'s cron schedule table, `.env.example`, the cron entry's own description, and — the one that actually mattered most — **user-facing privacy policy copy** (`views/privacy.erb`), which had been telling users articles get pruned after 7 days this whole time production wasn't pruning at all.
+
+## [ ] 115. Native iOS app
+
+I'd like to make an iOS app for tech-feed-reader.
+
+Specs for the app:
+
+- iPhone and iPad
+- iPad should be full screen
+- users can login to their tech-feed-reader on any platform and see their information, feeds, etc.
+- users can sign-up from any account
+- iOS app files should be a separate directory so that we don't intermingle files
+- app should be built using Apple's xcode
+- app should be able to run locally to test during development
+
+Full plan in `openspec/changes/ios-app/` (proposal, design, specs, tasks). **In progress, Phase 1:** a new token-authenticated `/api/v1/*` JSON API (feeds, articles, subscriptions, read-state) alongside the existing cookie-session routes, and a SwiftUI app under `ios/` (built via XcodeGen, `ios/project.yml`) that builds and runs on both iPhone and iPad Simulators. Sign-up/login are covered by recovery-code login (native) + a browser-handoff to the existing web `/sign-up` flow, since Associated Domains (needed for native passkey UI) aren't set up yet — deferred to Phase 2 pending a production domain + Apple Developer Team ID. See `openspec/changes/ios-app/design.md` for the full rationale.

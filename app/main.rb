@@ -42,6 +42,7 @@ require_relative 'providers/itunes_lookup'
 require_relative 'providers/youtube_channel_resolver'
 require_relative 'providers/wikipedia'
 require_relative 'auth'
+require_relative 'api_tokens_store'
 
 # Phase A1 (consumer auth) — load .env in dev for SESSION_SECRET
 # + WEBAUTHN_* config. Production reads from real env vars (host's
@@ -391,7 +392,24 @@ class TechFeedReader < Sinatra::Base
     end
   end
 
+  # ios-app change — token auth wall for the mobile JSON API. Separate
+  # from the cookie-session wall above (which /api/v1/ is exempted from
+  # via Auth::PUBLIC_PREFIXES): native clients (the iOS app) present
+  # `Authorization: Bearer <token>` instead of a session cookie. Sets
+  # @api_user for the route handlers below — deliberately not reusing
+  # current_user/session so this stays independent of browser auth.
+  before '/api/v1/*' do
+    content_type :json
+    header = request.env['HTTP_AUTHORIZATION'].to_s
+    @api_token = header.start_with?('Bearer ') ? header.sub('Bearer ', '') : nil
+    @api_user  = @api_token && ApiTokensStore.find_user_by_token(@api_token)
+    halt 401, JSON.generate(error: 'unauthorized', message: 'Missing or invalid bearer token.') unless @api_user
+  end
+
   helpers do
+    def api_user_id
+      @api_user['id'].to_i
+    end
     # Cache-bust query string for static assets — same pattern as t-money so
     # CSS/JS edits show up on next render without a hard reload.
     def asset_mtime(rel_path)
@@ -1737,7 +1755,11 @@ class TechFeedReader < Sinatra::Base
     codes = RecoveryCodesStore.mint_for!(user_id: user['id'])
     sign_in!(user)
 
-    JSON.generate(ok: true, recovery_codes: codes, username: user['username'])
+    result = { ok: true, recovery_codes: codes, username: user['username'] }
+    # ios-app change — a native client passes `native: true` to also get
+    # a bearer token, since it can't rely on the cookie session set above.
+    result[:api_token] = ApiTokensStore.issue!(user['id']) if body['native']
+    JSON.generate(result)
   end
 
   # Step 1 of authentication ceremony. For a given username, emit
@@ -1807,7 +1829,10 @@ class TechFeedReader < Sinatra::Base
     sign_in!(user)
 
     return_to = session.delete(:return_to) || '/'
-    JSON.generate(ok: true, return_to: return_to)
+    result = { ok: true, return_to: return_to }
+    # ios-app change — see register/verify above.
+    result[:api_token] = ApiTokensStore.issue!(user['id']) if body['native']
+    JSON.generate(result)
   end
 
   # Recovery — consume a one-time code, sign the user in. The code
@@ -1827,7 +1852,11 @@ class TechFeedReader < Sinatra::Base
 
     return_to = session.delete(:return_to) || '/'
     remaining = RecoveryCodesStore.unconsumed_count_for(user_id)
-    JSON.generate(ok: true, return_to: return_to, recovery_codes_remaining: remaining)
+    result = { ok: true, return_to: return_to, recovery_codes_remaining: remaining }
+    # ios-app change — recovery is the local-dev-friendly fallback login
+    # for the iOS app (passkeys need Associated Domains set up).
+    result[:api_token] = ApiTokensStore.issue!(user_id) if body['native']
+    JSON.generate(result)
   end
 
   # ===================================================================
@@ -3804,6 +3833,598 @@ class TechFeedReader < Sinatra::Base
       status 404
       { ok: false, error: 'not-found', message: 'No feed with that id.' }.to_json
     end
+  end
+
+  # ===================================================================
+  # Mobile API (ios-app change) — token-authenticated JSON API for the
+  # native iOS client. Auth is the `before '/api/v1/*'` filter above
+  # (bearer token, sets @api_user), not the cookie session, so every
+  # route here uses api_user_id instead of current_user_id. Mirrors the
+  # same FeedsStore / ArticlesStore / ReadStateStore calls the HTML +
+  # /api/feeds routes above already use.
+  # ===================================================================
+
+  get '/api/v1/feeds' do
+    FeedsStore.for_user(api_user_id).to_json
+  end
+
+  API_V1_ARTICLES_PER_PAGE = 50
+  get '/api/v1/articles' do
+    page    = [params['page'].to_i, 1].max
+    offset  = (page - 1) * API_V1_ARTICLES_PER_PAGE
+    feed_id = params['feed_id'].to_i
+    tag_id  = params['tag_id'].to_i
+
+    state = params['state'].to_s.to_sym
+    state = :all unless ARTICLES_STATE_FILTERS.include?(state)
+    topic = params['topic'].to_s
+    topic = nil if topic.empty?
+
+    articles = if tag_id.positive?
+                 ArticlesStore.for_tag(api_user_id, tag_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
+               elsif feed_id.positive?
+                 ArticlesStore.for_feed(api_user_id, feed_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
+               else
+                 # topic (Phase 8a — Comics/NPR/PBS) only applies here, matching
+                 # the web /comics, /npr, /pbs routes' use of ArticlesStore.recent.
+                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state, topic: topic)
+               end
+    articles.to_json
+  end
+
+  get '/api/v1/articles/:uid' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'not-found') unless article
+    article.merge(ReadStateStore.get(api_user_id, article['id'])).to_json
+  end
+
+  # Phase 3 (mobile-reading-parity) — search, tags, topics. Same
+  # store calls the web /search, /tags, /topics routes already use.
+  get '/api/v1/search' do
+    query = params['q'].to_s.strip
+    return [].to_json if query.empty?
+    ArticlesStore.search(api_user_id, query, limit: API_V1_ARTICLES_PER_PAGE).to_json
+  end
+
+  get '/api/v1/tags' do
+    TagsStore.all(api_user_id).to_json
+  end
+
+  get '/api/v1/topics' do
+    TopicClusters.recent.to_json
+  end
+
+  get '/api/v1/topics/:term' do |term|
+    ArticlesStore.for_topic(api_user_id, term, limit: API_V1_ARTICLES_PER_PAGE).to_json
+  end
+
+  post '/api/v1/subscriptions' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    url = body['url'].to_s.strip
+    unless url.match?(%r{\Ahttps?://\S+\z})
+      status 422
+      next { ok: false, error: 'invalid-url', message: "That doesn't look like a valid http(s) URL." }.to_json
+    end
+
+    feed, inserted = FeedsStore.add_for_user(user_id: api_user_id, url: url)
+    if inserted
+      status 201
+      { ok: true, feed: feed }.to_json
+    else
+      status 422
+      { ok: false, error: 'duplicate-url', message: 'That feed is already subscribed.' }.to_json
+    end
+  end
+
+  delete '/api/v1/subscriptions/:id' do |id|
+    if FeedsStore.unsubscribe(api_user_id, id.to_i)
+      { ok: true, id: id.to_i }.to_json
+    else
+      status 404
+      { ok: false, error: 'not-found', message: 'No feed with that id.' }.to_json
+    end
+  end
+
+  post '/api/v1/read_state' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    article = ArticlesStore.find_by_uid(body['uid'].to_s)
+    halt 404, JSON.generate(error: 'not-found') unless article
+
+    ReadStateStore.mark_read(api_user_id, article['id'], read: body['read']) if body.key?('read')
+    ReadStateStore.mark_bookmarked(api_user_id, article['id'], value: body['bookmarked']) if body.key?('bookmarked')
+    ReadStateStore.mark_archived(api_user_id, article['id'], value: body['archived']) if body.key?('archived')
+
+    { ok: true, state: ReadStateStore.get(api_user_id, article['id']) }.to_json
+  end
+
+  delete '/api/v1/session' do
+    ApiTokensStore.revoke!(@api_token)
+    { ok: true }.to_json
+  end
+
+  # Phase 4a (mobile-feed-discovery) — catalog browse, recommendations,
+  # popular charts, mute rules. Same store calls the web /feeds page +
+  # Manage nav already use.
+  get '/api/v1/feed_catalog' do
+    FeedCatalog.by_category.map { |category, feeds|
+      {
+        category: category,
+        label: FeedCatalog::CATEGORIES[category],
+        feeds: feeds.map { |f| f.slice(:url, :title, :blurb) }
+      }
+    }.to_json
+  end
+
+  get '/api/v1/feed_catalog/recommended' do
+    subscribed_urls = FeedsStore.for_user(api_user_id).map { |f| f['url'] }
+    FeedCatalog.recommend_for(subscribed_urls: subscribed_urls).to_json
+  end
+
+  get '/api/v1/feeds/popular' do
+    type = params['type'].to_s
+    halt 400, JSON.generate(error: 'invalid-type') unless FeedsStore::POPULAR_TYPES.include?(type)
+    FeedsStore.popular_by_type(type).to_json
+  end
+
+  get '/api/v1/mute_rules' do
+    MuteRulesStore.all(api_user_id).to_json
+  end
+
+  post '/api/v1/mute_rules' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid JSON body') unless body.is_a?(Hash)
+    begin
+      inserted = MuteRulesStore.add(user_id: api_user_id, kind: body['kind'].to_s, value: body['value'].to_s)
+    rescue ArgumentError => e
+      halt 422, JSON.generate(error: 'invalid-rule', message: e.message)
+    end
+    status inserted ? 201 : 200
+    { ok: true }.to_json
+  end
+
+  delete '/api/v1/mute_rules' do
+    begin
+      removed = MuteRulesStore.remove(user_id: api_user_id, kind: params['kind'].to_s, value: params['value'].to_s)
+    rescue ArgumentError => e
+      halt 422, JSON.generate(error: 'invalid-rule', message: e.message)
+    end
+    { ok: true, removed: removed }.to_json
+  end
+
+  # Phase 5 (mobile-podcasts-youtube) — feed-level listings. Episode/video
+  # listing itself reuses GET /api/v1/articles?feed_id= (already returns
+  # audio_url/audio_mime_type/audio_duration_seconds via `a.*`).
+  get '/api/v1/podcasts' do
+    ArticlesStore.podcast_feeds(api_user_id).to_json
+  end
+
+  get '/api/v1/youtube/channels' do
+    ArticlesStore.youtube_channels(api_user_id).to_json
+  end
+
+  # Phase 6a (mobile-sports) — catalog browse, follow/unfollow, detail,
+  # overview. Reuses the same store methods + ensure_catalog_*_in_db
+  # lazy-materialization helpers (defined earlier as Sinatra `helpers`,
+  # reachable from any route in this class) that the web /sports/*
+  # routes already use — see design.md for the DB-backed-only
+  # simplification on team detail (skips the 5-team curated
+  # SportsTeams module path).
+
+  get '/api/v1/sports' do
+    SportsCatalog::SPORTS.map { |slug, sport|
+      { slug: slug, name: sport[:name], emoji: sport[:emoji], region: sport[:region], blurb: sport[:blurb] }
+    }.to_json
+  end
+
+  get '/api/v1/sports/:sport_slug/leagues' do |sport_slug|
+    sport = SportsCatalog.find_sport(sport_slug)
+    halt 404, JSON.generate(error: 'not-found') unless sport
+    (sport[:leagues] || []).map { |lg| lg.reject { |k, _| k == :teams } }.to_json
+  end
+
+  get '/api/v1/sports/:sport_slug/:league_slug/teams' do |sport_slug, league_slug|
+    league = SportsCatalog.find_league(sport_slug, league_slug)
+    halt 404, JSON.generate(error: 'not-found') unless league
+    teams = league[:teams] || []
+    # STUFF #75 — api-sports leagues ship teams:[] in the catalog;
+    # teams auto-populate from synced match data instead. Same
+    # fallback the web /sports/manage/:sport/:league route uses.
+    if teams.empty? && league[:source_provider] == 'api-sports'
+      league_row = SportsLeaguesStore.find_by_slug(league[:slug])
+      teams = SportsTeamsStore.for_league(league_row['id']).sort_by { |t| t['name'] } if league_row
+    end
+    teams.to_json
+  end
+
+  get '/api/v1/sports/overview' do
+    followed_team_slugs   = SportsFollowsStore.for_kind(api_user_id, 'team').map { |f| f['value'] }
+    followed_league_slugs = SportsFollowsStore.for_kind(api_user_id, 'league').map { |f| f['value'] }
+    followed_player_slugs = SportsFollowsStore.for_kind(api_user_id, 'player').map { |f| f['value'] }
+
+    followed_teams = followed_team_slugs.filter_map { |slug| SportsTeamsStore.find_by_slug(slug) }
+    followed_leagues = followed_league_slugs.filter_map { |slug| SportsLeaguesStore.find_by_slug(slug) }
+    followed_players = followed_player_slugs.filter_map { |slug| SportsPlayersStore.find_by_slug(slug) }
+
+    live_matches = SportsMatchesStore.live
+    team_ids = live_matches.flat_map { |m| [m['home_team_id'], m['away_team_id']] }.compact.uniq
+    teams_by_id = SportsTeamsStore.find_many(team_ids).each_with_object({}) { |t, h| h[t['id']] = t }
+    live_matches = live_matches.map { |m|
+      m.merge('home_team' => teams_by_id[m['home_team_id']], 'away_team' => teams_by_id[m['away_team_id']])
+    }
+
+    {
+      followed_teams: followed_teams, followed_leagues: followed_leagues, followed_players: followed_players,
+      live_matches: live_matches
+    }.to_json
+  end
+
+  get '/api/v1/sports/teams/:slug' do |slug|
+    team = SportsTeamsStore.find_by_slug(slug)
+    if team
+      league = SportsLeaguesStore.find(team['league_id'])
+      SportsEntityArticlesStore.refresh_for(kind: 'team', entity_id: team['id'], name: team['name'])
+      {
+        team: team, league: league,
+        standings: SportsStandingsStore.for_team(team['id']),
+        upcoming: SportsMatchesStore.upcoming_for_team(team['id'], limit: 8),
+        recent_finals: SportsMatchesStore.recent_finals_for_team(team['id'], limit: 6),
+        mentions: SportsEntityArticlesStore.for_entity(kind: 'team', entity_id: team['id'], limit: 20),
+        followed: SportsFollowsStore.follow?(api_user_id, 'team', slug)
+      }.to_json
+    else
+      catalog_team = SportsCatalog.find_team(slug)
+      halt 404, JSON.generate(error: 'not-found') unless catalog_team
+      {
+        team: catalog_team, league: nil, standings: nil, upcoming: [], recent_finals: [], mentions: [],
+        followed: SportsFollowsStore.follow?(api_user_id, 'team', slug)
+      }.to_json
+    end
+  end
+
+  get '/api/v1/sports/leagues/:slug' do |slug|
+    league = SportsLeaguesStore.find_by_slug(slug)
+    halt 404, JSON.generate(error: 'not-found') unless league
+
+    standings = SportsStandingsStore.for_league(league['id'])
+    upcoming = SportsMatchesStore.upcoming_for_league(league['id'], limit: 20)
+    recent_finals = if league['sport'] == 'tennis'
+                      SportsMatchesStore.finals_by_round_for_league(league['id'])
+                    else
+                      SportsMatchesStore.recent_finals_for_league(league['id'], limit: 12)
+                    end
+    team_ids = (standings.map { |r| r['team_id'] } + (upcoming + recent_finals).flat_map { |m| [m['home_team_id'], m['away_team_id']] }).compact.uniq
+    teams_by_id = SportsTeamsStore.find_many(team_ids).each_with_object({}) { |t, h| h[t['id']] = t }
+
+    {
+      league: league, standings: standings, upcoming: upcoming, recent_finals: recent_finals,
+      teams_by_id: teams_by_id,
+      followed: SportsFollowsStore.follow?(api_user_id, 'league', slug)
+    }.to_json
+  end
+
+  get '/api/v1/sports/players/:slug' do |slug|
+    player = SportsPlayersStore.find_by_slug(slug) || ensure_catalog_player_by_slug(slug)
+    halt 404, JSON.generate(error: 'not-found') unless player
+    SportsEntityArticlesStore.refresh_for(kind: 'player', entity_id: player['id'], name: player['full_name'])
+    {
+      player: player,
+      mentions: SportsEntityArticlesStore.for_entity(kind: 'player', entity_id: player['id'], limit: 30),
+      followed: SportsFollowsStore.follow?(api_user_id, 'player', slug)
+    }.to_json
+  end
+
+  post '/api/v1/sports/teams/follow' do
+    body = parse_json_body
+    slug = body.is_a?(Hash) ? body['slug'].to_s : ''
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    team = SportsTeamsStore.find_by_slug(slug) || ensure_catalog_team_in_db(slug)
+    halt 404, JSON.generate(error: 'not-found') unless team
+    SportsFollowsStore.add(user_id: api_user_id, kind: 'team', value: slug)
+    begin
+      SportsTeamFetchWorker.perform_async(team['id']) if team['source_provider'] == 'espn'
+    rescue StandardError => e
+      AppLogger.warn('team_follow_enqueue_failed', slug: slug, message: e.message)
+    end
+    { ok: true, slug: slug, followed: true }.to_json
+  end
+
+  delete '/api/v1/sports/teams/follow' do
+    slug = params['slug'].to_s
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    SportsFollowsStore.remove(user_id: api_user_id, kind: 'team', value: slug)
+    { ok: true, slug: slug, followed: false }.to_json
+  end
+
+  post '/api/v1/sports/leagues/follow' do
+    body = parse_json_body
+    slug = body.is_a?(Hash) ? body['slug'].to_s : ''
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    league = SportsLeaguesStore.find_by_slug(slug) || ensure_catalog_league_in_db(slug)
+    halt 404, JSON.generate(error: 'not-found') unless league
+    SportsFollowsStore.add(user_id: api_user_id, kind: 'league', value: slug)
+    { ok: true, slug: slug, followed: true }.to_json
+  end
+
+  delete '/api/v1/sports/leagues/follow' do
+    slug = params['slug'].to_s
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    SportsFollowsStore.remove(user_id: api_user_id, kind: 'league', value: slug)
+    { ok: true, slug: slug, followed: false }.to_json
+  end
+
+  post '/api/v1/sports/players/follow' do
+    body = parse_json_body
+    slug = body.is_a?(Hash) ? body['slug'].to_s : ''
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    halt 404, JSON.generate(error: 'not-found') unless SportsPlayersStore.find_by_slug(slug)
+    SportsFollowsStore.add(user_id: api_user_id, kind: 'player', value: slug)
+    { ok: true, slug: slug, followed: true }.to_json
+  end
+
+  delete '/api/v1/sports/players/follow' do
+    slug = params['slug'].to_s
+    halt 400, JSON.generate(error: 'slug required') if slug.empty?
+    SportsFollowsStore.remove(user_id: api_user_id, kind: 'player', value: slug)
+    { ok: true, slug: slug, followed: false }.to_json
+  end
+
+  # Phase 7 (mobile-stocks) — search, quote detail, news, follow,
+  # ticker, sparklines. Same store calls the web /stocks/* routes
+  # already use; ticker_quotes itself is cookie-session-only
+  # (checks signed_in?), so this reimplements its small body against
+  # api_user_id instead of calling it directly.
+  get '/api/v1/stocks/search' do
+    StockQuoteProvider.search(params['q'].to_s).to_json
+  end
+
+  # Literal-path routes must come before the /:symbol wildcard below —
+  # Sinatra matches routes in definition order, so /:symbol would
+  # otherwise swallow /ticker and /sparklines with symbol="ticker" etc.
+  get '/api/v1/stocks/ticker' do
+    followed      = StockFollowsStore.all(api_user_id)
+    followed_syms = followed.map { |r| r['symbol'] }
+    indices       = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
+    ordered       = (followed_syms + indices).uniq
+    by_sym        = StockQuotesStore.find_many(ordered).each_with_object({}) { |q, h| h[q['symbol']] = q }
+    followed_by_sym = followed.each_with_object({}) { |r, h| h[r['symbol']] = r }
+    index_by_sym  = StockQuoteProvider::MAJOR_INDICES.each_with_object({}) { |i, h| h[i[:symbol]] = i }
+
+    ordered.filter_map { |s|
+      by_sym[s] ||
+        (followed_by_sym[s] && { 'symbol' => s, 'name' => followed_by_sym[s]['name'] }) ||
+        (index_by_sym[s] && { 'symbol' => s, 'name' => index_by_sym[s][:name] })
+    }.to_json
+  end
+
+  get '/api/v1/stocks/sparklines' do
+    StockQuoteProvider.sparklines_for_indices.to_json
+  end
+
+  get '/api/v1/stocks/:symbol' do |symbol|
+    symbol = symbol.to_s.upcase
+    StockQuoteProvider.fetch_and_cache(symbol) if StockQuotesStore.stale?(symbol, max_age_seconds: 300)
+    quote = StockQuotesStore.find(symbol)
+    { quote: quote, followed: StockFollowsStore.follow?(api_user_id, symbol) }.to_json
+  end
+
+  get '/api/v1/stocks/:symbol/news' do |symbol|
+    symbol = symbol.to_s.upcase
+    feed = StockNewsFeed.ensure_feed!(symbol)
+    if stock_news_stale?(feed)
+      begin
+        FeedRefreshWorker.perform_async(feed['id'])
+      rescue StandardError => e
+        AppLogger.warn('stock_news_refresh_enqueue_failed', symbol: symbol, message: e.message)
+      end
+    end
+    ArticlesStore.recent_for_feed(api_user_id, feed['id'], limit: 12).to_json
+  end
+
+  post '/api/v1/stocks/follow' do
+    body = parse_json_body
+    symbol = body.is_a?(Hash) ? body['symbol'].to_s.strip.upcase : ''
+    halt 400, JSON.generate(error: 'symbol required') if symbol.empty?
+    name = body['name'].to_s.strip
+    name = nil if name.empty?
+
+    StockFollowsStore.add(user_id: api_user_id, symbol: symbol, name: name)
+
+    begin
+      feed = StockNewsFeed.ensure_feed!(symbol, name)
+      FeedsStore.subscribe(api_user_id, feed['id'])
+      FeedRefreshWorker.perform_async(feed['id'])
+    rescue StandardError => e
+      AppLogger.warn('stock_news_subscribe_failed', symbol: symbol, message: e.message)
+    end
+
+    begin
+      require_relative 'workers/stock_quote_fetch_worker'
+      StockQuoteFetchWorker.perform_async(symbol)
+    rescue StandardError => e
+      AppLogger.warn('stock_follow_enqueue_failed', symbol: symbol, message: e.message)
+    end
+
+    { ok: true, symbol: symbol, followed: true }.to_json
+  end
+
+  delete '/api/v1/stocks/follow' do
+    symbol = params['symbol'].to_s.strip.upcase
+    halt 400, JSON.generate(error: 'symbol required') if symbol.empty?
+    StockFollowsStore.remove(user_id: api_user_id, symbol: symbol)
+
+    begin
+      feed = FeedsStore.find_by_url(StockNewsFeed.url_for(symbol))
+      FeedsStore.unsubscribe(api_user_id, feed['id']) if feed
+    rescue StandardError => e
+      AppLogger.warn('stock_news_unsubscribe_failed', symbol: symbol, message: e.message)
+    end
+
+    { ok: true, symbol: symbol, followed: false }.to_json
+  end
+
+  # Phase 8a (mobile-misc-content) — radio station catalog + follow.
+  get '/api/v1/radio/stations' do
+    RadioStore.seed_catalog!
+    groups = RadioStore.stations_by_group.map { |group, stations| { group: group, stations: stations } }
+    followed_ids = RadioStore.followed_stations(api_user_id).map { |s| s['id'] }
+    { groups: groups, followed_ids: followed_ids }.to_json
+  end
+
+  post '/api/v1/radio/follow' do
+    body = parse_json_body
+    station_id = body.is_a?(Hash) ? body['station_id'].to_i : 0
+    halt 404, JSON.generate(error: 'not-found') unless RadioStore.find(station_id)
+    RadioStore.follow!(api_user_id, station_id)
+    { ok: true, station_id: station_id, followed: true }.to_json
+  end
+
+  delete '/api/v1/radio/follow' do
+    station_id = params['station_id'].to_i
+    RadioStore.unfollow!(api_user_id, station_id)
+    { ok: true, station_id: station_id, followed: false }.to_json
+  end
+
+  # Phase 9 (mobile-ai-features) — triage + digests. Both gated by the
+  # same LlmGuard budget check the web /triage + /digests routes use;
+  # a denial is a real 429 here rather than the web's redirect-with-
+  # error-query-param (there's no page to redirect to on mobile).
+  get '/api/v1/triage' do
+    topic = sanitize_topic_filter(params['topic'])
+    TriageStore.recent(api_user_id, limit: 20, topic: topic || :any).to_json
+  end
+
+  get '/api/v1/triage/:id' do |id|
+    row = TriageStore.find(api_user_id, id)
+    halt 404, JSON.generate(error: 'not-found') unless row
+    %w[must_read optional skip].each do |key|
+      row[key] = row[key].map { |entry| entry.merge('article' => ArticlesStore.find_by_uid(entry['uid'])) }
+    end
+    row.to_json
+  end
+
+  post '/api/v1/triage' do
+    body  = parse_json_body
+    topic = sanitize_topic_filter(body.is_a?(Hash) ? body['topic'] : nil)
+
+    guard = LlmGuard.check(user_id: api_user_id)
+    halt 429, JSON.generate(error: 'llm-quota', message: guard.message) if guard.denied?
+
+    result = Triage::Claude.run(api_user_id, topic: topic)
+    if result.status == :ok && result.input_tokens
+      LlmUsageStore.record!(user_id: api_user_id, route: '/api/v1/triage',
+                            model: result.model, input_tokens: result.input_tokens, output_tokens: result.output_tokens)
+    end
+    id = TriageStore.create(api_user_id, result) if result.status != :unavailable
+    row = id ? TriageStore.find(api_user_id, id) : nil
+    if row
+      %w[must_read optional skip].each do |key|
+        row[key] = row[key].map { |entry| entry.merge('article' => ArticlesStore.find_by_uid(entry['uid'])) }
+      end
+    end
+    { status: result.status, id: id, triage: row }.to_json
+  end
+
+  get '/api/v1/digests' do
+    DigestStore.recent(api_user_id, limit: 100).to_json
+  end
+
+  get '/api/v1/digests/:id' do |id|
+    digest = DigestStore.find(api_user_id, id)
+    halt 404, JSON.generate(error: 'not-found') unless digest
+    digest.to_json
+  end
+
+  post '/api/v1/digests' do
+    body   = parse_json_body
+    window = body.is_a?(Hash) && body['window_hours'].to_s.match?(/\A\d+\z/) ? body['window_hours'].to_i : Digests::DEFAULT_WINDOW_HOURS
+    limit  = body.is_a?(Hash) && body['limit'].to_s.match?(/\A\d+\z/) ? body['limit'].to_i : Digests::DEFAULT_LIMIT
+    id, = Digests.generate_and_store!(api_user_id, window_hours: window.clamp(1, 720), limit: limit.clamp(1, 200))
+    DigestStore.find(api_user_id, id).to_json
+  end
+
+  post '/api/v1/digests/:id/summarize' do |id|
+    digest = DigestStore.find(api_user_id, id)
+    halt 404, JSON.generate(error: 'not-found') unless digest
+
+    if digest['llm_summary'].to_s.strip != ''
+      next digest.to_json
+    end
+
+    guard = LlmGuard.check(user_id: api_user_id)
+    halt 429, JSON.generate(error: 'llm-quota', message: guard.message) if guard.denied?
+
+    result = Summarizer::Claude.summarize_digest(subject: digest['subject'], text_body: digest['text_body'])
+    case result.status
+    when :ok
+      DigestStore.update_llm_summary(api_user_id, id, summary: result.text, model: result.model)
+      LlmUsageStore.record!(user_id: api_user_id, route: '/api/v1/digests/:id/summarize',
+                            model: result.model, input_tokens: result.input_tokens, output_tokens: result.output_tokens)
+      DigestStore.find(api_user_id, id).to_json
+    when :unavailable
+      halt 422, JSON.generate(error: 'llm-unavailable')
+    when :empty
+      halt 422, JSON.generate(error: 'empty-content')
+    else
+      halt 500, JSON.generate(error: 'llm-failed', message: result.error.to_s)
+    end
+  end
+
+  # Phase 10 (mobile-account) — account info, display name, recovery
+  # codes, passkey list/revoke (add still waits on Phase 2 — that's a
+  # registration ceremony), delete account. Mirrors the web /account/*
+  # routes' logic (including the last-passkey lockout protection),
+  # scoped to api_user_id instead of the cookie session.
+  get '/api/v1/account' do
+    {
+      username: @api_user['username'],
+      display_name: @api_user['display_name'],
+      passkey_count: WebauthnCredentialsStore.count_for_user(api_user_id),
+      recovery_codes_remaining: RecoveryCodesStore.unconsumed_count_for(api_user_id),
+      # Phase 6b calendar-surfacing deferral, resolved here for free now
+      # that a native client has a username to build the URL from.
+      calendar_url: url("/#{@api_user['username']}/sports/calendar.ics")
+    }.to_json
+  end
+
+  post '/api/v1/account/display_name' do
+    body = parse_json_body
+    display_name = body.is_a?(Hash) ? body['display_name'] : nil
+    UsersStore.update_display_name!(api_user_id, display_name)
+    { ok: true }.to_json
+  end
+
+  post '/api/v1/account/recovery_codes/regenerate' do
+    codes = RecoveryCodesStore.regenerate_for!(api_user_id)
+    { ok: true, recovery_codes: codes }.to_json
+  end
+
+  get '/api/v1/account/passkeys' do
+    WebauthnCredentialsStore.for_user(api_user_id).to_json
+  end
+
+  delete '/api/v1/account/passkeys/:credential_id' do |credential_id|
+    passkey_count = WebauthnCredentialsStore.count_for_user(api_user_id)
+    recovery_left = RecoveryCodesStore.unconsumed_count_for(api_user_id)
+    if passkey_count <= 1 && recovery_left.zero?
+      halt 422, JSON.generate(error: 'last-passkey-no-recovery',
+                             message: 'Refusing to remove your last passkey with no recovery codes left — this would lock you out.')
+    end
+    halt 404, JSON.generate(error: 'not-found') unless WebauthnCredentialsStore.delete_for_user!(api_user_id, credential_id)
+    { ok: true }.to_json
+  end
+
+  delete '/api/v1/account' do
+    # Body, not a query param — this is sensitive/destructive and
+    # shouldn't land in access logs the way a query string might.
+    body     = parse_json_body
+    expected = @api_user['username'].to_s
+    typed    = (body.is_a?(Hash) ? body['confirm_username'] : nil).to_s.strip.downcase
+    halt 400, JSON.generate(error: 'confirm-mismatch') unless typed == expected
+
+    UsersStore.delete!(api_user_id)
+    { ok: true }.to_json
   end
 
   post '/api/feeds/catalog/add' do

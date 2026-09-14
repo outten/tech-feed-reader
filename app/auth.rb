@@ -46,8 +46,14 @@ module Auth
 
   # Path prefixes that don't require auth (more flexible than PUBLIC_PATHS
   # for routes that take a tail like /api/auth/*).
+  #
+  # /api/v1/ (ios-app change) is exempted from the cookie-session wall
+  # because it authenticates natively via bearer token instead — see the
+  # dedicated `before '/api/v1/*'` filter in main.rb, which halts 401
+  # itself when the token is missing/invalid.
   PUBLIC_PREFIXES = [
     '/api/auth/',
+    '/api/v1/',
     '/img/',
     '/mini-profiler-resources/'
   ].freeze

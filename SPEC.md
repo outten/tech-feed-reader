@@ -62,6 +62,15 @@ The original brief was "technology articles". Post-launch, a finance surface lan
 - **Per-symbol news** (PR #195) — each symbol/index page gained a **Recent news** section sourced from that symbol's **Yahoo Finance per-symbol RSS feed**. Rather than a parallel pipeline, a symbol maps to one feed in the existing catalog (`StockNewsFeed`, topic `finance`), so following a symbol subscribes the user and its news flows into `/articles` + the home page through the ordinary feed→article path. No new table.
 - **Cold-start fill + global ticker** (PR #196) — `GET /stocks/:symbol/news` re-renders just the news section; `public/stock-news.js` polls it so a cold feed fills in without a reload. The scrolling ticker (followed symbols + indices, via the `ticker_quotes` helper) moved from the dashboard to **every signed-in page** in `layout.erb`.
 
+### Native iOS app — the v1 non-goal we changed our mind on (in progress)
+
+The original brief said "responsive web only" (see **Non-goals** below and open question #4). That's being reversed: a native SwiftUI app for iPhone + iPad, sharing the same passkey-based accounts and data as the web app. Full plan in `openspec/changes/ios-app/` (proposal, design, specs, tasks):
+
+- Lives entirely under a new top-level `ios/` directory — no changes to `app/`, `views/`, or `public/` needed to build or run it.
+- New token-authenticated `/api/v1/*` JSON API (feeds, articles, subscriptions, read-state) alongside the existing cookie-session HTML routes — additive, no change to browser behavior.
+- **Phase 1** (in progress): recovery-code login (native) + browser-handoff sign-up (opens the existing web `/sign-up` flow in an in-app sheet) — no native passkey UI yet.
+- **Phase 2** (not started — needs a production domain + Apple Developer Team ID): Associated Domains + native passkey sign-up/login, so a passkey created on web or iOS works on both.
+
 ### Where to read what
 
 | Question | File |
@@ -72,6 +81,7 @@ The original brief was "technology articles". Post-launch, a finance surface lan
 | What architectural patterns are load-bearing today? | [AGENTS.md](AGENTS.md) |
 | What user-facing asks did we resolve along the way? | [STUFF.md](STUFF.md) |
 | How do I work on this codebase? | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| What's the iOS app's plan / status? | [openspec/changes/ios-app/](openspec/changes/ios-app/) |
 
 ---
 
@@ -88,7 +98,7 @@ The user is one person reading ~50–200 articles a week across ~20–50 feeds. 
 
 - ~~Multi-user / authentication / accounts.~~ **Superseded.** Phase A1 (passkey auth, recovery codes, auth wall) shipped in `a9e5032` (#88) and Phase A2 (per-user data split) in `7b1533a` (#89) + `7b7bcca` (#90). The pivot rationale and final design are in *Scope evolution* above.
 - Paid / authenticated feeds (Substack-paywalled, NYT-subscriber, etc.).
-- Mobile-native app — responsive web only.
+- ~~Mobile-native app — responsive web only.~~ **Superseded (in progress).** A native iOS app is underway — see *Native iOS app* under **Scope evolution** above and `openspec/changes/ios-app/`.
 - Real-time push (websockets, server-sent events). Polling is fine.
 - Comments / annotations / sharing.
 - ~~Recommendation engine ("you might like..."). Out of scope for v1.~~ **Superseded.** Personalised relevance ranker shipped in Phase 6 (`a738901`) and consumed by the Read-next card (Phase 7) and the AI triage (Phase 8). See the *Scope evolution* section above for why we changed our mind.
@@ -211,4 +221,4 @@ These were the four open questions surfaced before any feature code landed; reco
 1. **Initial seed feed list** — start with 5 to validate the pipeline: Hacker News, Lobsters, Ars Technica, The Verge, Simon Willison's blog. More added via `/feeds` once the UI lands.
 2. **Summary backend** — extractive first (no API key needed), Claude API wired in Tier 2 alongside it. Both gated behind a user button on `/article/:id`.
 3. **Storage shape for articles** — **SQLite from day 1** (replaces monthly-sharded JSON). FTS5 backs `/search` and removes a Tier 2 design choice. WAL + foreign-key cascades cover the concurrency + integrity story.
-4. **Mobile** — desktop-first; responsive CSS is welcome but mobile-native is a non-goal.
+4. ~~**Mobile** — desktop-first; responsive CSS is welcome but mobile-native is a non-goal.~~ **Superseded (in progress)** — see *Native iOS app* under **Scope evolution** above.
