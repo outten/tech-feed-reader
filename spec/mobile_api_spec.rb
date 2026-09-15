@@ -763,6 +763,7 @@ RSpec.describe 'Mobile API' do
       body = JSON.parse(last_response.body)
       expect(body['summary']['extractive']).to eq('A short summary.')
       expect(body['tags'].map { |t| t['name'] }).to eq(['Ruby'])
+      expect(body['feed']['title']).to eq('Example Feed')
     end
 
     it 'GET /api/v1/articles/:uid returns null summary and empty tags when neither exist' do

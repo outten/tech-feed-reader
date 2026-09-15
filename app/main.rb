@@ -3877,7 +3877,11 @@ class TechFeedReader < Sinatra::Base
     halt 404, JSON.generate(error: 'not-found') unless article
     article
       .merge(ReadStateStore.get(api_user_id, article['id']))
-      .merge('summary' => SummaryStore.find(article['id']), 'tags' => TagsStore.tags_for_article(api_user_id, article['id']))
+      .merge(
+        'summary' => SummaryStore.find(article['id']),
+        'tags' => TagsStore.tags_for_article(api_user_id, article['id']),
+        'feed' => FeedsStore.find(article['feed_id'])
+      )
       .to_json
   end
 
