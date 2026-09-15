@@ -57,6 +57,20 @@ final class AudioPlayerViewModel: ObservableObject {
     private static let positionKeyPrefix = "tfr.podcast.position."
     private static let saveThrottleSeconds: TimeInterval = 5
 
+    /// Phase 14 — "Continue Listening" reads locally-stored positions
+    /// directly, mirroring the web app's `continue-progress.js` (which
+    /// scans `localStorage` for the same key prefix). Skips near-zero
+    /// positions as noise, matching the web's `MIN_SECONDS`.
+    static func storedPositions(minSeconds: Double = 5, maxItems: Int = 6) -> [(uid: String, seconds: Double)] {
+        UserDefaults.standard.dictionaryRepresentation()
+            .compactMap { key, value -> (String, Double)? in
+                guard key.hasPrefix(positionKeyPrefix), let seconds = value as? Double, seconds >= minSeconds else { return nil }
+                return (String(key.dropFirst(positionKeyPrefix.count)), seconds)
+            }
+            .prefix(maxItems)
+            .map { (uid: $0.0, seconds: $0.1) }
+    }
+
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var lastPositionSaveAt: Date = .distantPast

@@ -869,6 +869,64 @@ RSpec.describe 'Mobile API' do
     end
   end
 
+  describe 'home dashboard (Phase 14)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+
+    it 'GET /api/v1/home returns stats for the caller' do
+      feed = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml', title: 'Example Feed').first
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'home-1', title: 'Unread One', url: 'https://example.com/1',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      article = ArticlesStore.find_by_uid('home-1')
+      ReadStateStore.mark_bookmarked(user['id'], article['id'], value: true)
+
+      get '/api/v1/home', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['stats']['bookmarks']).to eq(1)
+      expect(body['stats']['articles']).to eq(1)
+    end
+
+    it 'GET /api/v1/home partitions today\'s articles by kind and empty lists are not errors' do
+      feed = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml', title: 'Example Feed').first
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'read-today', title: 'Plain', url: 'https://example.com/plain',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }, {
+        uid: 'listen-today', title: 'Episode', url: 'https://example.com/ep',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: '',
+        audio_url: 'https://example.com/ep.mp3', audio_mime_type: 'audio/mpeg'
+      }])
+
+      get '/api/v1/home', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['today_reading'].map { |a| a['uid'] }).to eq(['read-today'])
+      expect(body['today_listening'].map { |a| a['uid'] }).to eq(['listen-today'])
+      expect(body['today_watching']).to eq([])
+      expect(body['today_matches']).to eq([])
+      expect(body['live_matches']).to eq([])
+    end
+
+    it 'GET /api/v1/home includes today\'s matches for a followed team, with team info merged in' do
+      league = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football', source_provider: 'espn', external_id: 'football/nfl')
+      team = SportsTeamsStore.upsert(league_id: league['id'], slug: 'eagles', name: 'Philadelphia Eagles', source_provider: 'espn', external_id: '21')
+      SportsFollowsStore.add(user_id: user['id'], kind: 'team', value: 'eagles')
+      SportsMatchesStore.upsert(
+        league_id: league['id'], source_provider: 'espn', external_id: 'game-1',
+        scheduled_at: Time.now.utc.iso8601, status: 'scheduled', home_team_id: team['id']
+      )
+
+      get '/api/v1/home', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['today_matches'].length).to eq(1)
+      expect(body['today_matches'].first['home_team']['slug']).to eq('eagles')
+    end
+  end
+
   describe 'DELETE /api/v1/session' do
     it 'revokes the token so subsequent requests 401' do
       result = sign_up_native

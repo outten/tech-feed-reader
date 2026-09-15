@@ -386,6 +386,12 @@ final class APIClient {
         )
     }
 
+    // MARK: - Phase 14: home dashboard
+
+    func fetchHome() async throws -> HomeResponse {
+        try await request(path: "/api/v1/home", method: "GET", authenticated: true)
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }

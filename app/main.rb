@@ -3848,6 +3848,54 @@ class TechFeedReader < Sinatra::Base
     FeedsStore.for_user(api_user_id).to_json
   end
 
+  # Phase 14 (mobile-home-dashboard) — bundles the same data the web
+  # `/` dashboard's load_whats_on_today! helper assembles, so the iOS
+  # Home screen is one round-trip instead of five. Deliberately thinner
+  # than the web version in two ways (see design.md): no YouTube-
+  # fallback padding when today's video count is thin, and no
+  # continue-watching (the web's is client-side from localStorage; the
+  # iOS equivalent — Phase 13's resume positions — is podcast-only).
+  get '/api/v1/home' do
+    today        = Date.today
+    start_of_day = Time.new(today.year, today.month, today.day, 0, 0, 0).utc
+
+    today_matches = SportsMatchesStore.upcoming_for_followed_teams(api_user_id, days_forward: 1)
+    followed_league_slugs = SportsFollowsStore.for_kind(api_user_id, 'league').map { |f| f['value'] }
+    league_today = followed_league_slugs.flat_map do |slug|
+      row = SportsLeaguesStore.find_by_slug(slug)
+      next [] unless row
+      SportsMatchesStore.upcoming_for_league(row['id'], now: Time.now.utc, limit: 5)
+    end
+    today_matches = (today_matches + league_today).uniq { |m| m['id'] }.sort_by { |m| m['scheduled_at'].to_s }
+    live_matches = SportsMatchesStore.live
+
+    teams_by_id = build_teams_by_id_for_matches(today_matches + live_matches)
+    merge_teams = lambda do |m|
+      m.merge('home_team' => teams_by_id[m['home_team_id']], 'away_team' => teams_by_id[m['away_team_id']])
+    end
+    today_matches = today_matches.map(&merge_teams)
+    live_matches  = live_matches.map(&merge_teams)
+
+    scored = Recommendation::ForYou.score_window(api_user_id, state: :all, limit: 200, offset: 0)
+    todays = scored.select { |a| a['published_at'].to_s >= start_of_day.iso8601 }
+    today_listening = todays.select { |a| a['audio_url'].to_s.size.positive? }.first(10)
+    videos_today, non_video = todays.reject { |a| a['audio_url'].to_s.size.positive? }
+                                    .partition { |a| youtube_video_id(a) }
+
+    {
+      stats: {
+        unread:    ReadStateStore.unread_count(api_user_id),
+        bookmarks: ReadStateStore.bookmarked_count(api_user_id),
+        articles:  ArticlesStore.count_for_user(api_user_id)
+      },
+      today_matches:   today_matches,
+      live_matches:    live_matches,
+      today_reading:   non_video.first(10),
+      today_listening: today_listening,
+      today_watching:  videos_today.first(10)
+    }.to_json
+  end
+
   API_V1_ARTICLES_PER_PAGE = 50
   get '/api/v1/articles' do
     page    = [params['page'].to_i, 1].max

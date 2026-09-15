@@ -5,7 +5,7 @@ import SwiftUI
 /// Same view tree for both — see RootView.
 struct MainView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @State private var selection: SidebarItem?
+    @State private var selection: SidebarItem? = .home
 
     var body: some View {
         NavigationSplitView {
@@ -23,6 +23,8 @@ struct MainView: View {
             // into, rather than relying on the split view's column model.
             NavigationStack {
                 switch selection {
+                case .home:
+                    HomeView()
                 case .allArticles:
                     ReadingRiverView()
                 case .feed(let feed):
