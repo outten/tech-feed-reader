@@ -70,13 +70,20 @@ final class APIClient {
     }
 
     /// `state`: "unread" | "bookmarked" | "archived" | "all" (server default) — see mobile-reading-parity spec.
-    func fetchArticles(feedId: Int? = nil, tagId: Int? = nil, state: String? = nil, topic: String? = nil, page: Int = 1) async throws -> [Article] {
+    /// `kind`: "podcast" | nil (all, server default) — Phase 12.
+    /// `sort`: "relevance" (For You) | nil (chronological, server default) — Phase 12.
+    func fetchArticles(
+        feedId: Int? = nil, tagId: Int? = nil, state: String? = nil, topic: String? = nil,
+        kind: String? = nil, sort: String? = nil, page: Int = 1
+    ) async throws -> [Article] {
         let path = urlPath("/api/v1/articles", query: [
             "page": String(page),
             "feed_id": feedId.map(String.init),
             "tag_id": tagId.map(String.init),
             "state": state,
-            "topic": topic
+            "topic": topic,
+            "kind": kind,
+            "sort": sort
         ])
         return try await request(path: path, method: "GET", authenticated: true)
     }

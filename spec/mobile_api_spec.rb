@@ -827,6 +827,48 @@ RSpec.describe 'Mobile API' do
     end
   end
 
+  describe 'reading river (Phase 12)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+    let!(:feed)  { FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml', title: 'Example Feed').first }
+
+    it 'GET /api/v1/articles?kind=podcast filters to podcast episodes' do
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'plain-1', title: 'Plain Article', url: 'https://example.com/plain',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'pod-1', title: 'Episode', url: 'https://example.com/ep1',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: '',
+        audio_url: 'https://example.com/ep1.mp3', audio_mime_type: 'audio/mpeg'
+      }])
+
+      get '/api/v1/articles', { kind: 'podcast' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to eq(['pod-1'])
+    end
+
+    it 'GET /api/v1/articles?sort=relevance forces the unread state and returns a ranked list' do
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'unread-1', title: 'Unread', url: 'https://example.com/unread',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      article = ArticlesStore.find_by_uid('unread-1')
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'read-1', title: 'Already Read', url: 'https://example.com/read',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      read_article = ArticlesStore.find_by_uid('read-1')
+      ReadStateStore.mark_read(user['id'], read_article['id'], read: true)
+
+      get '/api/v1/articles', { sort: 'relevance', state: 'all' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to eq(['unread-1'])
+    end
+  end
+
   describe 'DELETE /api/v1/session' do
     it 'revokes the token so subsequent requests 401' do
       result = sign_up_native

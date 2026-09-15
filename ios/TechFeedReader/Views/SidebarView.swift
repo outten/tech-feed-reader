@@ -14,6 +14,7 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selection) {
             Section("Library") {
+                Label("All Articles", systemImage: "list.bullet").tag(SidebarItem.allArticles)
                 Label("Bookmarks", systemImage: "bookmark").tag(SidebarItem.bookmarks)
                 Label("Search", systemImage: "magnifyingglass").tag(SidebarItem.search)
                 Label("Tags", systemImage: "tag").tag(SidebarItem.tags)

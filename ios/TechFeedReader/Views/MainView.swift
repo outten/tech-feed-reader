@@ -23,6 +23,8 @@ struct MainView: View {
             // into, rather than relying on the split view's column model.
             NavigationStack {
                 switch selection {
+                case .allArticles:
+                    ReadingRiverView()
                 case .feed(let feed):
                     ArticlesListView(title: feed.title ?? "Articles") {
                         try await APIClient.shared.fetchArticles(feedId: feed.id)

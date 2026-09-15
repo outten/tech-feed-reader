@@ -227,4 +227,16 @@ Not a product capability (no spec.md — this is dev tooling, not app behavior),
 - [x] 27.8 Real mark-unread control (toolbar envelope icon toggles both ways now; `.task` still auto-marks-read once on open, matching the web app's behavior of marking read on open)
 - [~] 27.9 Verified what can be verified non-interactively: `xcodegen generate` + clean build succeeded on iPhone 17 and iPad Pro 11" (M5) destinations, and the app installs and launches without crashing on both (screenshot-confirmed — iPhone 17 shows the recovery-code login screen; iPad Pro 11" is already signed in as `ios-tester` from an earlier session and shows the sidebar/split view with no regressions). **Full tap-through into an article to see the new header/feedback/mute/tags/summary chrome needs a human at the Simulator** — no Accessibility automation access in this environment, same limitation as every prior interactive-verification task. A fresh recovery code for `ios-tester` was minted for this (see chat).
 
-**Phases 12-15 (roadmapped, not yet tasked)**: the reading river + `sort=relevance` (For You), player parity (scrubber/skip/speed/resume/Now Playing), a home/"What's On Today" dashboard, and discovery odds-and-ends (bus mode, lucky, per-feed refresh/weights, tag-rule authoring, welcome onboarding, data export) — see design.md.
+## 28. Phase 12 — The reading river (backend)
+
+- [x] 28.1 Add a `kind` query param to `GET /api/v1/articles` (`podcast` or unset/all), passed through to `ArticlesStore.recent` (matches the web app: `kind`/`topic` only apply on the unscoped branch, not the tag/feed branches)
+- [x] 28.2 Add a `sort` query param (`relevance` or unset/chronological); when `relevance`, call `Recommendation::ForYou.score_window(api_user_id, state: :unread, kind:, topic:, limit:, offset:)` instead of `ArticlesStore.recent`, forcing the effective state to unread — mirrors `app/main.rb`'s web `/articles` route (~line 2122)
+- [x] 28.3 Request specs covering the scenarios in `specs/mobile-reading-river/spec.md` — 2 new examples in `spec/mobile_api_spec.rb`
+
+## 29. Phase 12 — The reading river (iOS)
+
+- [x] 29.1 `APIClient.fetchArticles` gains `kind`/`sort` params, passed through to the existing query-building `urlPath` helper
+- [x] 29.2 New `ReadingRiverView`: state filter (segmented control: all/unread/bookmarked/archived), kind filter (podcasts-only toggle), topic filter (picker — a static list mirroring `FeedCatalog::TOPICS`, not the unrelated AI topic-clusters `/api/v1/topics` endpoint the Topics sidebar item already uses), and a "For You (relevance)" toggle that also forces the state filter to unread, matching the web app
+- [x] 29.3 Page-based "Load More" at the end of a full page (heuristic: last fetch returned a full page's worth of rows) — appends without duplicating or losing scroll position
+- [x] 29.4 Add `.allArticles` to `SidebarItem`/`SidebarView` (Library section, above the per-feed list) and wire it in `MainView`'s switch
+- [~] 29.5 Build succeeded and installed/launched cleanly on iPhone 17 and iPad Pro 11" (M5) — screenshot-confirmed the new "All Articles" sidebar entry renders correctly on iPad (already signed in). Interactive verification of the filters/sort/pagination themselves needs a human at the Simulator, same limitation as every prior interactive-verification task.

@@ -3859,15 +3859,24 @@ class TechFeedReader < Sinatra::Base
     state = :all unless ARTICLES_STATE_FILTERS.include?(state)
     topic = params['topic'].to_s
     topic = nil if topic.empty?
+    kind = params['kind'].to_s == 'podcast' ? :podcast : :all
+    sort = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     articles = if tag_id.positive?
                  ArticlesStore.for_tag(api_user_id, tag_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
                elsif feed_id.positive?
                  ArticlesStore.for_feed(api_user_id, feed_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state)
+               elsif sort == :relevance
+                 # Phase 12 — For-You ranker only scores unread articles,
+                 # same as the web `/articles?sort=relevance` route.
+                 Recommendation::ForYou.score_window(
+                   api_user_id, state: :unread, kind: kind, topic: topic,
+                   limit: API_V1_ARTICLES_PER_PAGE, offset: offset
+                 )
                else
-                 # topic (Phase 8a — Comics/NPR/PBS) only applies here, matching
-                 # the web /comics, /npr, /pbs routes' use of ArticlesStore.recent.
-                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state, topic: topic)
+                 # topic/kind (Phase 8a/12) only apply here, matching the web
+                 # /comics, /npr, /pbs, /articles?kind= routes' use of ArticlesStore.recent.
+                 ArticlesStore.recent(api_user_id, limit: API_V1_ARTICLES_PER_PAGE, offset: offset, state: state, kind: kind, topic: topic)
                end
     articles.to_json
   end
