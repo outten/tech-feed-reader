@@ -240,3 +240,13 @@ Not a product capability (no spec.md — this is dev tooling, not app behavior),
 - [x] 29.3 Page-based "Load More" at the end of a full page (heuristic: last fetch returned a full page's worth of rows) — appends without duplicating or losing scroll position
 - [x] 29.4 Add `.allArticles` to `SidebarItem`/`SidebarView` (Library section, above the per-feed list) and wire it in `MainView`'s switch
 - [~] 29.5 Build succeeded and installed/launched cleanly on iPhone 17 and iPad Pro 11" (M5) — screenshot-confirmed the new "All Articles" sidebar entry renders correctly on iPad (already signed in). Interactive verification of the filters/sort/pagination themselves needs a human at the Simulator, same limitation as every prior interactive-verification task.
+
+## 30. Phase 13 — Player parity (iOS only, no backend changes)
+
+Everything here is local playback state — resume position lives in `UserDefaults`, matching the web app's own `localStorage`-based, non-account-synced approach. No new `/api/v1/*` surface.
+
+- [x] 30.1 `AudioPlayerViewModel`: add `seek(to:)`, `skipBackward()`/`skipForward()` (15s/30s, matching the web app's `SKIP_BACK_S`/`SKIP_FWD_S`), `playbackRate` + `setPlaybackRate(_:)` (1×/1.25×/1.5×/1.75×/2×, matching the web `<select>` options)
+- [x] 30.2 Resume-from-last-position: per-episode position saved to `UserDefaults` (throttled, matching the web's 5s throttle), restored on `play(_:)` unless within the last 30s of duration (matches the web's `RESUME_TAIL_S`)
+- [x] 30.3 `MPNowPlayingInfoCenter` + `MPRemoteCommandCenter` wiring: title/elapsed/duration/rate published on every time-tick and state change; play/pause/skip-backward/skip-forward/changePlaybackPosition commands registered so lock-screen/CarPlay/AirPods controls work on backgrounded audio
+- [x] 30.4 `MiniPlayerView`: scrubber (Slider, seeks on release), elapsed/duration time labels, skip-back/skip-forward buttons, playback-speed menu — all hidden for radio streams (no known duration), matching the existing indeterminate-progress fallback
+- [~] 30.5 Build succeeded and installed/launched cleanly on iPhone 17 and iPad Pro 11" (M5), no regressions (screenshot-confirmed). Actually playing an episode, scrubbing, and checking Control Center/lock-screen controls needs a human at the Simulator — no Accessibility automation access in this environment, same limitation as every prior interactive-verification task.
