@@ -217,14 +217,14 @@ Not a product capability (no spec.md — this is dev tooling, not app behavior),
 
 ## 27. Phase 11 — Article detail parity (iOS)
 
-- [ ] 27.1 Extend `Article` model: `summary`, `tags: [Tag]`, decode already-present-but-unused fields (`imageUrl`, `author`, `feedback`)
-- [ ] 27.2 Article detail header: hero image, feed name, author, relative time, reading time / episode duration
-- [ ] 27.3 "Source" link/button opening `article.url` in a `SafariView` sheet
-- [ ] 27.4 👍/👎 feedback controls wired to the new endpoint
-- [ ] 27.5 Mute-author / mute-keyword shortcuts on the article screen (reuses the existing `POST /api/v1/mute_rules`, just surfaced inline instead of only from the Mute Rules management screen)
-- [ ] 27.6 Tag chips: applied tags (tap to remove) + unapplied tags (tap to apply), wired to the new endpoints
-- [ ] 27.7 Cached summary display block
-- [ ] 27.8 Real mark-unread control (today's `markRead()` only ever sets `read: true`)
-- [ ] 27.9 Verify in the Simulator against the local dev server
+- [x] 27.1 Extend `Article` model: `summary` (new `ArticleSummary` type), `tags: [Tag]`, `feed: Feed?`, `feedback: Int?` — `Models/Article.swift` + `Models/Article+Display.swift` (relative time / reading time / duration / hero-image-URL helpers)
+- [x] 27.2 Article detail header: hero image, feed name, author, relative time, reading time / episode duration
+- [x] 27.3 "Source" link/button opening `article.url` in a `SafariView` sheet
+- [x] 27.4 👍/👎 feedback controls wired to the new endpoint
+- [x] 27.5 Mute-author / mute-keyword shortcuts on the article screen (reuses the existing `POST /api/v1/mute_rules`, just surfaced inline instead of only from the Mute Rules management screen)
+- [x] 27.6 Tag chips: applied tags (tap to remove) + unapplied tags (tap to apply), wired to the new endpoints
+- [x] 27.7 Cached summary display block
+- [x] 27.8 Real mark-unread control (toolbar envelope icon toggles both ways now; `.task` still auto-marks-read once on open, matching the web app's behavior of marking read on open)
+- [~] 27.9 Verified what can be verified non-interactively: `xcodegen generate` + clean build succeeded on iPhone 17 and iPad Pro 11" (M5) destinations, and the app installs and launches without crashing on both (screenshot-confirmed — iPhone 17 shows the recovery-code login screen; iPad Pro 11" is already signed in as `ios-tester` from an earlier session and shows the sidebar/split view with no regressions). **Full tap-through into an article to see the new header/feedback/mute/tags/summary chrome needs a human at the Simulator** — no Accessibility automation access in this environment, same limitation as every prior interactive-verification task. A fresh recovery code for `ios-tester` was minted for this (see chat).
 
 **Phases 12-15 (roadmapped, not yet tasked)**: the reading river + `sort=relevance` (For You), player parity (scrubber/skip/speed/resume/Now Playing), a home/"What's On Today" dashboard, and discovery odds-and-ends (bus mode, lucky, per-feed refresh/weights, tag-rule authoring, welcome onboarding, data export) — see design.md.

@@ -355,6 +355,30 @@ final class APIClient {
         )
     }
 
+    // MARK: - Phase 11: article detail parity (feedback, tag apply/remove)
+
+    struct FeedbackResponse: Decodable { let ok: Bool; let feedback: Int }
+
+    /// `value`: `1` (thumbs up), `-1` (thumbs down), or `0` (clear).
+    func setArticleFeedback(uid: String, value: Int) async throws {
+        let _: FeedbackResponse = try await request(
+            path: "/api/v1/articles/\(percentEncodedPathSegment(uid))/feedback",
+            method: "POST", jsonBody: ["value": value], authenticated: true
+        )
+    }
+
+    func applyTag(uid: String, tagId: Int) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/articles/\(percentEncodedPathSegment(uid))/tags/\(tagId)", method: "POST", authenticated: true
+        )
+    }
+
+    func removeTag(uid: String, tagId: Int) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/articles/\(percentEncodedPathSegment(uid))/tags/\(tagId)", method: "DELETE", authenticated: true
+        )
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }
