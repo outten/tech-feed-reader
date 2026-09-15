@@ -210,10 +210,10 @@ Not a product capability (no spec.md — this is dev tooling, not app behavior),
 
 ## 26. Phase 11 — Article detail parity (backend)
 
-- [ ] 26.1 Add `summary` and `tags` to `GET /api/v1/articles/:uid` (wraps `SummaryStore.find` + `TagsStore.tags_for_article`)
-- [ ] 26.2 Add `POST /api/v1/articles/:uid/feedback` (wraps `ReadStateStore.mark_feedback`, validates `value ∈ {-1,0,1}`)
-- [ ] 26.3 Add `POST /api/v1/articles/:uid/tags/:tag_id` and `DELETE /api/v1/articles/:uid/tags/:tag_id` (wraps `TagsStore.tag_article`/`.untag_article`, 404 if the tag isn't owned by the caller — check via `TagsStore.find(api_user_id, tag_id)` first)
-- [ ] 26.4 Request specs covering the scenarios in `specs/mobile-article-detail-parity/spec.md`
+- [x] 26.1 Add `summary` and `tags` to `GET /api/v1/articles/:uid` (wraps `SummaryStore.find` + `TagsStore.tags_for_article`)
+- [x] 26.2 Add `POST /api/v1/articles/:uid/feedback` (wraps `ReadStateStore.mark_feedback`, validates `value ∈ {-1,0,1}`)
+- [x] 26.3 Add `POST /api/v1/articles/:uid/tags/:tag_id` and `DELETE /api/v1/articles/:uid/tags/:tag_id` (wraps `TagsStore.tag_article`/`.untag_article`, 404 if the tag isn't owned by the caller — check via `TagsStore.find(api_user_id, tag_id)` first)
+- [x] 26.4 Request specs covering the scenarios in `specs/mobile-article-detail-parity/spec.md` — 7 new examples in `spec/mobile_api_spec.rb`, full suite 1825/0. Note: every non-empty article gets an automatic extractive summary on import (`ArticlesStore#generate_extractive_for`), so "no summary yet" only occurs for empty-body articles — adjusted a test assumption accordingly.
 
 ## 27. Phase 11 — Article detail parity (iOS)
 

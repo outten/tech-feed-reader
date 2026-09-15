@@ -740,6 +740,92 @@ RSpec.describe 'Mobile API' do
     end
   end
 
+  describe 'article detail parity (Phase 11)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+    let!(:feed)  { FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml', title: 'Example Feed').first }
+    let!(:article) do
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'art-1', title: 'Hello World', url: 'https://example.com/1',
+        author: nil, published_at: Time.now.utc.iso8601,
+        content_html: '<p>Hi</p>', content_text: 'Hi'
+      }])
+      ArticlesStore.find_by_uid('art-1')
+    end
+
+    it 'GET /api/v1/articles/:uid includes summary and tags' do
+      SummaryStore.upsert(article['id'], extractive: 'A short summary.')
+      tag = TagsStore.add(user_id: user['id'], name: 'Ruby', match_kind: 'keyword', match_value: 'ruby')
+      TagsStore.tag_article(article['id'], tag['id'])
+
+      get "/api/v1/articles/#{article['uid']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['summary']['extractive']).to eq('A short summary.')
+      expect(body['tags'].map { |t| t['name'] }).to eq(['Ruby'])
+    end
+
+    it 'GET /api/v1/articles/:uid returns null summary and empty tags when neither exist' do
+      # An empty content_text skips the auto-generated extractive
+      # summary on import (see ArticlesStore#generate_extractive_for) —
+      # any non-empty body gets one automatically, so this is the only
+      # way to exercise the true "no summary yet" case.
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'art-2', title: 'No Summary', url: 'https://example.com/2',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      no_summary_article = ArticlesStore.find_by_uid('art-2')
+
+      get "/api/v1/articles/#{no_summary_article['uid']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['summary']).to be_nil
+      expect(body['tags']).to eq([])
+    end
+
+    it 'POST /api/v1/articles/:uid/feedback records thumbs up' do
+      post "/api/v1/articles/#{article['uid']}/feedback", { value: 1 }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(ReadStateStore.get(user['id'], article['id'])['feedback'].to_i).to eq(1)
+    end
+
+    it 'POST /api/v1/articles/:uid/feedback clears feedback with value: 0' do
+      ReadStateStore.mark_feedback(user['id'], article['id'], value: 1)
+      post "/api/v1/articles/#{article['uid']}/feedback", { value: 0 }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(ReadStateStore.get(user['id'], article['id'])['feedback'].to_i).to eq(0)
+    end
+
+    it 'POST /api/v1/articles/:uid/feedback rejects an invalid value' do
+      post "/api/v1/articles/#{article['uid']}/feedback", { value: 5 }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(400)
+    end
+
+    it 'applies and removes a tag on an article' do
+      tag = TagsStore.add(user_id: user['id'], name: 'Ruby', match_kind: 'keyword', match_value: 'ruby')
+
+      post "/api/v1/articles/#{article['uid']}/tags/#{tag['id']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(TagsStore.tags_for_article(user['id'], article['id']).map { |t| t['id'] }).to eq([tag['id']])
+
+      delete "/api/v1/articles/#{article['uid']}/tags/#{tag['id']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(TagsStore.tags_for_article(user['id'], article['id'])).to eq([])
+    end
+
+    it 'refuses to apply a tag owned by another user' do
+      other = sign_up_native(username: 'other-user')
+      other_user = UsersStore.find_by_username(other['username'])
+      other_tag = TagsStore.add(user_id: other_user['id'], name: 'Not Yours', match_kind: 'keyword', match_value: 'x')
+
+      post "/api/v1/articles/#{article['uid']}/tags/#{other_tag['id']}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(404)
+    end
+  end
+
   describe 'DELETE /api/v1/session' do
     it 'revokes the token so subsequent requests 401' do
       result = sign_up_native

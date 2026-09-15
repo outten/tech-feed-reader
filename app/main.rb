@@ -3875,7 +3875,37 @@ class TechFeedReader < Sinatra::Base
   get '/api/v1/articles/:uid' do |uid|
     article = ArticlesStore.find_by_uid(uid)
     halt 404, JSON.generate(error: 'not-found') unless article
-    article.merge(ReadStateStore.get(api_user_id, article['id'])).to_json
+    article
+      .merge(ReadStateStore.get(api_user_id, article['id']))
+      .merge('summary' => SummaryStore.find(article['id']), 'tags' => TagsStore.tags_for_article(api_user_id, article['id']))
+      .to_json
+  end
+
+  # Phase 11 (mobile-article-detail-parity) — feedback + tag apply/remove.
+  post '/api/v1/articles/:uid/feedback' do |uid|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'not-found') unless article
+    body = parse_json_body
+    value = body.is_a?(Hash) ? body['value'] : nil
+    halt 400, JSON.generate(error: 'invalid-value') unless ReadStateStore::FEEDBACK_VALUES.include?(value)
+    ReadStateStore.mark_feedback(api_user_id, article['id'], value: value)
+    { ok: true, feedback: value }.to_json
+  end
+
+  post '/api/v1/articles/:uid/tags/:tag_id' do |uid, tag_id|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'not-found') unless article
+    halt 404, JSON.generate(error: 'not-found') unless TagsStore.find(api_user_id, tag_id.to_i)
+    TagsStore.tag_article(article['id'], tag_id.to_i)
+    { ok: true }.to_json
+  end
+
+  delete '/api/v1/articles/:uid/tags/:tag_id' do |uid, tag_id|
+    article = ArticlesStore.find_by_uid(uid)
+    halt 404, JSON.generate(error: 'not-found') unless article
+    halt 404, JSON.generate(error: 'not-found') unless TagsStore.find(api_user_id, tag_id.to_i)
+    TagsStore.untag_article(article['id'], tag_id.to_i)
+    { ok: true }.to_json
   end
 
   # Phase 3 (mobile-reading-parity) — search, tags, topics. Same
