@@ -16,6 +16,8 @@ struct SidebarView: View {
             Section("Library") {
                 Label("Home", systemImage: "house").tag(SidebarItem.home)
                 Label("All Articles", systemImage: "list.bullet").tag(SidebarItem.allArticles)
+                Label("Bus Mode", systemImage: "bus").tag(SidebarItem.busMode)
+                Label("I Feel Lucky", systemImage: "dice").tag(SidebarItem.lucky)
                 Label("Bookmarks", systemImage: "bookmark").tag(SidebarItem.bookmarks)
                 Label("Search", systemImage: "magnifyingglass").tag(SidebarItem.search)
                 Label("Tags", systemImage: "tag").tag(SidebarItem.tags)

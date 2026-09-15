@@ -56,3 +56,14 @@ The system SHALL expose token-authenticated JSON endpoints equivalent to the exi
 - **WHEN** an authenticated client sends `POST /api/v1/subscriptions` for a feed they are not yet subscribed to
 - **THEN** the response is HTTP 200/201
 - **THEN** the feed appears in a subsequent `GET /api/v1/feeds` call for that user
+
+### Requirement: Feed list includes each feed's current relevance weight
+`GET /api/v1/feeds` SHALL include each feed's current per-user weight (from the existing `feed_feedback` weighting used by the For-You ranker), so the client can show it without a second round-trip.
+
+#### Scenario: Default weight
+- **WHEN** an authenticated client requests `GET /api/v1/feeds` for a feed they've never up/down-weighted
+- **THEN** that feed's `weight` is `1.0`
+
+#### Scenario: Adjusted weight
+- **WHEN** an authenticated client has previously up-weighted a feed
+- **THEN** that feed's `weight` in the response reflects the adjustment

@@ -24,13 +24,11 @@ struct MainView: View {
             NavigationStack {
                 switch selection {
                 case .home:
-                    HomeView()
+                    HomeGateView()
                 case .allArticles:
                     ReadingRiverView()
                 case .feed(let feed):
-                    ArticlesListView(title: feed.title ?? "Articles") {
-                        try await APIClient.shared.fetchArticles(feedId: feed.id)
-                    }
+                    FeedArticlesView(feed: feed)
                 case .bookmarks:
                     ArticlesListView(title: "Bookmarks", emptyTitle: "No Bookmarks Yet") {
                         try await APIClient.shared.fetchArticles(state: "bookmarked")
@@ -73,6 +71,12 @@ struct MainView: View {
                     DigestsHomeView()
                 case .account:
                     AccountView()
+                case .busMode:
+                    BusModeView()
+                case .lucky:
+                    ArticlesListView(title: "I Feel Lucky", emptyTitle: "Nothing To Show") {
+                        try await APIClient.shared.fetchLucky()
+                    }
                 case nil:
                     ContentUnavailableView("Select an Item", systemImage: "list.bullet.rectangle")
                 }

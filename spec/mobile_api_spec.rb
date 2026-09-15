@@ -112,6 +112,23 @@ RSpec.describe 'Mobile API' do
       expect(feeds.length).to eq(1)
       expect(feeds.first['title']).to eq('Example Feed')
     end
+
+    it 'includes each feed\'s default and adjusted weight (Phase 15)' do
+      result = sign_up_native
+      user   = UsersStore.find_by_username('mobileuser')
+      feed   = FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml', title: 'Example Feed').first
+
+      get '/api/v1/feeds', {}, auth_header(result['api_token'])
+      expect(JSON.parse(last_response.body).first['weight']).to eq(1.0)
+
+      post "/api/v1/feeds/#{feed['id']}/weight", { direction: 'up' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)['weight']).to eq(1.25)
+
+      get '/api/v1/feeds', {}, auth_header(result['api_token'])
+      expect(JSON.parse(last_response.body).first['weight']).to eq(1.25)
+    end
   end
 
   describe 'articles + read-state + subscriptions' do
@@ -924,6 +941,93 @@ RSpec.describe 'Mobile API' do
       body = JSON.parse(last_response.body)
       expect(body['today_matches'].length).to eq(1)
       expect(body['today_matches'].first['home_team']['slug']).to eq('eagles')
+    end
+  end
+
+  describe 'discovery odds and ends (Phase 15)' do
+    let(:result) { sign_up_native }
+    let(:user)   { UsersStore.find_by_username(result['username']) }
+    let!(:feed)  { FeedsStore.add_for_user(user_id: user['id'], url: 'https://example.com/feed.xml', title: 'Example Feed').first }
+
+    it 'GET /api/v1/articles/bus filters to short podcast episodes' do
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'short-ep', title: 'Short', url: 'https://example.com/short',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: '',
+        audio_url: 'https://example.com/short.mp3', audio_mime_type: 'audio/mpeg', audio_duration_seconds: 600
+      }, {
+        uid: 'long-ep', title: 'Long', url: 'https://example.com/long',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: '',
+        audio_url: 'https://example.com/long.mp3', audio_mime_type: 'audio/mpeg', audio_duration_seconds: 3600
+      }])
+
+      get '/api/v1/articles/bus', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body).map { |a| a['uid'] }).to eq(['short-ep'])
+    end
+
+    it 'GET /api/v1/articles/lucky returns a random sample' do
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'lucky-1', title: 'Lucky', url: 'https://example.com/lucky',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+
+      get '/api/v1/articles/lucky', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body).map { |a| a['uid'] }).to eq(['lucky-1'])
+    end
+
+    it 'POST /api/v1/feeds/:id/refresh enqueues a refresh' do
+      post "/api/v1/feeds/#{feed['id']}/refresh", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)['ok']).to eq(true)
+    end
+
+    it 'creates, lists, and deletes a tag rule' do
+      post '/api/v1/tags', { name: 'Ruby', match_kind: 'keyword', match_value: 'ruby' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      tag_id = JSON.parse(last_response.body)['tag']['id']
+
+      get '/api/v1/tags', {}, auth_header(result['api_token'])
+      expect(JSON.parse(last_response.body).map { |t| t['name'] }).to eq(['Ruby'])
+
+      delete "/api/v1/tags/#{tag_id}", {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+
+      get '/api/v1/tags', {}, auth_header(result['api_token'])
+      expect(JSON.parse(last_response.body)).to eq([])
+    end
+
+    it 'rejects an invalid tag match_kind' do
+      post '/api/v1/tags', { name: 'Bad', match_kind: 'nonsense', match_value: 'x' }.to_json,
+           auth_header(result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(400)
+    end
+
+    it 'GET /api/v1/onboarding/chips lists the curated topics' do
+      get '/api/v1/onboarding/chips', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      chips = JSON.parse(last_response.body)
+      expect(chips.map { |c| c['topic'] }).to include('technology')
+    end
+
+    it 'POST /api/v1/onboarding/subscribe subscribes to starter feeds for selected topics' do
+      other_user_result = sign_up_native(username: 'brand-new-user')
+      post '/api/v1/onboarding/subscribe', { topics: ['technology'] }.to_json,
+           auth_header(other_user_result['api_token']).merge('CONTENT_TYPE' => 'application/json')
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['subscribed_count']).to be_positive
+
+      other_user = UsersStore.find_by_username('brand-new-user')
+      expect(FeedsStore.for_user(other_user['id'])).not_to be_empty
+    end
+
+    it 'GET /api/v1/account/export returns the account export payload' do
+      get '/api/v1/account/export', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['tables']).to have_key('user')
     end
   end
 

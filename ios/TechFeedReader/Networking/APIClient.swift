@@ -392,6 +392,76 @@ final class APIClient {
         try await request(path: "/api/v1/home", method: "GET", authenticated: true)
     }
 
+    // MARK: - Phase 15: discovery odds and ends
+
+    func fetchBusMode(maxMinutes: Int? = nil) async throws -> [Article] {
+        let path = urlPath("/api/v1/articles/bus", query: ["max_minutes": maxMinutes.map(String.init)])
+        return try await request(path: path, method: "GET", authenticated: true)
+    }
+
+    func fetchLucky() async throws -> [Article] {
+        try await request(path: "/api/v1/articles/lucky", method: "GET", authenticated: true)
+    }
+
+    private struct FeedRefreshResponse: Decodable { let ok: Bool; let feedId: Int }
+
+    func refreshFeed(id: Int) async throws {
+        let _: FeedRefreshResponse = try await request(path: "/api/v1/feeds/\(id)/refresh", method: "POST", authenticated: true)
+    }
+
+    private struct FeedWeightResponse: Decodable { let ok: Bool; let feedId: Int; let weight: Double }
+
+    /// `direction`: "up" | "down" | "reset". Returns the new weight.
+    @discardableResult
+    func adjustFeedWeight(id: Int, direction: String) async throws -> Double {
+        let response: FeedWeightResponse = try await request(
+            path: "/api/v1/feeds/\(id)/weight", method: "POST", jsonBody: ["direction": direction], authenticated: true
+        )
+        return response.weight
+    }
+
+    private struct CreateTagResponse: Decodable { let ok: Bool; let tag: Tag }
+
+    func createTag(name: String, matchKind: String, matchValue: String) async throws -> Tag {
+        let response: CreateTagResponse = try await request(
+            path: "/api/v1/tags", method: "POST",
+            jsonBody: ["name": name, "match_kind": matchKind, "match_value": matchValue], authenticated: true
+        )
+        return response.tag
+    }
+
+    func deleteTag(id: Int) async throws {
+        let _: EmptyResponse = try await request(path: "/api/v1/tags/\(id)", method: "DELETE", authenticated: true)
+    }
+
+    func fetchOnboardingChips() async throws -> [OnboardingChip] {
+        try await request(path: "/api/v1/onboarding/chips", method: "GET", authenticated: true)
+    }
+
+    private struct OnboardingSubscribeResponse: Decodable { let ok: Bool; let subscribedCount: Int }
+
+    @discardableResult
+    func subscribeOnboarding(topics: [String]) async throws -> Int {
+        let response: OnboardingSubscribeResponse = try await request(
+            path: "/api/v1/onboarding/subscribe", method: "POST", jsonBody: ["topics": topics], authenticated: true
+        )
+        return response.subscribedCount
+    }
+
+    /// Raw export bytes, written to a temp file by the caller for a
+    /// `ShareLink` — the payload shape mirrors the web's account-export
+    /// JSON exactly and isn't worth re-modeling in Swift just to pass
+    /// through unchanged.
+    func fetchAccountExportData() async throws -> Data {
+        guard let url = URL(string: "/api/v1/account/export", relativeTo: baseURL) else { throw APIError.invalidResponse }
+        var req = URLRequest(url: url.absoluteURL)
+        guard let token = KeychainStore.loadToken() else { throw APIError.unauthorized }
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw APIError.invalidResponse }
+        return data
+    }
+
     // MARK: - Core request plumbing
 
     struct EmptyResponse: Decodable { let ok: Bool? }

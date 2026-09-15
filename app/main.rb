@@ -3845,7 +3845,26 @@ class TechFeedReader < Sinatra::Base
   # ===================================================================
 
   get '/api/v1/feeds' do
-    FeedsStore.for_user(api_user_id).to_json
+    feeds = FeedsStore.for_user(api_user_id)
+    weights = FeedFeedbackStore.weights_by_feed_id(api_user_id, feeds.map { |f| f['id'] })
+    feeds.map { |f| f.merge('weight' => weights[f['id']]) }.to_json
+  end
+
+  post '/api/v1/feeds/:id/refresh' do |id|
+    feed = FeedsStore.find(id.to_i)
+    halt 404, JSON.generate(error: 'not-found') unless feed
+    FeedRefreshWorker.perform_async(feed['id'])
+    { ok: true, feed_id: feed['id'] }.to_json
+  end
+
+  post '/api/v1/feeds/:id/weight' do |id|
+    feed = FeedsStore.find(id.to_i)
+    halt 404, JSON.generate(error: 'not-found') unless feed
+    body = parse_json_body
+    direction = (body.is_a?(Hash) ? body['direction'] : nil).to_s.to_sym
+    halt 400, JSON.generate(error: 'invalid-direction') unless FeedFeedbackStore::DIRECTIONS.include?(direction)
+    weight = FeedFeedbackStore.bump(api_user_id, feed['id'], direction: direction)
+    { ok: true, feed_id: feed['id'], weight: weight }.to_json
   end
 
   # Phase 14 (mobile-home-dashboard) — bundles the same data the web
@@ -3894,6 +3913,19 @@ class TechFeedReader < Sinatra::Base
       today_listening: today_listening,
       today_watching:  videos_today.first(10)
     }.to_json
+  end
+
+  # Phase 15 (mobile-discovery-odds-and-ends) — bus mode + I Feel Lucky.
+  get '/api/v1/articles/bus' do
+    requested_minutes = params['max_minutes'].to_s
+    max_minutes = requested_minutes.match?(/\A\d+\z/) ? requested_minutes.to_i.clamp(1, BUS_MAX_MINUTES_LIMIT) : BUS_DEFAULT_MAX_MINUTES
+    ArticlesStore.recent(
+      api_user_id, limit: BUS_LIMIT, kind: :podcast, max_duration_seconds: max_minutes * 60
+    ).to_json
+  end
+
+  get '/api/v1/articles/lucky' do
+    ArticlesStore.random(api_user_id, limit: 50).to_json
   end
 
   API_V1_ARTICLES_PER_PAGE = 50
@@ -3979,6 +4011,38 @@ class TechFeedReader < Sinatra::Base
 
   get '/api/v1/tags' do
     TagsStore.all(api_user_id).to_json
+  end
+
+  # Phase 15 (mobile-discovery-odds-and-ends) — tag rule creation/deletion
+  # (Phase 11 only covered apply/remove of an *existing* tag on one article).
+  post '/api/v1/tags' do
+    body = parse_json_body
+    halt 400, JSON.generate(error: 'invalid-body') unless body.is_a?(Hash)
+    name = body['name'].to_s.strip
+    kind = body['match_kind'].to_s.strip
+    val  = body['match_value'].to_s.strip
+    halt 400, JSON.generate(error: 'missing-fields') if name.empty? || val.empty?
+    halt 400, JSON.generate(error: 'invalid-kind') unless TagsStore::KINDS.include?(kind)
+    if kind == 'regex'
+      begin
+        Regexp.new(val)
+      rescue RegexpError
+        halt 400, JSON.generate(error: 'invalid-regex')
+      end
+    end
+    begin
+      tag = TagsStore.add(user_id: api_user_id, name: name, match_kind: kind, match_value: val)
+      tagged = TagsApplier.apply_to_existing(tag)
+      { ok: true, tag: tag, tagged: tagged }.to_json
+    rescue PG::UniqueViolation
+      halt 409, JSON.generate(error: 'duplicate-name')
+    end
+  end
+
+  delete '/api/v1/tags/:id' do |id|
+    removed = TagsStore.remove(api_user_id, id.to_i)
+    halt 404, JSON.generate(error: 'not-found') unless removed
+    { ok: true }.to_json
   end
 
   get '/api/v1/topics' do
@@ -4489,6 +4553,39 @@ class TechFeedReader < Sinatra::Base
   post '/api/v1/account/recovery_codes/regenerate' do
     codes = RecoveryCodesStore.regenerate_for!(api_user_id)
     { ok: true, recovery_codes: codes }.to_json
+  end
+
+  # Phase 15 (mobile-discovery-odds-and-ends) — same payload as the web
+  # /account/export.json route, minus the download-attachment headers
+  # (an API client, not a browser, is consuming this).
+  get '/api/v1/account/export' do
+    AccountExport.for_user(api_user_id).to_json
+  end
+
+  get '/api/v1/onboarding/chips' do
+    FeedCatalog::ONBOARDING_CHIPS.map { |topic, info| info.merge(topic: topic.to_s) }.to_json
+  end
+
+  post '/api/v1/onboarding/subscribe' do
+    body = parse_json_body
+    requested = Array(body.is_a?(Hash) ? body['topics'] : nil).map(&:to_sym)
+    selected = requested & FeedCatalog::ONBOARDING_CHIPS.keys
+    halt 400, JSON.generate(error: 'no-topics-selected') if selected.empty?
+
+    subscribed_count = 0
+    selected.each do |topic|
+      FeedCatalog.starters_for_topic(topic).each do |entry|
+        _feed, inserted = FeedsStore.add_for_user(
+          user_id: api_user_id,
+          url: entry[:url],
+          title: entry[:title],
+          fetch_interval_seconds: entry[:interval],
+          topic: FeedCatalog.topic_for(entry).to_s
+        )
+        subscribed_count += 1 if inserted
+      end
+    end
+    { ok: true, subscribed_count: subscribed_count }.to_json
   end
 
   get '/api/v1/account/passkeys' do

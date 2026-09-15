@@ -14,6 +14,9 @@ struct AccountView: View {
     @State private var showingDeleteConfirm = false
     @State private var deleteConfirmText = ""
 
+    @State private var exportFileURL: URL?
+    @State private var isExporting = false
+
     var body: some View {
         List {
             if let errorMessage {
@@ -37,6 +40,18 @@ struct AccountView: View {
                 }
                 Section("Calendar") {
                     Button("Add Sports Schedule to Calendar") { showingCalendarSheet = true }
+                }
+                Section("Your Data") {
+                    if let exportFileURL {
+                        ShareLink("Share Export", item: exportFileURL)
+                    } else {
+                        Button {
+                            Task { await exportData() }
+                        } label: {
+                            if isExporting { ProgressView() } else { Text("Export My Data") }
+                        }
+                        .disabled(isExporting)
+                    }
                 }
                 Section {
                     Button("Delete Account", role: .destructive) { showingDeleteConfirm = true }
@@ -113,6 +128,19 @@ struct AccountView: View {
                     errorMessage = error.localizedDescription
                 }
             }
+        }
+    }
+
+    private func exportData() async {
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let data = try await APIClient.shared.fetchAccountExportData()
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("feeder-export-\(account?.username ?? "account").json")
+            try data.write(to: url, options: .atomic)
+            exportFileURL = url
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

@@ -263,3 +263,24 @@ Everything here is local playback state — resume position lives in `UserDefaul
 - [x] 32.3 Add `.home` to `SidebarItem`/`SidebarView` (top of Library) and make it `MainView`'s default `selection` so the app no longer opens to "Select an Item"
 - [x] 32.4 Empty state ("Nothing New Today") when every section is empty
 - [x] 32.5 Verified in the Simulator against the local dev server (real `ios-tester` data: stats, 2 live matches, 5 today's/upcoming matches) — screenshot-confirmed on iPad Pro 11" (M5). Caught a second real environment footgun along the way, unrelated to the endpoint itself: `xcodebuild install` (no `-configuration`) silently defaults to **Release**, which points at production (`https://feeder.tmoneystuff.com`) instead of localhost — every prior phase's install+screenshot verification this session had almost certainly been doing the same thing. Saved as a memory (`feedback_xcodebuild_install_defaults_release`); always pass `-configuration Debug` explicitly from here on.
+
+## 33. Phase 15 — Discovery odds and ends (backend)
+
+- [x] 33.1 `GET /api/v1/articles/bus?max_minutes=` (default 15, clamp `[1,90]`, limit 25 — mirrors the web `/bus` route's constants)
+- [x] 33.2 `GET /api/v1/articles/lucky` (wraps `ArticlesStore.random(api_user_id, limit: 50)`)
+- [x] 33.3 `POST /api/v1/feeds/:id/refresh` (enqueues `FeedRefreshWorker.perform_async`) and `POST /api/v1/feeds/:id/weight` (body `direction`, wraps `FeedFeedbackStore.bump`); `GET /api/v1/feeds` now merges in `weight` via `FeedFeedbackStore.weights_by_feed_id`
+- [x] 33.4 `POST /api/v1/tags` (create + backfill, mirrors web `/tags`) and `DELETE /api/v1/tags/:id` (wraps `TagsStore.remove`)
+- [x] 33.5 `GET /api/v1/onboarding/chips` (serializes `FeedCatalog::ONBOARDING_CHIPS`) and `POST /api/v1/onboarding/subscribe` (body `topics: [...]`, wraps `FeedCatalog.starters_for_topic` + `FeedsStore.add_for_user`, mirrors web `/welcome/subscribe`)
+- [x] 33.6 `GET /api/v1/account/export` (wraps `AccountExport.for_user`, no attachment headers — this is an API call, not a browser download)
+- [x] 33.7 Request specs covering the scenarios in `specs/mobile-discovery-odds-and-ends/spec.md` and the feed-weight scenario in `specs/mobile-api/spec.md` — 9 new examples. Caught a test-authoring mistake (not a route bug): JSON-body POST specs need an explicit `CONTENT_TYPE: application/json` header merge or Rack::Test defaults to form-urlencoded and Sinatra's form-param parsing drains the body before the route's own `parse_json_body` reads it — the real iOS client always sets this header itself, so production was never affected.
+
+## 34. Phase 15 — Discovery odds and ends (iOS)
+
+- [x] 34.1 `APIClient` methods for all six new endpoint groups above; `Feed` model gains `weight: Double?`; new `OnboardingChip` model
+- [x] 34.2 `BusModeView`: episode list + a max-minutes stepper, reachable from the sidebar
+- [x] 34.3 "I Feel Lucky" screen (reuses `ArticlesListView`), reachable from the sidebar
+- [x] 34.4 Per-feed refresh-now + weight controls (up/down/reset) via a new `FeedArticlesView` wrapper (adds a toolbar menu around the existing `ArticlesListView`, rather than forking it) — used for the `.feed(_)` sidebar case
+- [x] 34.5 `TagsListView` gains an "Add Tag" sheet (name/kind/value) and swipe-to-delete
+- [x] 34.6 `WelcomeView` + `HomeGateView`: topic chips → subscribe, shown instead of `HomeView` when the account has zero subscribed feeds (fails open to `HomeView` on a network error during the check)
+- [x] 34.7 `AccountView` gains an "Export My Data" action using `ShareLink` with the fetched export JSON written to a temp file
+- [x] 34.8 Verified in the Simulator against the local dev server (`-configuration Debug` explicit) on iPhone 17 and iPad Pro 11" (M5) — screenshot-confirmed Home loads with the new "Bus Mode"/"I Feel Lucky" sidebar entries and no regressions. Hit two build errors along the way (both fixed, neither environment-related): a SwiftUI `ForEach`/`Binding` overload-resolution error in `WelcomeView` resolved by extracting the row into its own `@ViewBuilder` method, and `.foregroundStyle(.accentColor)` needing to be `Color.accentColor` (ShapeStyle has no bare `.accentColor` member, unlike `.tint`).

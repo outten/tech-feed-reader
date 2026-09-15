@@ -5,6 +5,8 @@ import Foundation
 enum SidebarItem: Hashable {
     case home
     case allArticles
+    case busMode
+    case lucky
     case bookmarks
     case search
     case tags
