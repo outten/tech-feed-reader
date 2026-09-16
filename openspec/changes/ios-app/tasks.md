@@ -113,7 +113,7 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 14.7 YouTube embed player — `YouTubePlayerView.swift` + `Article+YouTube.swift` (client-side video-ID extraction mirroring `youtube_video_id`/`youtube_embed_url`), shown above the description instead of the plain content renderer for YouTube articles
 - [x] 14.8 Add navigation entry points for Podcasts + YouTube — `SidebarView.swift`'s new "Browse" section
 - [x] 14.9 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders the new "Browse" section correctly (screenshot-confirmed)
-
+- [x] 14.10 **UX gap fix (2026-09-16)**: the Podcasts episode lists (and every other article list — `ArticleRow` is shared) had no visible play affordance at all — only a small icon in the article-detail toolbar, reachable after navigating in. `ArticleRow` now shows the episode duration and an inline ▶/⏸ button (wired to the shared `AudioPlayerViewModel`, `.buttonStyle(.borderless)` so it plays without also triggering the row's navigation) for any article with an audio enclosure — matches the web app's per-row "▶ Listen" affordance, but plays directly instead of requiring a second tap. Screenshot-confirmed on iPad (Home's "Continue Listening" row, which reuses `ArticleRow`, now shows the play button).
 ## 15. Phase 6a — Sports (backend)
 
 - [x] 15.1 Add `GET /api/v1/sports`, `GET /api/v1/sports/:sport_slug/leagues`, `GET /api/v1/sports/:sport_slug/:league_slug/teams` (catalog browse, wraps `SportsCatalog`, with the api-sports DB-teams fallback the web `/sports/manage/:sport/:league` route uses)
