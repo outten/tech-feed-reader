@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct StockDetailView: View {
     let symbol: String
@@ -8,6 +9,11 @@ struct StockDetailView: View {
     @State private var isFollowed = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    @State private var history: StockHistoryResponse?
+    @State private var selectedDays = 30
+    @State private var isLoadingHistory = false
+    private static let dayRanges = [7, 30, 60, 90]
 
     var body: some View {
         List {
@@ -30,6 +36,31 @@ struct StockDetailView: View {
                             Text(String(format: "%+.2f (%+.2f%%)", change, changePct))
                                 .foregroundStyle(change >= 0 ? .green : .red)
                         }
+                    }
+                }
+            }
+            if detail?.quote != nil {
+                Section {
+                    Picker("Range", selection: $selectedDays) {
+                        ForEach(Self.dayRanges, id: \.self) { Text("\($0)D").tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if let points = history?.points, !points.isEmpty {
+                        Chart(points, id: \.t) {
+                            LineMark(x: .value("Date", $0.date), y: .value("Price", $0.c))
+                            AreaMark(x: .value("Date", $0.date), y: .value("Price", $0.c))
+                                .foregroundStyle(.linearGradient(
+                                    colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0)],
+                                    startPoint: .top, endPoint: .bottom
+                                ))
+                        }
+                        .chartYAxis { AxisMarks(position: .trailing) }
+                        .frame(height: 180)
+                    } else if isLoadingHistory {
+                        ProgressView().frame(height: 180, alignment: .center)
+                    } else {
+                        Text("No chart data available").foregroundStyle(.secondary).frame(height: 180, alignment: .center)
                     }
                 }
             }
@@ -56,6 +87,7 @@ struct StockDetailView: View {
             if isLoading && detail == nil { ProgressView() }
         }
         .task { await load() }
+        .task(id: selectedDays) { await loadHistory() }
     }
 
     private func load() async {
@@ -71,6 +103,12 @@ struct StockDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func loadHistory() async {
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+        history = try? await APIClient.shared.fetchStockHistory(symbol: symbol, days: selectedDays)
     }
 
     private func toggleFollow() async {

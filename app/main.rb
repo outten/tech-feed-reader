@@ -4384,6 +4384,13 @@ class TechFeedReader < Sinatra::Base
     { quote: numeric_quote_fields(quote), followed: StockFollowsStore.follow?(api_user_id, symbol) }.to_json
   end
 
+  STOCK_HISTORY_ALLOWED_DAYS = [7, 30, 60, 90].freeze
+  get '/api/v1/stocks/:symbol/history' do |symbol|
+    days = params['days'].to_i
+    days = 30 unless STOCK_HISTORY_ALLOWED_DAYS.include?(days)
+    { symbol: symbol.to_s.upcase, days: days, points: StockQuoteProvider.history(symbol, days: days) }.to_json
+  end
+
   get '/api/v1/stocks/:symbol/news' do |symbol|
     symbol = symbol.to_s.upcase
     feed = StockNewsFeed.ensure_feed!(symbol)

@@ -43,3 +43,18 @@ The iOS app SHALL let a signed-in user search for symbols, follow/unfollow them,
 #### Scenario: Follow and view
 - **WHEN** a signed-in user searches for a symbol and follows it
 - **THEN** it appears in their ticker and its detail page shows quote + news
+
+### Requirement: Symbol detail supports historical price charts
+The system SHALL expose `GET /api/v1/stocks/:symbol/history?days=` returning daily-close price points for the requested window (`days` ∈ {7, 30, 60, 90}; any other value falls back to 30), and the iOS app SHALL render this as a line chart on the symbol detail screen with a control to switch between the four ranges. This is new functionality (not a web parity gap — the web app has no historical chart for an individual symbol, only intraday sparklines for the major-index cards).
+
+#### Scenario: Fetch a supported range
+- **WHEN** an authenticated client requests `GET /api/v1/stocks/AAPL/history?days=60`
+- **THEN** the response includes `days: 60` and an array of `{t, c}` points (timestamp, close price)
+
+#### Scenario: Unsupported range falls back
+- **WHEN** an authenticated client requests a `days` value outside `{7, 30, 60, 90}`
+- **THEN** the response uses `days: 30`
+
+#### Scenario: iOS shows a range picker and chart
+- **WHEN** a signed-in user opens a symbol's detail page
+- **THEN** they see a 7D/30D/60D/90D range control and a price chart for the selected range

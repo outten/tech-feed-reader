@@ -560,6 +560,21 @@ RSpec.describe 'Mobile API' do
       sparklines = JSON.parse(last_response.body)
       expect(sparklines).to have_key('SPY')
     end
+
+    it 'GET /api/v1/stocks/:symbol/history returns the requested day range' do
+      get '/api/v1/stocks/AAPL/history', { days: '60' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['symbol']).to eq('AAPL')
+      expect(body['days']).to eq(60)
+      expect(body['points']).to be_an(Array)
+    end
+
+    it 'GET /api/v1/stocks/:symbol/history rejects an unsupported day count' do
+      get '/api/v1/stocks/AAPL/history', { days: '13' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)['days']).to eq(30)
+    end
   end
 
   describe 'misc content (Phase 8a)' do

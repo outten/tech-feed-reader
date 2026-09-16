@@ -263,6 +263,12 @@ final class APIClient {
         try await request(path: "/api/v1/stocks/ticker", method: "GET", authenticated: true)
     }
 
+    /// `days`: one of 7, 30, 60, 90 (server clamps anything else to 30).
+    func fetchStockHistory(symbol: String, days: Int) async throws -> StockHistoryResponse {
+        let path = urlPath("/api/v1/stocks/\(percentEncodedPathSegment(symbol))/history", query: ["days": String(days)])
+        return try await request(path: path, method: "GET", authenticated: true)
+    }
+
     private struct StockFollowResponse: Decodable { let ok: Bool; let followed: Bool }
 
     func followStock(symbol: String, name: String? = nil) async throws {
