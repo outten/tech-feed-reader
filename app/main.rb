@@ -632,6 +632,26 @@ class TechFeedReader < Sinatra::Base
       (v >= 0 ? '+' : '') + format('%.2f%%', v)
     end
 
+    # JSON API only (web views already go through format_price/etc.,
+    # which call .to_f). stock_quotes' NUMERIC columns come back from pg
+    # as BigDecimal, and BigDecimal has no custom #to_json — it falls
+    # back to #to_s, which renders scientific notation strings like
+    # "0.15e3" instead of a JSON number. That silently breaks iOS's
+    # `Double` decode (Codable expects a number, not a string), so the
+    # Stocks tab shows nothing. Cast to Float before serializing.
+    def numeric_quote_fields(row)
+      return row unless row
+      row.merge(
+        'price'      => row['price']&.to_f,
+        'change'     => row['change']&.to_f,
+        'change_pct' => row['change_pct']&.to_f,
+        'day_high'   => row['day_high']&.to_f,
+        'day_low'    => row['day_low']&.to_f,
+        'open'       => row['open']&.to_f,
+        'prev_close' => row['prev_close']&.to_f
+      )
+    end
+
     def format_volume(val)
       return '—' if val.nil?
       v = val.to_i
@@ -4342,7 +4362,7 @@ class TechFeedReader < Sinatra::Base
     followed_syms = followed.map { |r| r['symbol'] }
     indices       = StockQuoteProvider::MAJOR_INDICES.map { |i| i[:symbol] }
     ordered       = (followed_syms + indices).uniq
-    by_sym        = StockQuotesStore.find_many(ordered).each_with_object({}) { |q, h| h[q['symbol']] = q }
+    by_sym        = StockQuotesStore.find_many(ordered).each_with_object({}) { |q, h| h[q['symbol']] = numeric_quote_fields(q) }
     followed_by_sym = followed.each_with_object({}) { |r, h| h[r['symbol']] = r }
     index_by_sym  = StockQuoteProvider::MAJOR_INDICES.each_with_object({}) { |i, h| h[i[:symbol]] = i }
 
@@ -4361,7 +4381,7 @@ class TechFeedReader < Sinatra::Base
     symbol = symbol.to_s.upcase
     StockQuoteProvider.fetch_and_cache(symbol) if StockQuotesStore.stale?(symbol, max_age_seconds: 300)
     quote = StockQuotesStore.find(symbol)
-    { quote: quote, followed: StockFollowsStore.follow?(api_user_id, symbol) }.to_json
+    { quote: numeric_quote_fields(quote), followed: StockFollowsStore.follow?(api_user_id, symbol) }.to_json
   end
 
   get '/api/v1/stocks/:symbol/news' do |symbol|

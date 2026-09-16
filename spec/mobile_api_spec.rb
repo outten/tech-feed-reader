@@ -488,6 +488,19 @@ RSpec.describe 'Mobile API' do
       expect(body['followed']).to be false
     end
 
+    it 'GET /api/v1/stocks/:symbol returns price as a JSON number, not a BigDecimal-string' do
+      # Regression: stock_quotes' NUMERIC columns come back from pg as
+      # BigDecimal, whose default #to_json falls back to #to_s and
+      # renders scientific notation ("0.15e3") instead of a number —
+      # iOS's Codable expects a Double and fails to decode it, so the
+      # Stocks tab silently showed nothing.
+      StockQuotesStore.upsert(symbol: 'AAPL', name: 'Apple Inc', price: 150.0, change: 1.2, change_pct: 0.8)
+      get '/api/v1/stocks/AAPL', {}, auth_header(result['api_token'])
+      body = JSON.parse(last_response.body)
+      expect(body['quote']['price']).to eq(150.0)
+      expect(body['quote']['price']).to be_a(Numeric)
+    end
+
     it 'GET /api/v1/stocks/:symbol returns quote: nil when uncached and provider unavailable' do
       get '/api/v1/stocks/ZZZZ', {}, auth_header(result['api_token'])
       expect(last_response.status).to eq(200)
@@ -529,6 +542,16 @@ RSpec.describe 'Mobile API' do
       get '/api/v1/stocks/ticker', {}, auth_header(result['api_token'])
       ticker = JSON.parse(last_response.body)
       expect(ticker.map { |t| t['symbol'] }).to include('AAPL')
+    end
+
+    it 'GET /api/v1/stocks/ticker returns price as a JSON number, not a BigDecimal-string' do
+      StockQuotesStore.upsert(symbol: 'AAPL', name: 'Apple Inc', price: 150.0)
+      StockFollowsStore.add(user_id: user['id'], symbol: 'AAPL', name: 'Apple Inc')
+      get '/api/v1/stocks/ticker', {}, auth_header(result['api_token'])
+      ticker = JSON.parse(last_response.body)
+      aapl = ticker.find { |t| t['symbol'] == 'AAPL' }
+      expect(aapl['price']).to eq(150.0)
+      expect(aapl['price']).to be_a(Numeric)
     end
 
     it 'GET /api/v1/stocks/sparklines returns an object keyed by index symbol' do

@@ -148,6 +148,7 @@ User doesn't have production domain / Apple Team ID handy yet. Revisit when avai
 - [x] 18.3 Ticker view — `StocksHomeView.swift` (followed symbols + major indices)
 - [x] 18.4 Add a "Stocks" navigation entry point — `SidebarView.swift`'s "Browse" section
 - [x] 18.5 Verified in the Simulator: builds clean on iPhone + iPad, sidebar renders "Stocks" in the Browse section correctly (screenshot-confirmed)
+- [x] 18.6 **Bug fix (2026-09-16)**: the Stocks tab showed nothing against real (non-test) data. Root cause: `stock_quotes`' `NUMERIC(12,4)` columns come back from `pg` as `BigDecimal`, which has no custom `#to_json` and falls back to `#to_s` — rendering scientific-notation strings like `"0.15e3"` instead of a JSON number. iOS's `Codable` expects a `Double` for `price`/`change`/etc. and silently failed to decode the whole response. Fixed with a `numeric_quote_fields` helper (casts to `Float` before serializing) applied in both `GET /api/v1/stocks/ticker` and `GET /api/v1/stocks/:symbol` — the only two DB-column-backed numeric JSON routes (`stock_quotes` is the only table in the schema with `NUMERIC`/`DECIMAL` columns, so no other route is affected). 2 new regression specs assert `price` decodes as `Numeric`, not a string. Verified live against `ios-tester`'s real Finnhub-fetched data.
 
 ## 19. Phase 8a — Misc content (backend)
 
