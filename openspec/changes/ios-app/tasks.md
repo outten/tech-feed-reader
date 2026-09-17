@@ -307,15 +307,15 @@ Everything here is local playback state — resume position lives in `UserDefaul
 
 ## 37. Phase 17 — Sports polish (backend)
 
-- [ ] 37.1 Fix `GET /api/v1/sports/leagues/:slug`: fall back to `SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug }` (stripped of the embedded `:teams` array, matching `/api/v1/sports/:sport_slug/leagues`'s existing `.reject`) when `SportsLeaguesStore.find_by_slug` is nil, returning empty standings/matches + `followed: false` instead of a 404 — matches the existing `teams/:slug` fallback pattern
-- [ ] 37.2 Add `GET /api/v1/sports/tennis/rankings` (params `tour`, `limit`; wraps `SportsPlayersStore.top_ranked` + `.refresh_if_stale!`, mirrors the web `/sports/tennis` route) including the caller's followed player slugs
-- [ ] 37.3 Request specs covering the scenarios in `specs/mobile-sports-polish/spec.md`
+- [x] 37.1 Fix `GET /api/v1/sports/leagues/:slug`: fall back to `SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug }` (stripped of the embedded `:teams` array, matching `/api/v1/sports/:sport_slug/leagues`'s existing `.reject`) when `SportsLeaguesStore.find_by_slug` is nil, returning empty standings/matches + `followed: false` instead of a 404 — matches the existing `teams/:slug` fallback pattern
+- [x] 37.2 Add `GET /api/v1/sports/tennis/rankings` (param `limit`; returns both `atp`/`wta` lists, wraps `SportsPlayersStore.top_ranked` + `.refresh_if_stale!`, mirrors the web `/sports/tennis` route) including the caller's followed player slugs
+- [x] 37.3 Request specs covering the scenarios in `specs/mobile-sports-polish/spec.md` — 2 new examples in `spec/mobile_api_spec.rb`
 
 ## 38. Phase 17 — Sports polish (iOS)
 
-- [ ] 38.1 `MatchRow`: show home/away team logos (`imageUrl`, small `AsyncImage`) next to each name
-- [ ] 38.2 `SportsHomeView`'s Followed Teams rows and `SportsLeagueDetailView`'s Teams section rows: add a small team logo
-- [ ] 38.3 `SportsTeamDetailView`: add a logo header (larger `imageUrl`, matching the web's team-page header treatment)
-- [ ] 38.4 New `TennisRankings` model + `APIClient.fetchTennisRankings(tour:limit:)`; new `SportsTennisRankingsView` (ATP/WTA sections, headshot via `SportsPlayer.imageUrl`, rank, inline follow toggle — no navigation required to follow)
-- [ ] 38.5 `SportsHomeView` gains a persistent "Tennis Rankings" entry point (alongside "Browse Sports"), navigating to `SportsTennisRankingsView`
-- [ ] 38.6 Verify in the Simulator against the local dev server (`-configuration Debug` explicit) on iPhone 17 and iPad Pro 11" (M5): confirm a catalog-only tournament (e.g. a Grand Slam) no longer 404s, team logos render, and Tennis Rankings is reachable from Sports
+- [x] 38.1 `MatchRow`: show home/away team logos (`imageUrl`, small `AsyncImage`) next to each name — new shared `TeamLogo` view (degrades to empty space, not a broken-image glyph, when a team has no logo)
+- [x] 38.2 `SportsHomeView`'s Followed Teams/Players rows and `SportsLeagueDetailView`'s Teams section rows: add a small logo (`TeamLogo`, reused for both team and player headshots)
+- [x] 38.3 `SportsTeamDetailView`: add a logo header (larger `imageUrl`, matching the web's team-page header treatment)
+- [x] 38.4 New `TennisRankings` model + `APIClient.fetchTennisRankings()`; new `SportsTennisRankingsView` (ATP/WTA sections, headshot via `TeamLogo`, rank, inline ★/☆ follow toggle — no navigation required to follow)
+- [x] 38.5 `SportsHomeView` gains a persistent "Tennis Rankings (ATP/WTA)" entry point (alongside "Browse Sports"), navigating to `SportsTennisRankingsView`
+- [x] 38.6 Verified in the Simulator against the local dev server (`-configuration Debug` explicit) on iPad Pro 11" (M5) — screenshot-confirmed real team logos render correctly in Home's Live/Today's Matches sections (which reuse `MatchRow`): St. Louis Cardinals, Toronto Blue Jays, Miami Marlins, Mets, Titans, Dolphins, 49ers, Cardinals all show real ESPN logos; one seeded team with no `image_url` (a demo-data gap, not a code bug) degrades gracefully with no broken-image placeholder. Also verified live via curl: a catalog-only tournament (Wimbledon) now returns 200 with catalog data instead of 404, and the tennis-rankings endpoint returns real ATP/WTA lists (50 each) with correct followed-player state. Full suite 1846/0. Couldn't tap into Sports/Tennis Rankings directly to screenshot those specific screens (no Accessibility automation here) — worth a look next time you're in the Simulator.

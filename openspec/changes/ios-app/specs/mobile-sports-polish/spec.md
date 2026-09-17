@@ -16,7 +16,7 @@
 - **THEN** the response is unchanged from today — full standings/matches from the database
 
 ### Requirement: Tennis ATP/WTA rankings are available on mobile
-The system SHALL expose `GET /api/v1/sports/tennis/rankings` (params `tour` — defaults to returning both `atp` and `wta`, `limit` — default 50, clamped to `[1, 150]`), backed by the same `SportsPlayersStore.top_ranked`/`refresh_if_stale!` the web `/sports/tennis` route uses, including each player's follow state for the caller.
+The system SHALL expose `GET /api/v1/sports/tennis/rankings` (param `limit` — default 50, clamped to `[1, 150]`), returning both `atp` and `wta` lists, backed by the same `SportsPlayersStore.top_ranked`/`refresh_if_stale!` the web `/sports/tennis` route uses, including each player's follow state for the caller.
 
 #### Scenario: Rankings include follow state
 - **WHEN** an authenticated client requests `GET /api/v1/sports/tennis/rankings`

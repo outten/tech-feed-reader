@@ -47,7 +47,12 @@ struct SportsLeagueDetailView: View {
                 Section("Teams") {
                     ForEach(teams) { team in
                         HStack {
-                            NavigationLink(team.name, value: team)
+                            NavigationLink(value: team) {
+                                HStack(spacing: 8) {
+                                    TeamLogo(imageURL: team.imageUrl.flatMap(URL.init))
+                                    Text(team.name)
+                                }
+                            }
                             Spacer()
                             if followedTeamSlugs.contains(team.slug) {
                                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)

@@ -11,6 +11,7 @@ struct SportsHomeView: View {
                 Text(errorMessage).foregroundStyle(.red)
             }
             NavigationLink("Browse Sports", value: SportsBrowseRoot())
+            NavigationLink("Tennis Rankings (ATP/WTA)", value: SportsTennisRankingsRoot())
 
             if let overview {
                 if !overview.liveMatches.isEmpty {
@@ -21,7 +22,12 @@ struct SportsHomeView: View {
                 if !overview.followedTeams.isEmpty {
                     Section("Followed Teams") {
                         ForEach(overview.followedTeams) { team in
-                            NavigationLink(team.name, value: team)
+                            NavigationLink(value: team) {
+                                HStack(spacing: 8) {
+                                    TeamLogo(imageURL: team.imageUrl.flatMap(URL.init))
+                                    Text(team.name)
+                                }
+                            }
                         }
                     }
                 }
@@ -35,7 +41,12 @@ struct SportsHomeView: View {
                 if !overview.followedPlayers.isEmpty {
                     Section("Followed Players") {
                         ForEach(overview.followedPlayers) { player in
-                            NavigationLink(player.fullName, value: player)
+                            NavigationLink(value: player) {
+                                HStack(spacing: 8) {
+                                    TeamLogo(imageURL: player.imageUrl.flatMap(URL.init))
+                                    Text(player.fullName)
+                                }
+                            }
                         }
                     }
                 }
@@ -46,6 +57,7 @@ struct SportsHomeView: View {
             if isLoading && overview == nil { ProgressView() }
         }
         .navigationDestination(for: SportsBrowseRoot.self) { _ in SportsBrowseView() }
+        .navigationDestination(for: SportsTennisRankingsRoot.self) { _ in SportsTennisRankingsView() }
         .navigationDestination(for: Sport.self) { SportsLeaguesView(sport: $0) }
         .navigationDestination(for: SportsLeague.self) { league in
             SportsLeagueDetailView(sportSlug: league.sport ?? "", leagueSlug: league.slug, leagueName: league.name)
@@ -73,3 +85,7 @@ struct SportsHomeView: View {
 /// anything pushed further down (Sport → SportsLeague → SportsTeam/
 /// SportsPlayer) resolves against the same NavigationStack.
 struct SportsBrowseRoot: Hashable {}
+
+/// Marker value for the "Tennis Rankings" NavigationLink — same pattern
+/// as `SportsBrowseRoot` (Phase 17).
+struct SportsTennisRankingsRoot: Hashable {}

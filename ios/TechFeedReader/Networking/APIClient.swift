@@ -215,6 +215,10 @@ final class APIClient {
         try await request(path: "/api/v1/sports/players/\(percentEncodedPathSegment(slug))", method: "GET", authenticated: true)
     }
 
+    func fetchTennisRankings() async throws -> TennisRankings {
+        try await request(path: "/api/v1/sports/tennis/rankings", method: "GET", authenticated: true)
+    }
+
     private struct FollowResponse: Decodable { let ok: Bool; let followed: Bool }
 
     func followSportsTeam(slug: String) async throws {

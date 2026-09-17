@@ -445,6 +445,30 @@ RSpec.describe 'Mobile API' do
       expect(body['teams_by_id'][team['id'].to_s]['slug']).to eq('eagles')
     end
 
+    it 'GET /api/v1/sports/leagues/:slug falls back to catalog data for a not-yet-synced tournament (Phase 17)' do
+      expect(SportsLeaguesStore.find_by_slug('wimbledon')).to be_nil
+
+      get '/api/v1/sports/leagues/wimbledon', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['league']['name']).to eq('Wimbledon')
+      expect(body['league']).not_to have_key('teams')
+      expect(body['standings']).to eq([])
+      expect(body['upcoming']).to eq([])
+      expect(body['followed']).to be false
+    end
+
+    it 'GET /api/v1/sports/tennis/rankings returns ATP/WTA lists with followed state' do
+      SportsFollowsStore.add(user_id: user['id'], kind: 'player', value: 'some-player')
+
+      get '/api/v1/sports/tennis/rankings', { skip_refresh: '1' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body).to have_key('atp')
+      expect(body).to have_key('wta')
+      expect(body['followed_player_slugs']).to eq(['some-player'])
+    end
+
     it 'GET /api/v1/sports/players/:slug materializes a catalog notable-player chip' do
       team_with_players = SportsCatalog.all_teams.find { |t| (t[:players] || []).any? }
       player_name = team_with_players[:players].first

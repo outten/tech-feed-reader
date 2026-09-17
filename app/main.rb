@@ -4264,7 +4264,24 @@ class TechFeedReader < Sinatra::Base
 
   get '/api/v1/sports/leagues/:slug' do |slug|
     league = SportsLeaguesStore.find_by_slug(slug)
-    halt 404, JSON.generate(error: 'not-found') unless league
+
+    unless league
+      # Phase 17 (mobile-sports-polish) — a catalog-only league (most
+      # tournaments, and any season league nobody's followed/synced
+      # yet) has no sports_leagues row. The web only reaches this
+      # DB-backed detail route *after* a league is followed (unfollowed
+      # catalog leagues browse through /sports/manage/:sport/:league
+      # instead); the mobile browse flow always lands here, so it needs
+      # the same catalog fallback GET /api/v1/sports/teams/:slug
+      # already has, instead of a hard 404.
+      catalog_league = SportsCatalog.all_leagues.find { |lg| lg[:slug] == slug.to_s }
+      halt 404, JSON.generate(error: 'not-found') unless catalog_league
+      halt 200, {
+        league: catalog_league.reject { |k, _| k == :teams },
+        standings: [], upcoming: [], recent_finals: [], teams_by_id: {},
+        followed: SportsFollowsStore.follow?(api_user_id, 'league', slug)
+      }.to_json
+    end
 
     standings = SportsStandingsStore.for_league(league['id'])
     upcoming = SportsMatchesStore.upcoming_for_league(league['id'], limit: 20)
@@ -4280,6 +4297,29 @@ class TechFeedReader < Sinatra::Base
       league: league, standings: standings, upcoming: upcoming, recent_finals: recent_finals,
       teams_by_id: teams_by_id,
       followed: SportsFollowsStore.follow?(api_user_id, 'league', slug)
+    }.to_json
+  end
+
+  # Phase 17 (mobile-sports-polish) — mirrors the web /sports/tennis
+  # route: opportunistic ESPN refresh if the per-tour cache is stale,
+  # then top-ranked ATP/WTA lists + the caller's followed-player slugs
+  # so the client can show an inline follow toggle with no extra
+  # round-trip.
+  get '/api/v1/sports/tennis/rankings' do
+    limit_raw = params['limit'].to_s
+    limit = (limit_raw.match?(/\A\d+\z/) ? limit_raw.to_i : 50).clamp(1, 150)
+    unless params['skip_refresh'] == '1'
+      %w[atp wta].each do |tour|
+        SportsPlayersStore.refresh_if_stale!(tour: tour)
+      rescue StandardError => e
+        AppLogger.warn('tennis_autosync', tour: tour, status: :error, message: e.message)
+      end
+    end
+    followed_player_slugs = SportsFollowsStore.for_kind(api_user_id, 'player').map { |f| f['value'] }
+    {
+      atp: SportsPlayersStore.top_ranked(tour: 'atp', limit: limit),
+      wta: SportsPlayersStore.top_ranked(tour: 'wta', limit: limit),
+      followed_player_slugs: followed_player_slugs
     }.to_json
   end
 

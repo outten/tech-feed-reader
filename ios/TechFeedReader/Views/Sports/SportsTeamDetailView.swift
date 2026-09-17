@@ -15,6 +15,19 @@ struct SportsTeamDetailView: View {
                 Text(errorMessage).foregroundStyle(.red)
             }
             if let detail {
+                if let imageURL = detail.team.imageUrl.flatMap(URL.init) {
+                    HStack {
+                        Spacer()
+                        AsyncImage(url: imageURL) { image in
+                            image.resizable().aspectRatio(contentMode: .fit)
+                        } placeholder: {
+                            Color.clear
+                        }
+                        .frame(width: 88, height: 88)
+                        Spacer()
+                    }
+                    .listRowSeparator(.hidden)
+                }
                 if let standing = detail.standings {
                     Section("Standing") {
                         HStack {
