@@ -286,3 +286,19 @@ Everything here is local playback state — resume position lives in `UserDefaul
 - [x] 34.6 `WelcomeView` + `HomeGateView`: topic chips → subscribe, shown instead of `HomeView` when the account has zero subscribed feeds (fails open to `HomeView` on a network error during the check)
 - [x] 34.7 `AccountView` gains an "Export My Data" action using `ShareLink` with the fetched export JSON written to a temp file
 - [x] 34.8 Verified in the Simulator against the local dev server (`-configuration Debug` explicit) on iPhone 17 and iPad Pro 11" (M5) — screenshot-confirmed Home loads with the new "Bus Mode"/"I Feel Lucky" sidebar entries and no regressions. Hit two build errors along the way (both fixed, neither environment-related): a SwiftUI `ForEach`/`Binding` overload-resolution error in `WelcomeView` resolved by extracting the row into its own `@ViewBuilder` method, and `.foregroundStyle(.accentColor)` needing to be `Color.accentColor` (ShapeStyle has no bare `.accentColor` member, unlike `.tint`).
+
+## 35. Phase 16 — Visual parity (backend)
+
+- [ ] 35.1 `GET /api/v1/articles` — recognize `kind=youtube` (map to `ArticlesStore`'s existing `:youtube` filter, alongside the current `podcast`/`all`), matching web's `/youtube` route's `kind: :youtube` usage
+- [ ] 35.2 Request spec covering the scenario in `specs/mobile-visual-parity/spec.md`
+
+## 36. Phase 16 — Visual parity (iOS)
+
+- [ ] 36.1 `Article+YouTube.swift` gains `youtubeThumbnailURL` (derives `https://i.ytimg.com/vi/<id>/hqdefault.jpg` from the existing `youtubeVideoID`, matching web's `youtube_thumbnail_url`); `APIClient.fetchArticles` call sites that want YouTube-only pass `kind: "youtube"`
+- [ ] 36.2 New `ShowGridCard` component (cover art + title + meta line, grid-friendly) mirroring `.podcast-show-card` — used by both Podcasts' shows grid and YouTube's channels grid
+- [ ] 36.3 New `MediaCardRow` component (leading thumbnail, feed name, date, duration badge, title, excerpt) mirroring `.podcast-card` — used by Podcasts' "Recent Episodes", Comics' "Recent Panels", and NPR/PBS's lists
+- [ ] 36.4 New `VideoGridCard` component (16:9 thumbnail, title, channel + date) mirroring `.youtube-video-card` — used by YouTube's new "Recent Videos" section
+- [ ] 36.5 `PodcastsView`: two sections — "Recent Episodes" (`MediaCardRow` list, `kind: "podcast"`) above "Subscribed Shows" (`ShowGridCard` grid), matching the web page's order
+- [ ] 36.6 `YouTubeChannelsView`: two sections — "Recent Videos" (`VideoGridCard` grid, `kind: "youtube"`, new — doesn't exist on iOS today) above "Subscribed Channels" (`ShowGridCard` grid, reusing the same component Podcasts uses)
+- [ ] 36.7 Comics (`.comics` sidebar case in `MainView`) and NPR/PBS (`.npr`/`.pbs` cases): replace the plain `ArticlesListView` call with a `MediaCardRow`-based list
+- [ ] 36.8 Verify in the Simulator against the local dev server (`-configuration Debug` explicit) on iPhone 17 and iPad Pro 11" (M5)
