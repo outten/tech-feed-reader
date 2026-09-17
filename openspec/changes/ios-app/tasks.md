@@ -289,16 +289,16 @@ Everything here is local playback state — resume position lives in `UserDefaul
 
 ## 35. Phase 16 — Visual parity (backend)
 
-- [ ] 35.1 `GET /api/v1/articles` — recognize `kind=youtube` (map to `ArticlesStore`'s existing `:youtube` filter, alongside the current `podcast`/`all`), matching web's `/youtube` route's `kind: :youtube` usage
-- [ ] 35.2 Request spec covering the scenario in `specs/mobile-visual-parity/spec.md`
+- [x] 35.1 `GET /api/v1/articles` — recognize `kind=youtube` (map to `ArticlesStore`'s existing `:youtube` filter, alongside the current `podcast`/`all`), matching web's `/youtube` route's `kind: :youtube` usage
+- [x] 35.2 Request spec covering the scenario in `specs/mobile-visual-parity/spec.md` — 1 new example in `spec/mobile_api_spec.rb`
 
 ## 36. Phase 16 — Visual parity (iOS)
 
-- [ ] 36.1 `Article+YouTube.swift` gains `youtubeThumbnailURL` (derives `https://i.ytimg.com/vi/<id>/hqdefault.jpg` from the existing `youtubeVideoID`, matching web's `youtube_thumbnail_url`); `APIClient.fetchArticles` call sites that want YouTube-only pass `kind: "youtube"`
-- [ ] 36.2 New `ShowGridCard` component (cover art + title + meta line, grid-friendly) mirroring `.podcast-show-card` — used by both Podcasts' shows grid and YouTube's channels grid
-- [ ] 36.3 New `MediaCardRow` component (leading thumbnail, feed name, date, duration badge, title, excerpt) mirroring `.podcast-card` — used by Podcasts' "Recent Episodes", Comics' "Recent Panels", and NPR/PBS's lists
-- [ ] 36.4 New `VideoGridCard` component (16:9 thumbnail, title, channel + date) mirroring `.youtube-video-card` — used by YouTube's new "Recent Videos" section
-- [ ] 36.5 `PodcastsView`: two sections — "Recent Episodes" (`MediaCardRow` list, `kind: "podcast"`) above "Subscribed Shows" (`ShowGridCard` grid), matching the web page's order
-- [ ] 36.6 `YouTubeChannelsView`: two sections — "Recent Videos" (`VideoGridCard` grid, `kind: "youtube"`, new — doesn't exist on iOS today) above "Subscribed Channels" (`ShowGridCard` grid, reusing the same component Podcasts uses)
-- [ ] 36.7 Comics (`.comics` sidebar case in `MainView`) and NPR/PBS (`.npr`/`.pbs` cases): replace the plain `ArticlesListView` call with a `MediaCardRow`-based list
-- [ ] 36.8 Verify in the Simulator against the local dev server (`-configuration Debug` explicit) on iPhone 17 and iPad Pro 11" (M5)
+- [x] 36.1 `Article+YouTube.swift` gains `youtubeThumbnailURL` (derives `https://i.ytimg.com/vi/<id>/hqdefault.jpg` from the existing `youtubeVideoID`, matching web's `youtube_thumbnail_url`); `Article+Display.swift` gains `thumbnailURL` (own image, else the YouTube fallback) and `excerptText` (whitespace-collapsed, truncated, mirrors `.podcast-card-excerpt`)
+- [x] 36.2 New `ShowGridCard` component (cover art + title + meta line, grid-friendly) mirroring `.podcast-show-card` — used by both Podcasts' shows grid and YouTube's channels grid
+- [x] 36.3 **Deviation from the plan**: rather than a separate `MediaCardRow` component, extended the existing shared `ArticleRow` in place with a leading thumbnail + excerpt (mirroring `.podcast-card`). `ArticleRow` already carried the duration badge + play button (added for the podcast-play-button fix) and is already what `ArticlesListView` uses for every list — Podcasts' "Recent Episodes", Comics, and NPR/PBS all get the image-led card look for free, with no risk of the two components drifting apart. A parallel `MediaCardRow` would have duplicated the play-button logic for no benefit.
+- [x] 36.4 New `VideoGridCard` component (16:9 thumbnail + play-icon overlay, title, meta) mirroring `.youtube-video-card` — used by YouTube's new "Recent Videos" section
+- [x] 36.5 `PodcastsView`: two sections — "Recent Episodes" (`ArticleRow` list, `kind: "podcast"`) above "Subscribed Shows" (`ShowGridCard` grid), matching the web page's order
+- [x] 36.6 `YouTubeChannelsView`: two sections — "Recent Videos" (`VideoGridCard` grid, `kind: "youtube"`, new — doesn't exist on iOS today) above "Subscribed Channels" (`ShowGridCard` grid, reusing the same component Podcasts uses)
+- [x] 36.7 Comics/NPR/PBS (`.comics`/`.npr`/`.pbs` cases in `MainView`) needed **no changes** — they already call the shared `ArticlesListView` → `ArticleRow`, so 36.3's enhancement applies automatically
+- [x] 36.8 Verified in the Simulator against the local dev server (`-configuration Debug` explicit) on iPhone 17 and iPad Pro 11" (M5) — screenshot-confirmed on iPad: Home's "Continue Listening" row (which reuses `ArticleRow`) now shows a real cover-art thumbnail and excerpt text. Full interactive verification of the new Podcasts/YouTube grid sections needs a human at the Simulator per the established limitation (no Accessibility automation access).

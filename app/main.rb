@@ -3959,7 +3959,11 @@ class TechFeedReader < Sinatra::Base
     state = :all unless ARTICLES_STATE_FILTERS.include?(state)
     topic = params['topic'].to_s
     topic = nil if topic.empty?
-    kind = params['kind'].to_s == 'podcast' ? :podcast : :all
+    kind = case params['kind'].to_s
+           when 'podcast' then :podcast
+           when 'youtube' then :youtube
+           else :all
+           end
     sort = params['sort'].to_s == 'relevance' ? :relevance : :chronological
 
     articles = if tag_id.positive?

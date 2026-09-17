@@ -904,6 +904,25 @@ RSpec.describe 'Mobile API' do
       expect(articles.map { |a| a['uid'] }).to eq(['pod-1'])
     end
 
+    it 'GET /api/v1/articles?kind=youtube filters to YouTube channel articles (Phase 16)' do
+      yt_feed = FeedsStore.add_for_user(
+        user_id: user['id'], url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC123', title: 'A Channel'
+      ).first
+      ArticlesStore.import(feed_id: feed['id'], entries: [{
+        uid: 'plain-2', title: 'Plain Article', url: 'https://example.com/plain2',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+      ArticlesStore.import(feed_id: yt_feed['id'], entries: [{
+        uid: 'yt-1', title: 'Video', url: 'https://www.youtube.com/watch?v=abcdefghijk',
+        author: nil, published_at: Time.now.utc.iso8601, content_html: '', content_text: ''
+      }])
+
+      get '/api/v1/articles', { kind: 'youtube' }, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      expect(articles.map { |a| a['uid'] }).to eq(['yt-1'])
+    end
+
     it 'GET /api/v1/articles?sort=relevance forces the unread state and returns a ranked list' do
       ArticlesStore.import(feed_id: feed['id'], entries: [{
         uid: 'unread-1', title: 'Unread', url: 'https://example.com/unread',

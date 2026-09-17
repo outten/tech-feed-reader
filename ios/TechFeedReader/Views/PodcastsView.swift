@@ -1,20 +1,53 @@
 import SwiftUI
 
+/// Two sections, mirroring the web app's `/podcasts` page order: recent
+/// episodes (image-led cards) on top, subscribed shows (cover-art grid)
+/// below (Phase 16 — was a single plain-text list of shows before).
 struct PodcastsView: View {
-    @State private var feeds: [PodcastFeed] = []
+    @State private var shows: [PodcastFeed] = []
+    @State private var recentEpisodes: [Article] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
 
     var body: some View {
-        List(feeds) { feed in
-            NavigationLink(value: feed) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(feed.title ?? feed.url)
-                    Text("\(feed.episodeCount) episodes")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red).padding(.horizontal)
+                }
+
+                if !recentEpisodes.isEmpty {
+                    sectionHeader("Recent Episodes")
+                    LazyVStack(spacing: 14) {
+                        ForEach(recentEpisodes) { article in
+                            NavigationLink(value: article) {
+                                ArticleRow(article: article)
+                            }
+                            .buttonStyle(.plain)
+                            Divider()
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+
+                if !shows.isEmpty {
+                    sectionHeader("Subscribed Shows")
+                    LazyVGrid(columns: showGridColumns, spacing: 16) {
+                        ForEach(shows) { show in
+                            NavigationLink(value: show) {
+                                ShowGridCard(
+                                    imageURL: show.imageUrl.flatMap(URL.init),
+                                    title: show.title ?? show.url,
+                                    meta: "\(show.episodeCount) episodes"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
                 }
             }
+            .padding(.vertical)
         }
         .navigationTitle("Podcasts")
         .navigationDestination(for: PodcastFeed.self) { feed in
@@ -22,24 +55,31 @@ struct PodcastsView: View {
                 try await APIClient.shared.fetchArticles(feedId: feed.id)
             }
         }
+        .navigationDestination(for: Article.self) { ArticleDetailView(article: $0) }
         .overlay {
-            if isLoading && feeds.isEmpty { ProgressView() }
-            if !isLoading && feeds.isEmpty && errorMessage == nil {
+            if isLoading && shows.isEmpty { ProgressView() }
+            if !isLoading && shows.isEmpty && errorMessage == nil {
                 ContentUnavailableView("No Podcasts Yet", systemImage: "mic")
-            }
-            if let errorMessage {
-                ContentUnavailableView("Couldn't Load Podcasts", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
             }
         }
         .refreshable { await load() }
         .task { await load() }
     }
 
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.title3.weight(.bold))
+            .padding(.horizontal)
+    }
+
     private func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            feeds = try await APIClient.shared.fetchPodcastFeeds()
+            async let showsResult = APIClient.shared.fetchPodcastFeeds()
+            async let episodesResult = APIClient.shared.fetchArticles(kind: "podcast")
+            shows = try await showsResult
+            recentEpisodes = try await episodesResult
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

@@ -25,4 +25,13 @@ extension Article {
         guard let id = youtubeVideoID else { return nil }
         return URL(string: "https://www.youtube.com/embed/\(id)")
     }
+
+    /// Matches the web app's `youtube_thumbnail_url` helper — every
+    /// YouTube video has a guaranteed hqdefault.jpg, so this gives a
+    /// grid card a thumbnail even when the article has no explicit
+    /// `image_url`.
+    var youtubeThumbnailURL: URL? {
+        guard let id = youtubeVideoID else { return nil }
+        return URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg")
+    }
 }

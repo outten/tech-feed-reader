@@ -49,4 +49,26 @@ extension Article {
         guard let candidate = own ?? feed?.imageUrl, !candidate.isEmpty else { return nil }
         return URL(string: candidate)
     }
+
+    /// List-row thumbnail (Phase 16) — own image, else the deterministic
+    /// YouTube hqdefault thumbnail. Distinct from `heroImageURL` (the
+    /// article detail header), which falls back to the feed's cover art
+    /// instead — list rows don't have the nested `feed` object to fall
+    /// back to (only the detail endpoint includes it).
+    var thumbnailURL: URL? {
+        if let imageUrl, !imageUrl.isEmpty, let url = URL(string: imageUrl) { return url }
+        return youtubeThumbnailURL
+    }
+
+    /// Short plain-text excerpt for image-led list cards — mirrors the
+    /// web app's `.podcast-card-excerpt` (whitespace-collapsed, truncated).
+    var excerptText: String? {
+        guard let contentText else { return nil }
+        let collapsed = contentText.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !collapsed.isEmpty else { return nil }
+        let limit = 140
+        guard collapsed.count > limit else { return collapsed }
+        return String(collapsed.prefix(limit)) + "…"
+    }
 }
