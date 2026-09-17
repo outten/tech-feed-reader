@@ -17,35 +17,45 @@ struct VideoGridCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                Group {
-                    if let imageURL {
-                        AsyncImage(url: imageURL) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
+            // `Color.clear` (not the AsyncImage itself) drives the 16:9
+            // frame, so the size is fixed the instant the row lays out —
+            // the image is only ever an overlay filling already-settled
+            // bounds. Sizing the frame from the AsyncImage's own content
+            // instead let the tile's height jump/relayout the moment the
+            // image finished loading (visible as a flicker, and could
+            // squeeze the title/meta text out of the visible row).
+            Color.clear
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    Group {
+                        if let imageURL {
+                            AsyncImage(url: imageURL) { image in
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color.secondary.opacity(0.15)
+                            }
+                        } else {
                             Color.secondary.opacity(0.15)
                         }
-                    } else {
-                        Color.secondary.opacity(0.15)
                     }
+                    .clipped()
                 }
-                .aspectRatio(16 / 9, contentMode: .fill)
-                .frame(maxWidth: .infinity)
+                .overlay {
+                    // Dark scrim behind the play icon (matches the web's
+                    // `rgba(0,0,0,0.55)` circle) — a plain white glyph
+                    // reads poorly against a bright thumbnail.
+                    Circle()
+                        .fill(Color.black.opacity(0.55))
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .offset(x: 1)
+                        }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                // Dark scrim behind the play icon (matches the web's
-                // `rgba(0,0,0,0.55)` circle) — a plain white glyph reads
-                // poorly against a bright thumbnail.
-                Circle()
-                    .fill(Color.black.opacity(0.55))
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
-                            .offset(x: 1)
-                    }
-            }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
