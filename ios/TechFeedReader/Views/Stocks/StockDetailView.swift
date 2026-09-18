@@ -55,6 +55,7 @@ struct StockDetailView: View {
                                     startPoint: .top, endPoint: .bottom
                                 ))
                         }
+                        .chartYScale(domain: yDomain(for: points))
                         .chartYAxis { AxisMarks(position: .trailing) }
                         .frame(height: 180)
                     } else if isLoadingHistory {
@@ -103,6 +104,18 @@ struct StockDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // AreaMark fills down to a zero baseline by default, which forces the
+    // y-axis domain to include 0 and makes normal single-stock price
+    // swings (a few percent) look flat. Scale to the data's own range instead.
+    private func yDomain(for points: [StockHistoryPoint]) -> ClosedRange<Double> {
+        let values = points.map(\.c)
+        let minValue = values.min() ?? 0
+        let maxValue = values.max() ?? 0
+        guard minValue < maxValue else { return (minValue - 1)...(minValue + 1) }
+        let padding = (maxValue - minValue) * 0.1
+        return (minValue - padding)...(maxValue + padding)
     }
 
     private func loadHistory() async {
