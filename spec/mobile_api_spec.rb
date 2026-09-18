@@ -588,6 +588,11 @@ RSpec.describe 'Mobile API' do
     end
 
     it 'GET /api/v1/stocks/sparklines returns an object keyed by index symbol' do
+      # Stub Yahoo Finance out — a real call per index (10 of them) is slow
+      # and unreliable in CI (Yahoo's undocumented chart API frequently
+      # blocks/throttles datacenter IP ranges), which was timing out the
+      # whole suite. See also the /history stubs below.
+      allow(StockQuoteProvider).to receive(:sparkline).and_return([100.0, 101.0, 99.5])
       get '/api/v1/stocks/sparklines', {}, auth_header(result['api_token'])
       expect(last_response.status).to eq(200)
       sparklines = JSON.parse(last_response.body)
@@ -595,6 +600,8 @@ RSpec.describe 'Mobile API' do
     end
 
     it 'GET /api/v1/stocks/:symbol/history returns the requested day range' do
+      allow(StockQuoteProvider).to receive(:history).with('AAPL', days: 60)
+        .and_return([{ 't' => 1_700_000_000, 'c' => 150.25 }])
       get '/api/v1/stocks/AAPL/history', { days: '60' }, auth_header(result['api_token'])
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
@@ -604,6 +611,7 @@ RSpec.describe 'Mobile API' do
     end
 
     it 'GET /api/v1/stocks/:symbol/history rejects an unsupported day count' do
+      allow(StockQuoteProvider).to receive(:history).with('AAPL', days: 30).and_return([])
       get '/api/v1/stocks/AAPL/history', { days: '13' }, auth_header(result['api_token'])
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)['days']).to eq(30)
