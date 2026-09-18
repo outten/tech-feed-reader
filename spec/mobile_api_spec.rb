@@ -1075,6 +1075,9 @@ RSpec.describe 'Mobile API' do
     end
 
     it 'POST /api/v1/feeds/:id/refresh enqueues a refresh' do
+      # CI has no Redis, so perform_async needs stubbing here — same
+      # convention as welcome_route_spec.rb, stocks_spec.rb, etc.
+      expect(FeedRefreshWorker).to receive(:perform_async).with(feed['id'])
       post "/api/v1/feeds/#{feed['id']}/refresh", {}, auth_header(result['api_token'])
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)['ok']).to eq(true)
