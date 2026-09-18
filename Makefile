@@ -1,4 +1,4 @@
-.PHONY: run dev stop serve test install migrate seed-feeds refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links strip-social-share
+.PHONY: run dev stop serve test install migrate seed-feeds seed-ios-demo refresh-feeds refresh-feed scheduler sidekiq redis jaeger jaeger-stop serve-otel sidekiq-otel run-all stop-all digest prune release release-major release-minor release-patch _release_guard _release_bump publish-image deploy deploy-major deploy-minor deploy-patch _remote_deploy fix-article-links strip-social-share
 
 install:
 	bundle install
@@ -23,6 +23,16 @@ seed-feeds:
 # username if omitted.
 seed-user:
 	bundle exec ruby scripts/seed_user.rb $(USER) "$(DISPLAY)"
+
+# ios-app change (dev tooling, not a product feature) — populates an
+# EXISTING account (USER must already have signed up) with realistic
+# content across every area the iOS app covers: feeds/articles (real
+# fetch), tags, mute rules, sports follows + seeded standings/matches,
+# stock follows + seeded quotes, radio follows, a digest, and (only if
+# ANTHROPIC_API_KEY is set) a triage run. Use:
+#   make seed-ios-demo USER=ios-tester
+seed-ios-demo:
+	bundle exec ruby scripts/seed_ios_demo_data.rb $(USER)
 
 # Auto-reloading dev server. `rerun` reads .rerun in the project root for
 # watch dirs, file patterns, and ignore globs. NOTE: .rerun does NOT support

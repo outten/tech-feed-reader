@@ -138,6 +138,42 @@ module StockQuoteProvider
     []
   end
 
+  # Daily-close history for any symbol over the last `days` days — the
+  # 7/30/60/90-day chart ranges on a symbol's detail page. Same free
+  # Yahoo Finance chart endpoint as #sparkline, but keyed by an exact
+  # period1/period2 window (not one of Yahoo's preset `range` buckets)
+  # so an arbitrary day count works, with daily granularity throughout
+  # (hourly/minute bars would be noise at this timescale).
+  # Returns [{ 't' => <unix seconds>, 'c' => <close> }, ...] or [] on
+  # failure — paired timestamp+close per point since (unlike the
+  # single-day sparkline) a multi-week chart needs an x-axis.
+  def history(symbol, days: 30)
+    sym = symbol.to_s.upcase
+    now = Time.now.to_i
+    period1 = now - (days.to_i * 86_400)
+    uri = URI("#{YAHOO_CHART_URL}/#{ERB::Util.url_encode(sym)}")
+    uri.query = URI.encode_www_form(period1: period1, period2: now, interval: '1d')
+
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 5, read_timeout: 10) do |http|
+      req = Net::HTTP::Get.new(uri.request_uri)
+      req['User-Agent'] = 'Mozilla/5.0'
+      http.request(req)
+    end
+
+    return [] unless response.code.to_i == 200
+
+    data = JSON.parse(response.body)
+    result = data.dig('chart', 'result', 0)
+    return [] unless result
+
+    timestamps = result['timestamp'] || []
+    closes = result.dig('indicators', 'quote', 0, 'close') || []
+    timestamps.zip(closes).filter_map { |t, c| { 't' => t, 'c' => c.round(2) } if t && c }
+  rescue StandardError => e
+    AppLogger.warn('stock_provider', message: "history failed for #{sym}", error: e.message)
+    []
+  end
+
   # Batch sparklines for all major indices.  Returns { "SPY" => [...], ... }.
   def sparklines_for_indices
     MAJOR_INDICES.each_with_object({}) do |idx, h|
