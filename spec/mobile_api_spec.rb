@@ -244,6 +244,15 @@ RSpec.describe 'Mobile API' do
       articles = JSON.parse(last_response.body)
       expect(articles.map { |a| a['uid'] }).to include('art-1')
     end
+
+    it 'GET /api/v1/topics/:term returns summary as an object, not a raw string' do
+      SummaryStore.upsert(article['id'], extractive: 'A short summary.')
+      get '/api/v1/topics/Hello', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      articles = JSON.parse(last_response.body)
+      found = articles.find { |a| a['uid'] == 'art-1' }
+      expect(found['summary']).to eq('extractive' => 'A short summary.')
+    end
   end
 
   describe 'feed discovery (Phase 4a)' do

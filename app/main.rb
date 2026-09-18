@@ -4074,7 +4074,13 @@ class TechFeedReader < Sinatra::Base
   end
 
   get '/api/v1/topics/:term' do |term|
-    ArticlesStore.for_topic(api_user_id, term, limit: API_V1_ARTICLES_PER_PAGE).to_json
+    articles = ArticlesStore.for_topic(api_user_id, term, limit: API_V1_ARTICLES_PER_PAGE)
+    # for_topic returns `summary` as the raw extractive string (the web
+    # /topics/:term view renders it that way); the mobile Article model
+    # expects the same {extractive, llm, llm_model} object shape as the
+    # single-article endpoint, so reshape it here.
+    articles.each { |a| a['summary'] = a['summary'].nil? ? nil : { 'extractive' => a['summary'] } }
+    articles.to_json
   end
 
   post '/api/v1/subscriptions' do
