@@ -521,9 +521,15 @@ final class APIClient {
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
 
-        if http.statusCode == 401 { throw APIError.unauthorized }
+        // A 401 on an authenticated call means the token itself was
+        // rejected (expired/revoked) — "session expired" is the right
+        // message. A 401 on an unauthenticated call (recovery/login/
+        // register) is the server rejecting the submitted credential
+        // (e.g. a used-up recovery code) — fall through so its real
+        // error message surfaces instead of the generic one.
+        if http.statusCode == 401 && authenticated { throw APIError.unauthorized }
         guard (200...299).contains(http.statusCode) else {
-            let message = (try? decoder.decode(ErrorBody.self, from: data))?.message ?? "Request failed (\(http.statusCode))."
+            let message = (try? decoder.decode(ErrorBody.self, from: data))?.error ?? "Request failed (\(http.statusCode))."
             throw APIError.server(message)
         }
         if data.isEmpty {
@@ -534,5 +540,5 @@ final class APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
-    private struct ErrorBody: Decodable { let message: String? }
+    private struct ErrorBody: Decodable { let error: String? }
 }
