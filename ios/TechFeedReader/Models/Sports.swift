@@ -36,12 +36,13 @@ struct SportsTeam: Identifiable, Codable, Hashable {
     let imageUrl: String?
     let leagueId: Int?
     let players: [String]?
+    let followed: Bool?
 
     var id: String { slug }
 
     enum CodingKeys: String, CodingKey {
         case dbId = "id"
-        case slug, name, shortName, location, imageUrl, leagueId, players
+        case slug, name, shortName, location, imageUrl, leagueId, players, followed
     }
 }
 

@@ -4220,7 +4220,17 @@ class TechFeedReader < Sinatra::Base
       league_row = SportsLeaguesStore.find_by_slug(league[:slug])
       teams = SportsTeamsStore.for_league(league_row['id']).sort_by { |t| t['name'] } if league_row
     end
-    teams.to_json
+
+    # The catalog's hand-curated teams never carry an image_url, and this
+    # response previously had no per-team follow state at all — both are
+    # populated (when available) from sports_teams, which match-sync
+    # backfills via ensure_team! regardless of provider.
+    followed_slugs = SportsFollowsStore.for_kind(api_user_id, 'team').map { |f| f['value'] }.to_set
+    teams.map { |team|
+      team = team.transform_keys(&:to_sym)
+      image_url = team[:image_url] || SportsTeamsStore.find_by_slug(team[:slug])&.[]('image_url')
+      team.merge(image_url: image_url, followed: followed_slugs.include?(team[:slug].to_s))
+    }.to_json
   end
 
   get '/api/v1/sports/overview' do
