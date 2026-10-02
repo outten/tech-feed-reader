@@ -54,12 +54,13 @@ struct SportsLeagueDetailView: View {
                                 }
                             }
                             Spacer()
-                            if followedTeamSlugs.contains(team.slug) {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                            } else {
-                                Button("Follow") { Task { await followTeam(team) } }
-                                    .buttonStyle(.borderless)
+                            Button {
+                                Task { await toggleFollowTeam(team) }
+                            } label: {
+                                Image(systemName: followedTeamSlugs.contains(team.slug) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(followedTeamSlugs.contains(team.slug) ? .green : .secondary)
                             }
+                            .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -93,6 +94,7 @@ struct SportsLeagueDetailView: View {
             detail = try await detailResult
             teams = try await teamsResult
             isFollowed = detail?.followed ?? false
+            followedTeamSlugs = Set(teams.filter { $0.followed ?? false }.map(\.slug))
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -112,10 +114,15 @@ struct SportsLeagueDetailView: View {
         }
     }
 
-    private func followTeam(_ team: SportsTeam) async {
+    private func toggleFollowTeam(_ team: SportsTeam) async {
         do {
-            try await APIClient.shared.followSportsTeam(slug: team.slug)
-            followedTeamSlugs.insert(team.slug)
+            if followedTeamSlugs.contains(team.slug) {
+                try await APIClient.shared.unfollowSportsTeam(slug: team.slug)
+                followedTeamSlugs.remove(team.slug)
+            } else {
+                try await APIClient.shared.followSportsTeam(slug: team.slug)
+                followedTeamSlugs.insert(team.slug)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

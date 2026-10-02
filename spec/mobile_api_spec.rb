@@ -386,6 +386,23 @@ RSpec.describe 'Mobile API' do
       expect(teams.map { |t| t['slug'] }).to include('eagles')
     end
 
+    it 'GET /api/v1/sports/:sport/:league/teams marks followed teams' do
+      SportsFollowsStore.add(user_id: user['id'], kind: 'team', value: 'eagles')
+      get '/api/v1/sports/football/nfl/teams', {}, auth_header(result['api_token'])
+      teams = JSON.parse(last_response.body)
+      expect(teams.find { |t| t['slug'] == 'eagles' }['followed']).to be true
+      expect(teams.find { |t| t['slug'] == 'cowboys' }['followed']).to be false
+    end
+
+    it 'GET /api/v1/sports/:sport/:league/teams fills in a synced logo the catalog itself never carries' do
+      league = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football', source_provider: 'espn', external_id: 'football/nfl')
+      SportsTeamsStore.upsert(league_id: league['id'], slug: 'eagles', name: 'Philadelphia Eagles',
+                               source_provider: 'espn', external_id: '21', image_url: 'https://example.com/eagles.png')
+      get '/api/v1/sports/football/nfl/teams', {}, auth_header(result['api_token'])
+      teams = JSON.parse(last_response.body)
+      expect(teams.find { |t| t['slug'] == 'eagles' }['image_url']).to eq('https://example.com/eagles.png')
+    end
+
     it 'follows a catalog-only team, materializing it into the database' do
       expect(SportsTeamsStore.find_by_slug('eagles')).to be_nil
 

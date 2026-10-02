@@ -7,16 +7,26 @@ struct TeamLogo: View {
     let imageURL: URL?
     var size: CGFloat = 20
 
+    private var placeholder: some View {
+        Image(systemName: "sportscourt.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundStyle(.secondary)
+            .padding(size * 0.15)
+    }
+
     var body: some View {
         Group {
             if let imageURL {
-                AsyncImage(url: imageURL) { image in
-                    image.resizable().aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    Color.clear
+                AsyncImage(url: imageURL) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fit)
+                    } else {
+                        placeholder
+                    }
                 }
             } else {
-                Color.clear
+                placeholder
             }
         }
         .frame(width: size, height: size)
