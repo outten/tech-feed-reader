@@ -7,13 +7,16 @@ struct ArticleDetailView: View {
     @State private var isMuteKeywordPresented = false
     @State private var muteKeywordText = ""
     @State private var actionErrorMessage: String?
+    @State private var htmlContentHeight: CGFloat = 1
     @EnvironmentObject var audioPlayer: AudioPlayerViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            content
+        ScrollView {
+            VStack(spacing: 0) {
+                header
+                Divider()
+                content
+            }
         }
         .navigationTitle(article.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -171,22 +174,18 @@ struct ArticleDetailView: View {
                 VStack(spacing: 0) {
                     YouTubePlayerView(embedURL: embedURL)
                         .aspectRatio(16 / 9, contentMode: .fit)
-                    ScrollView {
-                        Text(article.contentText ?? "")
-                            .padding()
-                    }
-                }
-            } else if let html = article.contentHtml, !html.isEmpty {
-                // WKWebView reports no intrinsic content size in SwiftUI —
-                // without an explicit frame it collapses to zero height and
-                // renders nothing, even though loadHTMLString succeeded.
-                ArticleContentView(html: html) { url in tappedLink = url }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
                     Text(article.contentText ?? "")
                         .padding()
                 }
+            } else if let html = article.contentHtml, !html.isEmpty {
+                // Self-sizing: the web view reports its rendered height via
+                // htmlContentHeight instead of scrolling itself, so it can
+                // sit inside the outer ScrollView alongside the header.
+                ArticleContentView(html: html, onLinkTapped: { url in tappedLink = url }, contentHeight: $htmlContentHeight)
+                    .frame(height: max(htmlContentHeight, 1))
+            } else {
+                Text(article.contentText ?? "")
+                    .padding()
             }
         }
     }
