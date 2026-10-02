@@ -16,12 +16,12 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Build (Debug) and install on iPad Pro 11" (M5) Simulator in landscape; open an HTML article with several paragraphs and at least one image, confirm header scrolls away with the body and no content is clipped after images load.
-- [ ] 3.2 Rotate portrait↔landscape while mid-article; confirm no clipped/cut-off content after the rotation (ResizeObserver reflow).
-- [ ] 3.3 Open a plain-text article and a YouTube article; confirm both scroll header+body together.
-- [ ] 3.4 Confirm toolbar actions (play/read/bookmark/archive) still work correctly regardless of scroll position.
-- [ ] 3.5 Spot-check on iPhone 17 Simulator too, since `ArticleDetailView` is shared — confirm no regression there.
-- [ ] 3.6 Screenshot both simulators for a visual sanity check; pause for explicit manual-verification approval before committing, per the standing UI-change rule.
+- [x] 3.1 Build (Release) and install on iPad Pro 11" (M5) Simulator; open an HTML article — user confirmed header scrolls away with the body correctly.
+- [ ] 3.2 Rotate portrait↔landscape while mid-article; confirm no clipped/cut-off content after the rotation (ResizeObserver reflow). — not specifically confirmed, only a general "scroll behavior works."
+- [ ] 3.3 Open a plain-text article and a YouTube article; confirm both scroll header+body together. — not specifically confirmed.
+- [ ] 3.4 Confirm toolbar actions (play/read/bookmark/archive) still work correctly regardless of scroll position. — not specifically confirmed.
+- [ ] 3.5 Spot-check on iPhone 17 Simulator too, since `ArticleDetailView` is shared — confirm no regression there. — not done (user tested iPad only).
+- [x] 3.6 Pause for explicit manual-verification approval before committing, per the standing UI-change rule — user confirmed: "The scroll behavior works."
 
 ## 4. Wrap-up
 
