@@ -33,3 +33,23 @@ targets:
         Release:
           INFOPLIST_FILE: TechFeedReader/Info-Release.plist
           PRODUCT_BUNDLE_IDENTIFIER: com.techfeedreader.ios
+schemes:
+  # XcodeGen's auto-generated default scheme runs the Debug config (which
+  # points at localhost:4567) whenever Xcode's own Run button is used —
+  # bitten us once already on the iPad Simulator. Pin every scheme action
+  # to Release (production) instead; explicit `-configuration Debug`
+  # command-line builds are still available for local dev-loop iteration.
+  TechFeedReader:
+    build:
+      targets:
+        TechFeedReader: all
+    run:
+      config: Release
+    test:
+      config: Release
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release
