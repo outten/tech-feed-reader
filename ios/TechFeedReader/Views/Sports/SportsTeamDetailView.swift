@@ -41,12 +41,12 @@ struct SportsTeamDetailView: View {
                 }
                 if !detail.upcoming.isEmpty {
                     Section("Upcoming") {
-                        ForEach(detail.upcoming) { MatchRow(match: $0) }
+                        ForEach(detail.upcoming) { MatchRow(match: $0, teamsById: detail.teamsById ?? [:]) }
                     }
                 }
                 if !detail.recentFinals.isEmpty {
                     Section("Recent Results") {
-                        ForEach(detail.recentFinals) { MatchRow(match: $0) }
+                        ForEach(detail.recentFinals) { MatchRow(match: $0, teamsById: detail.teamsById ?? [:]) }
                     }
                 }
                 if let players = detail.team.players, !players.isEmpty {

@@ -4260,11 +4260,14 @@ class TechFeedReader < Sinatra::Base
     if team
       league = SportsLeaguesStore.find(team['league_id'])
       SportsEntityArticlesStore.refresh_for(kind: 'team', entity_id: team['id'], name: team['name'])
+      upcoming = SportsMatchesStore.upcoming_for_team(team['id'], limit: 8)
+      recent_finals = SportsMatchesStore.recent_finals_for_team(team['id'], limit: 6)
       {
         team: team, league: league,
         standings: SportsStandingsStore.for_team(team['id']),
-        upcoming: SportsMatchesStore.upcoming_for_team(team['id'], limit: 8),
-        recent_finals: SportsMatchesStore.recent_finals_for_team(team['id'], limit: 6),
+        upcoming: upcoming,
+        recent_finals: recent_finals,
+        teams_by_id: build_teams_by_id_for_matches(upcoming + recent_finals),
         mentions: SportsEntityArticlesStore.for_entity(kind: 'team', entity_id: team['id'], limit: 20),
         followed: SportsFollowsStore.follow?(api_user_id, 'team', slug)
       }.to_json
@@ -4272,7 +4275,7 @@ class TechFeedReader < Sinatra::Base
       catalog_team = SportsCatalog.find_team(slug)
       halt 404, JSON.generate(error: 'not-found') unless catalog_team
       {
-        team: catalog_team, league: nil, standings: nil, upcoming: [], recent_finals: [], mentions: [],
+        team: catalog_team, league: nil, standings: nil, upcoming: [], recent_finals: [], teams_by_id: {}, mentions: [],
         followed: SportsFollowsStore.follow?(api_user_id, 'team', slug)
       }.to_json
     end

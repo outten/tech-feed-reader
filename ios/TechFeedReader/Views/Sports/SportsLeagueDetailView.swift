@@ -34,12 +34,12 @@ struct SportsLeagueDetailView: View {
                 }
                 if !detail.upcoming.isEmpty {
                     Section("Upcoming") {
-                        ForEach(detail.upcoming) { MatchRow(match: $0, teamsById: detail.teamsById) }
+                        ForEach(detail.upcoming) { MatchRow(match: $0, teamsById: detail.teamsById ?? [:]) }
                     }
                 }
                 if !detail.recentFinals.isEmpty {
                     Section("Recent Results") {
-                        ForEach(detail.recentFinals) { MatchRow(match: $0, teamsById: detail.teamsById) }
+                        ForEach(detail.recentFinals) { MatchRow(match: $0, teamsById: detail.teamsById ?? [:]) }
                     }
                 }
             }
@@ -82,7 +82,7 @@ struct SportsLeagueDetailView: View {
 
     private func teamName(for teamId: Int?) -> String {
         guard let teamId else { return "Unknown" }
-        return detail?.teamsById[String(teamId)]?.name ?? "Unknown"
+        return detail?.teamsById?[String(teamId)]?.name ?? "Unknown"
     }
 
     private func load() async {

@@ -454,6 +454,30 @@ RSpec.describe 'Mobile API' do
       expect(body['standings']['group_name']).to eq('NFC East')
     end
 
+    it 'GET /api/v1/sports/teams/:slug resolves opponent names in upcoming/recent_finals via teams_by_id' do
+      league = SportsLeaguesStore.upsert(slug: 'nfl', name: 'NFL', sport: 'football', source_provider: 'espn', external_id: 'football/nfl')
+      eagles = SportsTeamsStore.upsert(league_id: league['id'], slug: 'eagles', name: 'Philadelphia Eagles', source_provider: 'espn', external_id: '21')
+      cowboys = SportsTeamsStore.upsert(league_id: league['id'], slug: 'cowboys', name: 'Dallas Cowboys', source_provider: 'espn', external_id: '6')
+      SportsMatchesStore.upsert(
+        league_id: league['id'], source_provider: 'espn', external_id: 'm1',
+        scheduled_at: (Time.now.utc + 86_400).iso8601, status: 'scheduled',
+        home_team_id: eagles['id'], away_team_id: cowboys['id']
+      )
+
+      get '/api/v1/sports/teams/eagles', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['upcoming'].length).to eq(1)
+      expect(body['teams_by_id'][cowboys['id'].to_s]['name']).to eq('Dallas Cowboys')
+      expect(body['teams_by_id'][eagles['id'].to_s]['name']).to eq('Philadelphia Eagles')
+    end
+
+    it 'GET /api/v1/sports/teams/:slug returns an empty teams_by_id for a catalog-only team' do
+      get '/api/v1/sports/teams/eagles', {}, auth_header(result['api_token'])
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)['teams_by_id']).to eq({})
+    end
+
     it 'GET /api/v1/sports/leagues/:slug 404s for an unknown league' do
       get '/api/v1/sports/leagues/does-not-exist', {}, auth_header(result['api_token'])
       expect(last_response.status).to eq(404)
