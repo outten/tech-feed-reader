@@ -112,6 +112,9 @@ struct SportsTeamDetail: Codable {
     let standings: SportsStanding?
     let upcoming: [SportsMatch]
     let recentFinals: [SportsMatch]
+    // Optional — a backend from before this field existed won't send it;
+    // decoding shouldn't hard-fail the whole response over it.
+    let teamsById: [String: SportsTeam]?
     let mentions: [Article]
     let followed: Bool
 }
@@ -121,7 +124,7 @@ struct SportsLeagueDetail: Codable {
     let standings: [SportsStanding]
     let upcoming: [SportsMatch]
     let recentFinals: [SportsMatch]
-    let teamsById: [String: SportsTeam]
+    let teamsById: [String: SportsTeam]?
     let followed: Bool
 }
 
